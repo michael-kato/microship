@@ -1,0 +1,64 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#define MICROSHIP_DEBUG_BINDING 3
+#include "debug_buffers.glsl"
+
+// A separable, native-resolution glare filter. Both passes overwrite this
+// frame's buffers; neither samples a preceding frame or changes resolution.
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(set = 0, binding = 0, rgba32f) uniform readonly image2D beauty;
+layout(set = 0, binding = 1, rgba32f) uniform image2D horizontal;
+layout(set = 0, binding = 2, rgba8) uniform writeonly image2D display_image;
+layout(push_constant) uniform Bloom
+{
+    ivec2 extent;
+    int radius;
+    int pass;
+    float threshold;
+    float strength;
+    float exposure;
+    float debug_views;
+} bloom;
+
+vec3 linear_to_srgb(vec3 linear)
+{
+    return mix(1.055 * pow(linear, vec3(1.0 / 2.4)) - 0.055,
+               12.92 * linear, lessThanEqual(linear, vec3(0.0031308)));
+}
+
+void main()
+{
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(pixel, bloom.extent))) return;
+    vec3 sum = vec3(0.0);
+    float weight_sum = 0.0;
+    float sigma = max(0.5, float(bloom.radius) / 3.0);
+    for (int offset = -bloom.radius; offset <= bloom.radius; ++offset)
+    {
+        float weight = exp(-0.5 * float(offset * offset) / (sigma * sigma));
+        weight_sum += weight;
+        ivec2 sample_pixel = pixel + (bloom.pass == 0 ? ivec2(offset, 0) : ivec2(0, offset));
+        if (any(lessThan(sample_pixel, ivec2(0))) || any(greaterThanEqual(sample_pixel, bloom.extent))) continue;
+        vec3 value;
+        if (bloom.pass == 0)
+        {
+            value = imageLoad(beauty, sample_pixel).rgb;
+            float peak = max(value.r, max(value.g, value.b));
+            value *= max(0.0, peak - bloom.threshold) / max(peak, 0.000001);
+        }
+        else value = imageLoad(horizontal, sample_pixel).rgb;
+        sum += value * weight;
+    }
+    sum /= weight_sum;
+    if (bloom.pass == 0) imageStore(horizontal, pixel, vec4(sum, 1.0));
+    else
+    {
+        vec3 linear = (imageLoad(beauty, pixel).rgb + bloom.strength * sum) * bloom.exposure;
+        vec3 mapped = linear / (vec3(1.0) + linear);
+        vec3 display_value = linear_to_srgb(mapped);
+        imageStore(display_image, pixel, vec4(display_value, 1.0));
+        if (bloom.debug_views > 0.5)
+            debug_pixels[pixel.y*bloom.extent.x+pixel.x].direct.w =
+                uintBitsToFloat(packUnorm4x8(vec4(display_value,0.0)));
+    }
+}

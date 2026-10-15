@@ -1,0 +1,16 @@
+# Explicit atmospheric regression fixture independent of future level edits.
+star 0 -35 -95 5 1 0.85 0.60
+sun_orbit 0 0 0 1 0 0 120
+planet player -7 0 0 3 0.95 1 0.98
+planet enemy 7 0 0 3 1 0.92 0.86
+model 0 ../../../assets/models/temperate.fmesh
+model 1 ../../../assets/models/desert.fmesh
+atmosphere 0 0.13 0.035 0.08 0.20 0.48 0.025 0.005 0.76
+atmosphere 1 0.12 0.040 0.22 0.11 0.04 0.060 0.010 0.72
+haze -7 1 0 6 0.003 0.0035 0.004 0.78
+# Uniform fog retained for comparisons with historical frozen shaders.
+haze_edge_fade 0
+ship flowery large ../../../assets/models/flowery_large.fmesh -7 1 4.7 1.2 20 1 1 1
+ship flowery small ../../../assets/models/flowery_small.fmesh -4.8 0.8 4.2 0.55 10 1 1 1
+ship crystalline large ../../../assets/models/crystalline_large.fmesh 7 1 4.7 1.2 -20 1 1 1
+ship crystalline small ../../../assets/models/crystalline_small.fmesh 4.8 0.8 4.2 0.55 -10 1 1 1

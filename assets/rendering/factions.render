@@ -1,0 +1,30 @@
+# Native-resolution model inspection using the production path tracer.
+width 1920
+height 1080
+samples_per_pixel 8
+max_bounces 4
+seed 1
+sphere_segments 64
+sphere_rings 32
+camera_position 0 26 38
+camera_target 0 0 0
+camera_up 0 1 0
+vertical_fov_degrees 35
+camera_min_distance 8
+camera_max_distance 160
+volume_steps 8
+volume_samples_per_pixel 0
+volume_local_bounds 1
+microfacet_energy_compensation 1
+sun_radiance 35
+background 0.015 0.018 0.025
+exposure 1
+bloom_radius 24
+bloom_strength 0.12
+bloom_threshold 1
+
+# Current-frame SPMIS sun reuse experiment; measure before enabling by default.
+spatial_sun_reuse 0
+
+# Native-resolution reconstruction from this frame only.
+spatial_denoise 1

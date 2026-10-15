@@ -1,0 +1,5 @@
+# E2E fixture: a perfectly reflecting conductor in a uniform white environment.
+# The check writes a vertex-colored sphere export beside this world.
+star 0 0 -100 5 0 0 0
+planet neutral 0 0 0 3 1 1 1
+model 0 furnace.fmesh

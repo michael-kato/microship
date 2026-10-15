@@ -1,0 +1,40 @@
+#ifndef MICROSHIP_RENDER_CONFIG_H
+#define MICROSHIP_RENDER_CONFIG_H
+
+#include <stdint.h>
+#include "types.h"
+
+// These settings are loaded from assets; there are no compiled scene defaults.
+struct RenderConfig
+{
+    bool vsync; // Runtime preference; false requests immediate presentation.
+    uint32_t width;
+    uint32_t height;
+    uint32_t samples_per_pixel;
+    uint32_t max_bounces;
+    uint32_t seed;
+    uint32_t sphere_segments;
+    uint32_t sphere_rings;
+    float exposure;
+    float vertical_fov_degrees;
+    float sun_radiance;
+    Vec3 camera_position;
+    Vec3 camera_target;
+    Vec3 camera_up;
+    Color background;
+    float camera_min_distance;
+    float camera_max_distance;
+    uint32_t volume_steps;
+    uint32_t volume_samples_per_pixel;
+    uint32_t volume_local_bounds;
+    uint32_t microfacet_energy_compensation;
+    uint32_t spatial_sun_reuse;
+    uint32_t spatial_denoise;
+    uint32_t bloom_radius;
+    float bloom_strength;
+    float bloom_threshold;
+};
+
+bool render_config_load(RenderConfig* config, const char* path);
+
+#endif

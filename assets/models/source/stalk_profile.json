@@ -1,0 +1,12 @@
+{
+  "stem_radius": 0.055,
+  "stem_height": 0.85,
+  "leaf_count": 6,
+  "leaf_radius": 0.44,
+  "leaf_width": 0.17,
+  "stem_color": [0.10, 0.28, 0.06],
+  "leaf_color": [0.18, 0.48, 0.08],
+  "petal_color": [0.92, 0.35, 0.58],
+  "core_color": [0.92, 0.68, 0.12],
+  "roughness": 0.65
+}

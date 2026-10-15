@@ -1,0 +1,40 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#include "render_uniform.glsl"
+#include "debug_buffers.glsl"
+layout(local_size_x=8,local_size_y=8) in;
+layout(set=0,binding=1,rgba32f) uniform image2D beauty;
+struct Segment { vec4 a,b,color; };
+layout(set=0,binding=14,std430) readonly buffer Segments { Segment segments[]; };
+layout(set=0,binding=15,std430) readonly buffer Tiles { uint tiles[]; };
+void main()
+{
+    uvec2 p=gl_GlobalInvocationID.xy;
+    if (any(greaterThanEqual(p,render.settings.xy))) return;
+    uint width=(render.settings.x+15u)/16u,height=(render.settings.y+15u)/16u;
+    uint tile=(p.y/16u)*width+p.x/16u,start=tiles[tile],end=tiles[tile+1u];
+    if (start==end) return;
+    uint index=p.y*render.settings.x+p.x,base=2u*width*height+1u;
+    DebugPixel guide=debug_pixels[index];vec3 light=vec3(0);
+    for (uint i=start;i<end;++i)
+    {
+        Segment s=segments[tiles[base+i]];vec2 delta=s.b.xy-s.a.xy;
+        float t=clamp(dot(vec2(p)+.5-s.a.xy,delta)/max(.0001,dot(delta,delta)),0.0,1.0);
+        float distance=length(vec2(p)+.5-mix(s.a.xy,s.b.xy,t));
+        float alpha;
+        if (s.b.w>1.5 && s.b.w<3.5)
+        {
+            float ring=abs(distance-s.a.w*(s.b.w>2.5 ? 1.0 : .75));
+            alpha=exp(-ring*ring/2.0)*clamp(1.0-distance/max(s.a.w,1.0),0.0,1.0)*3.5;
+        }
+        else alpha=clamp((s.a.w+.7-distance)/1.4,0.0,1.0);
+        float depth=mix(s.a.z,s.b.z,t);
+        if (guide.vertex_hit.w>0.5 && guide.normal_depth.w>0.0 && depth>guide.normal_depth.w+.12)
+            alpha*=guide.vertex_hit.w==3.0 ? render.cell_material.x*.35 : 0.0;
+        float strength=s.b.w<.5 ? 1.5 : s.b.w<2.5 ? 4.0 : 1.0;
+        if (s.b.w>.5 && s.b.w<1.5)
+            alpha+=exp(-distance*distance/max(1.0,s.a.w*s.a.w*3.0))*.25;
+        light+=s.color.rgb*(s.color.a*alpha*strength);
+    }
+    vec4 value=imageLoad(beauty,ivec2(p));imageStore(beauty,ivec2(p),vec4(value.rgb+light,value.a));
+}
