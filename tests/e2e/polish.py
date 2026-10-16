@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from asset_data import stage_world,change,remove,write_world
 
 root=Path(__file__).resolve().parents[2]
 binary=Path(sys.argv[1]).resolve()
@@ -15,11 +16,13 @@ command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'sc
 count=0
 with tempfile.TemporaryDirectory(prefix='microship-polish-') as directory:
     out=Path(directory)
-    world=root/'tests/e2e/scenes/biology-two-virus.world'
+    config=out/'camera.json'
+    config.write_text(json.dumps(change(json.loads((root/'assets/rendering/biology.json').read_text()),'camera.position',[0,11,36])))
+    world=root/'tests/e2e/scenes/biology-two-virus.json'
     def run(name,ticks=1,orders='',extra=(),scene=world,expected=0):
         global count
         state=out/(name+'.json');replay=out/(name+'.orders');replay.write_text(orders)
-        args=[*command,'--smoke','--world',str(scene),'--ticks',str(ticks),'--state',str(state),*extra]
+        args=[*command,'--smoke','--config',str(config),'--world',str(scene),'--ticks',str(ticks),'--state',str(state),*extra]
         if orders:args+=['--replay',str(replay)]
         p=subprocess.run(args,capture_output=True,text=True,timeout=10);count+=1
         assert p.returncode==expected,(name,p.stdout,p.stderr)
@@ -46,28 +49,28 @@ with tempfile.TemporaryDirectory(prefix='microship-polish-') as directory:
         assert abs(sx-x)<.15 and abs(sy-y)<.15,('Cursor anchor moved',sx,sy,x,y)
     _,log=run('clamped-zoom',extra=('--camera-zoom','1000'))
     a,b=camera(log);assert abs(math.sqrt(dot(sub(a,b),sub(a,b)))-8)<.001
-    plant='0 select seedships\n0 order 0\n'
+    plant='0 select bombers\n0 order 0\n'
     snapshots=[]
     for tick in (900,901,902):
         data,_=run('flight-'+str(tick),tick,plant);snapshots.append(data)
         assert data['order']=={'cell':0,'tick':0,'count':1}
         assert any(abs(u['bank'])>.01 for u in data['units'] if u['kind']==0),'No banking'
         for u in data['units']:
-            speed=3.5 if u['kind']==0 else 1.8
+            speed=3.5 if u['kind']==0 else 2.5
             assert math.sqrt(dot(u['velocity'],u['velocity']))<=speed+.0001
     for before,after in zip(snapshots,snapshots[1:]):
         previous={u['generation']:u for u in before['units']}
         for u in after['units']:
             if u['generation'] in previous:
                 distance=sub(u['position'],previous[u['generation']]['position'])
-                speed=3.5 if u['kind']==0 else 1.8
+                speed=3.5 if u['kind']==0 else 2.5
                 assert math.sqrt(dot(distance,distance))<=speed/60+.002,'Visible flight jumped'
                 delta=sub(u['velocity'],previous[u['generation']]['velocity'])
                 assert math.sqrt(dot(delta,delta))<=9/60+.00001,'Acceleration exceeded authored bound'
     selected,_=run('selection-order',2,'0 select fighters\n0 order 1\n')
     assert selected['order']['count']==6 and sum(u['selected'] for u in selected['units'])==6
     assert all(u['target']==1 for u in selected['units'] if u['selected'])
-    for name,x,expected in [('fighters',80,6),('colonizers',280,1),('all',480,7)]:
+    for name,x,expected in [('fighters',80,6),('bombers',280,1),('all',480,7)]:
         clicked,_=run('hud-'+name,extra=('--click',str(x),'980'))
         assert sum(u['selected'] for u in clicked['units'])==expected,'HUD fleet button failed'
     directed,_=run('pointer-order',extra=('--select-group','1','--command','1250','540'))
@@ -84,13 +87,8 @@ with tempfile.TemporaryDirectory(prefix='microship-polish-') as directory:
         picked,_=run('unit-'+name,extra=('--select-group','1','--click',str(x),str(y),*extra))
         assert sum(u['selected'] for u in picked['units'])==expected,'Unit pick/additive selection failed'
     # Malformed authored flight data must fail at the actual application boundary.
-    text=world.read_text()
-    for raw in world.read_text().splitlines():
-        f=raw.split()
-        if f and f[0] in ('model','ship','stalk_model','backdrop','spike_weapon'):
-            i=2 if f[0]=='model' else 3 if f[0]=='ship' else 1
-            text=text.replace(f[i],Path(os.path.relpath((world.parent/f[i]).resolve(),out)).as_posix())
-    for name,replacement in [('zero-acceleration','0 7 .55 .55'),('bad-separation','9 7 -1 .55'),('bad-bank','9 7 .55 2')]:
-        scene=out/(name+'.world');scene.write_text(re.sub(r'(?m)^flight_rules.*$','flight_rules '+replacement,text))
+    text=stage_world(world,out)
+    for name,field,value in [('zero-acceleration','acceleration',0),('bad-separation','separation',-1),('bad-bank','bank',2)]:
+        scene=out/(name+'-world.json');write_world(scene,change(text,'rules.flight.'+field,value))
         run(name,scene=scene,expected=1)
 print(f'Polish E2E passed: {count} real-application runs; cursor anchoring, zoom bounds, bounded flight, selection/orders and invalid assets.')

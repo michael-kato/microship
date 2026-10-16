@@ -1,0 +1,42 @@
+{
+  "$schema": "../schemas/effects.schema.json",
+  "projectile": {
+    "projectile_speed": 12.0,
+    "shot_interval": 0.6,
+    "trail_width": 0.035,
+    "trail_lifetime": 0.42,
+    "flash_seconds": 0.12,
+    "pop_seconds": 0.35,
+    "pop_radius": 0.48
+  },
+  "damage": {
+    "flash": [
+      1.0,
+      0.94,
+      0.78
+    ],
+    "injured": [
+      1.0,
+      0.035,
+      0.055
+    ]
+  },
+  "spikes": {
+    "model": "../models/virus_spike.fmesh",
+    "root_radius": 0.48,
+    "length": 0.42,
+    "projectile_scale": 0.18
+  },
+  "injury": {
+    "first": [
+      0.26,
+      0.105,
+      0.035
+    ],
+    "later": [
+      0.045,
+      0.018,
+      0.009
+    ]
+  }
+}

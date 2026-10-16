@@ -24,6 +24,7 @@ struct GameOptions
     bool time_set;
     const char* replay_path;
     const char* state_path;
+    const char* scene_state_path;
     uint32_t ticks;
     PointerInput camera_input;
 };

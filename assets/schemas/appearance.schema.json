@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "microship appearance",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "ambient": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 10000
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "gradient": {
+      "type": "object",
+      "properties": {
+        "top": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "bottom": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "minItems": 3,
+          "maxItems": 3
+        }
+      },
+      "required": [
+        "top",
+        "bottom"
+      ],
+      "additionalProperties": false
+    },
+    "lights": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": -1e+18,
+                "maximum": 1e+18
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "color": {
+              "$ref": "shared.schema.json#/$defs/color"
+            },
+            "irradiance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "direction",
+            "color",
+            "irradiance"
+          ],
+          "additionalProperties": false
+        },
+        "fill": {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": -1e+18,
+                "maximum": 1e+18
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "color": {
+              "$ref": "shared.schema.json#/$defs/color"
+            },
+            "irradiance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "direction",
+            "color",
+            "irradiance"
+          ],
+          "additionalProperties": false
+        },
+        "rim": {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": -1e+18,
+                "maximum": 1e+18
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "color": {
+              "$ref": "shared.schema.json#/$defs/color"
+            },
+            "irradiance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "direction",
+            "color",
+            "irradiance"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "key",
+        "fill",
+        "rim"
+      ],
+      "additionalProperties": false
+    },
+    "thin_surface": {
+      "type": "object",
+      "properties": {
+        "transmission": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.9
+        },
+        "absorption": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "clarity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "transmission",
+        "absorption"
+      ],
+      "additionalProperties": false
+    },
+    "backdrop": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "$ref": "shared.schema.json#/$defs/path"
+        },
+        "position": {
+          "$ref": "shared.schema.json#/$defs/position"
+        },
+        "scale": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "tint": {
+          "$ref": "shared.schema.json#/$defs/color"
+        },
+        "samples": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "soft": {
+          "type": "object",
+          "properties": {
+            "blur_radius": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 256
+            },
+            "glow": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 20
+            },
+            "ambient": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10
+            },
+            "pulse_amplitude": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.15
+            },
+            "period_seconds": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 120
+            }
+          },
+          "required": [
+            "blur_radius",
+            "glow",
+            "ambient",
+            "pulse_amplitude",
+            "period_seconds"
+          ],
+          "additionalProperties": false
+        },
+        "wave": {
+          "type": "object",
+          "properties": {
+            "amplitude": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.1
+            },
+            "frequency": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100
+            },
+            "speed": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "amplitude",
+            "frequency",
+            "speed"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "model",
+        "position",
+        "scale",
+        "tint"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "ambient"
+  ],
+  "additionalProperties": false
+}

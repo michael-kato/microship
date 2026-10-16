@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "microship effects",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "projectile": {
+      "type": "object",
+      "properties": {
+        "projectile_speed": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        },
+        "shot_interval": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        },
+        "trail_width": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "trail_lifetime": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 5
+        },
+        "flash_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 2
+        },
+        "pop_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 2
+        },
+        "pop_radius": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "projectile_speed",
+        "shot_interval",
+        "trail_width",
+        "trail_lifetime",
+        "flash_seconds",
+        "pop_seconds",
+        "pop_radius"
+      ],
+      "additionalProperties": false
+    },
+    "damage": {
+      "type": "object",
+      "properties": {
+        "flash": {
+          "$ref": "shared.schema.json#/$defs/color"
+        },
+        "injured": {
+          "$ref": "shared.schema.json#/$defs/color"
+        }
+      },
+      "required": [
+        "flash",
+        "injured"
+      ],
+      "additionalProperties": false
+    },
+    "injury": {
+      "type": "object",
+      "properties": {
+        "first": {
+          "$ref": "shared.schema.json#/$defs/color"
+        },
+        "later": {
+          "$ref": "shared.schema.json#/$defs/color"
+        }
+      },
+      "required": [
+        "first",
+        "later"
+      ],
+      "additionalProperties": false
+    },
+    "spikes": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "$ref": "shared.schema.json#/$defs/path"
+        },
+        "root_radius": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "length": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 2
+        },
+        "projectile_scale": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "model",
+        "root_radius",
+        "length",
+        "projectile_scale"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

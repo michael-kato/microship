@@ -1,231 +1,128 @@
 #!/usr/bin/env python3
-"""Exercise world-file loading through complete Floria application runs."""
-
+"""Check structured assets through complete application runs."""
+from copy import deepcopy
+import json
 from pathlib import Path
-import re
 import shutil
 import struct
 import subprocess
 import sys
 import tempfile
+from asset_data import stage_world, write_world, change, remove
+
+root=Path(__file__).resolve().parents[2]
+binary=Path(sys.argv[1]).resolve()
+count=0
 
 
-def fail(name, result):
-    print(f"FAIL: {name} (exit {result.returncode})", file=sys.stderr)
-    print(result.stdout, end="", file=sys.stderr)
-    print(result.stderr, end="", file=sys.stderr)
-    sys.exit(1)
+def run(executable,directory,arguments=()):
+    global count
+    command=[str(executable)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(executable)]
+    result=subprocess.run([*command,'--smoke',*arguments],cwd=directory,capture_output=True,text=True,timeout=10)
+    count+=1
+    return result
 
 
-def run(binary, directory, arguments):
-    command = [str(binary)]
-    if binary.suffix.lower() == ".exe" and sys.platform != "win32":
-        command = [sys.executable, str(Path(__file__).resolve().parents[2]
-                                      / "scripts/proton_run.py"), str(binary)]
-    return subprocess.run(
-        [*command, "--smoke", *arguments], cwd=directory,
-        capture_output=True, text=True, timeout=10,
-    )
+def success(result,cells=None):
+    assert result.returncode==0,result.stdout+result.stderr
+    assert 'Application lifecycle smoke passed' in result.stdout,result.stdout
+    assert 'Render configuration: direct ray tracing;' in result.stdout,result.stdout
+    if cells is not None:assert f': {cells} bodies.' in result.stdout,result.stdout
 
 
-def check_success(name, result, expected_records=()):
-    if (result.returncode != 0
-            or "Application lifecycle smoke passed" not in result.stdout
-            or not re.search(r"Loaded world .*: [1-9][0-9]* bodies\.", result.stdout)
-            or any(record not in result.stdout.splitlines() for record in expected_records)):
-        fail(name, result)
+def failure(result,path):
+    details=f'{path}\n{result.stdout}{result.stderr}'
+    assert result.returncode==1,details
+    assert str(path) in result.stderr,details
+    assert 'Application lifecycle smoke passed' not in result.stdout,details
 
 
-def check_failure(name, result, path):
-    explanation = result.stderr.replace(str(path), "")
-    if (result.returncode != 1 or str(path) not in result.stderr
-            or not any(character.isalpha() for character in explanation)
-            or "Renderer stub:" in result.stdout
-            or "Application lifecycle smoke passed" in result.stdout):
-        fail(name, result)
+with tempfile.TemporaryDirectory(prefix='microship-json-e2e-') as directory:
+    out=Path(directory);scene=out/'editable.json'
+    base=stage_world(root/'assets/levels/biology-virus.json',out)
+    minimal=dict(content=dict(bodies=[dict(name='fixture',label='BODY',geometry='sphere',hosts_site=False)],
+                factions=[dict(id=1,name='virus',label='VIRUS',color=[.45,.9,.75]),dict(id=2,name='immune',label='IMMUNE',color=[1,.55,.65])],
+                groups=[],units=[],buildings=[]),appearance=dict(ambient=[.07,.055,.065]),
+                match=dict(player='virus',opponent='immune'),
+                bodies=[dict(type='fixture',owner='neutral',position=[9,8,7],radius=2,tint=[.2,.3,.4])],spawns=[])
+    success(run(binary,out),5)
+    success(run(binary,out,['--config',str(binary.parent/'assets/rendering/reference.json'),'--stats','--debug-views','--no-activate']))
+    bundle=out/'relocated game';bundle.mkdir();relocated=bundle/binary.name
+    shutil.copy2(binary,relocated);shutil.copytree(binary.parent/'assets',bundle/'assets')
+    success(run(relocated,out),5)
+    manifest=bundle/'assets/startup.json';startup=json.loads(manifest.read_text())
+    manifest.write_text(json.dumps(change(startup,'world','levels/biology-immune.json')))
+    state=out/'manifest-state.json';success(run(relocated,out,['--state',str(state)]),5)
+    assert json.loads(state.read_text())['player_faction']==2
+    for bad in [change(startup,'unknown','anything'),change(startup,'world','/tmp/absent.json'),
+                remove(startup,'shader'),change(startup,'world',12),
+                '{"world":"levels/biology-virus.json","world":"levels/biology-immune.json"}']:
+        manifest.write_text(bad if isinstance(bad,str) else json.dumps(bad));failure(run(relocated,out),manifest)
+    manifest.write_text(json.dumps(startup))
 
+    # Exercise mesh errors after the JSON declarations pass validation.
+    mesh=out/'ship.fmesh';data=bytearray((bundle/'assets/models/virus_virion.fmesh').read_bytes())
+    vertices=struct.unpack_from('<I',data,8)[0];tag_offset=16+vertices*48+12
+    struct.pack_into('<I',data,tag_offset,2);mesh.write_bytes(data)
+    unit=deepcopy(base['content']['units'][0]);unit.update(name='sample',model='ship.fmesh',scale=1,yaw_degrees=45)
+    mobile=change(minimal,'bodies',[]);mobile['content']['groups']=base['content']['groups'];mobile['content']['units']=[unit]
+    mobile['spawns']=[dict(type='sample',position=[0,0,0])];write_world(scene,mobile)
+    success(run(binary,out,['--world',str(scene)]),0)
+    struct.pack_into('<I',data,tag_offset,7);mesh.write_bytes(data)
+    failure(run(binary,out,['--world',str(scene)]),mesh)
+    mesh.unlink();failure(run(binary,out,['--world',str(scene)]),mesh)
 
-def main():
-    if len(sys.argv) != 2:
-        print("Usage: world_files.py PATH_TO_MICROSHIP", file=sys.stderr)
-        return 2
+    config=bundle/'assets/rendering/biology.json';render=json.loads(config.read_text())
+    for path,value in [('volume.rays_per_pixel',4097),('volume.integration_steps',1),
+                       ('sampling.max_bounces',4),('lighting.microfacet_energy_compensation',2),
+                       ('sampling.seed',4294967296),('output.width',1920.5),('output.width','1920'),
+                       ('camera.position',[0,0]),('camera.up',[0,0,0]),('sampling.max_transmission_layers',0),
+                       ('output.exposure',0),('bloom.radius',65),('camera.max_distance',1),
+                       ('output.unknown',1),('unknown',{}),('reconstruction',{}),('lighting.volume_local_bounds',True),('sampling.temporal',True)]:
+        config.write_text(json.dumps(change(render,path,value)));failure(run(relocated,out),config)
+    for path in ('output','camera.up','sampling.seed','volume.integration_steps'):
+        config.write_text(json.dumps(remove(render,path)));failure(run(relocated,out),config)
+    raw=json.dumps(render)
+    config.write_text(raw.replace('"width": 1920','"width": 1920, "width": 1920'))
+    failure(run(relocated,out),config)
+    config.unlink();failure(run(relocated,out),config)
 
-    binary = Path(sys.argv[1]).resolve()
-    star = "star 1 2 3 1 0.5 0.6 0.7"
-    planet = "planet neutral 9 8 7 2 0.2 0.3 0.4"
-    valid = f"{star}\n{planet}\n"
-    count = 0
-    fog = "haze 0 0 0 6 .003 .0035 .004 .78\n"
-    global_fog = "global_atmosphere 0 0 0 24 .0012 .0015 .0018 .2\n"
+    for flag,value in [('--samples','0'),('--samples','4097'),('--seed','-1'),('--seed','4294967296'),('--frames','0'),('--frames','1junk')]:
+        result=run(binary,out,[flag,value]);assert result.returncode==2 and flag in result.stderr,result.stdout+result.stderr
 
-    with tempfile.TemporaryDirectory(prefix="microship-world-e2e-") as directory:
-        world_path = Path(directory) / "editable.world"
+    variants=[minimal,change(minimal,'bodies',minimal['bodies']*16),
+              change(minimal,'bodies.0.medium',dict(radius_fraction=.94,edge_fade=.28,scattering=[.035,.045,.04],absorption=.012,anisotropy=.2)),
+              change(minimal,'content.bodies.0.label','BODY with spaces \u03bc')]
+    for value in variants:
+        write_world(scene,value);success(run(binary,out,['--world',str(scene)]),len(value['bodies']))
+    # JSON whitespace, escaping, and exponent numbers must load through the application.
+    write_world(scene,minimal);raw=scene.read_text()
+    for valid in [raw.rstrip(),raw.replace('\n','\r\n'),raw.replace('9,','9e0,'),raw.replace('"neutral"','"neutr\\u0061l"')]:
+        scene.write_text(valid);success(run(binary,out,['--world',str(scene)]),1)
 
-        check_success("default world outside source directory", run(binary, directory, []))
-        count += 1
-
-        atmospheric = Path(__file__).resolve().parent / 'scenes/atmospheres.world'
-        check_success('explicit atmospheric regression assets',
-                      run(binary, directory, ['--world', str(atmospheric)]), ('Ships: 4',))
-        count += 1
-
-        check_success('raw reference config and diagnostic CLI controls',
-                      run(binary,directory,['--config',str(binary.parent/'assets/rendering/reference.render'),
-                                            '--stats','--debug-views','--no-activate']))
-        count += 1
-
-        # Exercise the distributable layout, independent of the original build tree.
-        bundle = Path(directory) / "relocated game"
-        bundle.mkdir()
-        relocated = bundle / binary.name
-        shutil.copy2(binary, relocated)
-        shutil.copytree(binary.parent / "assets", bundle / "assets")
-        check_success("relocated executable and assets", run(relocated, directory, []))
-        count += 1
-
-        gallery_world = bundle / 'assets/levels/factions.world'
-        check_success('all faction exports in relocated bundle',
-                      run(relocated, directory, ['--world', str(gallery_world)]), ('Ships: 12',))
-        count += 1
-
-        # A ship-only asset scene uses the same application geometry path.
-        mesh_path = Path(directory) / 'ship.fmesh'
-        source_mesh = bundle / 'assets/models/liquid_metal_small.fmesh'
-        mesh_data = source_mesh.read_bytes()
-        mesh_path.write_bytes(mesh_data)
-        ship_only = star + '\nship liquid_metal small ship.fmesh 0 0 0 1 45 1 1 1\n'
-        world_path.write_text(ship_only, encoding='utf-8')
-        result = run(binary, directory, ['--world', str(world_path)])
-        if result.returncode != 0 or 'Ships: 1' not in result.stdout or ': 0 bodies.' not in result.stdout:
-            fail('ship-only scene with conductor mesh', result)
-        count += 1
-        vertex_count = struct.unpack_from('<I', mesh_data, 8)[0]
-        broken = bytearray(mesh_data)
-        struct.pack_into('<I', broken, 16 + vertex_count*48 + 12, 7)
-        mesh_path.write_bytes(broken)
-        check_failure('unsupported mesh surface tag',
-                      run(binary, directory, ['--world', str(world_path)]), mesh_path)
-        count += 1
-        mesh_path.unlink()
-        check_failure('missing ship mesh', run(binary, directory, ['--world', str(world_path)]), mesh_path)
-        count += 1
-
-        missing_config = bundle / "assets/rendering/biology.render"
-        render_text = missing_config.read_text()
-        for field, value in (('volume_samples_per_pixel', 4097), ('spatial_sun_reuse', 2), ('spatial_denoise', 2),
-                             ('volume_local_bounds', 2), ('microfacet_energy_compensation', 2)):
-            malformed = re.sub(rf'(?m)^{field}\s+[^\n]+', f'{field} {value}', render_text)
-            missing_config.write_text(malformed)
-            check_failure('invalid ' + field, run(relocated, directory, []), missing_config)
-            count += 1
-        missing_config.unlink()
-        check_failure("missing bundled render settings", run(relocated, directory, []), missing_config)
-        count += 1
-
-        for flag, value in (("--samples", "0"), ("--samples", "4097"),
-                            ("--seed", "-1"), ("--seed", "4294967296"),
-                            ("--frames", "0"), ("--frames", "1junk")):
-            result = run(binary, directory, [flag, value])
-            if result.returncode != 2 or flag not in result.stderr:
-                fail("invalid numeric CLI control " + flag, result)
-            count += 1
-
-        successes = [
-            ("alternate world", valid, (star, planet)),
-            ("final record without newline", valid.rstrip("\n"), (star, planet)),
-            ("blank lines and final comment without newline", "\n# Example world\n\n" + valid + "\n# End", (star, planet)),
-            ("maximum-length final comment", valid + "#" + "x" * 510, (star, planet)),
-            ("planet and asteroid records", valid + "asteroid enemy -4 -5 -6 0.25 1 0 0\n",
-             (star, planet, "asteroid enemy -4 -5 -6 0.25 1 0 0")),
-            ("maximum body capacity", star + "\n" + (planet + "\n") * 16, (star, planet)),
-        ]
-        for value in ('0', '.5', '1'):
-            successes.append(('fog fade '+value, valid+fog+'haze_edge_fade '+value+'\n', (star,planet)))
-            successes.append(('global fog fade '+value, valid+global_fog+'global_atmosphere_edge_fade '+value+'\n', (star,planet)))
-        successes.append(('independent fog fades',valid+fog+'haze_edge_fade .4\n'+global_fog+
-                          'global_atmosphere_edge_fade .6\n',(star,planet)))
-        for name, contents, records in successes:
-            world_path.write_text(contents, encoding="utf-8")
-            result = run(binary, directory, ["--world", str(world_path)])
-            check_success(name, result, records)
-            expected_count = contents.count("planet ") + contents.count("asteroid ")
-            if f": {expected_count} bodies." not in result.stdout:
-                fail(name + " body count", result)
-            count += 1
-
-        missing_path = Path(directory) / "missing.world"
-        check_failure("missing file", run(binary, directory, ["--world", str(missing_path)]), missing_path)
-        count += 1
-
-        failures = [
-            ("empty file", ""),
-            ("missing star", planet + "\n"),
-            ("missing bodies", star + "\n"),
-            ("duplicate star", valid + star + "\n"),
-            ("unknown record", valid + "moon neutral 0 0 0 1 1 1 1\n"),
-            ("unknown ownership", valid.replace("neutral", "other")),
-            ("missing value", valid.replace("0.2 0.3 0.4", "0.2 0.3")),
-            ("invalid numeric value", valid.replace("9 8 7", "nine 8 7")),
-            ("partial numeric value", valid.replace("9 8 7", "9junk 8 7")),
-            ("NaN position", valid.replace("9 8 7", "nan 8 7")),
-            ("infinite radius", valid.replace("7 2 0.2", "7 inf 0.2")),
-            ("numeric overflow", valid.replace("9 8 7", "1e100 8 7")),
-            ("zero radius", valid.replace("7 2 0.2", "7 0 0.2")),
-            ("negative radius", valid.replace("7 2 0.2", "7 -2 0.2")),
-            ("negative color", valid.replace("0.2 0.3 0.4", "-0.2 0.3 0.4")),
-            ("color over one", valid.replace("0.2 0.3 0.4", "1.2 0.3 0.4")),
-            ("trailing junk", valid.rstrip("\n") + " junk\n"),
-            ("capacity overflow", star + "\n" + (planet + "\n") * 17),
-            ("512-character final line", valid + "#" + "x" * 511),
-            ("512-character newline-terminated line", valid + "#" + "x" * 511 + "\n"),
-            ("zero solar orbit axis", valid + 'sun_orbit 0 0 0 0 0 0 120\n'),
-            ("negative orbit period", valid + 'sun_orbit 0 0 0 1 0 0 -1\n'),
-            ("duplicate orbit", valid + 'sun_orbit 0 0 0 1 0 0 120\n'*2),
-            ("model references missing body", valid + 'model 5 example.fmesh\n'),
-            ("absolute model path", valid + 'model 0 /tmp/example.fmesh\n'),
-            ("negative atmosphere height", valid + 'atmosphere 0 -1 .02 .1 .2 .3 .1 .01 .7\n'),
-            ("invalid scattering coefficient", valid + 'atmosphere 0 .1 .02 -1 .2 .3 .1 .01 .7\n'),
-            ("fog fade without fog", valid+'haze_edge_fade .5\n'),
-            ("negative fog fade", valid+fog+'haze_edge_fade -.1\n'),
-            ("fog fade above one", valid+fog+'haze_edge_fade 1.1\n'),
-            ("nonfinite fog fade", valid+fog+'haze_edge_fade nan\n'),
-            ("missing fog fade", valid+fog+'haze_edge_fade\n'),
-            ("extra fog fade field", valid+fog+'haze_edge_fade .5 .2\n'),
-            ("duplicate fog fade", valid+fog+'haze_edge_fade 0\nhaze_edge_fade .5\n'),
-            ("global fade without global fog", valid+fog+'global_atmosphere_edge_fade .5\n'),
-            ("negative global fog fade", valid+global_fog+'global_atmosphere_edge_fade -.1\n'),
-            ("global fog fade above one", valid+global_fog+'global_atmosphere_edge_fade 1.1\n'),
-            ("nonfinite global fog fade", valid+global_fog+'global_atmosphere_edge_fade nan\n'),
-            ("missing global fog fade", valid+global_fog+'global_atmosphere_edge_fade\n'),
-            ("extra global fog fade field", valid+global_fog+'global_atmosphere_edge_fade .5 .2\n'),
-            ("duplicate global fog fade", valid+global_fog+'global_atmosphere_edge_fade 0\nglobal_atmosphere_edge_fade .5\n'),
-            ("invalid haze phase", valid + 'haze 0 0 0 20 .01 .01 .01 1\n'),
-            ("duplicate global atmosphere", valid + 'global_atmosphere 0 0 0 180 .01 .01 .01 .7\n'*2),
-            ("negative global scattering", valid + 'global_atmosphere 0 0 0 180 -.01 .01 .01 .7\n'),
-            ("unknown ship faction", valid + 'ship unknown small sample.fmesh 0 0 0 1 0 1 1 1\n'),
-            ("invalid ship size", valid + 'ship flowery giant sample.fmesh 0 0 0 1 0 1 1 1\n'),
-            ("invalid ship scale", valid + 'ship flowery small sample.fmesh 0 0 0 0 0 1 1 1\n'),
-            ("invalid ship tint", valid + 'ship robotic large sample.fmesh 0 0 0 1 0 2 1 1\n'),
-            ("absolute ship mesh", valid + 'ship flowery small /tmp/sample.fmesh 0 0 0 1 0 1 1 1\n'),
-            ("ship capacity overflow", valid + 'ship rocky small sample.fmesh 0 0 0 1 0 1 1 1\n'*65),
-        ]
-        for name, contents in failures:
-            world_path.write_text(contents, encoding="utf-8")
-            check_failure(name, run(binary, directory, ["--world", str(world_path)]), world_path)
-            count += 1
-
-        result = run(binary, directory, ["--world"])
-        if result.returncode != 2 or not result.stderr.strip() or "Renderer stub:" in result.stdout:
-            fail("missing --world argument", result)
-        count += 1
-
-    print(f"World-file E2E passed: {count} complete application runs.")
-    return 0
-
-
-if __name__ == "__main__":
-    try:
-        sys.exit(main())
-    except (OSError, subprocess.TimeoutExpired) as error:
-        print(f"World-file E2E failed: {error}", file=sys.stderr)
-        sys.exit(1)
+    invalid=[change(minimal,'bodies',[]),change(minimal,'bodies',minimal['bodies']*17),
+             change(mobile,'spawns',mobile['spawns']*65),change(minimal,'bodies.0.owner','other'),
+             change(minimal,'bodies.0.radius',0),change(minimal,'bodies.0.tint',[-.2,.3,.4]),
+             change(minimal,'bodies.0.tint',[1.2,.3,.4]),change(minimal,'bodies.0.position',['nine',8,7]),
+             change(minimal,'bodies.0.position',[float('nan'),8,7]),change(minimal,'bodies.0.position',[1e100,8,7]),
+             change(minimal,'bodies.0.extra',1),remove(minimal,'match'),remove(minimal,'appearance'),
+             change(minimal,'content','absent.json'),change(minimal,'match.opponent','virus'),
+             change(minimal,'content.bodies.0.hosts_site',1)]
+    for value in invalid:
+        write_world(scene,value);result=run(binary,out,['--world',str(scene)])
+        assert result.returncode==1 and result.stderr and 'Application lifecycle smoke passed' not in result.stdout,result.stdout+result.stderr
+    write_world(scene,minimal);raw=scene.read_text()
+    for bad in ['',raw+'\0',raw+' trailing',raw[:-2]+',}',raw.replace('"radius": 2','"radius": 02'),
+                raw.replace('"radius": 2','"radius": 2.'),raw.replace('"radius": 2','"radius": 0x2'),
+                raw.replace('"radius": 2','"radius": 1e999'),raw.replace('"radius": 2','"radius": null'),
+                raw.replace('"radius": 2','"radius": true'),raw.replace('"radius": 2','"radius": 2, "radius": 3'),
+                raw.replace('"neutral"','"neutr\\u0000al"'),raw.replace('"neutral"','"neutr\\q"'),
+                '['*33+'0'+']'*33,' '*1048577,'# comment\n'+raw,
+                json.dumps({str(i):i for i in range(65)}),
+                raw.replace('"radius": 2','"radius": 2, "ra\\u0064ius": 3'),
+                raw.replace('"match"','"ma\\u0000tch"')]:
+        scene.write_text(bad);failure(run(binary,out,['--world',str(scene)]),scene)
+    scene.write_bytes(raw.encode().replace(b'neutral',b'neutr\xffal'));failure(run(binary,out,['--world',str(scene)]),scene)
+    missing=out/'missing.json';failure(run(binary,out,['--world',str(missing)]),missing)
+    result=run(binary,out,['--world']);assert result.returncode==2 and result.stderr.strip()
+print(f'Structured-file E2E passed: {count} complete application runs; relocated bundle, render settings, types, syntax, references and capacities.')

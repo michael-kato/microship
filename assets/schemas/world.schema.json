@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "microship world",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "content": {
+      "$ref": "shared.schema.json#/$defs/path"
+    },
+    "rules": {
+      "$ref": "shared.schema.json#/$defs/path"
+    },
+    "appearance": {
+      "$ref": "shared.schema.json#/$defs/path"
+    },
+    "effects": {
+      "$ref": "shared.schema.json#/$defs/path"
+    },
+    "match": {
+      "type": "object",
+      "properties": {
+        "player": {
+          "$ref": "shared.schema.json#/$defs/name"
+        },
+        "opponent": {
+          "$ref": "shared.schema.json#/$defs/name"
+        }
+      },
+      "required": [
+        "player",
+        "opponent"
+      ],
+      "additionalProperties": false
+    },
+    "bodies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "owner": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "position": {
+            "$ref": "shared.schema.json#/$defs/position"
+          },
+          "radius": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000
+          },
+          "tint": {
+            "$ref": "shared.schema.json#/$defs/color"
+          },
+          "site": {
+            "type": "object",
+            "properties": {
+              "normal": {
+                "$ref": "shared.schema.json#/$defs/normal"
+              },
+              "availability": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "normal",
+              "availability"
+            ],
+            "additionalProperties": false
+          },
+          "medium": {
+            "type": "object",
+            "properties": {
+              "radius_fraction": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              },
+              "edge_fade": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "scattering": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "absorption": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000
+              },
+              "anisotropy": {
+                "type": "number",
+                "exclusiveMinimum": -0.95,
+                "exclusiveMaximum": 0.95
+              }
+            },
+            "required": [
+              "radius_fraction",
+              "edge_fade",
+              "scattering",
+              "absorption",
+              "anisotropy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "type",
+          "owner",
+          "position",
+          "radius",
+          "tint"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 16
+    },
+    "spawns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "position": {
+            "$ref": "shared.schema.json#/$defs/position"
+          }
+        },
+        "required": [
+          "type",
+          "position"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 64
+    }
+  },
+  "required": [
+    "content",
+    "appearance",
+    "match",
+    "bodies",
+    "spawns"
+  ],
+  "additionalProperties": false,
+  "anyOf": [
+    {
+      "properties": {
+        "bodies": {
+          "minItems": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "spawns": {
+          "minItems": 1
+        }
+      }
+    }
+  ]
+}

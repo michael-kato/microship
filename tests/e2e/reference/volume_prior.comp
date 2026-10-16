@@ -1,4 +1,0 @@
-#version 460
-// The frozen prior / monolithic shaders already integrate their volumes.
-layout(local_size_x=8,local_size_y=8) in;
-void main() {}

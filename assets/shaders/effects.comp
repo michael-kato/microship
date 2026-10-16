@@ -3,10 +3,10 @@
 #include "render_uniform.glsl"
 #include "debug_buffers.glsl"
 layout(local_size_x=8,local_size_y=8) in;
-layout(set=0,binding=1,rgba32f) uniform image2D beauty;
+layout(set=0,binding = 1,rgba32f) uniform image2D beauty;
 struct Segment { vec4 a,b,color; };
-layout(set=0,binding=14,std430) readonly buffer Segments { Segment segments[]; };
-layout(set=0,binding=15,std430) readonly buffer Tiles { uint tiles[]; };
+layout(set=0,binding = 13,std430) readonly buffer Segments { Segment segments[]; };
+layout(set=0,binding = 14,std430) readonly buffer Tiles { uint tiles[]; };
 void main()
 {
     uvec2 p=gl_GlobalInvocationID.xy;
@@ -30,7 +30,7 @@ void main()
         else alpha=clamp((s.a.w+.7-distance)/1.4,0.0,1.0);
         float depth=mix(s.a.z,s.b.z,t);
         if (guide.vertex_hit.w>0.5 && guide.normal_depth.w>0.0 && depth>guide.normal_depth.w+.12)
-            alpha*=guide.vertex_hit.w==3.0 ? render.cell_material.x*.35 : 0.0;
+            alpha*=guide.vertex_hit.w==3.0 ? render.thin_material.x*.35 : 0.0;
         float strength=s.b.w<.5 ? 1.5 : s.b.w<2.5 ? 4.0 : 1.0;
         if (s.b.w>.5 && s.b.w<1.5)
             alpha+=exp(-distance*distance/max(1.0,s.a.w*s.a.w*3.0))*.25;

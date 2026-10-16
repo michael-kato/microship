@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "microship groups",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7
+          },
+          "key": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "selection": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "singular": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "plural": {
+            "$ref": "shared.schema.json#/$defs/name"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "selection",
+          "singular",
+          "plural"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 8
+    }
+  },
+  "required": [
+    "groups"
+  ],
+  "additionalProperties": false
+}

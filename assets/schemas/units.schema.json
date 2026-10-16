@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "microship units",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "units": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "faction": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "group": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "model": {
+            "$ref": "shared.schema.json#/$defs/path"
+          },
+          "scale": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1000
+          },
+          "yaw_degrees": {
+            "type": "number",
+            "minimum": -360000,
+            "maximum": 360000
+          },
+          "tint": {
+            "$ref": "shared.schema.json#/$defs/color"
+          },
+          "speed": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
+          },
+          "health": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
+          },
+          "range": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
+          },
+          "cost": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
+          },
+          "shot_interval": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
+          },
+          "separation": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "units",
+                "structures"
+              ]
+            },
+            "maxItems": 2,
+            "uniqueItems": true
+          },
+          "colonizes": {
+            "type": "boolean"
+          },
+          "detaches": {
+            "type": "boolean"
+          },
+          "trails": {
+            "type": "boolean"
+          },
+          "pick_radius": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1000
+          },
+          "cue_radius": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1000
+          },
+          "hits": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 32
+          }
+        },
+        "required": [
+          "name",
+          "faction",
+          "group",
+          "model",
+          "scale",
+          "yaw_degrees",
+          "tint",
+          "speed",
+          "health",
+          "range",
+          "cost",
+          "shot_interval",
+          "separation",
+          "targets",
+          "colonizes",
+          "detaches",
+          "trails",
+          "pick_radius",
+          "cue_radius",
+          "hits"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 32
+    }
+  },
+  "required": [
+    "units"
+  ],
+  "additionalProperties": false
+}

@@ -3,84 +3,52 @@
 
 #include <stdint.h>
 #include "types.h"
+#include "content.h"
 
-enum BodyKind
+struct Body
 {
-    BODY_CELL,
-    BODY_ASTEROID
-};
-
-enum Faction
-{
-    FACTION_NEUTRAL,
-    FACTION_PLAYER,
-    FACTION_ENEMY,
-    FACTION_FLOWERY = FACTION_PLAYER,
-    FACTION_CRYSTALLINE = FACTION_ENEMY,
-    FACTION_LIQUID_METAL,
-    FACTION_INSECTOID,
-    FACTION_ROCKY,
-    FACTION_ROBOTIC
-};
-enum BiologySide { BIOLOGY_NONE, BIOLOGY_VIRUS, BIOLOGY_IMMUNE };
-
-struct Cell
-{
-    BodyKind kind;
+    uint32_t type;
     Faction owner;
     Vec3 position;
     float radius;
     Color color;
     char model_path[256];
-    float atmosphere_height;
-    float atmosphere_scale_height;
-    Color rayleigh;
-    float mie;
-    float absorption;
-    float anisotropy;
     Vec3 colony_normal;
-    float nutrients;
+    float availability;
+    float interior_radius, interior_fade;
+    Color interior_scattering;
+    float interior_absorption, interior_anisotropy;
 };
 
-struct Star
+struct Spawn
 {
+    char type_name[32];
+    uint32_t type;
     Vec3 position;
-    float radius;
-    Color color;
 };
-
-struct Ship
+struct Background
 {
-    Faction faction;
-    bool large;
     Vec3 position;
     float scale;
-    float yaw_degrees;
     Color color;
     char model_path[256];
 };
-
-enum { MAX_BODIES = 16, MAX_SHIPS = 64 };
-
+enum { MAX_BODIES=16,MAX_SPAWNS=64 };
 struct GameplayRules
 {
     bool enabled;
-    float fighter_speed, fighter_health, fighter_damage, fighter_range, fighter_cost;
-    float seed_speed, seed_health, seed_cost;
-    float growth_seconds, stalk_health, collection_rate, stalk_height, stalk_width;
-    float storage, manufacture_seconds, landing_seconds, enemy_attack_seconds;
-    char stalk_model[256];
+    float storage,manufacture_seconds,landing_seconds,enemy_attack_seconds;
 };
 struct StudioLight { Vec3 direction; Color color; float irradiance; };
 struct CombatVisuals
 {
     bool enabled;
     float projectile_speed, shot_interval, trail_width, trail_lifetime;
-    float flash_seconds, low_health, pop_seconds, pop_radius;
+    float flash_seconds, pop_seconds, pop_radius;
     float orbit_clearance, orbit_speed;
     bool flight_enabled;
     float acceleration, turn_rate, separation, bank;
-    Color faction[3], flash, injured;
+    Color flash, injured;
 };
 struct SpikeRules
 {
@@ -93,32 +61,20 @@ struct SpikeRules
 
 struct World
 {
-    Star sun;
-    Cell bodies[MAX_BODIES];
+    Body bodies[MAX_BODIES];
     uint32_t body_count;
-    Ship ships[MAX_SHIPS];
-    uint32_t ship_count;
-    Vec3 orbit_center;
-    Vec3 orbit_axis;
-    float orbit_period;
-    Vec3 haze_center;
-    float haze_radius;
-    Color haze_scattering;
-    float haze_anisotropy;
-    float haze_edge_fade; // Fraction of the radius occupied by the outer fade; zero is uniform.
-    Vec3 global_atmosphere_center;
-    float global_atmosphere_radius;
-    Color global_atmosphere_scattering;
-    float global_atmosphere_anisotropy;
-    float global_atmosphere_edge_fade;
+    Spawn spawns[MAX_SPAWNS];
+    uint32_t spawn_count;
+    Content content;
+    char content_path[256];
     GameplayRules gameplay;
-    BiologySide biology;
-    Faction player_faction;
+    float sight_radius;
+    Faction player_faction,opponent_faction;
     bool ambient_enabled;
     Color ambient;
     Color ambient_top, ambient_bottom;
     bool ambient_gradient;
-    Ship backdrop; // Vertex-colored background art; not a gameplay cell.
+    Background backdrop; // Vertex-colored background art; not a gameplay cell.
     uint32_t backdrop_samples; // Explicit background budget; zero inherits the surface budget.
     bool backdrop_soft;
     float backdrop_blur, backdrop_glow, backdrop_ambient;
@@ -127,10 +83,10 @@ struct World
     bool backdrop_wave_set;
     StudioLight studio[3];
     uint32_t studio_mask;
-    float cell_transmission, cell_absorption;
-    bool cell_transmission_set;
-    float cell_clarity,ai_production,ai_expansion;
-    bool cell_clarity_set,ai_production_set;
+    float thin_transmission, thin_absorption;
+    bool thin_transmission_set;
+    float thin_clarity,ai_production,ai_expansion;
+    bool thin_clarity_set,ai_production_set;
     SpikeRules spikes;
     CombatVisuals combat;
     uint32_t combat_fields;

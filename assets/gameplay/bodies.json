@@ -1,0 +1,26 @@
+{
+  "$schema": "../schemas/bodies.schema.json",
+  "bodies": [
+    {
+      "name": "infected",
+      "label": "CELL",
+      "geometry": "mesh",
+      "model": "../models/cell_infected.fmesh",
+      "hosts_site": true
+    },
+    {
+      "name": "healthy",
+      "label": "CELL",
+      "geometry": "mesh",
+      "model": "../models/cell_healthy.fmesh",
+      "hosts_site": true
+    },
+    {
+      "name": "unclaimed",
+      "label": "CELL",
+      "geometry": "mesh",
+      "model": "../models/cell_neutral.fmesh",
+      "hosts_site": true
+    }
+  ]
+}

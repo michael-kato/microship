@@ -13,10 +13,10 @@ ROOT = Path(__file__).resolve().parents[1] / 'screenshots'
 
 
 def ppm_png(data):
-    # Preserve Floria's display-mapped RGB8 without resizing or changing pixels.
+    # Preserve microship's display-mapped RGB8 without resizing or changing pixels.
     header = re.match(rb'P6\s+(\d+)\s+(\d+)\s+255(?:\r\n|[\t\n\r ])', data)
     if not header:
-        raise ValueError('Expected a Floria RGB8 .ppm display capture')
+        raise ValueError('Expected a microship RGB8 .ppm display capture')
     width, height = map(int, header.groups())
     pixels = data[header.end():]
     if width <= 0 or height <= 0 or len(pixels) != width * height * 3:

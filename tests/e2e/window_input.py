@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Drive a real Floria window with OS mouse/keyboard events, then exit it."""
+"""Drive a real microship window with OS mouse/keyboard events, then exit it."""
 
+import json
 import ctypes as c
 import ctypes.util
 from pathlib import Path
@@ -65,7 +66,7 @@ class Desktop:
             def visit(handle, _):
                 title = c.create_unicode_buffer(128)
                 self.api.GetWindowTextW(handle, title, len(title))
-                if title.value == 'Floria': result.add(handle)
+                if title.value == 'microship': result.add(handle)
                 return True
             callback = self.callback_type(visit)
             self.api.EnumWindows(callback, 0)
@@ -73,7 +74,7 @@ class Desktop:
             def visit(handle, depth):
                 title = c.c_void_p()
                 if self.api.XFetchName(self.display, handle, c.byref(title)) and title.value:
-                    if c.string_at(title.value) == b'Floria':
+                    if c.string_at(title.value) == b'microship':
                         attributes = XWindowAttributes()
                         if self.api.XGetWindowAttributes(self.display, handle, c.byref(attributes)) and attributes.map_state == 2:
                             result.add(handle)
@@ -139,15 +140,16 @@ def main():
     desktop = Desktop()
     existing = desktop.windows()
     with tempfile.TemporaryDirectory(prefix='microship-window-e2e-') as directory:
-        config = Path(directory) / 'native.render'
-        contents = config_path.read_text()
-        for name, value in (('width',1920), ('height',1080), ('samples_per_pixel',8)):
-            contents = re.sub(rf'(?m)^{name}\s+[^\n#]+', f'{name} {value}', contents)
-        config.write_text(contents)
+        config = Path(directory) / 'native.json'
+        contents = json.loads(config_path.read_text())
+        contents['output'].update(width=1920,height=1080)
+        contents['sampling']['samples_per_pixel']=6
+        contents['volume']['rays_per_pixel']=1
+        config.write_text(json.dumps(contents,indent=2))
         command = [str(binary)]
         if binary.suffix.lower() == '.exe' and sys.platform != 'win32':
             command = [sys.executable, str(Path(__file__).resolve().parents[2] / 'scripts/proton_run.py'), str(binary)]
-        process = subprocess.Popen([*command, '--config', str(config), '--time', '60', '--frames', '512'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process = subprocess.Popen([*command, '--config', str(config), '--time', '60', '--frames', '2'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
             deadline, handle = time.monotonic()+8, None
             while time.monotonic() < deadline:
@@ -159,7 +161,7 @@ def main():
                 time.sleep(.01)
             if handle is None:
                 output, errors = process.communicate(timeout=2)
-                raise RuntimeError('Floria did not create its production window\n'+output+'\n'+errors)
+                raise RuntimeError('microship did not create its production window\n'+output+'\n'+errors)
             x,y = desktop.focus_point(handle)
             desktop.move(x,y)
             time.sleep(.03)

@@ -248,5 +248,27 @@
         -0.32
       ]
     ]
+  },
+  "fractal": {
+    "scale": 0.6,
+    "radius_scale": 0.64,
+    "spread": 0.66,
+    "jitter": 0.17
+  },
+  "substrate": {
+    "roots": 7,
+    "length": 0.32,
+    "radius": 0.027,
+    "depth": 3,
+    "color": [
+      0.22,
+      0.41,
+      0.35
+    ]
+  },
+  "factory": {
+    "length": 0.4,
+    "radius": 0.064,
+    "depth": 4
   }
 }

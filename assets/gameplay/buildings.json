@@ -1,0 +1,51 @@
+{
+  "$schema": "../schemas/buildings.schema.json",
+  "buildings": [
+    {
+      "name": "virus_factory",
+      "faction": "virus",
+      "model": "../models/virus_factory.fmesh",
+      "growth_seconds": 5.0,
+      "health": 80.0,
+      "collection": 5.0,
+      "height": 1.4,
+      "width": 1.6,
+      "hits": 3,
+      "branches": {
+        "seconds": 16.0,
+        "count": 9,
+        "spacing": 1.15,
+        "production": 0.35,
+        "seed": 4721,
+        "normal": [
+          0.0,
+          0.29,
+          0.957
+        ]
+      }
+    },
+    {
+      "name": "immune_factory",
+      "faction": "immune",
+      "model": "../models/immune_factory.fmesh",
+      "growth_seconds": 5.0,
+      "health": 80.0,
+      "collection": 5.0,
+      "height": 1.4,
+      "width": 1.6,
+      "hits": 3,
+      "branches": {
+        "seconds": 16.0,
+        "count": 9,
+        "spacing": 1.15,
+        "production": 0.35,
+        "seed": 4721,
+        "normal": [
+          0.0,
+          0.29,
+          0.957
+        ]
+      }
+    }
+  ]
+}

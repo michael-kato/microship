@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "microship bodies",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "bodies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "label": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "geometry": {
+            "enum": [
+              "mesh",
+              "sphere"
+            ]
+          },
+          "model": {
+            "$ref": "shared.schema.json#/$defs/path"
+          },
+          "hosts_site": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "geometry",
+          "hosts_site"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "geometry": {
+                  "const": "mesh"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "model"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "model"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "maxItems": 32
+    }
+  },
+  "required": [
+    "bodies"
+  ],
+  "additionalProperties": false
+}

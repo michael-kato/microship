@@ -1,0 +1,35 @@
+{
+  "$schema": "../schemas/factions.schema.json",
+  "factions": [
+    {
+      "id": 1,
+      "name": "virus",
+      "label": "VIRUS",
+      "color": [
+        0.45,
+        0.9,
+        0.75
+      ],
+      "production": {
+        "building": "virus_factory",
+        "default_unit": "virus_fighter",
+        "assault_unit": "virus_bomber"
+      }
+    },
+    {
+      "id": 2,
+      "name": "immune",
+      "label": "IMMUNE",
+      "color": [
+        1.0,
+        0.55,
+        0.65
+      ],
+      "production": {
+        "building": "immune_factory",
+        "default_unit": "immune_fighter",
+        "assault_unit": "immune_bomber"
+      }
+    }
+  ]
+}

@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "microship rules",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "resource_label": {
+      "$ref": "shared.schema.json#/$defs/name"
+    },
+    "economy": {
+      "type": "object",
+      "properties": {
+        "storage": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "manufacture_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "landing_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "enemy_attack_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "storage",
+        "manufacture_seconds",
+        "landing_seconds",
+        "enemy_attack_seconds"
+      ],
+      "additionalProperties": false
+    },
+    "ai": {
+      "type": "object",
+      "properties": {
+        "production_rate": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "expansion_delay": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 300
+        }
+      },
+      "required": [
+        "production_rate",
+        "expansion_delay"
+      ],
+      "additionalProperties": false
+    },
+    "exploration": {
+      "type": "object",
+      "properties": {
+        "sight_radius": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1000
+        }
+      },
+      "required": [
+        "sight_radius"
+      ],
+      "additionalProperties": false
+    },
+    "flight": {
+      "type": "object",
+      "properties": {
+        "acceleration": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        },
+        "turn_rate": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 30
+        },
+        "separation": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 3
+        },
+        "bank": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "acceleration",
+        "turn_rate",
+        "separation",
+        "bank"
+      ],
+      "additionalProperties": false
+    },
+    "orbit": {
+      "type": "object",
+      "properties": {
+        "clearance": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 5
+        },
+        "speed": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 2
+        }
+      },
+      "required": [
+        "clearance",
+        "speed"
+      ],
+      "additionalProperties": false
+    },
+    "recovery": {
+      "type": "object",
+      "properties": {
+        "heal_interval": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 60
+        },
+        "damage_delay": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 60
+        },
+        "orbit_clearance": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10
+        }
+      },
+      "required": [
+        "heal_interval",
+        "damage_delay",
+        "orbit_clearance"
+      ],
+      "additionalProperties": false
+    },
+    "spikes": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "regrow_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 60
+        }
+      },
+      "required": [
+        "count",
+        "regrow_seconds"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "resource_label"
+  ],
+  "additionalProperties": false
+}

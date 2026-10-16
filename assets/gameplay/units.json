@@ -1,0 +1,117 @@
+{
+  "$schema": "../schemas/units.schema.json",
+  "units": [
+    {
+      "name": "virus_fighter",
+      "faction": "virus",
+      "group": "fighter",
+      "model": "../models/virus_virion.fmesh",
+      "scale": 0.15,
+      "yaw_degrees": 0.0,
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "speed": 3.5,
+      "health": 36.0,
+      "range": 3.2,
+      "cost": 12.0,
+      "shot_interval": 1.0,
+      "separation": 1.0,
+      "targets": [
+        "units"
+      ],
+      "colonizes": true,
+      "detaches": true,
+      "trails": true,
+      "pick_radius": 0.35,
+      "cue_radius": 0.22,
+      "hits": 3
+    },
+    {
+      "name": "virus_bomber",
+      "faction": "virus",
+      "group": "bomber",
+      "model": "../models/virus_bomber.fmesh",
+      "scale": 0.65,
+      "yaw_degrees": 0.0,
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "speed": 2.5,
+      "health": 60.0,
+      "range": 3.2,
+      "cost": 30.0,
+      "shot_interval": 3.0,
+      "separation": 2.0,
+      "targets": [
+        "structures"
+      ],
+      "colonizes": true,
+      "detaches": false,
+      "trails": false,
+      "pick_radius": 0.65,
+      "cue_radius": 0.65,
+      "hits": 3
+    },
+    {
+      "name": "immune_fighter",
+      "faction": "immune",
+      "group": "fighter",
+      "model": "../models/immune_leukocyte.fmesh",
+      "scale": 0.15,
+      "yaw_degrees": 0.0,
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "speed": 3.5,
+      "health": 36.0,
+      "range": 3.2,
+      "cost": 12.0,
+      "shot_interval": 1.0,
+      "separation": 1.0,
+      "targets": [
+        "units"
+      ],
+      "colonizes": true,
+      "detaches": false,
+      "trails": true,
+      "pick_radius": 0.35,
+      "cue_radius": 0.22,
+      "hits": 3
+    },
+    {
+      "name": "immune_bomber",
+      "faction": "immune",
+      "group": "bomber",
+      "model": "../models/immune_bomber.fmesh",
+      "scale": 0.65,
+      "yaw_degrees": 0.0,
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "speed": 2.5,
+      "health": 60.0,
+      "range": 3.2,
+      "cost": 30.0,
+      "shot_interval": 3.0,
+      "separation": 2.0,
+      "targets": [
+        "structures"
+      ],
+      "colonizes": true,
+      "detaches": false,
+      "trails": false,
+      "pick_radius": 0.65,
+      "cue_radius": 0.65,
+      "hits": 3
+    }
+  ]
+}

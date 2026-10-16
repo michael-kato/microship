@@ -1,0 +1,590 @@
+#version 460
+#extension GL_EXT_ray_query : require
+#extension GL_GOOGLE_include_directive : require
+#ifdef MICROSHIP_DEBUG_BUFFERS
+#include "debug_buffers.glsl"
+vec3 debug_direct = vec3(0.0);
+vec4 debug_vertex_hit = vec4(0.0), debug_normal_depth = vec4(0.0);
+uint debug_closest_queries = 0u, debug_shadow_queries = 0u, debug_primary_hits = 0u;
+#endif
+
+// Deterministic direct ray tracing. All film samples and volume quadrature
+// belong to this frame. No indirect surface paths, random light choices, or history.
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+struct Vertex
+{
+    vec4 position;
+    vec4 normal;
+    vec4 color;
+};
+
+layout(set = 0, binding = 0) uniform accelerationStructureEXT scene_acceleration;
+#ifdef MICROSHIP_VOLUME_PASS
+layout(set = 0, binding = 1, rgba32f) uniform image2D output_image;
+#else
+layout(set = 0, binding = 1, rgba32f) uniform writeonly image2D output_image;
+#endif
+layout(set = 0, binding = 2, std430) readonly buffer VertexBuffer
+{
+    Vertex vertices[];
+};
+layout(set = 0, binding = 3, std430) readonly buffer TriangleBuffer
+{
+    uvec4 triangles[]; // XYZ vertex indices; W: 0 dielectric, 2 conductor, 3 thin membrane.
+};
+#include "render_uniform.glsl"
+layout(set=0,binding = 11) uniform sampler2D soft_backdrop;
+
+struct Medium
+{
+    vec4 center_radius;
+    vec4 scattering; // RGB coefficient; W outer fade fraction.
+    vec4 absorption_phase;
+};
+layout(set = 0, binding = 5, std430) readonly buffer MediaBuffer { Medium media[]; };
+layout(set = 0, binding = 6, std430) readonly buffer EnergyBuffer { float ggx_energy[]; };
+
+
+
+const float PI = 3.14159265358979323846;
+const float RAY_MAX = 3.402823466e38;
+vec3 environment_radiance(vec3 direction)
+{
+    return render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,0.5+0.5*direction.y);
+}
+// Committed geometry transforms are scene state, never lighting history.
+uint hit_instance=0u;
+mat4x3 hit_to_world;
+mat3 hit_normal_to_world;
+
+float point_epsilon(vec3 point)
+{
+    return max(0.0001, 0.00001 * max(max(abs(point.x), abs(point.y)), abs(point.z)));
+}
+
+bool box_intersection(vec3 origin, vec3 direction, float distance, float margin, vec3 low, vec3 high)
+{
+    float begin = 0.0, end = distance;
+    for (uint axis = 0u; axis < 3u; ++axis)
+    {
+        if (direction[axis] == 0.0)
+        {
+            if (origin[axis] < low[axis]-margin || origin[axis] > high[axis]+margin) return false;
+        }
+        else
+        {
+            float a = (low[axis]-margin-origin[axis])/direction[axis];
+            float b = (high[axis]+margin-origin[axis])/direction[axis];
+            begin = max(begin,min(a,b)); end = min(end,max(a,b));
+        }
+    }
+    return end >= begin;
+}
+
+bool scene_box_intersection(vec3 origin, vec3 direction, float distance, float margin)
+{
+    return box_intersection(origin,direction,distance,margin,render.scene_min.xyz,render.scene_max.xyz);
+}
+
+bool closest_hit(vec3 origin, vec3 direction, out uint triangle_index,
+                 out vec2 barycentric, out float distance)
+{
+    distance=RAY_MAX;
+    if (!scene_box_intersection(origin,direction,RAY_MAX,0.0))
+    { triangle_index=0u;barycentric=vec2(0);return false; }
+    rayQueryEXT query;
+#if defined(MICROSHIP_DEBUG_BUFFERS) && !defined(MICROSHIP_NO_QUERY_COUNTERS)
+    ++debug_closest_queries;
+#endif
+    rayQueryInitializeEXT(query, scene_acceleration, gl_RayFlagsOpaqueEXT,
+                          0x1u, origin, 0.0, direction, RAY_MAX);
+    while (rayQueryProceedEXT(query))
+    {
+        // Opaque triangles are committed by traversal without an any-hit shader.
+    }
+    if (rayQueryGetIntersectionTypeEXT(query, true) == gl_RayQueryCommittedIntersectionNoneEXT)
+    {
+        triangle_index = 0u;
+        barycentric = vec2(0.0);
+        return false;
+    }
+
+    triangle_index = uint(rayQueryGetIntersectionPrimitiveIndexEXT(query, true)) +
+                     rayQueryGetIntersectionInstanceCustomIndexEXT(query, true);
+    uint instance_id=rayQueryGetIntersectionInstanceIdEXT(query,true);
+    hit_instance=instance_id;
+    hit_to_world=rayQueryGetIntersectionObjectToWorldEXT(query,true);
+    hit_normal_to_world=transpose(mat3(rayQueryGetIntersectionWorldToObjectEXT(query,true)));
+    barycentric = rayQueryGetIntersectionBarycentricsEXT(query, true);
+    distance = rayQueryGetIntersectionTEXT(query, true);
+    return true;
+}
+
+bool medium_interval(Medium medium, vec3 origin, vec3 direction, float distance,
+                     out float begin, out float end)
+{
+    if (medium.center_radius.w<=0.0) return false;
+    vec3 offset = origin - medium.center_radius.xyz;
+    float b = dot(offset, direction);
+    float c = dot(offset, offset) - medium.center_radius.w * medium.center_radius.w;
+    float discriminant = b * b - c;
+    if (discriminant <= 0.0) return false;
+    float root = sqrt(discriminant);
+    begin = max(0.0, -b - root);
+    end = min(distance, -b + root);
+    return end > begin;
+}
+
+float medium_density(Medium medium, vec3 point)
+{
+    if (medium.scattering.w<=0.0) return 1.0;
+    float radius_fraction=length(point-medium.center_radius.xyz)/medium.center_radius.w;
+    float fade=clamp((1.0-radius_fraction)/max(medium.scattering.w,0.000001),0.0,1.0);
+    return fade*fade*(3.0-2.0*fade);
+}
+
+vec3 transmittance(vec3 origin, vec3 direction, float distance)
+{
+    vec3 optical_depth = vec3(0.0);
+    for (uint i = 0u; i < render.scene.y; ++i)
+    {
+        Medium medium = media[i];
+        float begin, end;
+        if (!medium_interval(medium, origin, direction, distance, begin, end)) continue;
+        float density_integral = end - begin;
+        if (medium.scattering.w>0.0)
+        {
+            uint steps = uint(render.display.w);
+            float stride = (end - begin) / float(steps);
+            density_integral = 0.0;
+            for (uint j = 0u; j < steps; ++j)
+                density_integral += stride * medium_density(medium, origin + direction * (begin + (float(j) + 0.5) * stride));
+        }
+        vec3 extinction = medium.scattering.rgb + medium.absorption_phase.rgb;
+        optical_depth += extinction * density_integral;
+    }
+    return exp(-optical_depth);
+}
+
+float henyey_greenstein(float cosine, float g)
+{
+    float denominator = 1.0 + g*g - 2.0*g*cosine;
+    return (1.0 - g*g) / (4.0*PI*denominator*sqrt(denominator));
+}
+
+vec3 studio_visibility(vec3 origin,vec3 direction);
+
+vec3 volume_light(vec3 point,vec3 view_direction,Medium medium)
+{
+    // Analytic ambient fill: integrate the authored linear gradient against HG.
+    // This approximation is unoccluded. Studio lights use current geometry.
+    vec3 incident=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,
+        .5+.5*medium.absorption_phase.w*view_direction.y);
+    for (int light=0;light<3;++light)
+    {
+        if (render.studio_direction[light].w<=0.0) continue;
+        vec3 direction=render.studio_direction[light].xyz;
+        float phase=henyey_greenstein(clamp(dot(view_direction,direction),-1.0,1.0),medium.absorption_phase.w);
+        incident+=phase*render.studio_color[light].rgb*studio_visibility(point,direction);
+    }
+    return medium.scattering.rgb*incident;
+}
+
+vec3 single_scattering(vec3 origin,vec3 direction,float distance)
+{
+    vec3 radiance=vec3(0);
+    uint steps=uint(render.display.w);
+    for (uint i=0u;i<render.scene.y;++i)
+    {
+        Medium medium=media[i];float begin,end;
+        if (all(equal(medium.scattering.rgb,vec3(0)))) continue;
+        if (!medium_interval(medium,origin,direction,distance,begin,end)) continue;
+        float stride=(end-begin)/float(steps);
+        for (uint step=0u;step<steps;++step)
+        {
+            float d=begin+(float(step)+.5)*stride;
+            vec3 point=origin+direction*d;
+            radiance+=transmittance(origin,direction,d)*medium_density(medium,point)*
+                volume_light(point,direction,medium)*stride;
+        }
+    }
+    return radiance;
+}
+
+float fresnel(float cosine, float ior)
+{
+    float f0 = (ior - 1.0) / (ior + 1.0);
+    f0 *= f0;
+    return f0 + (1.0 - f0) * pow(1.0 - clamp(cosine, 0.0, 1.0), 5.0);
+}
+
+float ggx_distribution(float cosine, float alpha)
+{
+    float a2 = alpha*alpha;
+    float denominator = cosine*cosine*(a2-1.0)+1.0;
+    return a2 / (PI*denominator*denominator);
+}
+
+float ggx_mask(float cosine, float alpha)
+{
+    return 2.0*cosine / (cosine + sqrt(alpha*alpha + (1.0-alpha*alpha)*cosine*cosine));
+}
+
+float directional_energy(float cosine, float roughness)
+{
+    vec2 grid = vec2(sqrt(clamp(cosine,0.001,1.0)),clamp(roughness,0.0,1.0))*31.0;
+    uvec2 cell = min(uvec2(grid),uvec2(30u));
+    vec2 fraction = grid-vec2(cell);
+    uint base = cell.y*32u+cell.x;
+    float low = mix(ggx_energy[base],ggx_energy[base+1u],fraction.x);
+    float high = mix(ggx_energy[base+32u],ggx_energy[base+33u],fraction.x);
+    return mix(low,high,fraction.y);
+}
+
+vec3 evaluate_bsdf(vec3 normal, vec3 outgoing, vec3 incoming, vec3 albedo,
+                   float roughness, float ior, bool metal)
+{
+    float ni = max(0.0, dot(normal, incoming)), no = max(0.0, dot(normal, outgoing));
+    if (ni <= 0.0 || no <= 0.0) return vec3(0.0);
+    if (!metal && (roughness >= 0.999 || ior <= 1.0)) return albedo / PI;
+    vec3 half_vector = normalize(incoming + outgoing);
+    float nh = max(0.0, dot(normal, half_vector)), oh = max(0.000001, dot(outgoing, half_vector));
+    float alpha = max(0.002, roughness*roughness);
+    float distribution = ggx_distribution(nh, alpha);
+    if (metal)
+    {
+        // Vertex RGB is conductor normal-incidence reflectance (Schlick RGB
+        // approximation), not diffuse albedo. No diffuse lobe in metal.
+        vec3 f = albedo + (vec3(1.0) - albedo) * pow(1.0 - oh, 5.0);
+        vec3 gain = vec3(1.0);
+        if (render.quality.z != 0u)
+        {
+            // Turquin Eq.16: inexpensive conductor microfacet multiple-scattering
+            // approximation for direct shading.
+            float energy = directional_energy(no,roughness);
+            gain += albedo*((1.0-energy)/energy);
+        }
+        return gain*f*distribution*ggx_mask(ni,alpha)*ggx_mask(no,alpha)/(4.0*ni*no);
+    }
+    float f = fresnel(oh, ior);
+    float specular = f * distribution * ggx_mask(ni, alpha) * ggx_mask(no, alpha) / (4.0*ni*no);
+    return albedo * ((1.0-f) / PI) + vec3(specular);
+}
+
+struct InstanceStyle { vec4 tint,emission; };
+layout(set=0,binding = 15,std430) readonly buffer InstanceStyles { InstanceStyle instance_style[]; };
+
+struct Surface
+{
+    vec3 point, normal, geometric_normal, color;
+    float roughness, ior, emission;
+    bool metal,translucent;
+};
+
+bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surface surface)
+{
+    uvec4 triangle = triangles[triangle_index];
+    Vertex a = vertices[triangle.x];
+    Vertex b = vertices[triangle.y];
+    Vertex c = vertices[triangle.z];
+    a.position.xyz=hit_to_world*vec4(a.position.xyz,1.0);
+    b.position.xyz=hit_to_world*vec4(b.position.xyz,1.0);
+    c.position.xyz=hit_to_world*vec4(c.position.xyz,1.0);
+    a.normal.xyz=hit_normal_to_world*a.normal.xyz;
+    b.normal.xyz=hit_normal_to_world*b.normal.xyz;
+    c.normal.xyz=hit_normal_to_world*c.normal.xyz;
+    vec3 weights = vec3(1.0 - barycentric.x - barycentric.y, barycentric.x, barycentric.y);
+    vec3 point = a.position.xyz * weights.x + b.position.xyz * weights.y +
+                 c.position.xyz * weights.z;
+    vec3 area_normal = cross(b.position.xyz - a.position.xyz, c.position.xyz - a.position.xyz);
+    float twice_area = length(area_normal);
+    if (twice_area <= 0.0)
+        return false;
+    vec3 geometric_normal = area_normal / twice_area;
+    vec3 color = a.color.rgb * weights.x + b.color.rgb * weights.y + c.color.rgb * weights.z;
+    float roughness = dot(vec3(a.color.w,b.color.w,c.color.w), weights);
+    float ior = dot(vec3(a.position.w,b.position.w,c.position.w), weights);
+    float emission = dot(vec3(a.normal.w,b.normal.w,c.normal.w), weights);
+    vec3 normal = normalize(a.normal.xyz * weights.x + b.normal.xyz * weights.y +
+                            c.normal.xyz * weights.z);
+    if (dot(normal, geometric_normal) < 0.0)
+        normal = -normal;
+    if (dot(geometric_normal, direction) > 0.0)
+    {
+        geometric_normal = -geometric_normal;
+        normal = -normal;
+    }
+    if (dot(normal, -direction) <= 0.0)
+        normal = geometric_normal;
+
+    surface.point = point; surface.normal = normal; surface.geometric_normal = geometric_normal;
+    surface.color = color; surface.roughness = roughness; surface.ior = ior;
+    surface.emission = emission; surface.metal = triangle.w == 2u;
+    surface.translucent=triangle.w==3u;
+    vec4 tint=instance_style[hit_instance].tint;
+    surface.color=mix(surface.color,tint.rgb,tint.a);
+    surface.emission+=instance_style[hit_instance].emission.x;
+    return true;
+}
+
+// Evaluate all authored directional lights. Transmitting shadow intersections
+// multiply attenuation; opaque intersections stop the query.
+vec3 studio_visibility(vec3 origin,vec3 direction)
+{
+#if defined(MICROSHIP_DEBUG_BUFFERS) && !defined(MICROSHIP_NO_QUERY_COUNTERS)
+    ++debug_shadow_queries;
+#endif
+    rayQueryEXT q;rayQueryInitializeEXT(q,scene_acceleration,gl_RayFlagsNoOpaqueEXT,1u,origin,0.0,direction,RAY_MAX);
+    vec3 visibility=vec3(1);
+    while (rayQueryProceedEXT(q))
+    {
+        if (rayQueryGetIntersectionTypeEXT(q,false)!=gl_RayQueryCandidateIntersectionTriangleEXT) continue;
+        uint index=rayQueryGetIntersectionPrimitiveIndexEXT(q,false)+rayQueryGetIntersectionInstanceCustomIndexEXT(q,false);
+        uvec4 triangle=triangles[index];
+        if (triangle.w!=3u || render.thin_material.x<=0.0) return vec3(0);
+        vec2 uv=rayQueryGetIntersectionBarycentricsEXT(q,false);vec3 w=vec3(1.0-uv.x-uv.y,uv);
+        vec3 pigment=vertices[triangle.x].color.rgb*w.x+vertices[triangle.y].color.rgb*w.y+vertices[triangle.z].color.rgb*w.z;
+        float clarity=render.thin_material.w,cosine=1.0;
+        if (clarity>0.0)
+        {
+            vec3 n=vertices[triangle.x].normal.xyz*w.x+vertices[triangle.y].normal.xyz*w.y+vertices[triangle.z].normal.xyz*w.z;
+            n=transpose(mat3(rayQueryGetIntersectionWorldToObjectEXT(q,false)))*n;
+            cosine=max(.2,abs(dot(normalize(n),direction)));
+        }
+        visibility*=mix(vec3(1),pigment,clarity>0.0 ? .15 : .35)*render.thin_material.x*(clarity>0.0 ? clarity : 1.0)*exp(-render.thin_material.y/cosine);
+    }
+    return visibility*transmittance(origin,direction,RAY_MAX);
+}
+vec3 evaluate_studio(Surface s,vec3 outgoing,int selected)
+{
+    if (render.studio_direction[selected].w<=0.0) return vec3(0);
+    vec3 direction=render.studio_direction[selected].xyz;
+    float cosine=dot(s.normal,direction),geometric_cosine=dot(s.geometric_normal,direction);
+    float transmission=s.translucent ? render.thin_material.x : 0.0;
+    vec3 f;
+    if (cosine>0.0 && geometric_cosine>0.0)
+        f=(1.0-transmission)*evaluate_bsdf(s.normal,outgoing,direction,s.color,s.roughness,s.ior,s.metal);
+    else if (cosine<0.0 && geometric_cosine<0.0 && transmission>0.0)
+        f=s.color*(transmission*(1.0-render.thin_material.w)/PI)*exp(-render.thin_material.y/max(.2,-cosine));
+    else return vec3(0);
+    vec3 origin=s.point+s.geometric_normal*(geometric_cosine>0.0 ? point_epsilon(s.point) : -point_epsilon(s.point));
+    vec3 weighted=f*abs(cosine)*render.studio_color[selected].rgb;
+    if (max(weighted.r,max(weighted.g,weighted.b))<=0.0) return vec3(0);
+    return weighted*studio_visibility(origin,direction);
+}
+
+vec3 ambient_surface(Surface s,vec3 outgoing)
+{
+    // Cosine-weighted integral of the authored linear environment gradient.
+    // Ambient fill is an approximation, with no traced diffuse bounces or AO.
+    vec3 diffuse=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5+s.normal.y/3.0);
+    vec3 reflected=environment_radiance(reflect(-outgoing,s.normal));
+    float cosine=max(0.0,dot(s.normal,outgoing));
+    float transmission=s.translucent ? render.thin_material.x : 0.0;
+    vec3 f=s.metal ? s.color+(vec3(1)-s.color)*pow(1.0-cosine,5.0) : vec3(fresnel(cosine,s.ior));
+    vec3 result=s.metal ? f*reflected : (vec3(1)-f)*s.color*diffuse+f*reflected;
+    result*=1.0-transmission;
+    if (transmission>0.0)
+    {
+        vec3 behind=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5-s.normal.y/3.0);
+        result+=s.color*behind*(transmission*(1.0-render.thin_material.w))*
+            exp(-render.thin_material.y/max(.2,cosine));
+    }
+    return result;
+}
+
+vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel)
+{
+    vec3 radiance=vec3(0),weight=vec3(1);
+    // The limit counts transparent crossings. An opaque surface after the last
+    // allowed crossing can still be shaded. Exhaustion does not reveal the sky.
+    for (uint layer=0u;layer<=render.settings.w;++layer)
+    {
+        uint triangle;vec2 barycentric;float distance;
+        bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
+        weight*=transmittance(origin,direction,distance);
+        if (!hit)
+        {
+            vec3 background=render.backdrop_style.x>0.0 ? texelFetch(soft_backdrop,ivec2(pixel),0).rgb : environment_radiance(direction);
+            radiance+=weight*background;
+#ifdef MICROSHIP_DEBUG_BUFFERS
+            debug_direct+=weight*background;
+#endif
+            break;
+        }
+        Surface s;if (!surface_at(triangle,barycentric,direction,s)) break;
+#ifdef MICROSHIP_DEBUG_BUFFERS
+        if (layer==0u)
+        {
+            ++debug_primary_hits;
+            if (sample_index==0u)
+            {
+                debug_vertex_hit=vec4(s.color,s.translucent ? 3.0 : 1.0);
+                debug_normal_depth=vec4(s.normal,distance);
+            }
+        }
+#endif
+        vec3 direct=s.color*s.emission;
+        for (int light=0;light<3;++light) direct+=evaluate_studio(s,-direction,light);
+        radiance+=weight*(direct+ambient_surface(s,-direction));
+#ifdef MICROSHIP_DEBUG_BUFFERS
+        debug_direct+=weight*direct;
+#endif
+        float clear=s.translucent ? render.thin_material.x*render.thin_material.w : 0.0;
+        if (clear<=0.0 || layer==render.settings.w) break;
+        weight*=clear*mix(vec3(1),s.color,.15)*exp(-render.thin_material.y/max(.2,abs(dot(s.normal,direction))));
+        origin=s.point-s.geometric_normal*point_epsilon(s.point);
+    }
+    return radiance;
+}
+
+vec2 film_sample(uint index,uint count)
+{
+    if (count==1u || ((count&1u)!=0u && index==count-1u)) return vec2(.5);
+    uint pairs=count/2u,pair=index/2u;
+    // Mirrored pairs keep the centroid at the pixel center for every count.
+    // The fixed seed changes film positions only; no frame or pixel RNG exists.
+    vec2 sample_value=vec2((float(pair)+.5)/float(pairs),
+        fract(float(bitfieldReverse(pair^render.scene.x))*exp2(-32.0)+.5/float(pairs)));
+    return (index&1u)==0u ? sample_value : vec2(1)-sample_value;
+}
+
+vec3 film_direction(uvec2 pixel, vec2 jitter)
+{
+    vec2 film = (vec2(pixel)+jitter)/vec2(render.settings.xy);
+    vec2 ndc = vec2(2.0*film.x-1.0,1.0-2.0*film.y);
+    return normalize(render.camera_forward.xyz +
+        render.camera_right.xyz*(ndc.x*render.display.y*render.display.z) +
+        render.camera_up.xyz*(ndc.y*render.display.y));
+}
+
+bool pixel_may_intersect_medium(uvec2 pixel)
+{
+    vec3 axis = film_direction(pixel,vec2(0.5));
+    // Normalization is Lipschitz with bound 2/|D|; unnormalized camera rays
+    // have |D| >= 1. This covers every subpixel direction, including silhouettes.
+    float cone = min(2.0,2.828427125*render.display.y/float(render.settings.y));
+    for (uint i = 0u; i < render.scene.y; ++i)
+    {
+        vec3 delta = media[i].center_radius.xyz-render.camera_position.xyz;
+        float squared = dot(delta,delta), along = dot(delta,axis);
+        float radius = media[i].center_radius.w+sqrt(squared)*cone;
+        if (along+radius > 0.0 && squared-along*along <= radius*radius) return true;
+    }
+    return false;
+}
+
+bool pixel_is_vacuum(uvec2 pixel)
+{
+    vec3 origin = render.camera_position.xyz;
+    vec3 axis = film_direction(pixel,vec2(0.5));
+    // Every subpixel direction is within this chord distance of the center ray.
+    // The small additional margin covers floating-point camera normalization.
+    float cone = min(2.0,2.828427125*render.display.y/float(render.settings.y)+0.00002);
+    vec3 center = 0.5*(render.scene_min.xyz+render.scene_max.xyz);
+    float farthest = length(center-origin)+length(0.5*(render.scene_max.xyz-render.scene_min.xyz));
+    if (isinf(farthest) || isnan(farthest)) return false;
+    // A potential hit is at most farthest units away. Expanding every box axis
+    // by farthest*cone encloses the entire pixel footprint at that distance.
+    if (scene_box_intersection(origin,axis,RAY_MAX,farthest*cone+point_epsilon(center))) return false;
+    for (uint i = 0u; i < render.scene.y; ++i)
+    {
+        vec3 delta = media[i].center_radius.xyz-origin;
+        float radius = media[i].center_radius.w+length(delta)*cone;
+        vec3 perpendicular = cross(delta,axis);
+        if (dot(delta,axis)+radius > 0.0 && dot(perpendicular,perpendicular) <= radius*radius) return false;
+    }
+    return true;
+}
+
+bool pixel_only_background(uvec2 pixel)
+{
+    vec3 low=render.foreground_min.xyz,high=render.foreground_max.xyz;
+    if (any(greaterThan(low,high))) return true;
+    vec3 origin=render.camera_position.xyz,center=.5*(low+high);
+    float farthest=length(center-origin)+length(.5*(high-low));
+    if (isnan(farthest) || isinf(farthest)) return false;
+    // Conservative subpixel cone plus an eight-pixel reconstruction guard band.
+    float cone=min(2.0,17.0*2.828427125*render.display.y/float(render.settings.y)+.00002);
+    return !box_intersection(origin,film_direction(pixel,vec2(.5)),RAY_MAX,
+        farthest*cone+point_epsilon(center),low,high);
+}
+
+void main()
+{
+    uvec2 pixel = gl_GlobalInvocationID.xy;
+    if (pixel.x >= render.settings.x || pixel.y >= render.settings.y)
+        return;
+
+
+#ifndef MICROSHIP_VOLUME_PASS
+#ifndef MICROSHIP_DISABLE_VACUUM_SKIP
+    // All samples here have exactly the same uniform-environment radiance.
+    // No path traversal, random draws or repeated per-sample normalization.
+    if (render.backdrop_style.x>0.0 && pixel_is_vacuum(pixel))
+    {
+        vec3 background=texelFetch(soft_backdrop,ivec2(pixel),0).rgb;
+#ifdef MICROSHIP_DEBUG_BUFFERS
+        debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(vec4(0),vec4(0),
+            vec4(background,0),vec4(background,0),vec4(0));
+#endif
+        imageStore(output_image,ivec2(pixel),vec4(background,0.0));
+        return;
+    }
+#endif
+    uint sample_count=render.settings.z;
+    if (render.background_quality.x>0u && render.background_quality.y>0u && pixel_only_background(pixel))
+        sample_count=min(sample_count,render.background_quality.x);
+    vec3 sum = vec3(0.0);
+    for (uint sample_index = 0u; sample_index < sample_count; ++sample_index)
+    {
+        vec3 direction=film_direction(pixel,film_sample(sample_index,sample_count));
+        sum+=trace_direct(render.camera_position.xyz,direction,sample_index,pixel);
+    }
+
+    vec3 radiance = sum/float(sample_count);
+#ifdef MICROSHIP_DEBUG_BUFFERS
+    debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(debug_vertex_hit,debug_normal_depth,
+        vec4(debug_direct/float(sample_count),float(debug_primary_hits)/float(sample_count)),
+        vec4(radiance,float(debug_closest_queries)),
+        vec4(0,0,0,float(debug_shadow_queries)));
+#endif
+#else
+    // The surface pass overwrites HDR before this pass. Skip empty-space pixels
+    // without any scene traversal, and leave their current surface radiance alone.
+    if (!pixel_may_intersect_medium(pixel)) return;
+    vec4 surface_radiance = imageLoad(output_image,ivec2(pixel));
+    vec3 radiance = surface_radiance.rgb;
+    // Volume film rays use the same fixed rule. Quadrature is deterministic.
+    uint volume_count = render.scene.y > 0u ? render.quality.x : 0u;
+    vec3 volume_sum = vec3(0.0);
+    for (uint sample_index = 0u; sample_index < volume_count; ++sample_index)
+    {
+        vec3 direction=film_direction(pixel,film_sample(sample_index,volume_count));
+        vec3 origin=render.camera_position.xyz,weight=vec3(1);
+        for (uint depth=0u;depth<=render.settings.w;++depth)
+        {
+            uint triangle;vec2 barycentric;float distance;
+            bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
+            volume_sum+=weight*single_scattering(origin,direction,distance);
+            if (!hit || depth==render.settings.w) break;
+            Surface s;if (!surface_at(triangle,barycentric,direction,s) || !s.translucent) break;
+            float clear=render.thin_material.x*render.thin_material.w;if (clear<=0.0) break;
+            weight*=transmittance(origin,direction,distance)*clear*mix(vec3(1),s.color,.15)
+                *exp(-render.thin_material.y/max(.2,abs(dot(s.normal,direction))));
+            origin=s.point-s.geometric_normal*point_epsilon(s.point);
+        }
+    }
+    if (volume_count > 0u) radiance += volume_sum/float(volume_count);
+#ifdef MICROSHIP_DEBUG_BUFFERS
+    uint debug_index = pixel.y*render.settings.x+pixel.x;
+    debug_pixels[debug_index].volume.rgb = volume_count > 0u ? volume_sum/float(volume_count) : vec3(0);
+    debug_pixels[debug_index].surface.w += float(debug_closest_queries);
+    debug_pixels[debug_index].volume.w += float(debug_shadow_queries);
+#endif
+#endif
+    // Keep HDR energy until current-frame bloom and the display transform.
+    imageStore(output_image,ivec2(pixel),vec4(radiance,1.0));
+}

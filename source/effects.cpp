@@ -46,54 +46,39 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
     const CombatVisuals* v=&s->world.combat;
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
-        const Unit* u=&s->units[i];const Trail* t=&s->trails[i];if (u->health<=0 || u->kind!=UNIT_FIGHTER) continue;
+        const Unit* u=&s->units[i];const Trail* t=&s->trails[i];if (u->health<=0 || !simulation_unit_definition(s,u)->trails || !s->visible_units[i]) continue;
         Vec3 previous=u->position;
         for (uint32_t j=0;j<t->count;++j)
         {
             float fade=1-(float)j/TRAIL_POINTS;
-            segment(output,count,p,previous,t->points[j],v->trail_width*fade,v->faction[u->faction],fade*.5f,0);
+            segment(output,count,p,previous,t->points[j],v->trail_width*fade,content_color(&s->world.content,u->faction),fade*.5f,0);
             previous=t->points[j];
         }
     }
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
-        const Unit* u=&s->units[i];if (u->health<=0) continue;
-        float max_health=u->kind==UNIT_FIGHTER ? s->world.gameplay.fighter_health : s->world.gameplay.seed_health;
-        Color color=v->faction[u->faction];
+        const Unit* u=&s->units[i];if (u->health<=0 || !s->visible_units[i]) continue;
+        Color color=content_color(&s->world.content,u->faction);
         if (u->selected)
-            segment(output,count,p,u->position,u->position,u->kind==UNIT_FIGHTER ? .22f : .65f,color,.45f,3);
-        if (!s->world.spikes.enabled && (u->selected || u->health<max_health*v->low_health))
-        {
-            float width=u->kind==UNIT_FIGHTER ? .28f : .65f;
-            Vec3 center=add(u->position,scale(p.up,width+.12f));
-            Vec3 a=subtract(center,scale(p.right,width)),b=add(center,scale(p.right,width));
-            segment(output,count,p,a,b,.018f,color,.12f,4);
-            Color health=u->health<max_health*v->low_health ? v->injured : color;
-            segment(output,count,p,a,add(a,scale(subtract(b,a),u->health/max_health)),.018f,health,.8f,4);
-        }
-    }
-    for (uint32_t i=0;i<MAX_PROJECTILES;++i)
-    {
-        const Projectile* shot=&s->projectiles[i];if (shot->damage<=0 || s->world.spikes.enabled) continue;
-        segment(output,count,p,shot->previous,shot->position,v->trail_width*2.2f,v->faction[shot->faction],1,1);
+            segment(output,count,p,u->position,u->position,simulation_unit_definition(s,u)->cue_radius,color,.45f,3);
     }
     for (uint32_t i=0;i<MAX_POPS;++i)
     {
-        const Pop* pop=&s->pops[i];if (pop->duration<=0) continue;float t=pop->age/pop->duration;
+        const Pop* pop=&s->pops[i];if (pop->duration<=0 || !simulation_in_sight(s,pop->position,0)) continue;float t=pop->age/pop->duration;
         float ease=1-(1-t)*(1-t);
-        segment(output,count,p,pop->position,pop->position,v->pop_radius*(.2f+1.3f*ease),v->faction[pop->faction],(1-t)*(1-t),2);
+        segment(output,count,p,pop->position,pop->position,v->pop_radius*(.2f+1.3f*ease),content_color(&s->world.content,pop->faction),(1-t)*(1-t),2);
         for (int j=0;j<7;++j)
         {
             float angle=j*6.2831853f/7+i*2.399963f;
             Vec3 direction=add(scale(p.right,std::cos(angle)),scale(p.up,std::sin(angle)));
             Vec3 a=add(pop->position,scale(direction,v->pop_radius*(.1f+ease*.8f)));
             Vec3 b=add(pop->position,scale(direction,v->pop_radius*(.2f+ease*1.7f)));
-            segment(output,count,p,a,b,v->trail_width*.6f,v->faction[pop->faction],1-t,1);
+            segment(output,count,p,a,b,v->trail_width*.6f,content_color(&s->world.content,pop->faction),1-t,1);
         }
     }
     for (uint32_t i=0;i<MAX_POPS;++i)
     {
-        const Impact* hit=&s->impacts[i];if (hit->duration<=0) continue;
+        const Impact* hit=&s->impacts[i];if (hit->duration<=0 || !simulation_in_sight(s,hit->position,0)) continue;
         float t=hit->age/hit->duration,radius=v->pop_radius*.55f*std::sqrt(t+.02f);
         for (int j=0;j<5;++j)
         {

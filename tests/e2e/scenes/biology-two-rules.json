@@ -1,0 +1,33 @@
+{
+  "$schema": "../../../assets/schemas/rules.schema.json",
+  "resource_label": "NUTRIENTS",
+  "economy": {
+    "storage": 180.0,
+    "manufacture_seconds": 2.5,
+    "landing_seconds": 1.5,
+    "enemy_attack_seconds": 300.0
+  },
+  "ai": {
+    "production_rate": 0.45,
+    "expansion_delay": 300.0
+  },
+  "orbit": {
+    "clearance": 0.6,
+    "speed": 0.48
+  },
+  "flight": {
+    "acceleration": 9.0,
+    "turn_rate": 7.0,
+    "separation": 0.55,
+    "bank": 0.55
+  },
+  "spikes": {
+    "count": 22,
+    "regrow_seconds": 5.0
+  },
+  "recovery": {
+    "heal_interval": 2.5,
+    "damage_delay": 3.0,
+    "orbit_clearance": 1.6
+  }
+}

@@ -12,8 +12,8 @@ struct PointerInput
     int32_t click_x, click_y, command_x, command_y;
     int32_t pointer_x, pointer_y;
     bool pointer_valid;
-    uint32_t group; // 1 fighters, 2 seedships, 3 all; zero leaves selection unchanged.
-    uint32_t priority; // 1 fighter, 2 seedship.
+    uint32_t group; // 1 fighters, 2 bombers, 3 all; zero keeps the selection.
+    uint32_t priority; // 1 fighter, 2 bomber.
 };
 struct Camera { Vec3 position, target, up; };
 

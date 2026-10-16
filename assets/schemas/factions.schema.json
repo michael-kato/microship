@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "microship factions",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "factions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "name": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "label": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "color": {
+            "$ref": "shared.schema.json#/$defs/color"
+          },
+          "production": {
+            "type": "object",
+            "properties": {
+              "building": {
+                "$ref": "shared.schema.json#/$defs/name"
+              },
+              "default_unit": {
+                "$ref": "shared.schema.json#/$defs/name"
+              },
+              "assault_unit": {
+                "$ref": "shared.schema.json#/$defs/name"
+              }
+            },
+            "required": [
+              "building",
+              "default_unit",
+              "assault_unit"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "label",
+          "color"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 8
+    }
+  },
+  "required": [
+    "factions"
+  ],
+  "additionalProperties": false
+}

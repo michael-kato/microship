@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "microship content",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "bodies": {
+      "$ref": "shared.schema.json#/$defs/path"
+    },
+    "factions": {
+      "$ref": "shared.schema.json#/$defs/path"
+    },
+    "groups": {
+      "$ref": "shared.schema.json#/$defs/path"
+    },
+    "units": {
+      "$ref": "shared.schema.json#/$defs/path"
+    },
+    "buildings": {
+      "$ref": "shared.schema.json#/$defs/path"
+    }
+  },
+  "required": [
+    "bodies",
+    "factions",
+    "groups",
+    "units",
+    "buildings"
+  ],
+  "additionalProperties": false
+}

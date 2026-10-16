@@ -1,0 +1,49 @@
+{
+  "$schema": "../schemas/render.schema.json",
+  "output": {
+    "width": 1920,
+    "height": 1080,
+    "exposure": 1.6
+  },
+  "sampling": {
+    "samples_per_pixel": 256,
+    "seed": 1,
+    "max_transmission_layers": 8
+  },
+  "geometry": {
+    "sphere_segments": 64,
+    "sphere_rings": 32
+  },
+  "camera": {
+    "position": [
+      0.0,
+      6.0,
+      20.0
+    ],
+    "target": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "up": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "min_distance": 8.0,
+    "max_distance": 38.0,
+    "vertical_fov_degrees": 45.0
+  },
+  "lighting": {
+    "microfacet_energy_compensation": true
+  },
+  "bloom": {
+    "radius": 32,
+    "strength": 0.0,
+    "threshold": 1.0
+  },
+  "volume": {
+    "rays_per_pixel": 1,
+    "integration_steps": 32
+  }
+}

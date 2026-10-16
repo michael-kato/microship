@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "microship render",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "exposure": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "width",
+        "height",
+        "exposure"
+      ],
+      "additionalProperties": false
+    },
+    "sampling": {
+      "type": "object",
+      "properties": {
+        "samples_per_pixel": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "max_transmission_layers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        }
+      },
+      "required": [
+        "samples_per_pixel",
+        "seed",
+        "max_transmission_layers"
+      ],
+      "additionalProperties": false
+    },
+    "geometry": {
+      "type": "object",
+      "properties": {
+        "sphere_segments": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 512
+        },
+        "sphere_rings": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 256
+        }
+      },
+      "required": [
+        "sphere_segments",
+        "sphere_rings"
+      ],
+      "additionalProperties": false
+    },
+    "camera": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "$ref": "shared.schema.json#/$defs/position"
+        },
+        "target": {
+          "$ref": "shared.schema.json#/$defs/position"
+        },
+        "up": {
+          "$ref": "shared.schema.json#/$defs/position"
+        },
+        "min_distance": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 1000000
+        },
+        "max_distance": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 1000000
+        },
+        "vertical_fov_degrees": {
+          "type": "number",
+          "exclusiveMinimum": 1,
+          "exclusiveMaximum": 179
+        }
+      },
+      "required": [
+        "position",
+        "target",
+        "up",
+        "min_distance",
+        "max_distance",
+        "vertical_fov_degrees"
+      ],
+      "additionalProperties": false
+    },
+    "lighting": {
+      "type": "object",
+      "properties": {
+        "microfacet_energy_compensation": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "microfacet_energy_compensation"
+      ],
+      "additionalProperties": false
+    },
+    "bloom": {
+      "type": "object",
+      "properties": {
+        "radius": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "strength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      },
+      "required": [
+        "radius",
+        "strength",
+        "threshold"
+      ],
+      "additionalProperties": false
+    },
+    "volume": {
+      "type": "object",
+      "properties": {
+        "rays_per_pixel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "integration_steps": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 64
+        }
+      },
+      "required": [
+        "rays_per_pixel",
+        "integration_steps"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "output",
+    "sampling",
+    "geometry",
+    "camera",
+    "lighting",
+    "bloom",
+    "volume"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,266 @@
+#include "presentation.h"
+#include "simulation.h"
+#include "render_config.h"
+#include "camera.h"
+#include "effects.h"
+#include "vector_math.h"
+#include <string.h>
+#include <stdio.h>
+#include <new>
+#include <algorithm>
+
+static void set_instance(Presentation* p,uint32_t slot,uint32_t mesh,Vec3 position,Vec3 x,Vec3 y,Vec3 z)
+{
+    RenderInstance* instance=&p->scene.instances[slot];instance->mesh=mesh;instance->mask=1;
+    const float columns[3][3]={{x.x,x.y,x.z},{y.x,y.y,y.z},{z.x,z.y,z.z}};
+    const float center[3]={position.x,position.y,position.z};
+    for (uint32_t row=0;row<3;++row)
+    {
+        for (uint32_t column=0;column<3;++column) instance->transform[row][column]=columns[column][row];
+        instance->transform[row][3]=center[row];
+    }
+}
+
+bool presentation_initialize(Presentation* p,const Simulation* s,const RenderConfig* config)
+{
+    const World* w=&s->world;RenderScene* scene=&p->scene;
+    std::vector<MeshSource> sources;
+    try
+    {
+        sources.reserve(MAX_BODIES+MAX_UNIT_TYPES+MAX_PRODUCER_TYPES+2);
+        for (uint32_t i=0;i<w->body_count;++i)
+        {
+            const Body* c=&w->bodies[i];p->body_meshes[i]=(uint32_t)sources.size();
+            sources.push_back(MeshSource{c->model_path,c->position,c->radius,0,c->color});
+        }
+        for (uint32_t i=0;i<w->content.unit_count;++i)
+        {
+            const UnitDefinition* definition=&w->content.units[i];bool shared=false;
+            for (uint32_t j=0;j<i;++j)
+                if (!strcmp(definition->model_path,w->content.units[j].model_path)
+                    && !memcmp(&definition->color,&w->content.units[j].color,sizeof(Color)))
+                { p->unit_meshes[i]=p->unit_meshes[j];shared=true;break; }
+            if (shared) continue;
+            p->unit_meshes[i]=(uint32_t)sources.size();
+            sources.push_back(MeshSource{definition->model_path,Vec3{},1,0,definition->color});
+        }
+        for (uint32_t i=0;i<w->content.producer_count;++i)
+        {
+            p->factory_meshes[i]=(uint32_t)sources.size();
+            sources.push_back(MeshSource{w->content.producers[i].model_path,Vec3{},1,0,Color{1,1,1}});
+        }
+        if (w->spikes.enabled)
+        {
+            p->spike_mesh=(uint32_t)sources.size();
+            sources.push_back(MeshSource{w->spikes.model,Vec3{},1,0,Color{1,1,1}});
+        }
+        if (w->backdrop.model_path[0])
+        {
+            p->background_mesh=(uint32_t)sources.size();const Background* b=&w->backdrop;
+            sources.push_back(MeshSource{b->model_path,b->position,b->scale,0,b->color});
+        }
+        if (!geometry_build(&scene->geometry,sources.data(),(uint32_t)sources.size(),config)) return false;
+        p->unit_base=0;p->body_base=w->gameplay.enabled ? (uint32_t)MAX_UNITS : w->spawn_count;
+        p->factory_base=p->body_base+w->body_count;
+        p->attached_base=p->factory_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES : 0);
+        p->flying_base=p->attached_base+(w->spikes.enabled ? MAX_UNITS*w->spikes.count : 0);
+        p->embedded_base=p->flying_base+(w->spikes.enabled ? MAX_PROJECTILES : 0);
+        p->background_slot=p->embedded_base+(w->spikes.enabled ? 2*(MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES) : 0);
+        scene->instances.resize(p->background_slot+1);
+        scene->effects.resize(MAX_EFFECT_SEGMENTS);
+        scene->tile_count=((config->width+EFFECT_TILE-1)/EFFECT_TILE)*((config->height+EFFECT_TILE-1)/EFFECT_TILE);
+        scene->effect_tiles.resize(2*scene->tile_count+1+MAX_EFFECT_REFERENCES);
+        for (uint32_t i=0;i<w->body_count;++i)
+            if (w->bodies[i].interior_radius>0)
+            { p->medium_bodies[scene->media.size()]=(int32_t)i;scene->media.push_back(RenderMedium{}); }
+    }
+    catch (const std::bad_alloc&) { fprintf(stderr,"Cannot allocate game presentation storage.\n");return false; }
+    scene->ambient=w->ambient;scene->ambient_top=w->ambient_top;scene->ambient_bottom=w->ambient_bottom;
+    for (uint32_t i=0;i<3;++i) scene->lights[i]=RenderLight{w->studio[i].direction,w->studio[i].color,w->studio[i].irradiance};
+    scene->lights_enabled=w->studio_mask!=0;scene->guides_required=w->combat.enabled;
+    scene->thin_transmission=w->thin_transmission;scene->thin_absorption=w->thin_absorption;scene->thin_clarity=w->thin_clarity;
+    scene->background_samples=w->backdrop_soft ? 0 : w->backdrop_samples;
+    scene->background_triangles=w->backdrop_soft || !w->backdrop.model_path[0] ? 0 : scene->geometry.meshes[p->background_mesh].count;
+    scene->background_blur=w->backdrop_soft ? w->backdrop_blur : 0;
+    scene->background_glow=w->backdrop_glow;scene->background_ambient=w->backdrop_ambient;scene->background_wave=w->backdrop_wave;
+    return true;
+}
+
+static float unit_visual_scale(const Simulation* s,const Unit* unit)
+{
+    float size=simulation_unit_definition(s,unit)->scale;
+    if (!s->world.combat.flight_enabled) return size;
+    float t=std::fmin(1.0f,unit->age/.25f);t=t*t*(3-2*t);size*=.3f+.7f*t;
+    if (unit->landing>0) size*=1-.8f*std::fmin(1.0f,unit->landing/s->world.gameplay.landing_seconds);
+    return size;
+}
+
+static Vec3 posed_direction(Vec3 local,Vec3 x,Vec3 y,Vec3 z)
+{ return add(add(scale(x,local.x),scale(y,local.y)),scale(z,local.z)); }
+static uint32_t factory_instance_slot(const Presentation* state,uint32_t cell,uint32_t structure)
+{ return state->factory_base+cell*MAX_FACTORY_STRUCTURES+structure; }
+static void spike_instance(Presentation* state,uint32_t slot,Vec3 root,Vec3 direction,float length,float width,Color color)
+{
+    Vec3 axis=std::fabs(direction.y)<.95f ? Vec3{0,1,0} : Vec3{1,0,0};
+    Vec3 x=normalize(cross(axis,direction)),y=cross(direction,x);
+    set_instance(state,slot,state->spike_mesh,root,scale(x,width),scale(y,width),scale(direction,length));
+    float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=1;
+}
+static void update_spike_instances(Presentation* state,const Simulation* simulation)
+{
+    const Simulation* s=simulation;const SpikeRules* r=&s->world.spikes;if (!r->enabled) return;
+    state->attached_spikes=state->flying_spikes=state->embedded_spikes=0;
+    uint32_t flying=state->flying_base,embedded=state->embedded_base;
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    {
+        const Unit* u=&s->units[i];if (u->health<=0 || !s->visible_units[i]) continue;
+        float size=unit_visual_scale(s,u);Vec3 x,y,z;simulation_unit_axes(u,&x,&y,&z);
+        Color color=u->flash>0 ? s->world.combat.flash : u->wounds ? r->injury[std::min(1u,u->wounds-1)] : content_color(&s->world.content,u->faction);
+        if (simulation_unit_definition(s,u)->detaches)
+            for (uint32_t j=0;j<r->count;++j)
+            {
+                float growth=u->spikes[j];if (growth<=.001f) continue;
+                Vec3 dir=posed_direction(simulation_spike_direction(j,r->count),x,y,z);
+                spike_instance(state,state->attached_base+i*r->count+j,add(u->position,scale(dir,r->root*size)),dir,
+                    size*r->length*growth,size*.5f*growth,color);++state->attached_spikes;
+            }
+        for (uint32_t j=0;j<u->wounds && j<MAX_EMBEDDED;++j)
+        {
+            Vec3 outward=posed_direction(u->embedded[j].direction,x,y,z);float length=std::fmax(r->scale,size*.45f);
+            Vec3 root=add(add(u->position,scale(posed_direction(u->embedded[j].anchor,x,y,z),size)),scale(outward,length*.7f));
+            spike_instance(state,embedded+i*2+j,root,scale(outward,-1),length,length*.5f,content_color(&s->world.content,u->embedded[j].faction));++state->embedded_spikes;
+        }
+    }
+    for (uint32_t i=0;i<MAX_PROJECTILES;++i)
+    {
+        const Projectile* p=&s->projectiles[i];if (!p->active || !simulation_in_sight(s,p->position,0)) continue;
+        float blend=std::fmin(1.0f,p->age/.06f),length=p->launch_scale+(r->scale-p->launch_scale)*blend;
+        spike_instance(state,flying+i,p->position,p->direction,length,length*.5f,content_color(&s->world.content,p->faction));++state->flying_spikes;
+    }
+    for (uint32_t i=0;i<s->world.body_count;++i)
+    {
+        const Colony* c=&s->colonies[i];if (c->health<=0 || !s->visible_bodies[i]) continue;
+        uint32_t count=simulation_producer_definition(s,i)->branches.count;
+        for (uint32_t k=0;k<count;++k)
+        {
+            const FactoryStructure* b=k ? &c->branches[k-1] : 0;
+            if (k && b->health<=0) continue;
+            uint32_t wounds=k ? b->wounds : c->wounds;
+            const EmbeddedSpike* spikes=k ? b->embedded : c->embedded;
+            Vec3 tip=simulation_structure_position(s,i,k);
+            for (uint32_t j=0;j<wounds && j<MAX_EMBEDDED;++j)
+            {
+                Vec3 outward=spikes[j].direction;float length=r->scale*2;
+                spike_instance(state,embedded+MAX_UNITS*2+(i*MAX_FACTORY_STRUCTURES+k)*2+j,
+                    add(add(tip,spikes[j].anchor),scale(outward,length*.7f)),scale(outward,-1),length,length*.5f,
+                    content_color(&s->world.content,spikes[j].faction));++state->embedded_spikes;
+            }
+            if (wounds)
+            {
+                Color tint=r->injury[std::min(1u,wounds-1)];float* style=state->scene.instances[factory_instance_slot(state,i,k)].style;
+                style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=.95f;
+            }
+        }
+    }
+}
+
+static void update_gameplay_instances(Presentation* state,const Simulation* simulation)
+{
+    const Simulation* s=simulation;
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    {
+        const Unit* unit=&s->units[i];if (unit->health<=0 || !s->visible_units[i]) continue;
+        const UnitDefinition* definition=simulation_unit_definition(s,unit);float yaw=definition->yaw_degrees*.01745329252f;
+        if (unit->target>=0)
+        {
+            Vec3 delta=subtract(s->world.bodies[unit->target].position,unit->position);
+            yaw=std::atan2(delta.x,delta.z);
+        }
+        if (s->world.combat.enabled)
+        {
+            Vec3 velocity=subtract(unit->position,s->trails[i].points[0]);
+            if (dot(velocity,velocity)>.000001f) yaw=std::atan2(velocity.x,velocity.z);
+            const CombatVisuals* fx=&s->world.combat;
+            bool flash=unit->flash>0;float flash_strength=flash ? std::sqrt(unit->flash/fx->flash_seconds) : 0;Color tint=flash ? fx->flash : fx->injured;
+            if (!flash && unit->wounds) tint=s->world.spikes.injury[std::min(1u,unit->wounds-1)];
+            float* style=state->scene.instances[state->unit_base+i].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;
+            style[3]=flash ? .9f*flash_strength : (unit->wounds ? .95f : 0);
+            style[4]=flash ? .6f*flash_strength : 0;
+        }
+        if (s->world.combat.flight_enabled)
+        {
+            float size=unit_visual_scale(s,unit);Vec3 x,y,z;simulation_unit_axes(unit,&x,&y,&z);
+            set_instance(state,state->unit_base+i,state->unit_meshes[unit->type],unit->position,scale(x,size),scale(y,size),scale(z,size));
+            continue;
+        }
+        float c=std::cos(yaw)*definition->scale,v=std::sin(yaw)*definition->scale;
+        set_instance(state,state->unit_base+i,state->unit_meshes[unit->type],unit->position,
+            Vec3{c,0,-v},Vec3{0,definition->scale,0},Vec3{v,0,c});
+    }
+    for (uint32_t p=0;p<s->world.body_count;++p)
+    {
+        const Colony* colony=&s->colonies[p];if (colony->health<=0 || !s->visible_bodies[p]) continue;
+        if (s->world.gameplay.enabled)
+        {
+            Vec3 right,up,normal;simulation_producer_axes(simulation_producer_definition(s,p),&right,&up,&normal);
+            for (uint32_t k=0;k<simulation_producer_definition(s,p)->branches.count;++k)
+            {
+                const FactoryStructure* b=k ? &colony->branches[k-1] : 0;if (k && b->health<=0) continue;
+                float growth=std::fmax(.02f,k ? b->growth : colony->growth);
+                Vec3 position=k ? add(colony->surface,b->offset) : colony->surface;
+                float width=simulation_producer_definition(s,p)->width*growth;
+                set_instance(state,factory_instance_slot(state,p,k),state->factory_meshes[colony->type],position,
+                    scale(right,width),scale(up,simulation_producer_definition(s,p)->height*growth),scale(normal,width));
+            }
+            continue;
+        }
+    }
+    update_spike_instances(state,simulation);
+}
+
+
+bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera,const RenderConfig* config)
+{
+    RenderScene* scene=&p->scene;const World* w=&s->world;
+    memset(scene->instances.data(),0,scene->instances.size()*sizeof(RenderInstance));
+    for (uint32_t i=0;i<scene->instances.size();++i)
+        for (uint32_t axis=0;axis<3;++axis) scene->instances[i].transform[axis][axis]=1;
+    for (uint32_t i=0;i<w->body_count;++i)
+        if (simulation_body_known(s,i))
+            set_instance(p,p->body_base+i,p->body_meshes[i],Vec3{},Vec3{1,0,0},Vec3{0,1,0},Vec3{0,0,1});
+    for (uint32_t i=0;i<scene->media.size();++i)
+    {
+        const Body* c=&w->bodies[p->medium_bodies[i]];RenderMedium* medium=&scene->media[i];
+        *medium=RenderMedium();
+        medium->center_radius[0]=c->position.x;medium->center_radius[1]=c->position.y;medium->center_radius[2]=c->position.z;
+        medium->center_radius[3]=simulation_body_known(s,p->medium_bodies[i]) ? c->radius*c->interior_radius : 0;
+        medium->scattering[0]=c->interior_scattering.r;medium->scattering[1]=c->interior_scattering.g;medium->scattering[2]=c->interior_scattering.b;
+        medium->scattering[3]=c->interior_fade;
+        medium->absorption_phase[0]=medium->absorption_phase[1]=medium->absorption_phase[2]=c->interior_absorption;
+        medium->absorption_phase[3]=c->interior_anisotropy;
+    }
+    if (w->gameplay.enabled) update_gameplay_instances(p,s);
+    else
+        for (uint32_t i=0;i<w->spawn_count;++i)
+        {
+            const Spawn* spawn=&w->spawns[i];const UnitDefinition* definition=&w->content.units[spawn->type];
+            float c=std::cos(definition->yaw_degrees*.01745329252f)*definition->scale;
+            float v=std::sin(definition->yaw_degrees*.01745329252f)*definition->scale;
+            set_instance(p,p->unit_base+i,p->unit_meshes[spawn->type],spawn->position,Vec3{c,0,-v},Vec3{0,definition->scale,0},Vec3{v,0,c});
+        }
+    scene->time_seconds=s->time_seconds;
+    if (w->backdrop.model_path[0])
+    {
+        double phase=s->time_seconds*6.283185307179586/(w->backdrop_soft ? w->backdrop_period : 1);
+        scene->background_animation[0]=(float)std::sin(phase);scene->background_animation[1]=(float)std::cos(phase);
+        scene->background_animation[2]=(float)std::fmod(phase,6.283185307179586);
+        float pulse=w->backdrop_soft ? w->backdrop_pulse : 0;
+        Vec3 stretch={1+pulse*(float)std::sin(phase),1+pulse*(float)std::sin(phase+.7),1},center=w->backdrop.position;
+        set_instance(p,p->background_slot,p->background_mesh,Vec3{center.x*(1-stretch.x),center.y*(1-stretch.y),0},
+            Vec3{stretch.x,0,0},Vec3{0,stretch.y,0},Vec3{0,0,1});
+        scene->instances[p->background_slot].mask=w->backdrop_soft ? 4 : 1;
+        scene->instances[p->background_slot].background=true;
+    }
+    render_scene_bounds(scene);
+    return effects_build(s,camera,config,scene->effects.data(),&scene->effect_count,scene->effect_tiles.data(),scene->tile_count);
+}

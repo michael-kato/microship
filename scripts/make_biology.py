@@ -45,6 +45,22 @@ def rod(a,b,radius,color):
     obj=bpy.context.object;obj.rotation_euler=delta.to_track_quat('Z','Y').to_euler()
     return finish(obj,color)
 
+def branches(start,direction,length,radius,depth,color,planar=False,buds=None):
+    p=profiles['fractal'];start=Vector(start);direction=Vector(direction).normalized();end=start+direction*length
+    rod(start,end,radius,color)
+    if depth==0:
+        if buds:sphere(end,(radius*3,)*3,buds,1,.65)
+        return
+    axis=Vector((0,0,1)) if planar else Vector((.37,.81,.45))
+    side=direction.cross(axis)
+    if side.length<.01:side=direction.cross(Vector((1,0,0)))
+    side.normalize()
+    for sign in (-1,1):
+        jitter=rng.uniform(-p['jitter'],p['jitter'])
+        child=direction+side*(sign*p['spread']+jitter)
+        if not planar:child+=axis*rng.uniform(-p['jitter'],p['jitter'])
+        branches(end,child,length*p['scale'],radius*p['radius_scale'],depth-1,color,planar,buds)
+
 def export(name):
     global parts
     bpy.ops.object.select_all(action='DESELECT')
@@ -101,22 +117,29 @@ def cell(name,key):
             point=(radius*math.cos(angle),radius*.7*math.sin(angle),-.15+ring*.095+.04*math.sin(angle*3))
             if previous:rod(previous,point,inner['reticulum_tube'],inner['reticulum_color'])
             previous=point
+    substrate=profiles['substrate']
+    for i in range(substrate['roots']):
+        angle=i*2.39996323;y=1-2*(i+.5)/substrate['roots'];r=math.sqrt(1-y*y)
+        direction=Vector((r*math.cos(angle),y,r*math.sin(angle)))
+        branches(direction*.12,direction,substrate['length'],substrate['radius'],substrate['depth'],substrate['color'])
     export(name)
 
 def virus(large):
     p=profiles['virus']
     if not large:
         sphere((0,0,0),(.58,.58,.58),p['body'],2,.8)
+        for i in range(6):
+            a=i*math.tau/6;d=Vector((math.cos(a),math.sin(a),.2))
+            branches(d*.45,d,.10,.012,2,p['spikes'])
         # Detachable spikes are instances of virus_spike.fmesh at runtime.
     else:
-        sphere((0,.32,0),(.48,.50,.48),p['body'],2)
-        sphere((0,.36,.40),(.23,.24,.12),p['core'],2)
-        rod((0,-.28,0),(0,.1,0),.105,p['spikes'])
-        sphere((0,-.30,0),(.20,.10,.20),p['spikes'],1)
-        for i in range(6):
-            a=i*math.tau/6;mid=(.5*math.cos(a),-.4,.5*math.sin(a));tip=(.72*math.cos(a),-.78,.72*math.sin(a))
-            rod((0,-.27,0),mid,.035,p['spikes']);rod(mid,tip,.025,p['spikes'])
-    export('virus_'+('infector' if large else 'virion'))
+        # A broad capsid with paired payload sacs and repeated forked ribs.
+        sphere((0,0,0),(.42,.3,.78),p['body'],2)
+        for side in (-1,1):
+            for j in range(3):
+                z=(j-1)*.4;sphere((side*.34,-.1,z),(.19,.18,.2),p['core'],1,.48)
+                branches((side*.25,.05,z),(side,.25,.12),.22,.035,3,p['spikes'],buds=p['body'])
+    export('virus_'+('bomber' if large else 'virion'))
 
 def immune(large):
     p=profiles['immune'];radius=.70 if large else .59
@@ -133,7 +156,10 @@ def immune(large):
         sphere((math.cos(a)*radius*.8,-.2,math.sin(a)*radius*.8),(.20,.17,.22),p['body'],2)
     for i in range(10):
         a=i*2.39996323;sphere((.38*math.cos(a),.32*math.sin(a),.49),(.04,.04,.04),p['granules'],1)
-    export('immune_'+('macrophage' if large else 'leukocyte'))
+    for i in range(6 if large else 4):
+        a=i*math.tau/(6 if large else 4);d=Vector((math.cos(a),math.sin(a),.1))
+        branches(d*radius*.8,d,.13 if large else .09,.022,2,p['body'],buds=p['granules'])
+    export('immune_'+('bomber' if large else 'leukocyte'))
 
 def node():
     p=profiles['node'];sphere((0,.12,0),(.24,.16,.24),p['stem'],2)
@@ -144,6 +170,16 @@ def node():
         a=i*math.tau/5;sphere((.25*math.cos(a),.82,.25*math.sin(a)),(.14,.14,.14),p['buds'],2)
     sphere((0,.87,0),(.20,.17,.20),p['membrane'],2)
     export('cell_replication_node')
+
+def factory(side):
+    p=profiles[side];f=profiles['factory']
+    color=p['spikes'] if side=='virus' else p['body'];bud=p['core'] if side=='virus' else p['granules']
+    sphere((0,.18,0),(.19,.2,.17),p['body'],2,.7)
+    branches((0,0,0),(0,1,0),f['length'],f['radius'],f['depth'],color,True,bud)
+    # Repeated small capsids or rounded immune lobes replace flower petals.
+    for sign in (-1,1):
+        sphere((sign*.26,.55,.04),(.14,.18,.12),bud,1 if side=='virus' else 2,.6)
+    export(side+'_factory')
 
 def background(name,key):
     p=profiles[key];vertices=[];faces=[];nx,ny=64,40
@@ -182,10 +218,11 @@ def background(name,key):
     export(name)
 
 cell('cell_infected','infected_cell');cell('cell_healthy','healthy_cell');cell('cell_neutral','neutral_cell')
-virus(False);virus(True);immune(False);immune(True);node()
+virus(False);virus(True);immune(False);immune(True);node();factory('virus');factory('immune')
 # One reusable shaft and head, local +Z; attached, flying and embedded use this mesh.
 rod((0,0,0),(0,0,.87),.075,(1,1,1));sphere((0,0,.91),(.14,.14,.09),(1,1,1),1,.45)
 export('virus_spike')
+rng=random.Random(profiles['seed'])
 background('tissue_background','tissue');background('bloodstream_background','bloodstream')
 bpy.context.preferences.filepaths.save_version=0
 bpy.ops.wm.save_as_mainfile(filepath=str(out/'source/biology.blend'),compress=True)

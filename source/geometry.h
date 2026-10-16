@@ -3,39 +3,29 @@
 
 #include <stdint.h>
 #include <vector>
+#include "types.h"
 
-struct World;
 struct RenderConfig;
-struct Cell;
-struct Vec3;
 
-// Matches std430 records. Triangle tag: 0 dielectric, 1 sun, 2 conductor, 3 thin cell membrane.
-struct GpuVertex
+// Matches std430. Surface tags: 0 dielectric, 2 conductor, 3 thin transmission.
+struct GpuVertex { float position[4],normal[4],color[4]; };
+struct GpuTriangle { uint32_t index[4]; };
+struct MeshRange { uint32_t first,count; float low[3],high[3]; };
+struct MeshSource
 {
-    float position[4];
-    float normal[4];
-    float color[4];
+    const char* path; // An empty path requests an authored sphere primitive.
+    Vec3 position;
+    float scale,yaw;
+    Color color;
 };
-
-struct GpuTriangle
-{
-    uint32_t index[4];
-};
-struct MeshRange { uint32_t first, count; };
-
 struct Geometry
 {
     std::vector<GpuVertex> vertices;
     std::vector<GpuTriangle> triangles;
-    uint32_t light_first_triangle;
-    uint32_t light_triangle_count;
-    float light_area;
-    uint32_t static_triangle_count;
-    MeshRange ships[64], stalk, backdrop,spike;
+    std::vector<MeshRange> meshes;
 };
 
-// Generates one startup mesh. Geometry contains no rendering API resources.
-bool geometry_build(Geometry* geometry, const World* world, const RenderConfig* config);
-bool geometry_cell_surface_point(const Cell* planet, Vec3* point);
+bool geometry_build(Geometry*,const MeshSource*,uint32_t count,const RenderConfig*);
+bool geometry_surface_point(const char* path,Vec3 position,float scale,Vec3 direction,Vec3* point);
 
 #endif

@@ -1,0 +1,6 @@
+{
+  "$schema": "schemas/startup.schema.json",
+  "world": "levels/biology-virus.json",
+  "render": "rendering/biology.json",
+  "shader": "shaders/ray_trace.comp.spv"
+}

@@ -7,14 +7,14 @@
 // approximate ambient shading/emission, then two native-resolution blur passes.
 // This layer never supplies indirect illumination or gameplay collision.
 layout(local_size_x=8,local_size_y=8) in;
-layout(set=0,binding=0) uniform accelerationStructureEXT scene_acceleration;
+layout(set=0,binding = 0) uniform accelerationStructureEXT scene_acceleration;
 struct Vertex { vec4 position,normal,color; };
-layout(set=0,binding=2,std430) readonly buffer Vertices { Vertex vertices[]; };
-layout(set=0,binding=3,std430) readonly buffer Triangles { uvec4 triangles[]; };
-layout(set=0,binding=10,rgba16f) uniform writeonly image2D background_a;
-layout(set=0,binding=11,rgba16f) uniform writeonly image2D background_b;
-layout(set=0,binding=12) uniform sampler2D source_a;
-layout(set=0,binding=13) uniform sampler2D source_b;
+layout(set=0,binding = 2,std430) readonly buffer Vertices { Vertex vertices[]; };
+layout(set=0,binding = 3,std430) readonly buffer Triangles { uvec4 triangles[]; };
+layout(set=0,binding = 9,rgba16f) uniform writeonly image2D background_a;
+layout(set=0,binding = 10,rgba16f) uniform writeonly image2D background_b;
+layout(set=0,binding = 11) uniform sampler2D source_a;
+layout(set=0,binding = 12) uniform sampler2D source_b;
 layout(push_constant) uniform BackgroundPass { int pass; int unused0; int unused1; int unused2; } filter_pass;
 
 void main()

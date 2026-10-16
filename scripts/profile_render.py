@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prepare bounded diagnostic runs; GPU execution requires --run.
 
-Default diagnostics: native 1920x1080, 8 surface + 0 volume spp, two frames, one round, timing queries only.
+Default diagnostics: native 1920x1080, 6 film + 1 volume + 1 background query, two frames, one round.
 Runs the Windows executable through scripts/proton_run.py on Linux. Game defaults stay
 unchanged. No hardware tracing is supported after the recorded driver lockup.
 """
@@ -11,20 +11,23 @@ import json
 import os
 from pathlib import Path
 import re
-import shutil
 import signal
 import statistics
 import subprocess
 import sys
 import time
 from gpu_environment import check_gpu_environment
+from authored_assets import stage_world, write_world
+from copy import deepcopy
 
 
-def setting(text, name, value):
-    updated, count = re.subn(rf'(?m)^{re.escape(name)}\s+[^\n#]+', f'{name} {value}', text)
-    if count != 1:
-        raise RuntimeError(f'Expected one {name} in rendering data')
-    return updated
+def setting(data, name, value):
+    updated=deepcopy(data)
+    for section in updated.values():
+        if isinstance(section,dict) and name in section:
+            section[name]=value
+            return updated
+    raise RuntimeError(f'Unknown rendering setting: {name}')
 
 
 def numbers(pattern, log, frames, allow_zero=False):
@@ -40,27 +43,21 @@ def main():
     parser.add_argument('--run', action='store_true', help='Explicitly launch GPU diagnostics')
     parser.add_argument('--width', type=int, default=1920)
     parser.add_argument('--height', type=int, default=1080)
-    parser.add_argument('--samples', type=int, default=8)
-    parser.add_argument('--volume-samples', type=int, default=0)
+    parser.add_argument('--samples', type=int, default=6)
+    parser.add_argument('--volume-samples', type=int, default=1)
     parser.add_argument('--frames', type=int, default=2)
     parser.add_argument('--rounds', type=int, default=1)
     parser.add_argument('--timeout', type=float, default=10,
                         help='Host timeout per process; cannot recover a hung GPU driver')
-    parser.add_argument('--time', type=float, default=60, help='Frozen scene/sun timestamp; not workload duration')
-    parser.add_argument('--reference-shader', type=Path,
-                        help='Compare the prior lighting shader with the current shader in the full scene')
-    parser.add_argument('--reference-world', type=Path,
-                        help='Optional frozen prior world for the reference case (changes scene as well as shader)')
+    parser.add_argument('--time', type=float, default=60, help='Frozen scene timestamp; not workload duration')
     parser.add_argument('--output', type=Path, default=Path('build/profiling/diagnostic'))
     args = parser.parse_args()
     if args.binary.suffix.lower() != '.exe':
         parser.error('Profile the Windows .exe; Linux runs it through Proton')
-    if args.reference_world and not args.reference_shader:
-        parser.error('--reference-world requires --reference-shader')
-    if not ((args.width,args.height) in ((1920,1080),(2560,1440))
+    if not ((args.width,args.height) == (1920,1080)
             and 1 <= args.samples <= 8 and 0 <= args.volume_samples <= 8-args.samples and 1 <= args.frames <= 2
             and 1 <= args.rounds <= 2 and 0 < args.timeout <= 10):
-        parser.error('Diagnostics require native 1920x1080 or 2560x1440, 1-8 total surface/volume spp, 1-2 frames, '
+        parser.error('Diagnostics require native 1920x1080, 1-8 total surface/volume spp, 1-2 frames, '
                      '1-2 rounds, and a process timeout of at most 10 seconds')
     if args.run:
         check_gpu_environment()
@@ -70,58 +67,48 @@ def main():
     levels, configs = output / 'levels', output / 'rendering'
     levels.mkdir(parents=True, exist_ok=True)
     configs.mkdir(exist_ok=True)
-    # Preserve relative mesh references in the diagnostic worlds.
-    models = output / 'models'
-    models.mkdir(exist_ok=True)
-    for model in (assets / 'models').glob('*.fmesh'):
-        shutil.copy2(model, models / model.name)
-    world = (assets / 'levels/first.world').read_text()
-    config = (assets / 'rendering/first.render').read_text()
-    config = setting(config, 'spatial_denoise', 0)
-    for name, value in (('width', args.width), ('height', args.height),
-                        ('samples_per_pixel', args.samples), ('volume_samples_per_pixel', args.volume_samples)):
-        config = setting(config, name, value)
-    reuse = int(re.search(r'(?m)^spatial_sun_reuse\s+(\d+)',config)[1])
-    if args.samples+args.volume_samples+reuse > 8:
-        parser.error('The SPMIS source candidate counts toward the eight-sample cap; lower an explicit diagnostic budget')
-    cases = [
-        ('full', world, config),
-        ('no-ships', re.sub(r'(?m)^ship\s+.*$', '', world), config),
-        ('sphere-bodies', re.sub(r'(?m)^model\s+.*$', '', world), config),
-        ('one-bounce', world, setting(config, 'max_bounces', 1)),
-        ('half-samples', world, setting(config, 'samples_per_pixel', max(1, args.samples // 2))),
-    ]
-    if re.search(r'(?m)^(global_atmosphere|global_atmosphere_edge_fade|atmosphere|haze|haze_edge_fade)\s+', world):
-        cases.append(('no-volumes', re.sub(r'(?m)^(global_atmosphere|global_atmosphere_edge_fade|atmosphere|haze|haze_edge_fade)\s+.*$', '', world), config))
+    startup=json.loads((assets/'startup.json').read_text())
+    world=stage_world(assets/startup['world'],levels)
+    config=json.loads((assets/startup['render']).read_text())
+    config['$schema']=Path(os.path.relpath(assets/'schemas/render.schema.json',configs)).as_posix()
+    for name,value in (('width',args.width),('height',args.height),
+                       ('samples_per_pixel',args.samples),('rays_per_pixel',args.volume_samples)):
+        config=setting(config,name,value)
+    background=int('soft' in world['appearance'].get('backdrop',{}))
+    if args.samples+args.volume_samples+background>8:
+        parser.error('Background queries count toward the eight-sample cap')
+    single=deepcopy(world)
+    for building in single['content']['buildings']:building['branches']['count']=1
+    spheres=deepcopy(world)
+    for body in spheres['content']['bodies']:
+        body['geometry']='sphere';body.pop('model',None)
+    cases=[('full',world,config),('single-structure',single,config),('sphere-bodies',spheres,config),
+           ('one-transmission-layer',world,setting(config,'max_transmission_layers',1)),
+           ('half-samples',world,setting(config,'samples_per_pixel',max(1,args.samples//2)))]
+    if any('medium' in body for body in world['bodies']):
+        no_volumes=deepcopy(world)
+        for body in no_volumes['bodies']:body.pop('medium',None)
+        cases.append(('no-volumes',no_volumes,config))
         if args.volume_samples:
-            cases.extend([
-                ('half-volume-samples', world, setting(config,'volume_samples_per_pixel',args.volume_samples//2)),
-                ('uniform-volume-proposal', world, setting(config,'volume_local_bounds',0)),
-            ])
-    if args.reference_shader:
-        prior_world = args.reference_world.read_text() if args.reference_world else world
-        cases = [('reference', prior_world, config), ('full', world, config)]
+            cases.extend([('no-in-scattering',world,setting(config,'rays_per_pixel',0)),
+                          ('half-volume-steps',world,setting(config,'integration_steps',max(2,config['volume']['integration_steps']//2)))])
     command = [str(binary)]
     if binary.suffix.lower() == '.exe' and sys.platform != 'win32':
         command = [sys.executable, str(Path(__file__).resolve().with_name('proton_run.py')), str(binary)]
-    results = {name: {'trace_ms': [], 'surface_ms': [], 'volume_ms': [], 'sun_sources_ms': [], 'bloom_ms': [], 'application_ms': [], 'runs': []}
+    results = {name: {'trace_ms': [], 'surface_ms': [], 'volume_ms': [], 'bloom_ms': [], 'application_ms': [], 'runs': []}
                for name, _, _ in cases}
     for name, world_text, config_text in cases:
-        (levels / (name + '.world')).write_text(world_text)
-        (configs / (name + '.render')).write_text(config_text)
+        write_world(levels/(name+'.json'),world_text)
+        (configs/(name+'.json')).write_text(json.dumps(config_text,indent=2)+'\n')
     plan = {'binary': str(binary), 'scene_seconds': args.time,
             'width': args.width, 'height': args.height, 'samples_per_pixel': args.samples,
-            'volume_samples_per_pixel': args.volume_samples, 'spatial_sun_reuse': reuse,
-            'total_candidates_per_pixel': args.samples+args.volume_samples+reuse,
+            'volume_rays_per_pixel': args.volume_samples,
+            'background_queries_per_pixel': background,
+            'total_candidates_per_pixel': args.samples+args.volume_samples+background,
             'frames_per_run': args.frames, 'rounds': args.rounds,
             'process_timeout_seconds': args.timeout, 'total_timeout_seconds': 30,
             'cases': [name for name, _, _ in cases],
-            'note': 'Native-resolution capped diagnostics with reconstruction disabled; not the current eight-surface-plus-two-volume default or a 256-sample reference.'}
-    if args.reference_shader:
-        plan['reference_shader'] = str(args.reference_shader.resolve())
-    if args.reference_world:
-        plan['reference_world'] = str(args.reference_world.resolve())
-        plan['note'] += ' Reference world differs; this is a combined scene/shader comparison, not equal-quality timing.'
+            'note': 'Native-resolution direct ray tracing with fixed film samples and deterministic volume integration. No 256-sample reference is run.'}
     (output / 'plan.json').write_text(json.dumps(plan, indent=2))
     if not args.run:
         print(f'Prepared {len(cases)} cases at {args.width}x{args.height}, {args.samples} spp. '
@@ -135,11 +122,10 @@ def main():
             remaining = deadline - time.perf_counter()
             if remaining <= 0:
                 raise RuntimeError('Diagnostic run reached its 30-second host time limit')
-            shader = ['--shader', str(args.reference_shader.resolve())] if name == 'reference' else []
             process = subprocess.Popen([*command, '--headless', '--frames', str(args.frames),
                                   '--time', str(args.time),
-                                  '--world', str(levels / (name + '.world')),
-                                  '--config', str(configs / (name + '.render')), *shader],
+                                  '--world', str(levels / (name + '.json')),
+                                  '--config', str(configs / (name + '.json'))],
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                        start_new_session=(sys.platform != 'win32'))
             try:
@@ -168,7 +154,6 @@ def main():
             result['trace_ms'] += numbers(r'GPU trace: ([\d.]+) ms', log, args.frames)
             result['surface_ms'] += numbers(r'GPU surface: ([\d.]+) ms', log, args.frames)
             result['volume_ms'] += numbers(r'GPU volumes: ([\d.]+) ms', log, args.frames, allow_zero=True)
-            result['sun_sources_ms'] += numbers(r'GPU sun sources: ([\d.]+) ms', log, args.frames, allow_zero=True)
             result['bloom_ms'] += numbers(r'GPU bloom/display: ([\d.]+) ms', log, args.frames)
             result['application_ms'] += numbers(r'Application frame: ([\d.]+) ms', log, args.frames)
             result['runs'].append({'round': round_index + 1,

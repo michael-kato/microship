@@ -2,7 +2,7 @@
 #extension GL_GOOGLE_include_directive : require
 #include "debug_buffers.glsl"
 layout(local_size_x=8,local_size_y=8) in;
-layout(set=0,binding=1,rgba8) uniform image2D display_image;
+layout(set=0,binding = 1,rgba8) uniform image2D display_image;
 layout(push_constant) uniform Debug {
     uvec4 header; // Width, height, buffer views, stats.
     vec4 settings; // Exposure, surface spp, depth scale, unused.
@@ -12,7 +12,7 @@ layout(push_constant) uniform Debug {
 } debug;
 
 // Procedural 4x7 glyphs: no font texture or atlas.
-layout(set=0,binding=4,std140) uniform DebugText {
+layout(set=0,binding = 4,std140) uniform DebugText {
     uvec4 glyphs[32];
     uvec4 mask[1570]; // Native 512x92 debug text plus 960x160 gameplay text, packed in bits.
 } text_data;
@@ -26,7 +26,7 @@ const uint panel_text[72]=uint[72](
     0x55414542u,0x00005954u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,
     0x454e494cu,0x48205241u,0x00005244u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,
     0x45524944u,0x2f205443u,0x4d414320u,0x00415245u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,
-    0x49444e49u,0x54434552u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,
+    0x49424d41u,0x00544e45u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,
     0x54524556u,0x52205845u,0x2d204247u,0x4d415320u,0x20454c50u,0x00000030u,0x00000000u,0x00000000u,
     0x4d524f4eu,0x20534c41u,0x4153202du,0x454c504du,0x00003020u,0x00000000u,0x00000000u,0x00000000u,
     0x54504544u,0x202d2048u,0x504d4153u,0x3020454cu,0x00000000u,0x00000000u,0x00000000u,0x00000000u,

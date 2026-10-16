@@ -3,12 +3,11 @@
 
 #include <stdint.h>
 
-struct World;
+struct RenderScene;
 struct RenderConfig;
 struct PointerInput;
 struct Camera;
 struct RendererState;
-struct Simulation;
 
 // One concrete Vulkan backend; the state owns resources allocated at startup.
 struct Renderer
@@ -16,23 +15,22 @@ struct Renderer
     RendererState* state;
     bool running;
     uint32_t scene_submissions;
-    uint32_t submitted_body_count;
     bool debug_stats;
     bool debug_views;
     double previous_frame_ms;
     double gpu_frame_ms, work_frame_ms, acquire_ms, present_ms;
-    bool gameplay_hud;
+    bool overlay_enabled;
     char hud[8][96];
-    int32_t planet_marker[4];
+    int32_t selection_marker[4];
     int32_t hover_marker[4];
     float hud_status[4],hud_accent[4],hud_feedback[4];
 };
 
-bool renderer_initialize(Renderer* renderer, const World* world,
+bool renderer_initialize(Renderer* renderer, const RenderScene* scene,
                          const RenderConfig* config, const char* shader_path, const char* builtin_shader_path,
-                         bool headless, bool debug_views, bool no_activate, const Simulation* simulation);
+                         bool headless, bool debug_views, bool no_activate);
 bool renderer_poll(Renderer* renderer, PointerInput* input);
-bool renderer_render(Renderer* renderer, const World* world, const Camera* camera, const char* capture_path);
+bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera* camera, const char* capture_path);
 bool renderer_shutdown(Renderer* renderer);
 
 #endif

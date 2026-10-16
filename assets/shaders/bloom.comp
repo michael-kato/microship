@@ -26,10 +26,25 @@ vec3 linear_to_srgb(vec3 linear)
                12.92 * linear, lessThanEqual(linear, vec3(0.0031308)));
 }
 
+void write_display(ivec2 pixel,vec3 linear)
+{
+    vec3 mapped=linear/(vec3(1.0)+linear);
+    vec3 value=linear_to_srgb(mapped);
+    imageStore(display_image,pixel,vec4(value,1.0));
+    if (bloom.debug_views>.5)
+        debug_pixels[pixel.y*bloom.extent.x+pixel.x].direct.w=
+            uintBitsToFloat(packUnorm4x8(vec4(value,0.0)));
+}
+
 void main()
 {
     ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
     if (any(greaterThanEqual(pixel, bloom.extent))) return;
+    if (bloom.strength<=0.0)
+    {
+        if (bloom.pass==1) write_display(pixel,imageLoad(beauty,pixel).rgb*bloom.exposure);
+        return;
+    }
     vec3 sum = vec3(0.0);
     float weight_sum = 0.0;
     float sigma = max(0.5, float(bloom.radius) / 3.0);
@@ -54,11 +69,6 @@ void main()
     else
     {
         vec3 linear = (imageLoad(beauty, pixel).rgb + bloom.strength * sum) * bloom.exposure;
-        vec3 mapped = linear / (vec3(1.0) + linear);
-        vec3 display_value = linear_to_srgb(mapped);
-        imageStore(display_image, pixel, vec4(display_value, 1.0));
-        if (bloom.debug_views > 0.5)
-            debug_pixels[pixel.y*bloom.extent.x+pixel.x].direct.w =
-                uintBitsToFloat(packUnorm4x8(vec4(display_value,0.0)));
+        write_display(pixel,linear);
     }
 }

@@ -9,7 +9,7 @@ def check_gpu_environment():
                    if value and name.startswith(('MESA_VK_TRACE', 'RADV_THREAD_TRACE')))
     if flags:
         raise RuntimeError('Hardware tracing is disabled after the GPU lockup. '
-                           'Unset these variables before running Floria: ' + ', '.join(flags))
+                           'Unset these variables before running microship: ' + ', '.join(flags))
 
 
 if __name__ == '__main__':

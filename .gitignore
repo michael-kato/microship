@@ -4,4 +4,6 @@ __pycache__/
 *.pyo
 *.md
 !/README.md
+!/assets/README.md
+!/third_party/json/README.md
 /screenshots/

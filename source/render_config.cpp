@@ -1,136 +1,14 @@
 #include "render_config.h"
-
-#include <ctype.h>
-#include <errno.h>
+#include "asset_json.h"
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <cmath>
-
-enum { RENDER_LINE_SIZE = 512, RENDER_FIELD_COUNT = 25 };
-
-static const char* const field_names[RENDER_FIELD_COUNT] = {
-    "width", "height", "samples_per_pixel", "max_bounces", "seed",
-    "sphere_segments", "sphere_rings", "exposure", "vertical_fov_degrees",
-    "sun_radiance", "camera_position", "camera_target", "camera_up", "background",
-    "camera_min_distance", "camera_max_distance", "volume_steps",
-    "bloom_radius", "bloom_strength", "bloom_threshold",
-    "volume_samples_per_pixel", "volume_local_bounds", "microfacet_energy_compensation", "spatial_sun_reuse", "spatial_denoise"
-};
-
-static char* read_word(char** cursor)
-{
-    char* position = *cursor;
-    while (isspace((unsigned char)*position))
-        ++position;
-    char* word = position;
-    while (*position && !isspace((unsigned char)*position))
-        ++position;
-    if (*position)
-        *position++ = 0;
-    *cursor = position;
-    return *word ? word : 0;
-}
-
-static bool read_uint(char* word, uint32_t* value)
-{
-    if (!word || *word < '0' || *word > '9')
-        return false;
-    char* end = 0;
-    errno = 0;
-    unsigned long parsed = strtoul(word, &end, 10);
-    if (*end || errno == ERANGE || parsed > UINT32_MAX)
-        return false;
-    *value = (uint32_t)parsed;
-    return true;
-}
-
-static bool read_float(char* word, float* value)
-{
-    if (!word)
-        return false;
-    char* end = 0;
-    errno = 0;
-    float parsed = strtof(word, &end);
-    if (*end || errno == ERANGE || !std::isfinite(parsed))
-        return false;
-    *value = parsed;
-    return true;
-}
-
-static bool read_vector(char** cursor, Vec3* value)
-{
-    return read_float(read_word(cursor), &value->x)
-        && read_float(read_word(cursor), &value->y)
-        && read_float(read_word(cursor), &value->z);
-}
-
-static const char* read_record(char* line, RenderConfig* config, uint32_t* seen)
-{
-    char* comment = strchr(line, '#');
-    if (comment)
-        *comment = 0;
-    char* cursor = line;
-    char* name = read_word(&cursor);
-    if (!name)
-        return 0;
-    uint32_t field = 0;
-    while (field != RENDER_FIELD_COUNT && strcmp(name, field_names[field]) != 0)
-        ++field;
-    if (field == RENDER_FIELD_COUNT)
-        return "unknown rendering setting";
-    if (*seen & (1u << field))
-        return "duplicate rendering setting";
-
-    bool valid = false;
-    switch (field)
-    {
-    case 0: valid = read_uint(read_word(&cursor), &config->width); break;
-    case 1: valid = read_uint(read_word(&cursor), &config->height); break;
-    case 2: valid = read_uint(read_word(&cursor), &config->samples_per_pixel); break;
-    case 3: valid = read_uint(read_word(&cursor), &config->max_bounces); break;
-    case 4: valid = read_uint(read_word(&cursor), &config->seed); break;
-    case 5: valid = read_uint(read_word(&cursor), &config->sphere_segments); break;
-    case 6: valid = read_uint(read_word(&cursor), &config->sphere_rings); break;
-    case 7: valid = read_float(read_word(&cursor), &config->exposure); break;
-    case 8: valid = read_float(read_word(&cursor), &config->vertical_fov_degrees); break;
-    case 9: valid = read_float(read_word(&cursor), &config->sun_radiance); break;
-    case 10: valid = read_vector(&cursor, &config->camera_position); break;
-    case 11: valid = read_vector(&cursor, &config->camera_target); break;
-    case 12: valid = read_vector(&cursor, &config->camera_up); break;
-    case 13:
-    {
-        Vec3 color = {};
-        valid = read_vector(&cursor, &color);
-        config->background = Color{ color.x, color.y, color.z };
-        break;
-    }
-    case 14: valid = read_float(read_word(&cursor), &config->camera_min_distance); break;
-    case 15: valid = read_float(read_word(&cursor), &config->camera_max_distance); break;
-    case 16: valid = read_uint(read_word(&cursor), &config->volume_steps); break;
-    case 17: valid = read_uint(read_word(&cursor), &config->bloom_radius); break;
-    case 18: valid = read_float(read_word(&cursor), &config->bloom_strength); break;
-    case 19: valid = read_float(read_word(&cursor), &config->bloom_threshold); break;
-    case 20: valid = read_uint(read_word(&cursor), &config->volume_samples_per_pixel); break;
-    case 21: valid = read_uint(read_word(&cursor), &config->volume_local_bounds); break;
-    case 22: valid = read_uint(read_word(&cursor), &config->microfacet_energy_compensation); break;
-    case 23: valid = read_uint(read_word(&cursor), &config->spatial_sun_reuse); break;
-    case 24: valid = read_uint(read_word(&cursor), &config->spatial_denoise); break;
-    }
-    if (!valid || read_word(&cursor))
-        return "invalid setting fields: expected one number or three vector components";
-    *seen |= 1u << field;
-    return 0;
-}
 
 static const char* validate_config(const RenderConfig* config)
 {
-    if (config->spatial_denoise > 1) return "spatial_denoise must be 0 or 1";
-    if (config->spatial_sun_reuse > 1) return "spatial_sun_reuse must be 0 or 1";
-    if (config->volume_samples_per_pixel > 4096)
-        return "volume_samples_per_pixel must be in [0, 4096]";
-    if (config->volume_local_bounds > 1 || config->microfacet_energy_compensation > 1)
-        return "volume_local_bounds and microfacet_energy_compensation must be 0 or 1";
+    if (config->volume_rays_per_pixel > 4096)
+        return "volume_rays_per_pixel must be in [0, 4096]";
+    if (config->microfacet_energy_compensation > 1)
+        return "microfacet_energy_compensation must be 0 or 1";
     if (config->bloom_radius < 1 || config->bloom_radius > 64
         || config->bloom_strength < 0 || config->bloom_strength > 1
         || config->bloom_threshold < 0 || config->bloom_threshold > 1000000)
@@ -144,8 +22,8 @@ static const char* validate_config(const RenderConfig* config)
         return "width and height must be in [1, 4096]";
     if (config->samples_per_pixel == 0 || config->samples_per_pixel > 4096)
         return "samples_per_pixel must be in [1, 4096]";
-    if (config->max_bounces == 0 || config->max_bounces > 32)
-        return "max_bounces must be in [1, 32]";
+    if (config->max_transmission_layers == 0 || config->max_transmission_layers > 32)
+        return "max_transmission_layers must be in [1, 32]";
     if (config->sphere_segments < 3 || config->sphere_segments > 512
         || config->sphere_rings < 2 || config->sphere_rings > 256)
         return "sphere_segments must be in [3, 512] and sphere_rings in [2, 256]";
@@ -153,12 +31,6 @@ static const char* validate_config(const RenderConfig* config)
         return "exposure must be positive and no greater than 100";
     if (config->vertical_fov_degrees <= 1.0f || config->vertical_fov_degrees >= 179.0f)
         return "vertical_fov_degrees must be greater than 1 and less than 179";
-    if (config->sun_radiance < 0.0f || config->sun_radiance > 1000000.0f)
-        return "sun_radiance must be in [0,1000000]";
-    if (config->background.r < 0.0f || config->background.r > 1.0f
-        || config->background.g < 0.0f || config->background.g > 1.0f
-        || config->background.b < 0.0f || config->background.b > 1.0f)
-        return "background channels must be in [0, 1]";
 
     if (std::fabs(config->camera_position.x) > 1000000.0f
         || std::fabs(config->camera_position.y) > 1000000.0f
@@ -189,71 +61,52 @@ static const char* validate_config(const RenderConfig* config)
     return 0;
 }
 
-static bool read_config(FILE* file, const char* path, RenderConfig* config)
+bool render_config_load(RenderConfig* config,const char* path)
 {
-    uint32_t seen = 0;
-    uint32_t line_number = 0;
-    char line[RENDER_LINE_SIZE];
-    for (;;)
+    JsonDocument document;if (!json_load(&document,path)) return false;
+    Json root=json_root(&document);json_object(root,"$schema|output|sampling|volume|geometry|camera|lighting|bloom");RenderConfig loaded={};
     {
-        uint32_t length = 0;
-        int character = fgetc(file);
-        if (character == EOF)
-            break;
-        ++line_number;
-        while (character != EOF && character != '\n')
-        {
-            if (character == 0 || length == RENDER_LINE_SIZE - 1)
-            {
-                fprintf(stderr, "%s:%u: NUL byte or line exceeds 511 characters\n", path, line_number);
-                return false;
-            }
-            line[length++] = (char)character;
-            character = fgetc(file);
-        }
-        line[length] = 0;
-        const char* error = read_record(line, config, &seen);
-        if (error)
-        {
-            fprintf(stderr, "%s:%u: %s\n", path, line_number, error);
-            return false;
-        }
+        Json j=json_get(root,"output");json_object(j,"width|height|exposure");
+        loaded.width=json_uint(json_get(j,"width"),1,4096);
+        loaded.height=json_uint(json_get(j,"height"),1,4096);
+        loaded.exposure=json_positive(json_get(j,"exposure"),100);
     }
-    if (ferror(file))
     {
-        fprintf(stderr, "%s: rendering settings read failed\n", path);
-        return false;
+        Json j=json_get(root,"sampling");json_object(j,"samples_per_pixel|max_transmission_layers|seed");
+        loaded.samples_per_pixel=json_uint(json_get(j,"samples_per_pixel"),1,4096);
+        loaded.max_transmission_layers=json_uint(json_get(j,"max_transmission_layers"),1,32);
+        loaded.seed=json_uint(json_get(j,"seed"),0,UINT32_MAX);
     }
-    for (uint32_t i = 0; i < RENDER_FIELD_COUNT; ++i)
     {
-        if (!(seen & (1u << i)))
-        {
-            fprintf(stderr, "%s: missing rendering setting: %s\n", path, field_names[i]);
-            return false;
-        }
+        Json j=json_get(root,"volume");json_object(j,"rays_per_pixel|integration_steps");
+        loaded.volume_steps=json_uint(json_get(j,"integration_steps"),2,64);
+        loaded.volume_rays_per_pixel=json_uint(json_get(j,"rays_per_pixel"),0,4096);
     }
-    const char* error = validate_config(config);
-    if (error)
-        fprintf(stderr, "%s: %s\n", path, error);
-    return error == 0;
-}
-
-bool render_config_load(RenderConfig* config, const char* path)
-{
-    FILE* file = fopen(path, "rb");
-    if (!file)
     {
-        fprintf(stderr, "%s: cannot open rendering settings: %s\n", path, strerror(errno));
-        return false;
+        Json j=json_get(root,"geometry");json_object(j,"sphere_segments|sphere_rings");
+        loaded.sphere_segments=json_uint(json_get(j,"sphere_segments"),3,512);
+        loaded.sphere_rings=json_uint(json_get(j,"sphere_rings"),2,256);
     }
-    RenderConfig loaded = {};
-    bool success = read_config(file, path, &loaded);
-    if (fclose(file) != 0)
     {
-        fprintf(stderr, "%s: cannot close rendering settings: %s\n", path, strerror(errno));
-        return false;
+        Json j=json_get(root,"camera");json_object(j,"position|target|up|min_distance|max_distance|vertical_fov_degrees");
+        loaded.camera_position=json_vector(json_get(j,"position"),-1000000,1000000);
+        loaded.camera_target=json_vector(json_get(j,"target"),-1000000,1000000);
+        loaded.camera_up=json_vector(json_get(j,"up"),-1000000,1000000);
+        loaded.camera_min_distance=json_float(json_get(j,"min_distance"),0.1,1000000);
+        loaded.camera_max_distance=json_float(json_get(j,"max_distance"),0.1,1000000);
+        loaded.vertical_fov_degrees=json_float(json_get(j,"vertical_fov_degrees"),1,179);
     }
-    if (success)
-        *config = loaded;
-    return success;
+    {
+        Json j=json_get(root,"lighting");json_object(j,"microfacet_energy_compensation");
+        loaded.microfacet_energy_compensation=json_bool(json_get(j,"microfacet_energy_compensation"));
+    }
+    {
+        Json j=json_get(root,"bloom");json_object(j,"radius|strength|threshold");
+        loaded.bloom_radius=json_uint(json_get(j,"radius"),1,64);
+        loaded.bloom_strength=json_float(json_get(j,"strength"),0,1);
+        loaded.bloom_threshold=json_float(json_get(j,"threshold"),0,1000000);
+    }
+    if (!document.valid) return false;
+    const char* error=validate_config(&loaded);if (error) return json_error(root,error);
+    *config=loaded;return true;
 }

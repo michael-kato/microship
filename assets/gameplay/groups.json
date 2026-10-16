@@ -1,0 +1,19 @@
+{
+  "$schema": "../schemas/groups.schema.json",
+  "groups": [
+    {
+      "id": 0,
+      "key": "fighter",
+      "selection": "fighters",
+      "singular": "FIGHTER",
+      "plural": "FIGHTERS"
+    },
+    {
+      "id": 1,
+      "key": "bomber",
+      "selection": "bombers",
+      "singular": "BOMBER",
+      "plural": "BOMBERS"
+    }
+  ]
+}

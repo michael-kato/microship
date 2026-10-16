@@ -1,0 +1,171 @@
+{
+  "$schema": "../../../assets/schemas/world.schema.json",
+  "content": "../../../assets/gameplay/biology.json",
+  "rules": "biology-two-rules.json",
+  "appearance": "../../../assets/presentation/biology.json",
+  "effects": "../../../assets/presentation/combat.json",
+  "match": {
+    "player": "immune",
+    "opponent": "virus"
+  },
+  "bodies": [
+    {
+      "type": "infected",
+      "owner": "virus",
+      "position": [
+        -6.0,
+        0.0,
+        0.0
+      ],
+      "radius": 3.2,
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "site": {
+        "availability": 1.0,
+        "normal": [
+          0.0,
+          0.29,
+          0.957
+        ]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [
+          0.035,
+          0.045,
+          0.04
+        ],
+        "absorption": 0.012,
+        "anisotropy": 0.2
+      }
+    },
+    {
+      "type": "healthy",
+      "owner": "immune",
+      "position": [
+        6.0,
+        0.0,
+        0.0
+      ],
+      "radius": 3.2,
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "site": {
+        "availability": 1.0,
+        "normal": [
+          0.0,
+          0.29,
+          0.957
+        ]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [
+          0.035,
+          0.045,
+          0.04
+        ],
+        "absorption": 0.012,
+        "anisotropy": 0.2
+      }
+    }
+  ],
+  "spawns": [
+    {
+      "type": "virus_bomber",
+      "position": [
+        -6.0,
+        2.8,
+        5.2
+      ]
+    },
+    {
+      "type": "immune_bomber",
+      "position": [
+        6.0,
+        2.8,
+        5.2
+      ]
+    },
+    {
+      "type": "virus_fighter",
+      "position": [
+        -6.85,
+        1.6,
+        5.2
+      ]
+    },
+    {
+      "type": "virus_fighter",
+      "position": [
+        -6.0,
+        1.6,
+        5.2
+      ]
+    },
+    {
+      "type": "virus_fighter",
+      "position": [
+        -5.15,
+        1.6,
+        5.2
+      ]
+    },
+    {
+      "type": "immune_fighter",
+      "position": [
+        5.15,
+        1.6,
+        5.2
+      ]
+    },
+    {
+      "type": "immune_fighter",
+      "position": [
+        6.0,
+        1.6,
+        5.2
+      ]
+    },
+    {
+      "type": "immune_fighter",
+      "position": [
+        6.85,
+        1.6,
+        5.2
+      ]
+    },
+    {
+      "type": "immune_fighter",
+      "position": [
+        5.15,
+        2.3,
+        5.2
+      ]
+    },
+    {
+      "type": "immune_fighter",
+      "position": [
+        6.0,
+        2.3,
+        5.2
+      ]
+    },
+    {
+      "type": "immune_fighter",
+      "position": [
+        6.85,
+        2.3,
+        5.2
+      ]
+    }
+  ]
+}

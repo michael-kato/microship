@@ -1,4 +1,5 @@
 #include "game.h"
+#include "asset_json.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -27,11 +28,15 @@ static bool asset_paths(char* world, char* config, char* shader, size_t capacity
     if (!slash)
         return false;
     *slash = 0;
-    int a = snprintf(world, capacity, "%s/assets/levels/biology-virus.world", executable);
-    int b = snprintf(config, capacity, "%s/assets/rendering/biology.render", executable);
-    int c = snprintf(shader, capacity, "%s/assets/shaders/path_trace.comp.spv", executable);
-    return a > 0 && (size_t)a < capacity && b > 0 && (size_t)b < capacity
-        && c > 0 && (size_t)c < capacity;
+    char manifest[4096];
+    int length=snprintf(manifest,sizeof(manifest),"%s/assets/startup.json",executable);
+    if (length<=0 || (size_t)length>=sizeof(manifest)) return false;
+    JsonDocument document;if (!json_load(&document,manifest)) return false;
+    Json root=json_root(&document);json_object(root,"$schema|world|render|shader");
+    return json_path(json_get(root,"world"),manifest,world,capacity)
+        && json_path(json_get(root,"render"),manifest,config,capacity)
+        && json_path(json_get(root,"shader"),manifest,shader,capacity)
+        && document.valid;
 }
 
 static void print_usage(FILE* output)
@@ -41,8 +46,8 @@ static void print_usage(FILE* output)
         "              [--vsync] [--time SECONDS] [--step-seconds N] [--camera-drag X Y] [--camera-zoom N]\n"
         "              [--camera-pointer X Y] [--click X Y] [--command X Y] [--select-group 1..3] [--focus] [--additive] [--restart]\n"
         "              [--smoke] [--stats|--no-stats] [--debug-views] [--no-activate]\n"
-        "              [--replay PATH.orders] [--ticks N] [--state PATH.json]\n"
-        "Default: path-traced Win32 window; Escape or close to exit.\n"
+        "              [--replay PATH.orders] [--ticks N] [--state PATH.json] [--scene-state PATH.json]\n"
+        "Default: direct ray-traced Win32 window; Escape or close to exit.\n"
         "Headless/capture runs default to one frame. PFM saves linear HDR before bloom; PPM saves display RGB.\n"
         "--smoke runs asset loading and simulation lifecycle without a GPU.\n");
 }
@@ -80,7 +85,7 @@ int main(int argc, char** argv)
     char world_path[4096], config_path[4096], shader_path[4096];
     if (!asset_paths(world_path, config_path, shader_path, sizeof(world_path)))
     {
-        fprintf(stderr, "Cannot locate assets beside the Floria executable.\n");
+        fprintf(stderr, "Cannot locate assets beside the microship executable.\n");
         return 1;
     }
     options.world_path = world_path;
@@ -148,7 +153,7 @@ int main(int argc, char** argv)
         }
         else if (strcmp(argv[i], "--world") == 0 || strcmp(argv[i], "--config") == 0
                  || strcmp(argv[i], "--capture") == 0 || strcmp(argv[i], "--shader") == 0
-                 || strcmp(argv[i], "--replay") == 0 || strcmp(argv[i], "--state") == 0)
+                 || strcmp(argv[i], "--replay") == 0 || strcmp(argv[i], "--state") == 0 || strcmp(argv[i], "--scene-state") == 0)
         {
             const char* flag = argv[i];
             if (++i == argc || !argv[i][0] || strncmp(argv[i], "--", 2) == 0)
@@ -164,6 +169,8 @@ int main(int argc, char** argv)
                 options.shader_path = argv[i];
             else if (strcmp(flag, "--replay") == 0)
                 options.replay_path = argv[i];
+            else if (strcmp(flag, "--scene-state") == 0)
+                options.scene_state_path = argv[i];
             else if (strcmp(flag, "--state") == 0)
                 options.state_path = argv[i];
             else

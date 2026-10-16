@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "microship buildings",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "buildings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "faction": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "model": {
+            "$ref": "shared.schema.json#/$defs/path"
+          },
+          "growth_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
+          },
+          "health": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
+          },
+          "collection": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
+          },
+          "height": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
+          },
+          "width": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
+          },
+          "hits": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 32
+          },
+          "branches": {
+            "type": "object",
+            "properties": {
+              "seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 300
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9
+              },
+              "spacing": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 10
+              },
+              "production": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 10
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 16777215
+              },
+              "normal": {
+                "$ref": "shared.schema.json#/$defs/normal"
+              }
+            },
+            "required": [
+              "seconds",
+              "count",
+              "spacing",
+              "production",
+              "seed",
+              "normal"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "name",
+          "faction",
+          "model",
+          "growth_seconds",
+          "health",
+          "collection",
+          "height",
+          "width",
+          "hits",
+          "branches"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 8
+    }
+  },
+  "required": [
+    "buildings"
+  ],
+  "additionalProperties": false
+}

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 project(microship LANGUAGES CXX)
 
 if(NOT WIN32)
-    message(FATAL_ERROR "Floria builds only for Windows. On Linux, use scripts/check.sh to cross-build and test through Proton.")
+    message(FATAL_ERROR "microship builds only for Windows. On Linux, use scripts/check.sh to cross-build and test through Proton.")
 endif()
 find_package(Vulkan REQUIRED)
 find_program(GLSLC glslc HINTS "$ENV{VULKAN_SDK}/Bin" "$ENV{VULKAN_SDK}/bin")
@@ -10,11 +10,11 @@ if(NOT GLSLC)
     message(FATAL_ERROR "glslc is required; install the Vulkan SDK shader compiler")
 endif()
 
-set(shader_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/path_trace.comp.spv")
+set(shader_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/ray_trace.comp.spv")
 set(bloom_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/bloom.comp.spv")
 set(volume_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/volume.comp.spv")
 set(debug_outputs)
-foreach(debug_variant IN ITEMS surface volume spatial guide_surface guide_volume guide_spatial)
+foreach(debug_variant IN ITEMS surface volume guide_surface)
     set(debug_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/debug_${debug_variant}.comp.spv")
     set(debug_flags -DMICROSHIP_DEBUG_BUFFERS=1)
     if(debug_variant MATCHES "^guide_")
@@ -22,22 +22,15 @@ foreach(debug_variant IN ITEMS surface volume spatial guide_surface guide_volume
     endif()
     if(debug_variant MATCHES "volume$")
         list(APPEND debug_flags -DMICROSHIP_VOLUME_PASS=1)
-    elseif(debug_variant MATCHES "spatial$")
-        list(APPEND debug_flags -DMICROSHIP_ENABLE_SUN_REUSE=1)
     endif()
     add_custom_command(OUTPUT "${debug_output}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
         COMMAND ${GLSLC} --target-env=vulkan1.2 -O ${debug_flags}
-            "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/path_trace.comp" -o "${debug_output}"
-        DEPENDS assets/shaders/path_trace.comp assets/shaders/render_uniform.glsl assets/shaders/sampling.glsl assets/shaders/sun_reuse.glsl
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/ray_trace.comp" -o "${debug_output}"
+        DEPENDS assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl
             assets/shaders/debug_buffers.glsl VERBATIM)
     list(APPEND debug_outputs "${debug_output}")
 endforeach()
-set(denoise_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/denoise.comp.spv")
-add_custom_command(OUTPUT "${denoise_output}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/denoise.comp" -o "${denoise_output}"
-    DEPENDS assets/shaders/denoise.comp assets/shaders/debug_buffers.glsl VERBATIM)
 set(backdrop_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/backdrop.comp.spv")
 add_custom_command(OUTPUT "${backdrop_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
@@ -56,8 +49,8 @@ add_custom_command(OUTPUT "${debug_overlay}"
 add_custom_command(OUTPUT "${volume_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DMICROSHIP_VOLUME_PASS=1
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/path_trace.comp" -o "${volume_output}"
-    DEPENDS assets/shaders/path_trace.comp assets/shaders/render_uniform.glsl assets/shaders/sampling.glsl assets/shaders/sun_reuse.glsl VERBATIM)
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/ray_trace.comp" -o "${volume_output}"
+    DEPENDS assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl VERBATIM)
 add_custom_command(OUTPUT "${bloom_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O
@@ -66,107 +59,42 @@ add_custom_command(OUTPUT "${bloom_output}"
 add_custom_command(OUTPUT "${shader_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/path_trace.comp" -o "${shader_output}"
-    DEPENDS assets/shaders/path_trace.comp assets/shaders/render_uniform.glsl assets/shaders/sampling.glsl assets/shaders/sun_reuse.glsl
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/ray_trace.comp" -o "${shader_output}"
+    DEPENDS assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl
     VERBATIM)
-set(reference_shader "${CMAKE_CURRENT_BINARY_DIR}/test-assets/shaders/path_trace.comp.spv")
-set(reference_bloom "${CMAKE_CURRENT_BINARY_DIR}/test-assets/shaders/bloom.comp.spv")
-set(reference_volume "${CMAKE_CURRENT_BINARY_DIR}/test-assets/shaders/volume.comp.spv")
-add_custom_command(OUTPUT "${reference_shader}" "${reference_bloom}" "${reference_volume}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/test-assets/shaders"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DMICROSHIP_REFERENCE_LIGHTING=1
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/path_trace.comp" -o "${reference_shader}"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DMICROSHIP_REFERENCE_LIGHTING=1 -DMICROSHIP_VOLUME_PASS=1
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/path_trace.comp" -o "${reference_volume}"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${bloom_output}" "${reference_bloom}"
-    DEPENDS assets/shaders/path_trace.comp assets/shaders/render_uniform.glsl assets/shaders/sampling.glsl assets/shaders/sun_reuse.glsl "${bloom_output}" VERBATIM)
-# CPU compilation only; test assets stay outside the distributable's assets tree.
-add_custom_target(microship_reference_shader DEPENDS "${reference_shader}" "${reference_bloom}" "${reference_volume}")
-# Same transport and sampler, with only the whole-pixel vacuum shortcut disabled.
-set(vacuum_folder "${CMAKE_CURRENT_BINARY_DIR}/vacuum-reference-assets/shaders")
-add_custom_command(OUTPUT "${vacuum_folder}/path_trace.comp.spv" "${vacuum_folder}/volume.comp.spv" "${vacuum_folder}/bloom.comp.spv"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${vacuum_folder}"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DMICROSHIP_DISABLE_VACUUM_SKIP=1
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/path_trace.comp" -o "${vacuum_folder}/path_trace.comp.spv"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${volume_output}" "${vacuum_folder}/volume.comp.spv"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${bloom_output}" "${vacuum_folder}/bloom.comp.spv"
-    DEPENDS assets/shaders/path_trace.comp assets/shaders/render_uniform.glsl assets/shaders/sampling.glsl assets/shaders/sun_reuse.glsl
-        "${volume_output}" "${bloom_output}" VERBATIM)
-add_custom_target(microship_vacuum_reference_shader DEPENDS "${vacuum_folder}/path_trace.comp.spv"
-    "${vacuum_folder}/volume.comp.spv" "${vacuum_folder}/bloom.comp.spv")
-set(prior_shader "${CMAKE_CURRENT_BINARY_DIR}/prior-assets/shaders/path_trace.comp.spv")
-set(prior_bloom "${CMAKE_CURRENT_BINARY_DIR}/prior-assets/shaders/bloom.comp.spv")
-set(prior_volume "${CMAKE_CURRENT_BINARY_DIR}/prior-assets/shaders/volume.comp.spv")
-add_custom_command(OUTPUT "${prior_shader}" "${prior_bloom}" "${prior_volume}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/prior-assets/shaders"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O
-        "${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/reference/path_trace_prior.comp" -o "${prior_shader}"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${bloom_output}" "${prior_bloom}"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O
-        "${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/reference/volume_prior.comp" -o "${prior_volume}"
-    DEPENDS tests/e2e/reference/path_trace_prior.comp tests/e2e/reference/volume_prior.comp "${bloom_output}" VERBATIM)
-add_custom_target(microship_prior_shader DEPENDS "${prior_shader}" "${prior_bloom}" "${prior_volume}")
-# Frozen PCG transport for matched real-application sampling comparisons.
-set(pcg_folder "${CMAKE_CURRENT_BINARY_DIR}/pcg-assets/shaders")
-add_custom_command(OUTPUT "${pcg_folder}/path_trace.comp.spv" "${pcg_folder}/volume.comp.spv" "${pcg_folder}/bloom.comp.spv"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${pcg_folder}"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O "${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/reference/path_trace_pcg.comp" -o "${pcg_folder}/path_trace.comp.spv"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DMICROSHIP_VOLUME_PASS=1 "${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/reference/path_trace_pcg.comp" -o "${pcg_folder}/volume.comp.spv"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${bloom_output}" "${pcg_folder}/bloom.comp.spv"
-    DEPENDS tests/e2e/reference/path_trace_pcg.comp "${bloom_output}" VERBATIM)
-add_custom_target(microship_pcg_shader DEPENDS "${pcg_folder}/path_trace.comp.spv" "${pcg_folder}/volume.comp.spv" "${pcg_folder}/bloom.comp.spv")
-set(spatial_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/spatial.comp.spv")
-set(sun_sources_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/sun_sources.comp.spv")
-add_custom_command(OUTPUT "${spatial_output}" "${sun_sources_output}"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DMICROSHIP_ENABLE_SUN_REUSE=1 "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/path_trace.comp" -o "${spatial_output}"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DMICROSHIP_SUN_REUSE_PASS=1 "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/path_trace.comp" -o "${sun_sources_output}"
-    DEPENDS assets/shaders/path_trace.comp assets/shaders/render_uniform.glsl assets/shaders/sampling.glsl assets/shaders/sun_reuse.glsl VERBATIM)
-set(matrix_folder "${CMAKE_CURRENT_BINARY_DIR}/matrix-assets/shaders")
-add_custom_command(OUTPUT "${matrix_folder}/path_trace.comp.spv" "${matrix_folder}/volume.comp.spv" "${matrix_folder}/bloom.comp.spv"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${matrix_folder}"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DMICROSHIP_REFERENCE_SAMPLING=1 "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/path_trace.comp" -o "${matrix_folder}/path_trace.comp.spv"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DMICROSHIP_REFERENCE_SAMPLING=1 -DMICROSHIP_VOLUME_PASS=1 "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/path_trace.comp" -o "${matrix_folder}/volume.comp.spv"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${bloom_output}" "${matrix_folder}/bloom.comp.spv"
-    DEPENDS assets/shaders/path_trace.comp assets/shaders/render_uniform.glsl assets/shaders/sampling.glsl assets/shaders/sun_reuse.glsl tests/e2e/reference/sampling_diagonals.glsl "${bloom_output}" VERBATIM)
-add_custom_target(microship_matrix_shader DEPENDS "${matrix_folder}/path_trace.comp.spv" "${matrix_folder}/volume.comp.spv" "${matrix_folder}/bloom.comp.spv")
-set(columns_folder "${CMAKE_CURRENT_BINARY_DIR}/columns-assets/shaders")
-add_custom_command(OUTPUT "${columns_folder}/path_trace.comp.spv" "${columns_folder}/volume.comp.spv" "${columns_folder}/bloom.comp.spv"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${columns_folder}"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DMICROSHIP_COLUMN_SAMPLING=1 "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/path_trace.comp" -o "${columns_folder}/path_trace.comp.spv"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DMICROSHIP_COLUMN_SAMPLING=1 -DMICROSHIP_VOLUME_PASS=1 "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/path_trace.comp" -o "${columns_folder}/volume.comp.spv"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${bloom_output}" "${columns_folder}/bloom.comp.spv"
-    DEPENDS assets/shaders/path_trace.comp assets/shaders/render_uniform.glsl assets/shaders/sampling.glsl assets/shaders/sun_reuse.glsl tests/e2e/reference/sampling_diagonals.glsl "${bloom_output}" VERBATIM)
-add_custom_target(microship_columns_shader DEPENDS "${columns_folder}/path_trace.comp.spv" "${columns_folder}/volume.comp.spv" "${columns_folder}/bloom.comp.spv")
-set(nile_license "${CMAKE_CURRENT_BINARY_DIR}/licenses/nile.txt")
-add_custom_command(OUTPUT "${nile_license}"
+file(GLOB model_files CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/models/*.fmesh")
+set(json_license "${CMAKE_CURRENT_BINARY_DIR}/licenses/json.txt")
+add_custom_command(OUTPUT "${json_license}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/licenses"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/third_party/nile/LICENSE" "${nile_license}"
-    DEPENDS third_party/nile/LICENSE VERBATIM)
-set(world_output "${CMAKE_CURRENT_BINARY_DIR}/assets/levels/first.world")
-set(config_output "${CMAKE_CURRENT_BINARY_DIR}/assets/rendering/first.render")
-add_custom_command(OUTPUT "${world_output}" "${config_output}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/levels"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/rendering"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets/levels/first.world" "${world_output}"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets/rendering/first.render" "${config_output}"
-    DEPENDS assets/levels/first.world assets/rendering/first.render
-    VERBATIM)
-file(GLOB planet_models CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/models/*.fmesh")
-set(gallery_outputs)
-foreach(gallery_asset IN ITEMS levels/factions.world levels/prototype.world levels/biology-virus.world levels/biology-immune.world rendering/biology.render rendering/factions.render rendering/reference.render)
-    set(gallery_output "${CMAKE_CURRENT_BINARY_DIR}/assets/${gallery_asset}")
-    get_filename_component(gallery_folder "${gallery_output}" DIRECTORY)
-    add_custom_command(OUTPUT "${gallery_output}"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${gallery_folder}"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/third_party/json/LICENSE" "${json_license}"
+    DEPENDS third_party/json/LICENSE VERBATIM)
+set(asset_outputs)
+# Do not leave a second renderer or obsolete reconstruction kernels in the bundle.
+foreach(old_shader IN ITEMS path_trace.comp.spv denoise.comp.spv debug_guide_volume.comp.spv)
+    file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/${old_shader}")
+endforeach()
+file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/licenses/nile.txt")
+# Remove only the six inputs replaced by the JSON migration from an older bundle.
+foreach(legacy_asset IN ITEMS startup.game gameplay/biology.content
+    levels/biology-virus.world levels/biology-immune.world
+    rendering/biology.render rendering/reference.render)
+    file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/assets/${legacy_asset}")
+endforeach()
+file(GLOB_RECURSE authored_files CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/*.json")
+list(FILTER authored_files EXCLUDE REGEX "^models/source/")
+foreach(scene_asset IN LISTS authored_files)
+    set(asset_output "${CMAKE_CURRENT_BINARY_DIR}/assets/${scene_asset}")
+    get_filename_component(asset_folder "${asset_output}" DIRECTORY)
+    add_custom_command(OUTPUT "${asset_output}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${asset_folder}"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/assets/${gallery_asset}" "${gallery_output}"
-        DEPENDS "assets/${gallery_asset}" VERBATIM)
-    list(APPEND gallery_outputs "${gallery_output}")
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/${scene_asset}" "${asset_output}"
+        DEPENDS "assets/${scene_asset}" VERBATIM)
+    list(APPEND asset_outputs "${asset_output}")
 endforeach()
 set(model_outputs)
-foreach(model IN LISTS planet_models)
+foreach(model IN LISTS model_files)
     get_filename_component(model_name "${model}" NAME)
     set(model_output "${CMAKE_CURRENT_BINARY_DIR}/assets/models/${model_name}")
     add_custom_command(OUTPUT "${model_output}"
@@ -175,15 +103,17 @@ foreach(model IN LISTS planet_models)
         DEPENDS "${model}" VERBATIM)
     list(APPEND model_outputs "${model_output}")
 endforeach()
-add_custom_target(microship_assets DEPENDS "${effects_output}" "${backdrop_output}" "${nile_license}" "${spatial_output}" "${sun_sources_output}" "${shader_output}" "${bloom_output}" "${volume_output}" "${debug_overlay}" "${denoise_output}" ${debug_outputs} "${world_output}" "${config_output}" ${model_outputs} ${gallery_outputs})
+add_custom_target(microship_assets DEPENDS "${effects_output}" "${backdrop_output}" "${json_license}" "${shader_output}" "${bloom_output}" "${volume_output}" "${debug_overlay}" ${debug_outputs} ${model_outputs} ${asset_outputs})
 
 add_executable(microship
+    source/content.cpp source/asset_json.cpp
     source/effects.cpp
     source/main.cpp
-    source/microfacet.cpp source/sampling.cpp
+    source/microfacet.cpp
     source/camera.cpp
     source/world.cpp
     source/render_config.cpp
+    source/presentation.cpp source/render_scene.cpp
     source/geometry.cpp
     source/window.cpp
     source/simulation.cpp
@@ -235,89 +165,14 @@ if(CMAKE_CROSSCOMPILING)
     set_tests_properties(world_files PROPERTIES TIMEOUT 60)
 endif()
 
+add_test(NAME data_assets COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/data_assets.py $<TARGET_FILE:microship>)
+set_tests_properties(data_assets PROPERTIES TIMEOUT 45)
+
 option(MICROSHIP_GPU_TESTS "Run real hardware Vulkan E2E scenarios (explicit opt-in)" OFF)
 if(MICROSHIP_GPU_TESTS)
-    foreach(part IN ITEMS probe views conquest invariants lighting transmission combat buffers background isolation window polish spike-combat cell-interiors)
-        add_test(NAME biology_${part} COMMAND ${Python3_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/biology_render.py $<TARGET_FILE:microship>
-            --part ${part} --output "${CMAKE_CURRENT_BINARY_DIR}/biology-${part}")
-        set_tests_properties(biology_${part} PROPERTIES TIMEOUT 35 LABELS gpu RUN_SERIAL TRUE)
-    endforeach()
-    foreach(part IN ITEMS probe growth battle invariants window)
-        add_test(NAME gameplay_${part} COMMAND ${Python3_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/gameplay_render.py $<TARGET_FILE:microship>
-            --part ${part} --output "${CMAKE_CURRENT_BINARY_DIR}/gameplay-${part}")
-        set_tests_properties(gameplay_${part} PROPERTIES TIMEOUT 35 LABELS gpu RUN_SERIAL TRUE)
-    endforeach()
-    add_dependencies(microship microship_reference_shader microship_matrix_shader microship_pcg_shader)
-    add_test(NAME render_equivalence COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/render_equivalence.py $<TARGET_FILE:microship>
-        "${reference_shader}"
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/rendering/first.render
-        # Frozen transport predates faded fog; use the uniform regression world.
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/scenes/atmospheres.world)
-    set_tests_properties(render_equivalence PROPERTIES TIMEOUT 45 LABELS gpu RUN_SERIAL TRUE)
-    foreach(part IN ITEMS invariants furnace)
-        set(sampling_world "${CMAKE_CURRENT_SOURCE_DIR}/assets/levels/first.world")
-        if(part STREQUAL "invariants")
-            set(sampling_world "${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/scenes/atmospheres.world")
-        endif()
-        add_test(NAME sampling_${part} COMMAND ${Python3_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/render_sampling.py $<TARGET_FILE:microship>
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/rendering/first.render
-            "${sampling_world}"
-            --part ${part} --output "${CMAKE_CURRENT_BINARY_DIR}/sampling-${part}")
-        set_tests_properties(sampling_${part} PROPERTIES TIMEOUT 35 LABELS gpu RUN_SERIAL TRUE)
-    endforeach()
-    foreach(part IN ITEMS invariants energy terminator)
-        add_test(NAME methods_${part} COMMAND ${Python3_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/render_methods.py $<TARGET_FILE:microship>
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/rendering/first.render
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/levels/first.world
-            --part ${part} --output "${CMAKE_CURRENT_BINARY_DIR}/methods-${part}")
-        set_tests_properties(methods_${part} PROPERTIES TIMEOUT 35 LABELS gpu RUN_SERIAL TRUE)
-    endforeach()
-    add_test(NAME atmospheres_restored COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/atmospheres.py $<TARGET_FILE:microship>
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/rendering/first.render
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/levels/first.world
-        --part checks --output "${CMAKE_CURRENT_BINARY_DIR}/atmospheres-restored")
-    set_tests_properties(atmospheres_restored PROPERTIES TIMEOUT 35 LABELS gpu RUN_SERIAL TRUE)
-    add_test(NAME fog_edge_fade COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/atmospheres.py $<TARGET_FILE:microship>
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/rendering/first.render
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/levels/first.world
-        --part fog-edge --output "${CMAKE_CURRENT_BINARY_DIR}/fog-edge-fade")
-    set_tests_properties(fog_edge_fade PROPERTIES TIMEOUT 35 LABELS gpu RUN_SERIAL TRUE)
-    add_test(NAME fog_front_light COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/atmospheres.py $<TARGET_FILE:microship>
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/rendering/first.render
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/levels/first.world
-        --part front-light --output "${CMAKE_CURRENT_BINARY_DIR}/fog-front-light")
-    set_tests_properties(fog_front_light PROPERTIES TIMEOUT 35 LABELS gpu RUN_SERIAL TRUE)
-    foreach(part IN ITEMS scene energy)
-        add_test(NAME denoise_${part} COMMAND ${Python3_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/spatial_denoise.py $<TARGET_FILE:microship>
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/rendering/first.render
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/levels/first.world
-            --part ${part} --output "${CMAKE_CURRENT_BINARY_DIR}/denoise-${part}")
-        set_tests_properties(denoise_${part} PROPERTIES TIMEOUT 35 LABELS gpu RUN_SERIAL TRUE)
-    endforeach()
-    foreach(part IN ITEMS surface volume window)
-        add_test(NAME debug_${part} COMMAND ${Python3_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/debug_views.py $<TARGET_FILE:microship>
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/rendering/first.render
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/levels/first.world
-            --part ${part} --output "${CMAKE_CURRENT_BINARY_DIR}/debug-${part}")
-        set_tests_properties(debug_${part} PROPERTIES TIMEOUT 35 LABELS gpu RUN_SERIAL TRUE)
-    endforeach()
-    add_test(NAME render_frames COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/render_frames.py $<TARGET_FILE:microship>
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/rendering/first.render
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/levels/first.world)
-    set_tests_properties(render_frames PROPERTIES TIMEOUT 180 LABELS gpu RUN_SERIAL TRUE)
-    add_test(NAME window_input COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/window_input.py $<TARGET_FILE:microship>
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/rendering/first.render)
-    set_tests_properties(window_input PROPERTIES TIMEOUT 30 LABELS gpu RUN_SERIAL TRUE)
+    add_test(NAME biology_scale_render COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/scale_render.py $<TARGET_FILE:microship>
+        --output "${CMAKE_CURRENT_BINARY_DIR}/biology-scale-render")
+    set_tests_properties(biology_scale_render PROPERTIES TIMEOUT 35 LABELS gpu RUN_SERIAL TRUE)
 endif()

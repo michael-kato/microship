@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "microship shared",
+  "$defs": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 31
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^(?![/\\\\])[^:]+$"
+    },
+    "color": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "position": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": -1000000,
+        "maximum": 1000000
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "normal": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": -100,
+        "maximum": 100
+      },
+      "minItems": 3,
+      "maxItems": 3
+    }
+  }
+}
