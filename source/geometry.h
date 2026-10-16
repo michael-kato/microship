@@ -10,7 +10,13 @@ struct RenderConfig;
 // Matches std430. Surface tags: 0 dielectric, 2 conductor, 3 thin transmission.
 struct GpuVertex { float position[4],normal[4],color[4]; };
 struct GpuTriangle { uint32_t index[4]; };
-struct MeshRange { uint32_t first,count; float low[3],high[3]; };
+struct MeshRange
+{
+    uint32_t first,count,first_vertex,vertex_count;
+    float low[3],high[3];
+    bool deformable;
+    uint64_t revision;
+};
 struct MeshSource
 {
     const char* path; // An empty path requests an authored sphere primitive.

@@ -114,7 +114,7 @@ static_assert(sizeof(DebugParameters) == GPU_DEBUG_PUSH_BYTES, "Debug push-const
 
 struct MeshAllocation
 {
-    GpuBuffer storage;
+    GpuBuffer storage,scratch;
     VkAccelerationStructureKHR acceleration;
     VkDeviceAddress address;
     MeshRange range;
@@ -577,13 +577,13 @@ static bool submit_commands(RendererState* state, bool presentation)
 
 static bool build_acceleration(RendererState* state, VkAccelerationStructureTypeKHR type,
     VkAccelerationStructureGeometryKHR* geometry, uint32_t primitive_count,
-    GpuBuffer* storage, VkAccelerationStructureKHR* result)
+    GpuBuffer* storage, VkAccelerationStructureKHR* result,GpuBuffer* update_scratch=0)
 {
     VkAccelerationStructureBuildGeometryInfoKHR build = {};
     build.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
     build.type = type;
     build.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
-    if (type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR)
+    if (type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR || update_scratch)
         build.flags |= VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
     build.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
     build.geometryCount = 1;
@@ -604,7 +604,8 @@ static bool build_acceleration(RendererState* state, VkAccelerationStructureType
     if (!vk_ok(state->create_as(state->device, &create, 0, result), "Create acceleration structure"))
         return false;
     GpuBuffer local_scratch = {};
-    GpuBuffer* scratch = type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR ? &state->tlas_scratch : &local_scratch;
+    GpuBuffer* scratch = type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR ? &state->tlas_scratch
+        : update_scratch ? update_scratch : &local_scratch;
     VkDeviceSize scratch_size = sizes.buildScratchSize > sizes.updateScratchSize ? sizes.buildScratchSize : sizes.updateScratchSize;
     if (!create_buffer(state, scratch, scratch_size + state->scratch_alignment,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -730,7 +731,7 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
         MeshAllocation* allocation=&state->meshes[i];allocation->range=geometry.meshes[i];
         mesh.geometry.triangles.indexData.deviceAddress=state->indices.address+allocation->range.first*3*sizeof(uint32_t);
         if (!build_acceleration(state,VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,&mesh,allocation->range.count,
-            &allocation->storage,&allocation->acceleration)) return false;
+            &allocation->storage,&allocation->acceleration,allocation->range.deformable ? &allocation->scratch : 0)) return false;
         VkAccelerationStructureDeviceAddressInfoKHR address={};address.sType=VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
         address.accelerationStructure=allocation->acceleration;allocation->address=state->get_as_address(state->device,&address);
     }
@@ -1425,6 +1426,60 @@ bool renderer_poll(Renderer* renderer, PointerInput* input)
     return renderer->running;
 }
 
+// The CPU scene changes vertex positions and normals, with fixed mesh topology.
+// Each mutable BLAS owns persistent scratch. Completed frame fences protect uploads.
+static bool update_meshes(RendererState* state,const Geometry& scene)
+{
+    if (scene.vertices.size()*sizeof(GpuVertex)!=state->vertices.size
+        || scene.triangles.size()!=state->triangle_count)
+    { fprintf(stderr,"Render mesh storage changed after initialization.\n");return false; }
+    bool changed=false;
+    for (uint32_t i=0;i<state->mesh_count;++i)
+    {
+        MeshAllocation& mesh=state->meshes[i];const MeshRange& source=scene.meshes[i];
+        if (source.first!=mesh.range.first || source.count!=mesh.range.count || source.deformable!=mesh.range.deformable
+            || source.first_vertex!=mesh.range.first_vertex || source.vertex_count!=mesh.range.vertex_count)
+        { fprintf(stderr,"Render mesh topology changed after initialization.\n");return false; }
+        if (source.revision==mesh.range.revision) continue;
+        if (!source.deformable) { fprintf(stderr,"Static render mesh changed after initialization.\n");return false; }
+        memcpy((GpuVertex*)state->vertices.mapped+source.first_vertex,
+            scene.vertices.data()+source.first_vertex,source.vertex_count*sizeof(GpuVertex));
+        changed=true;
+    }
+    if (!changed) return true;
+    VkMemoryBarrier before={};before.sType=VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    before.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT;
+    before.dstAccessMask=VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+    vkCmdPipelineBarrier(state->command,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+        0,1,&before,0,0,0,0);
+    uint32_t updates=0;
+    for (uint32_t i=0;i<state->mesh_count;++i)
+    {
+        MeshAllocation& mesh=state->meshes[i];const MeshRange& source=scene.meshes[i];
+        if (source.revision==mesh.range.revision) continue;
+        VkAccelerationStructureGeometryKHR geometry={};geometry.sType=VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+        geometry.geometryType=VK_GEOMETRY_TYPE_TRIANGLES_KHR;geometry.flags=VK_GEOMETRY_OPAQUE_BIT_KHR;
+        geometry.geometry.triangles.sType=VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+        geometry.geometry.triangles.vertexFormat=VK_FORMAT_R32G32B32_SFLOAT;
+        geometry.geometry.triangles.vertexData.deviceAddress=state->vertices.address;
+        geometry.geometry.triangles.vertexStride=sizeof(GpuVertex);geometry.geometry.triangles.maxVertex=(uint32_t)scene.vertices.size()-1;
+        geometry.geometry.triangles.indexType=VK_INDEX_TYPE_UINT32;
+        geometry.geometry.triangles.indexData.deviceAddress=state->indices.address+source.first*3*sizeof(uint32_t);
+        VkAccelerationStructureBuildGeometryInfoKHR build={};build.sType=VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+        build.type=VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+        build.flags=VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
+        build.mode=VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;build.srcAccelerationStructure=build.dstAccelerationStructure=mesh.acceleration;
+        build.geometryCount=1;build.pGeometries=&geometry;
+        build.scratchData.deviceAddress=(mesh.scratch.address+state->scratch_alignment-1)&~(state->scratch_alignment-1);
+        VkAccelerationStructureBuildRangeInfoKHR range={};range.primitiveCount=source.count;
+        const VkAccelerationStructureBuildRangeInfoKHR* ranges=&range;state->build_as(state->command,1,&build,&ranges);
+        mesh.range=source;++updates;
+    }
+    // The following TLAS build barrier makes these BLAS writes visible.
+    printf("Deformed mesh updates: %u BLAS refits.\n",updates);
+    return true;
+}
+
 bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera* camera, const char* capture_path)
 {
     RendererState* state = renderer->state;
@@ -1460,6 +1515,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     if (scene->instances.size()!=state->instance_count || scene->media.size()!=state->medium_count
         || scene->geometry.meshes.size()!=state->mesh_count || scene->effect_tiles.size()!=state->effect_tile_size)
     { fprintf(stderr,"Render scene storage changed after initialization.\n");return false; }
+    if (!update_meshes(state,scene->geometry)) return false;
     scene_instances(state,scene);
     if (state->medium_count) memcpy(state->media.mapped,scene->media.data(),state->medium_count*sizeof(RenderMedium));
     memcpy(state->sight.mapped,scene->sight,sizeof(scene->sight));
@@ -1485,7 +1541,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
         VkMemoryBarrier before = {};
         before.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
         before.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
-        before.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+        before.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR | VK_ACCESS_SHADER_READ_BIT;
         vkCmdPipelineBarrier(state->command, VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
             VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &before, 0, 0, 0, 0);
         state->build_as(state->command, 1, &build, &ranges);
@@ -1749,6 +1805,7 @@ bool renderer_shutdown(Renderer* renderer)
             MeshAllocation* mesh=&state->meshes[i];
             if (mesh->acceleration) state->destroy_as(state->device,mesh->acceleration,0);
             destroy_buffer(state,&mesh->storage);
+            destroy_buffer(state,&mesh->scratch);
         }
         if (state->tlas) state->destroy_as(state->device, state->tlas, 0);
         GpuBuffer* buffers[] = { &state->vertices, &state->triangles, &state->indices, &state->instances,

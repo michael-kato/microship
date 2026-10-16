@@ -29,7 +29,7 @@ with tempfile.TemporaryDirectory(prefix='microship-forms-') as directory:
         data['rules']['ai']['expansion_delay']=1 if side=='fungus' else 300
         data['rules']['economy']['enemy_attack_seconds']=300;data['rules']['economy']['manufacture_seconds']=1
         orders='' if side=='fungus' else f'0 select all\n0 order {home}\n'
-        initial,_=run(side+'-neutral',data)
+        initial,initial_scene=run(side+'-neutral',data)
         middle,mid_scene=run(side+'-partial',data,600,orders)
         mature,scene=run(side+'-mature',data,1800,orders)
         a=initial['colonies'][home]['appearance'];b=middle['colonies'][home]['appearance'];c=mature['colonies'][home]['appearance']
@@ -38,13 +38,37 @@ with tempfile.TemporaryDirectory(prefix='microship-forms-') as directory:
         style=next(v['style'] for v in scene['instances'] if v['slot']==body_slot)
         profile=next(f for f in data['content']['factions'] if f['id']==faction)
         assert abs(style[5]-profile['cell_appearance']['roughness'])<1e-5 and style[6]==1
+        base=initial_scene['meshes'][home]['deformation'];partial=mid_scene['meshes'][home]['deformation'];full=scene['meshes'][home]['deformation']
+        assert base['indices']==partial['indices']==full['indices'],'Cell topology changed'
+        assert len(base['vertices'])==len(partial['vertices'])==len(full['vertices'])
+        wall={i for triangle in base['indices'] if triangle[3]==3 for i in triangle[:3]}
+        moved=0
+        for i,(v0,v1,v2) in enumerate(zip(base['vertices'],partial['vertices'],full['vertices'])):
+            if i not in wall:
+                assert v0==v1==v2,'An organelle moved with the wall'
+                continue
+            distance=math.dist(v0[:3],v2[:3]);moved+=distance>1e-5
+            for axis in range(3):assert abs(v1[axis]-(v0[axis]+b['factions'][faction]*(v2[axis]-v0[axis])))<1e-5,'Wall positions did not lerp'
+            assert abs(math.dist(v2[3:],[0,0,0])-1)<1e-5
+            assert distance<=data['bodies'][home]['radius']*profile['cell_appearance'].get('displacement',{}).get('height',0)+1e-5
+        assert moved>100 if side!='immune' else moved==0
+        def face_normal(vertices,triangle):
+            a,b,c=(vertices[i][:3] for i in triangle[:3]);u=[y-x for x,y in zip(a,b)];v=[y-x for x,y in zip(a,c)]
+            return [u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]]
+        for triangle in base['indices']:
+            if triangle[3]!=3:continue
+            original=face_normal(base['vertices'],triangle)
+            for deformation in (partial,full):
+                normal=face_normal(deformation['vertices'],triangle)
+                assert sum(x*y for x,y in zip(original,normal))>0,'A wall triangle collapsed or flipped'
         assert len(scene['instances'])>len(mid_scene['instances']) or side=='fungus'
         assert mature==run(side+'-repeat',data,1800,orders)[0]
         unlit=deepcopy(data);unlit['appearance']['ambient']=[0,0,0]
         dark,_=run(side+'-render-independent',unlit,1800,orders,('--samples','1'))
         assert all(dark[k]==mature[k] for k in ('colonies','units','outcome','births'))
-        reset,_=run(side+'-restart',data,1800,orders,('--restart',))
+        reset,reset_scene=run(side+'-restart',data,1800,orders,('--restart',))
         assert not any(reset['colonies'][home]['appearance']['factions']) and not reset['colonies'][home]['active']
+        assert reset_scene['meshes'][home]['deformation']['vertices']==base['vertices'],'Restart did not restore the original wall'
         if side=='virus':
             colony=mature['colonies'][home];structures=colony['structures'];roots=colony['root_count']
             assert len(structures)==roots*7==70
@@ -87,19 +111,23 @@ with tempfile.TemporaryDirectory(prefix='microship-forms-') as directory:
     changeover['bodies'][0]['position']=[-8,0,0];changeover['bodies'][1]['position']=[8,0,0]
     changeover['spawns']=[dict(type='virus_fighter',position=[-100,0,8]),dict(type='immune_bomber',position=[8,3,6])]
     changeover['rules']['ai']['expansion_delay']=10;changeover['rules']['economy'].update(enemy_attack_seconds=10,manufacture_seconds=1000)
+    changeover['rules'].pop('exploration',None)
     for building in changeover['content']['buildings']:
         building['hits']=1;building['branches'].update(seconds=300,regrow_seconds=300)
     for unit in changeover['content']['units']:
         if unit['faction']=='virus':unit['speed']=.01
         if unit['name']=='immune_bomber':unit.update(speed=2.8,shot_interval=.25)
     before,_=run('ownership-before',changeover,600)
-    after,_=run('ownership-after',changeover,4800)
+    after,after_scene=run('ownership-after',changeover,4800)
     assert before['colonies'][0]['faction']==1 and before['colonies'][0]['appearance']['factions'][1]>0
     assert after['colonies'][0]['faction']==2 and after['colonies'][0]['appearance']['factions'][1]==0
     assert after['colonies'][0]['appearance']['factions'][2]==1
+    _,neutral_scene=run('ownership-neutral-wall',changeover,1,extra=('--restart',))
+    assert after_scene['meshes'][0]['deformation']['vertices']==neutral_scene['meshes'][0]['deformation']['vertices'],'Immune control did not restore the neutral wall'
     for field,value in [('children',1),('levels',0),('length_scale',1.1),('width_scale',0),('angle_degrees',0),('bend',0)]:
         run('bad-tree-'+field,change(virus,'content.buildings.0.branches.tree.'+field,value),expected=1)
-    for field,value in [('roughness',-1),('surface.count',33),('surface.width',0),('surface.model','missing.fmesh')]:
+    for field,value in [('roughness',-1),('displacement.features',65),('displacement.height',0),('displacement.profile','missing')]:
         run('bad-surface-'+field.replace('.','-'),change(virus,'content.factions.0.cell_appearance.'+field,value),expected=1)
     run('tree-capacity',change(virus,'content.buildings.0.branches.count',12),expected=1)
-print(f'Colony forms E2E passed: {count} application runs; neutral and partial forms, faction materials, curved forked trees, terminal production, restart, deterministic results and invalid assets.')
+    run('old-surface-pieces',change(virus,'content.factions.0.cell_appearance.surface',dict(model='missing.fmesh')),expected=1)
+print(f'Colony forms E2E passed: {count} application runs; fixed wall topology, vertex interpolation, unchanged organelles, valid normals, immune restoration, faction materials, curved forked trees, terminal production, restart, deterministic results and invalid assets.')

@@ -15,9 +15,7 @@
           },
           "shape": {
             "enum": [
-              "leaf",
-              "spine",
-              "lobe"
+              "leaf"
             ]
           },
           "color": {

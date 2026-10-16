@@ -83,6 +83,7 @@ file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/licenses/nile.txt")
 foreach(legacy_asset IN ITEMS startup.game gameplay/biology.content
     levels/biology-virus.world levels/biology-immune.world
     rendering/biology.render rendering/reference.render
+    models/cell_spine.fmesh models/cell_lobe.fmesh
     levels/biology-body.json models/body_spore.fmesh models/fungus_fighter.fmesh models/fungus_bomber.fmesh
     gameplay/trial-units.json gameplay/trial-buildings.json)
     file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/assets/${legacy_asset}")
@@ -120,7 +121,7 @@ add_executable(microship
     source/camera.cpp
     source/world.cpp
     source/render_config.cpp
-    source/presentation.cpp source/render_scene.cpp
+    source/presentation.cpp source/cell_deformation.cpp source/render_scene.cpp
     source/geometry.cpp source/geometry_variation.cpp
     source/window.cpp
     source/simulation.cpp

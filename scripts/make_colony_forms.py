@@ -1,4 +1,4 @@
-"""Build small vertex-colored cell forms and a factory leaf in Blender."""
+"""Build the vertex-colored factory leaf in Blender."""
 import bpy
 import json
 import math
@@ -7,7 +7,6 @@ import re
 from pathlib import Path
 import struct
 import sys
-from mathutils import Matrix
 
 root=Path(__file__).resolve().parents[1]
 profile=root/'assets/models/source/colony_forms.json'
@@ -33,15 +32,6 @@ for form in data['forms']:
         faces=[(1,2,4),(2,0,4),(0,3,4),(3,1,4),(2,1,5),(0,2,5),(3,0,5),(1,3,5)]
         mesh=bpy.data.meshes.new(form['name']);mesh.from_pydata(vertices,[],faces);mesh.update()
         obj=bpy.data.objects.new(form['name'],mesh);bpy.context.collection.objects.link(obj)
-    elif form['shape']=='spine':
-        bpy.ops.mesh.primitive_cone_add(vertices=8,radius1=.4,radius2=0,depth=1)
-        obj=bpy.context.object
-        for v in obj.data.vertices:v.co.z+=.5
-        obj.data.transform(Matrix.Rotation(-math.pi/2,4,'X'))
-    elif form['shape']=='lobe':
-        bpy.ops.mesh.primitive_uv_sphere_add(segments=16,ring_count=8,radius=1)
-        obj=bpy.context.object
-        for face in obj.data.polygons:face.use_smooth=True
     else:raise ValueError('Unknown form shape')
     obj.name=form['name'];mesh=obj.data;mesh.update();mesh.calc_loop_triangles()
     color=mesh.color_attributes.new(name='Color',type='FLOAT_COLOR',domain='POINT')

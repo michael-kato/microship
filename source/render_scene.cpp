@@ -88,8 +88,25 @@ bool render_scene_write(const RenderScene* scene,const char* path)
                 rough_low=std::fmin(rough_low,v.color[3]);rough_high=std::fmax(rough_high,v.color[3]);
                 ior_low=std::fmin(ior_low,v.position[3]);ior_high=std::fmax(ior_high,v.position[3]);
             }
-        fprintf(file,"%s{\"triangles\":%u,\"low\":[%.6f,%.6f,%.6f],\"high\":[%.6f,%.6f,%.6f],\"roughness\":[%.6f,%.6f],\"ior\":[%.6f,%.6f]}",
+        fprintf(file,"%s{\"triangles\":%u,\"low\":[%.6f,%.6f,%.6f],\"high\":[%.6f,%.6f,%.6f],\"roughness\":[%.6f,%.6f],\"ior\":[%.6f,%.6f]",
             i ? "," : "",m->count,m->low[0],m->low[1],m->low[2],m->high[0],m->high[1],m->high[2],rough_low,rough_high,ior_low,ior_high);
+        if (m->deformable)
+        {
+            fprintf(file,",\"deformation\":{\"revision\":%llu,\"vertices\":[",(unsigned long long)m->revision);
+            for (uint32_t v=0;v<m->vertex_count;++v)
+            {
+                const GpuVertex& vertex=scene->geometry.vertices[m->first_vertex+v];
+                fprintf(file,"%s[%.9g,%.9g,%.9g,%.9g,%.9g,%.9g]",v ? "," : "",vertex.position[0],vertex.position[1],vertex.position[2],vertex.normal[0],vertex.normal[1],vertex.normal[2]);
+            }
+            fprintf(file,"],\"indices\":[");
+            for (uint32_t t=m->first;t<m->first+m->count;++t)
+            {
+                const GpuTriangle& triangle=scene->geometry.triangles[t];
+                fprintf(file,"%s[%u,%u,%u,%u]",t>m->first ? "," : "",triangle.index[0]-m->first_vertex,triangle.index[1]-m->first_vertex,triangle.index[2]-m->first_vertex,triangle.index[3]);
+            }
+            fprintf(file,"]}");
+        }
+        fprintf(file,"}");
     }
     fprintf(file,"],\"instances\":[");bool first=true;
     for (uint32_t i=0;i<scene->instances.size();++i)

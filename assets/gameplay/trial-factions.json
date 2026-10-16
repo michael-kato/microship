@@ -24,12 +24,11 @@
         "strength": 0.42,
         "seconds": 180,
         "roughness": 0.18,
-        "surface": {
-          "model": "../models/cell_spine.fmesh",
-          "count": 28,
-          "width": 0.08,
-          "height": 0.16,
-          "offset": 0.96,
+        "displacement": {
+          "features": 28,
+          "height": 0.14,
+          "width_degrees": 20,
+          "profile": "pointed",
           "seed": 7821
         }
       }
@@ -83,12 +82,11 @@
         "strength": 0.46,
         "seconds": 180,
         "roughness": 0.94,
-        "surface": {
-          "model": "../models/cell_lobe.fmesh",
-          "count": 18,
-          "width": 0.13,
-          "height": 0.095,
-          "offset": 0.96,
+        "displacement": {
+          "features": 18,
+          "height": 0.105,
+          "width_degrees": 38,
+          "profile": "rounded",
           "seed": 1769
         }
       }

@@ -21,9 +21,9 @@ struct FactionDefinition
     Color cell_tint;
     float cell_strength,transform_seconds,cell_roughness;
     bool cell_material;
-    char surface_path[ASSET_PATH_CAPACITY];
-    uint32_t surface_count,surface_seed;
-    float surface_width,surface_height,surface_offset;
+    uint32_t displacement_features,displacement_seed;
+    float displacement_height,displacement_width;
+    bool displacement_pointed;
 };
 struct UnitDefinition
 {

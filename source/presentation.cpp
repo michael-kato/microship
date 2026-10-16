@@ -46,24 +46,6 @@ static void set_instance(Presentation* p,uint32_t slot,uint32_t mesh,Vec3 positi
     }
 }
 
-static bool cell_surface_point(const Geometry& g,uint32_t mesh,Vec3 center,Vec3 direction,Vec3* point)
-{
-    const MeshRange& range=g.meshes[mesh];float farthest=0;
-    for (uint32_t i=range.first;i<range.first+range.count;++i)
-    {
-        const GpuTriangle& t=g.triangles[i];const float* av=g.vertices[t.index[0]].position;
-        const float* bv=g.vertices[t.index[1]].position;const float* cv=g.vertices[t.index[2]].position;
-        Vec3 a={av[0],av[1],av[2]},b={bv[0],bv[1],bv[2]},c={cv[0],cv[1],cv[2]};
-        Vec3 e1=subtract(b,a),e2=subtract(c,a),h=cross(direction,e2);float det=dot(e1,h);
-        if (std::fabs(det)<.000001f) continue;
-        Vec3 offset=subtract(center,a);float u=dot(offset,h)/det;if (u<0 || u>1) continue;
-        Vec3 q=cross(offset,e1);float v=dot(direction,q)/det;if (v<0 || u+v>1) continue;
-        farthest=std::fmax(farthest,dot(e2,q)/det);
-    }
-    if (farthest<=0) return false;
-    *point=add(center,scale(direction,farthest));return true;
-}
-
 bool presentation_initialize(Presentation* p,const Simulation* s,const RenderConfig* config)
 {
     const World* w=&s->world;RenderScene* scene=&p->scene;
@@ -109,11 +91,6 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
             p->background_mesh=(uint32_t)sources.size();const Background* b=&w->backdrop;
             sources.push_back(MeshSource{b->model_path,b->position,b->scale,0,b->color,0,0,0,0});
         }
-        for (uint32_t f=1;f<MAX_FACTIONS;++f) if (w->content.factions[f].surface_count)
-        {
-            const FactionDefinition& profile=w->content.factions[f];p->surface_meshes[f]=(uint32_t)sources.size();
-            sources.push_back(MeshSource{profile.surface_path,Vec3{},1,0,profile.cell_tint,0,0,0,0});
-        }
         if (!geometry_build(&scene->geometry,sources.data(),(uint32_t)sources.size(),config)) return false;
         p->unit_base=0;p->body_base=w->gameplay.enabled ? (uint32_t)MAX_UNITS : w->spawn_count;
         p->factory_base=p->body_base+w->body_count;
@@ -124,22 +101,7 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
         p->flying_base=p->attached_base+(w->spikes.enabled ? MAX_UNITS*w->spikes.count : 0);
         p->embedded_base=p->flying_base+(w->spikes.enabled ? MAX_PROJECTILES : 0);
         p->background_slot=p->embedded_base+(w->spikes.enabled ? MAX_EMBEDDED*(MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES) : 0);
-        for (uint32_t body=0;body<w->body_count;++body)
-            if (w->content.bodies[w->bodies[body].type].hosts_site)
-            for (uint32_t f=1;f<MAX_FACTIONS;++f)
-            {
-                const FactionDefinition& profile=w->content.factions[f];
-                for (uint32_t k=0;k<profile.surface_count;++k)
-                {
-                    float z=1-2*(k+.5f)/profile.surface_count,ring=std::sqrt(std::fmax(0.0f,1-z*z));
-                    float angle=k*2.39996323f+(w->bodies[body].seed^profile.surface_seed)*.001f;
-                    Vec3 normal={ring*std::cos(angle),ring*std::sin(angle),z},point;
-                    if (!cell_surface_point(scene->geometry,p->body_meshes[body],w->bodies[body].position,normal,&point))
-                    { fprintf(stderr,"Cannot attach authored cell surface form.\n");return false; }
-                    point=add(point,scale(normal,-w->bodies[body].radius*(1-profile.surface_offset)));
-                    p->surface_features.push_back(CellSurfaceFeature{body,f,p->background_slot++,point,normal});
-                }
-            }
+        if (!presentation_prepare_membranes(p,s)) return false;
         scene->instances.resize(p->background_slot+1);
         scene->effects.resize(MAX_EFFECT_SEGMENTS);
         scene->tile_count=((config->width+EFFECT_TILE-1)/EFFECT_TILE)*((config->height+EFFECT_TILE-1)/EFFECT_TILE);
@@ -366,6 +328,7 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
 {
     RenderScene* scene=&p->scene;const World* w=&s->world;
     static_assert(MAX_RENDER_SIGHT>=MAX_UNITS+MAX_BODIES,"Sight source capacity");
+    if (!presentation_update_membranes(p,s)) return false;
     scene->sight_count=0;scene->fog_blur=w->sight_radius>0 ? w->fog_blur : 0;
     scene->fog_feather=w->fog_feather;scene->fog_plane_z=w->fog_plane_z;
     if (scene->fog_blur>0)
@@ -409,15 +372,6 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
         medium->scattering[3]=c->interior_fade;
         medium->absorption_phase[0]=medium->absorption_phase[1]=medium->absorption_phase[2]=c->interior_absorption;
         medium->absorption_phase[3]=c->interior_anisotropy;
-    }
-    for (uint32_t i=0;i<p->surface_features.size();++i)
-    {
-        const CellSurfaceFeature& feature=p->surface_features[i];if (!s->visible_bodies[feature.body]) continue;
-        float blend=s->cell_appearance[feature.body].factions[feature.faction];if (blend<=.001f) continue;
-        blend=blend*blend*(3-2*blend);
-        const FactionDefinition& profile=w->content.factions[feature.faction];float radius=w->bodies[feature.body].radius;
-        Vec3 y=feature.normal,x=normalize(cross(std::fabs(y.z)<.9f ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
-        set_instance(p,feature.slot,p->surface_meshes[feature.faction],feature.position,scale(x,radius*profile.surface_width*blend),scale(y,radius*profile.surface_height*blend),scale(z,radius*profile.surface_width*blend));
     }
     if (w->gameplay.enabled) update_gameplay_instances(p,s);
     else

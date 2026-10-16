@@ -118,7 +118,7 @@ static bool load_bodies(Content* c,Json root,const char* path)
     }
     return root.document->valid;
 }
-static bool load_factions(Content* c,Json root,const char* path)
+static bool load_factions(Content* c,Json root)
 {
     json_object(root,"$schema|factions");JsonArray a=json_array(json_get(root,"factions"),MAX_FACTIONS-1);Json j={};
     while (json_next(&a,&j))
@@ -127,17 +127,21 @@ static bool load_factions(Content* c,Json root,const char* path)
         Json appearance=json_find(j,"cell_appearance");
         if (json_present(appearance))
         {
-            json_object(appearance,"tint|strength|seconds|roughness|surface");f.cell_tint=json_color(json_get(appearance,"tint"));
+            json_object(appearance,"tint|strength|seconds|roughness|displacement");f.cell_tint=json_color(json_get(appearance,"tint"));
             f.cell_strength=json_float(json_get(appearance,"strength"),0,1);f.transform_seconds=json_positive(json_get(appearance,"seconds"),MAX_CELL_TINT_SECONDS);
             Json roughness=json_find(appearance,"roughness");
             if (json_present(roughness)) { f.cell_roughness=json_float(roughness,.02f,1);f.cell_material=true; }
-            Json surface=json_find(appearance,"surface");
-            if (json_present(surface))
+            Json displacement=json_find(appearance,"displacement");
+            if (json_present(displacement))
             {
-                json_object(surface,"model|count|width|height|offset|seed");json_path(json_get(surface,"model"),path,f.surface_path);
-                f.surface_count=json_uint(json_get(surface,"count"),1,32);f.surface_seed=json_uint(json_get(surface,"seed"),0,16777215);
-                f.surface_width=json_positive(json_get(surface,"width"),.5f);f.surface_height=json_positive(json_get(surface,"height"),.5f);
-                f.surface_offset=json_float(json_get(surface,"offset"),.5f,1.2f);
+                json_object(displacement,"features|height|width_degrees|profile|seed");
+                f.displacement_features=json_uint(json_get(displacement,"features"),1,64);
+                f.displacement_seed=json_uint(json_get(displacement,"seed"),0,16777215);
+                f.displacement_height=json_positive(json_get(displacement,"height"),.2f);
+                f.displacement_width=json_float(json_get(displacement,"width_degrees"),10,75)*.01745329252f;
+                char profile[ASSET_NAME_CAPACITY]={};json_string(json_get(displacement,"profile"),profile,sizeof(profile));
+                f.displacement_pointed=!strcmp(profile,"pointed");
+                if (!f.displacement_pointed && strcmp(profile,"rounded")) json_error(displacement,"profile must be pointed or rounded");
             }
 
         }
@@ -336,7 +340,7 @@ bool content_load(Content* content,const char* path)
     {
         char file[ASSET_PATH_CAPACITY]={};if (!json_path(json_get(root,keys[i]),path,file)) return false;
         JsonDocument document;if (!json_load(&document,file)) return false;Json data=json_root(&document);
-        bool valid=i==0 ? load_bodies(content,data,file) : i==1 ? load_factions(content,data,file) : i==2 ? load_groups(content,data)
+        bool valid=i==0 ? load_bodies(content,data,file) : i==1 ? load_factions(content,data) : i==2 ? load_groups(content,data)
             : i==3 ? load_units(content,data,file) : load_buildings(content,data,file);
         if (!valid) return false;
     }

@@ -242,10 +242,12 @@ bool geometry_build(Geometry* geometry,const MeshSource* sources,uint32_t count,
     {
         const MeshSource* source=&sources[i];MeshRange* range=&built.meshes[i];
         range->first=(uint32_t)built.triangles.size();
+        range->first_vertex=(uint32_t)built.vertices.size();
         bool valid=source->path[0] ? add_model(&built,source->path,source->position,source->scale,source->color,source->yaw,source)
             : add_sphere(&built,source->position,source->scale,source->color,config);
         if (!valid) return false;
         range->count=(uint32_t)built.triangles.size()-range->first;
+        range->vertex_count=(uint32_t)built.vertices.size()-range->first_vertex;
         for (uint32_t axis=0;axis<3;++axis) { range->low[axis]=FLT_MAX;range->high[axis]=-FLT_MAX; }
         for (uint32_t t=range->first;t<range->first+range->count;++t)
             for (uint32_t v=0;v<3;++v)

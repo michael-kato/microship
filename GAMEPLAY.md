@@ -12,7 +12,7 @@ Each virus organelle root grows a curved trunk, two forked sub-trunks, and four 
 
 Virus trees deploy one complete tree at a time. Trunks use sixty percent of the full deployment time; smaller branches share the rest. New units grow at terminal leaves. Support damage removes descendants. The growth plane is authored to match the startup view. Moving the camera does not change geometry or gameplay.
 
-Ownership changes cell form and material over 180 seconds. Virus cells grow small blue-green spines and acquire a shinier membrane. Fungal cells grow brown lobes and acquire a rougher membrane. Immune cells move toward pink and white and the base cell form. Previous faction features shrink when ownership changes. These features use fixed meshes and current instance transforms. They do not change cell collisions, attachment points, or simulation outcomes.
+Ownership changes the existing cell wall over 180 seconds. Virus control blends in a pointed radial displacement and a shinier blue-green material. Fungal control blends in broad rounded displacement and a rougher brown material. Immune control returns the wall to its neutral shape and moves its material toward pink and white. Vertex and triangle counts stay fixed. Normals and render bounds follow the current positions. No separate spines or lobes appear. Organelle geometry, collision rules, attachment points, and game outcomes do not change.
 
 Damage removes stem sections and can remove descendants of a damaged support. Other roots keep working. Geometry and BLAS stay fixed during growth; instance transforms expose the current sections. Unit manufacture occurs at mature tips.
 
