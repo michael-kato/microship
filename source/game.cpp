@@ -8,6 +8,7 @@
 #include "orders.h"
 #include "audio.h"
 #include "vector_math.h"
+#include "math_constants.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -18,6 +19,16 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include "../assets/shaders/hud_layout.glsl"
+
+static const float PICK_MISS_DISTANCE = 1e30f;
+static const float CELL_PICK_RADIUS_SCALE = 1.08f;
+static const float MOVE_PLANE_DIRECTION_EPSILON = .0001f;
+static const float SELECTION_MARKER_RADIUS_SCALE = 1.14f;
+static const int PERCENT_SCALE = 100;
+static const double MILLISECONDS_PER_SECOND = 1000.0;
+static const double MAX_FRAME_CATCHUP_SECONDS = 0.25;
+static const int SMOKE_SIMULATION_TICKS = 3;
 
 struct Game
 {
@@ -63,7 +74,7 @@ static Vec3 pointer_ray(const Camera* camera, const RenderConfig* config, int x,
 {
     Vec3 forward=normalize(subtract(camera->target,camera->position));
     Vec3 right=normalize(cross(forward,camera->up)),up=cross(right,forward);
-    float scale=std::tan(config->vertical_fov_degrees*.00872664626f);
+    float scale=std::tan(config->vertical_fov_degrees*HALF_DEGREES_TO_RADIANS);
     return normalize(add(forward,add(::scale(right,(2.0f*(x+.5f)/config->width-1)*scale*config->width/config->height),
         ::scale(up,(1-2.0f*(y+.5f)/config->height)*scale))));
 }
@@ -72,7 +83,7 @@ static float pick_distance(Vec3 eye, Vec3 direction, Vec3 position, float radius
 {
     Vec3 offset=subtract(eye,position);float b=dot(offset,direction);
     float discriminant=b*b-dot(offset,offset)+radius*radius;
-    return discriminant>=0 && -b+std::sqrt(discriminant)>0 ? std::fmax(0.0f,-b-std::sqrt(discriminant)) : 1e30f;
+    return discriminant>=0 && -b+std::sqrt(discriminant)>0 ? std::fmax(0.0f,-b-std::sqrt(discriminant)) : PICK_MISS_DISTANCE;
 }
 
 static void startup_camera(Game* game,const RenderConfig* config)
@@ -103,34 +114,34 @@ static void gameplay_input(Game* game, const PointerInput* input, const RenderCo
         { Vec3 offset=subtract(game->camera.position,game->camera.target);game->camera.target=s->world.bodies[p].position;game->camera.position=add(game->camera.target,offset); }
     }
     if (!input->click && !input->command) return;
-    if ((input->click || input->command) && (input->click ? input->click_y : input->command_y)>=(int)config->height-164)
+    if ((input->click || input->command) && (input->click ? input->click_y : input->command_y)>=(int)config->height-HUD_BOTTOM_BAND_HEIGHT)
     {
         int x=input->click ? input->click_x : input->command_x;
-        if (x>=24 && x<604 && (input->click ? input->click_y : input->command_y)>=(int)config->height-144)
+        if (x>=HUD_PANEL_MARGIN && x<HUD_FLEET_PANEL_RIGHT && (input->click ? input->click_y : input->command_y)>=(int)config->height-HUD_PANEL_HEIGHT)
         {
-            if (input->click && input->click_y>=(int)config->height-108 && input->click_y<(int)config->height-86)
-                simulation_select(s,(input->click_x-24)/194==2 ? -1 : (input->click_x-24)/194);
+            if (input->click && input->click_y>=(int)config->height-HUD_GROUP_BUTTON_TOP && input->click_y<(int)config->height-HUD_GROUP_BUTTON_BOTTOM)
+                simulation_select(s,(input->click_x-HUD_PANEL_MARGIN)/HUD_GROUP_BUTTON_WIDTH==2 ? -1 : (input->click_x-HUD_PANEL_MARGIN)/HUD_GROUP_BUTTON_WIDTH);
             return;
         }
-        if (x>=(int)config->width-464 && x<(int)config->width-24)
+        if (x>=(int)config->width-HUD_SITE_PANEL_LEFT_INSET && x<(int)config->width-HUD_PANEL_MARGIN)
         {
-            if (input->click && input->click_y>=(int)config->height-80 && input->click_y<(int)config->height-58)
-                simulation_priority(s,input->click_x<(int)config->width-244 ? 0 : 1);
+            if (input->click && input->click_y>=(int)config->height-HUD_PRIORITY_BUTTON_TOP && input->click_y<(int)config->height-HUD_PRIORITY_BUTTON_BOTTOM)
+                simulation_priority(s,input->click_x<(int)config->width-HUD_PRIORITY_BUTTON_DIVIDER_INSET ? 0 : 1);
             return;
         }
     }
     int x=input->command ? input->command_x : input->click_x,y=input->command ? input->command_y : input->click_y;
-    Vec3 ray=pointer_ray(&game->camera,config,x,y);float nearest=1e30f;int cell=-1,unit=-1;
+    Vec3 ray=pointer_ray(&game->camera,config,x,y);float nearest=PICK_MISS_DISTANCE;int cell=-1,unit=-1;
     for (uint32_t p=0;p<s->world.body_count;++p)
     {
         if (!simulation_body_known(s,p)) continue;
-        float t=pick_distance(game->camera.position,ray,s->world.bodies[p].position,s->world.bodies[p].radius*1.08f);
+        float t=pick_distance(game->camera.position,ray,s->world.bodies[p].position,s->world.bodies[p].radius*CELL_PICK_RADIUS_SCALE);
         if (t<nearest) { nearest=t;cell=(int)p; }
     }
     if (input->command)
     {
         if (cell>=0) simulation_order(s,(uint32_t)cell);
-        else if (s->world.sight_radius>0 && std::fabs(ray.z)>.0001f)
+        else if (s->world.sight_radius>0 && std::fabs(ray.z)>MOVE_PLANE_DIRECTION_EPSILON)
         {
             float plane=0;
             for (uint32_t p=0;p<s->world.body_count;++p)
@@ -163,10 +174,10 @@ static void selection_marker(const Game* game,const RenderConfig* config,int cel
     Vec3 f=normalize(subtract(game->camera.target,game->camera.position)),right=normalize(cross(f,game->camera.up));
     Vec3 up=cross(right,f),offset=subtract(body->position,game->camera.position);float depth=dot(offset,f);
     if (depth<=0) return;
-    float pixels=config->height/(2*depth*std::tan(config->vertical_fov_degrees*.00872664626f));
+    float pixels=config->height/(2*depth*std::tan(config->vertical_fov_degrees*HALF_DEGREES_TO_RADIANS));
     marker[0]=(int)(config->width*.5f+dot(offset,right)*pixels);
     marker[1]=(int)(config->height*.5f-dot(offset,up)*pixels);
-    marker[2]=(int)(body->radius*pixels*1.14f);marker[3]=1;
+    marker[2]=(int)(body->radius*pixels*SELECTION_MARKER_RADIUS_SCALE);marker[3]=1;
 }
 
 static void overlay_enabled(Game* game, const RenderConfig* config)
@@ -177,19 +188,19 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (s->units[i].health>0 && s->units[i].faction==s->world.player_faction)
         { ++groups[simulation_unit_definition(s,&s->units[i])->group];++fleet;if (s->units[i].selected) ++selected; }
-    snprintf(r->hud[0],96,"MICROSHIP / %s     FLEET %u     SELECTED %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet,selected);
-    snprintf(r->hud[1],96,"1 %-10s %-5u 2 %-10s %-5u 3 ALL",s->world.content.groups[0].plural,groups[0],s->world.content.groups[1].plural,groups[1]);
-    snprintf(r->hud[2],96,"%.55s",s->outcome ? (s->outcome>0 ? "ENEMY PRODUCTION SITES DESTROYED / R TO RESTART" : "COLONY LOST / R TO RESTART") : s->message);
-    snprintf(r->hud[3],96,"RIGHT CLICK: ORDER   HOME: FOCUS   SPACE: PAUSE");
-    snprintf(r->hud[4],96,"SELECT A BODY");
-    snprintf(r->hud[5],96,"SCOUT TO FIND ENEMY PRODUCTION SITES");
-    snprintf(r->hud[6],96,"CLEAR DEFENDERS / COLONIZE TO EXPAND");
-    snprintf(r->hud[7],96,"F: %-15s S: %s",s->world.content.groups[0].plural,s->world.content.groups[1].plural);
+    snprintf(r->hud[HUD_LINE_TITLE],HUD_LINE_CAPACITY,"MICROSHIP / %s     FLEET %u     SELECTED %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet,selected);
+    snprintf(r->hud[HUD_LINE_GROUPS],HUD_LINE_CAPACITY,"1 %-10s %-5u 2 %-10s %-5u 3 ALL",s->world.content.groups[0].plural,groups[0],s->world.content.groups[1].plural,groups[1]);
+    snprintf(r->hud[HUD_LINE_MESSAGE],HUD_LINE_CAPACITY,"%.55s",s->outcome ? (s->outcome>0 ? "ENEMY PRODUCTION SITES DESTROYED / R TO RESTART" : "COLONY LOST / R TO RESTART") : s->message);
+    snprintf(r->hud[HUD_LINE_HELP],HUD_LINE_CAPACITY,"RIGHT CLICK: ORDER   HOME: FOCUS   SPACE: PAUSE");
+    snprintf(r->hud[HUD_LINE_SITE],HUD_LINE_CAPACITY,"SELECT A BODY");
+    snprintf(r->hud[HUD_LINE_STRUCTURES],HUD_LINE_CAPACITY,"SCOUT TO FIND ENEMY PRODUCTION SITES");
+    snprintf(r->hud[HUD_LINE_RESOURCE],HUD_LINE_CAPACITY,"CLEAR DEFENDERS / COLONIZE TO EXPAND");
+    snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,"F: %-15s S: %s",s->world.content.groups[0].plural,s->world.content.groups[1].plural);
     if (s->world.content.factions[s->world.player_faction].automatic)
     {
-        snprintf(r->hud[0],96,"MICROSHIP / %s     SPORES %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet);
-        snprintf(r->hud[1],96,"AUTOMATIC EMISSION / NO UNIT ORDERS");
-        snprintf(r->hud[3],96,"HOME: FOCUS   SPACE: PAUSE   R: RESTART");
+        snprintf(r->hud[HUD_LINE_TITLE],HUD_LINE_CAPACITY,"MICROSHIP / %s     SPORES %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet);
+        snprintf(r->hud[HUD_LINE_GROUPS],HUD_LINE_CAPACITY,"AUTOMATIC EMISSION / NO UNIT ORDERS");
+        snprintf(r->hud[HUD_LINE_HELP],HUD_LINE_CAPACITY,"HOME: FOCUS   SPACE: PAUSE   R: RESTART");
     }
     for (int j=0;j<4;++j) r->hud_status[j]=0;
     r->hud_status[0]=-1;
@@ -203,39 +214,39 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
         const Colony* c=&s->colonies[p];
         bool ours=c->active && c->faction==s->world.player_faction;
         r->hud_accent[3]=ours ? 1.0f : c->active ? -1.0f : 0.0f;
-        snprintf(r->hud[4],96,"%s %02d / %s",s->world.content.bodies[s->world.bodies[p].type].label,p+1,c->active ? (ours ? "YOUR NODE" : "HOSTILE NODE") : "UNCLAIMED");
-        if (c->building) snprintf(r->hud[4]+strlen(r->hud[4]),96-strlen(r->hud[4]),"  %s %03.0f%%",s->world.content.factions[c->faction].automatic ? "SPORE" : "BUILD",c->manufacturing*100);
-        if (c->capacity_blocked) snprintf(r->hud[4],96,"UNIT STORAGE FULL / BUILD HELD");
+        snprintf(r->hud[HUD_LINE_SITE],HUD_LINE_CAPACITY,"%s %02d / %s",s->world.content.bodies[s->world.bodies[p].type].label,p+1,c->active ? (ours ? "YOUR NODE" : "HOSTILE NODE") : "UNCLAIMED");
+        if (c->building) snprintf(r->hud[HUD_LINE_SITE]+strlen(r->hud[HUD_LINE_SITE]),HUD_LINE_CAPACITY-strlen(r->hud[HUD_LINE_SITE]),"  %s %03.0f%%",s->world.content.factions[c->faction].automatic ? "SPORE" : "BUILD",c->manufacturing*PERCENT_SCALE);
+        if (c->capacity_blocked) snprintf(r->hud[HUD_LINE_SITE],HUD_LINE_CAPACITY,"UNIT STORAGE FULL / BUILD HELD");
         if (s->world.gameplay.enabled)
         {
             uint32_t structures=c->health>0 ? 1 : 0;float production=simulation_production(s,p);
             for (uint32_t j=0;j<simulation_producer_definition(s,p)->branches.count-1;++j) if (c->branches[j].health>0)
             { ++structures; }
-            snprintf(r->hud[5],96,"STRUCTURES %u / %u   RATE %.2fX",c->active ? structures : 0,simulation_producer_definition(s,p)->branches.count,production);
+            snprintf(r->hud[HUD_LINE_STRUCTURES],HUD_LINE_CAPACITY,"STRUCTURES %u / %u   RATE %.2fX",c->active ? structures : 0,simulation_producer_definition(s,p)->branches.count,production);
         }
-        snprintf(r->hud[6],96,"%s %05.1f / %.0f",s->world.content.resource_label,c->energy,s->world.gameplay.storage);
-        snprintf(r->hud[7],96,"F: %.16s %s  S: %.16s %s",s->world.content.groups[0].plural,s->world.content.units[c->priority].group==0 ? "*" : " ",s->world.content.groups[1].plural,s->world.content.units[c->priority].group==1 ? "*" : " ");
+        snprintf(r->hud[HUD_LINE_RESOURCE],HUD_LINE_CAPACITY,"%s %05.1f / %.0f",s->world.content.resource_label,c->energy,s->world.gameplay.storage);
+        snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,"F: %.16s %s  S: %.16s %s",s->world.content.groups[0].plural,s->world.content.units[c->priority].group==0 ? "*" : " ",s->world.content.groups[1].plural,s->world.content.units[c->priority].group==1 ? "*" : " ");
         if (s->world.content.factions[c->faction].automatic)
         {
-            snprintf(r->hud[5],96,"AUTOMATIC SEEKING SPORES");
-            snprintf(r->hud[6],96,"SPORES CAN BE SHOT DOWN");
-            snprintf(r->hud[7],96,"BLASTS ALSO DAMAGE NEARBY FRIENDLIES");
+            snprintf(r->hud[HUD_LINE_STRUCTURES],HUD_LINE_CAPACITY,"AUTOMATIC SEEKING SPORES");
+            snprintf(r->hud[HUD_LINE_RESOURCE],HUD_LINE_CAPACITY,"SPORES CAN BE SHOT DOWN");
+            snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,"BLASTS ALSO DAMAGE NEARBY FRIENDLIES");
         }
-        if (!ours) snprintf(r->hud[7],96,"CLEAR DEFENDERS TO ESTABLISH A SITE");
+        if (!ours) snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,"CLEAR DEFENDERS TO ESTABLISH A SITE");
         r->hud_status[0]=-1;r->hud_status[1]=c->growth;
         r->hud_status[2]=c->energy/s->world.gameplay.storage;r->hud_status[3]=c->building ? c->manufacturing : 0;
-        if (s->order_body==p && s->order_count) r->hud_feedback[0]=(s->tick_count-s->order_tick)/60.0f;
+        if (s->order_body==p && s->order_count) r->hud_feedback[0]=(s->tick_count-s->order_tick)/SIMULATION_TICKS_PER_SECOND_FLOAT;
     }
     else if (p>=0 && simulation_body_known(s,(uint32_t)p))
-    { r->hud_accent[3]=0;snprintf(r->hud[4],96,"%s %02d / OUT OF SIGHT",s->world.content.bodies[s->world.bodies[p].type].label,p+1); }
-    int hover=-1;float nearest=1e30f;
+    { r->hud_accent[3]=0;snprintf(r->hud[HUD_LINE_SITE],HUD_LINE_CAPACITY,"%s %02d / OUT OF SIGHT",s->world.content.bodies[s->world.bodies[p].type].label,p+1); }
+    int hover=-1;float nearest=PICK_MISS_DISTANCE;
     if (game->pointer.pointer_valid)
     {
         Vec3 ray=pointer_ray(&game->camera,config,game->pointer.pointer_x,game->pointer.pointer_y);
         for (uint32_t j=0;j<s->world.body_count;++j)
         {
             if (!simulation_body_known(s,j)) continue;
-            float d=pick_distance(game->camera.position,ray,s->world.bodies[j].position,s->world.bodies[j].radius*1.08f);
+            float d=pick_distance(game->camera.position,ray,s->world.bodies[j].position,s->world.bodies[j].radius*CELL_PICK_RADIUS_SCALE);
             if (d<nearest) { nearest=d;hover=(int)j; }
         }
     }
@@ -275,7 +286,7 @@ int game_run(const GameOptions* options)
     if (options->smoke)
     {
         if (!options->ticks)
-        { for (uint32_t i=0;i<3;++i) simulation_step(&game.simulation);if (game.simulation.tick_count!=3) return 1; }
+        { for (uint32_t i=0;i<SMOKE_SIMULATION_TICKS;++i) simulation_step(&game.simulation);if (game.simulation.tick_count!=SMOKE_SIMULATION_TICKS) return 1; }
         if (!presentation_build(presentation.get(),&game.simulation,&game.camera,&config)
             || !render_scene_validate(&presentation->scene)) return 1;
         if (options->state_path && !simulation_write_state(&game.simulation,options->state_path)) return 1;
@@ -290,7 +301,7 @@ int game_run(const GameOptions* options)
     if (!options->headless && !audio_open(&audio)) { renderer_shutdown(&game.renderer);return 1; }
     game.renderer.debug_views = options->debug_views;
     printf("Left-drag to pan; wheel to zoom. F1/F2 debug. Gameplay: 1 fighters, 2 bombers, 3 all; right-click to move or order; F/S factory production; Space pause; R restart.\n");
-    const double tick_seconds = 1.0 / 60.0;
+    const double tick_seconds = 1.0 / SIMULATION_TICKS_PER_SECOND_DOUBLE;
     double previous = monotonic_seconds();
     double accumulator = 0.0;
     double frame_total = 0.0;
@@ -302,13 +313,13 @@ int game_run(const GameOptions* options)
         double start = monotonic_seconds();
         double elapsed = start - previous;
         previous = start;
-        game.renderer.previous_frame_ms = frames ? elapsed*1000.0 : 0.0;
+        game.renderer.previous_frame_ms = frames ? elapsed*MILLISECONDS_PER_SECOND : 0.0;
         if (input.toggle_stats) game.renderer.debug_stats = !game.renderer.debug_stats;
         if (input.toggle_buffers) game.renderer.debug_views = !game.renderer.debug_views;
         camera_apply_input(&game.camera,&input,&config);
         if (input.restart && game.simulation.world.gameplay.enabled) { accumulator=0;elapsed=0; }
         game.pointer=input;gameplay_input(&game,&input,&config);
-        accumulator += elapsed < 0.25 ? elapsed : 0.25;
+        accumulator += elapsed < MAX_FRAME_CATCHUP_SECONDS ? elapsed : MAX_FRAME_CATCHUP_SECONDS;
         if (options->headless) accumulator=0;
         while (accumulator >= tick_seconds)
         {
@@ -332,7 +343,7 @@ int game_run(const GameOptions* options)
             success = false;
             break;
         }
-        double frame_ms = (monotonic_seconds() - start) * 1000.0;
+        double frame_ms = (monotonic_seconds() - start) * MILLISECONDS_PER_SECOND;
         game.renderer.work_frame_ms=frame_ms-game.renderer.acquire_ms-game.renderer.present_ms;
         frame_total += frame_ms;
         ++frames;
@@ -345,6 +356,6 @@ int game_run(const GameOptions* options)
     if (options->scene_state_path && !render_scene_write(&presentation->scene,options->scene_state_path)) success=false;
     if (frames)
         printf("Rendered %u frames: mean application %.3f ms (%.2f FPS).\n",
-               frames, frame_total / frames, 1000.0 * frames / frame_total);
+               frames, frame_total / frames, MILLISECONDS_PER_SECOND * frames / frame_total);
     return success ? 0 : 1;
 }

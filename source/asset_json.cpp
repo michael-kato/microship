@@ -6,6 +6,12 @@
 #include <errno.h>
 #include <cmath>
 #include <windows.h>
+#include "asset_limits.h"
+
+static const int MAX_JSON_FILE_BYTES = 1024*1024;
+static const int MAX_JSON_DEPTH = 32;
+static const int MAX_JSON_OBJECT_FIELDS = 64;
+static const int JSON_ERROR_TEXT_CAPACITY = 160;
 
 JsonDocument::JsonDocument() : root(0),path(0),valid(false) {}
 JsonDocument::~JsonDocument() { free(root); }
@@ -37,7 +43,7 @@ static bool bounded_text(const char* text,size_t size)
             else if (c=='"') string=false;
         }
         else if (c=='"') string=true;
-        else if (c=='{' || c=='[') { if (++depth>32) return false; }
+        else if (c=='{' || c=='[') { if (++depth>MAX_JSON_DEPTH) return false; }
         else if (c=='}' || c==']') { if (!depth) return false;--depth; }
     }
     return MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,text,(int)size,0,0)>0;
@@ -54,7 +60,7 @@ static bool check_tree(Json j)
     if (v->type==json_type_object)
     {
         json_object_s* o=(json_object_s*)v->payload;
-        if (o->length>64) return json_error(j,"object exceeds 64 fields");
+        if (o->length>MAX_JSON_OBJECT_FIELDS) return json_error(j,"object exceeds 64 fields");
         for (json_object_element_s* e=o->start;e;e=e->next)
         {
             if (strlen(e->name->string)!=e->name->string_size) return json_error(j,"NUL in JSON key");
@@ -74,7 +80,7 @@ bool json_load(JsonDocument* d,const char* path)
     d->path=path;d->valid=true;
     FILE* f=fopen(path,"rb");if (!f) return json_error(json_root(d),"cannot open JSON asset");
     bool ok=fseek(f,0,SEEK_END)==0;long size=ok ? ftell(f) : -1;
-    ok=ok && size>0 && size<=1024*1024 && fseek(f,0,SEEK_SET)==0;
+    ok=ok && size>0 && size<=MAX_JSON_FILE_BYTES && fseek(f,0,SEEK_SET)==0;
     char* text=ok ? (char*)malloc((size_t)size) : 0;
     ok=ok && text && fread(text,1,(size_t)size,f)==(size_t)size;
     if (fclose(f)) ok=false;
@@ -113,7 +119,7 @@ bool json_object(Json j,const char* keys)
             return json_error(Json{j.document,e->value},"$schema must be a string");
         else if (!allowed(keys,e->name->string))
         {
-            char error[160];snprintf(error,sizeof(error),"unknown field: %.120s",e->name->string);
+            char error[JSON_ERROR_TEXT_CAPACITY];snprintf(error,sizeof(error),"unknown field: %.120s",e->name->string);
             return json_error(Json{j.document,e->value},error);
         }
     return true;
@@ -131,7 +137,7 @@ Json json_get(Json j,const char* key)
     Json value=json_find(j,key);
     if (!value.value)
     {
-        char error[160];snprintf(error,sizeof(error),"missing field: %.120s",key);json_error(j,error);
+        char error[JSON_ERROR_TEXT_CAPACITY];snprintf(error,sizeof(error),"missing field: %.120s",key);json_error(j,error);
     }
     return value;
 }
@@ -196,7 +202,7 @@ bool json_string(Json j,char* output,size_t capacity)
 }
 bool json_path(Json j,const char* source,char* output,size_t capacity)
 {
-    char value[256]={};if (!json_string(j,value,sizeof(value))) return false;
+    char value[ASSET_PATH_CAPACITY]={};if (!json_string(j,value,sizeof(value))) return false;
     if (value[0]=='/' || value[0]=='\\' || strchr(value,':')) return json_error(j,"asset path must be relative to this file");
     const char* slash=strrchr(source,'/');const char* backslash=strrchr(source,'\\');
     if (backslash && (!slash || backslash>slash)) slash=backslash;

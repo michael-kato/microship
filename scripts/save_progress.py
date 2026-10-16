@@ -8,9 +8,10 @@ import struct
 import sys
 import zlib
 
+PNG_SAMPLE_BITS = 8
+MAX_DESCRIPTION_CHARACTERS = 64
 
 ROOT = Path(__file__).resolve().parents[1] / 'screenshots'
-
 
 def ppm_png(data):
     # Preserve microship's display-mapped RGB8 without resizing or changing pixels.
@@ -30,9 +31,8 @@ def ppm_png(data):
     rows = b''.join(b'\0' + pixels[start:start+stride]
                     for start in range(0, len(pixels), stride))
     return (b'\x89PNG\r\n\x1a\n'
-            + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0))
+            + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, PNG_SAMPLE_BITS, 2, 0, 0, 0))
             + chunk(b'sRGB', b'\0') + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))
-
 
 def archive_capture(capture, description=None):
     capture = Path(capture)
@@ -43,7 +43,7 @@ def archive_capture(capture, description=None):
         raise ValueError('Use a display .ppm or .png screenshot')
     if description is None:
         description = re.sub(r'^\d+[-_ ]*', '', capture.stem) or 'render'
-    description = re.sub(r'[^a-z0-9]+', '-', description.lower()).strip('-')[:64].rstrip('-')
+    description = re.sub(r'[^a-z0-9]+', '-', description.lower()).strip('-')[:MAX_DESCRIPTION_CHARACTERS].rstrip('-')
     if not description:
         raise ValueError('Description must contain letters or numbers')
     ROOT.mkdir(parents=True, exist_ok=True)
@@ -72,14 +72,12 @@ def archive_capture(capture, description=None):
     print(f'Screenshot saved: {path}', flush=True)
     return path
 
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('capture', type=Path, help='Existing display .ppm or .png; this script does not run the GPU')
     parser.add_argument('--description', help='Short description; defaults to the capture filename')
     args = parser.parse_args()
     archive_capture(args.capture, args.description)
-
 
 if __name__ == '__main__':
     try:

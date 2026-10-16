@@ -7,6 +7,18 @@ import random
 import struct
 import wave
 
+SAMPLE_RATE_HZ = 48000
+NOISE_MEMORY_WEIGHT = .82
+NOISE_INPUT_WEIGHT = .18
+ATTACK_SECONDS = .008
+RELEASE_SECONDS = .025
+OVERTONE_GAIN = .24
+OVERTONE_FREQUENCY_RATIO = 2.01
+NOISE_GAIN = 3
+MAX_SIGNAL_AMPLITUDE = .9
+OUTPUT_GAIN = .52
+PCM16_MAX_SAMPLE = 32767
+
 root=Path(__file__).resolve().parents[1]/'assets/audio'
 def unique(pairs):
     result={}
@@ -27,17 +39,17 @@ for name,p in profiles['sounds'].items():
     if type(p['seed']) is not int:raise ValueError(name+': seed must be an integer')
 for name,p in profiles['sounds'].items():
     rng=random.Random(p['seed']);samples=[];phase=0;filtered=0
-    count=round(p['seconds']*48000)
+    count=round(p['seconds']*SAMPLE_RATE_HZ)
     for i in range(count):
-        t=i/48000;u=i/max(1,count-1)
+        t=i/SAMPLE_RATE_HZ;u=i/max(1,count-1)
         frequency=p['start_hz']*(p['end_hz']/p['start_hz'])**u
-        phase+=math.tau*frequency/48000
-        filtered=filtered*.82+rng.uniform(-1,1)*.18
-        attack=min(1,t/.008);release=min(1,(count-1-i)/(48000*.025))
+        phase+=math.tau*frequency/SAMPLE_RATE_HZ
+        filtered=filtered*NOISE_MEMORY_WEIGHT+rng.uniform(-1,1)*NOISE_INPUT_WEIGHT
+        attack=min(1,t/ATTACK_SECONDS);release=min(1,(count-1-i)/(SAMPLE_RATE_HZ*RELEASE_SECONDS))
         envelope=attack*release*math.exp(-p['decay']*u)
-        signal=(math.sin(phase)+.24*math.sin(phase*2.01))*(1-p['noise'])+filtered*p['noise']*3
-        samples.append(round(max(-.9,min(.9,signal*envelope*.52))*32767))
+        signal=(math.sin(phase)+OVERTONE_GAIN*math.sin(phase*OVERTONE_FREQUENCY_RATIO))*(1-p['noise'])+filtered*p['noise']*NOISE_GAIN
+        samples.append(round(max(-MAX_SIGNAL_AMPLITUDE,min(MAX_SIGNAL_AMPLITUDE,signal*envelope*OUTPUT_GAIN))*PCM16_MAX_SAMPLE))
     with wave.open(str(root/(name+'.wav')),'wb') as f:
-        f.setnchannels(1);f.setsampwidth(2);f.setframerate(48000)
+        f.setnchannels(1);f.setsampwidth(2);f.setframerate(SAMPLE_RATE_HZ)
         f.writeframes(struct.pack('<'+'h'*len(samples),*samples))
     print(name,count,'samples')

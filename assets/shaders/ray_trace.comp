@@ -1,6 +1,7 @@
 #version 460
 #extension GL_EXT_ray_query : require
 #extension GL_GOOGLE_include_directive : require
+#include "render_bindings.glsl"
 #ifdef MICROSHIP_DEBUG_BUFFERS
 #include "debug_buffers.glsl"
 vec3 debug_direct = vec3(0.0);
@@ -11,7 +12,7 @@ uint debug_closest_queries = 0u, debug_shadow_queries = 0u, debug_primary_hits =
 // Deterministic direct ray tracing. All film samples and volume quadrature
 // belong to this frame. No indirect surface paths, random light choices, or history.
 
-layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(local_size_x = COMPUTE_GROUP_SIZE, local_size_y = COMPUTE_GROUP_SIZE, local_size_z = 1) in;
 
 struct Vertex
 {
@@ -20,22 +21,47 @@ struct Vertex
     vec4 color;
 };
 
-layout(set = 0, binding = 0) uniform accelerationStructureEXT scene_acceleration;
+layout(set = 0, binding = RENDER_BINDING_ACCELERATION) uniform accelerationStructureEXT scene_acceleration;
 #ifdef MICROSHIP_VOLUME_PASS
-layout(set = 0, binding = 1, rgba32f) uniform image2D output_image;
+layout(set = 0, binding = RENDER_BINDING_BEAUTY, rgba32f) uniform image2D output_image;
 #else
-layout(set = 0, binding = 1, rgba32f) uniform writeonly image2D output_image;
+layout(set = 0, binding = RENDER_BINDING_BEAUTY, rgba32f) uniform writeonly image2D output_image;
 #endif
-layout(set = 0, binding = 2, std430) readonly buffer VertexBuffer
+layout(set = 0, binding = RENDER_BINDING_VERTICES, std430) readonly buffer VertexBuffer
 {
     Vertex vertices[];
 };
-layout(set = 0, binding = 3, std430) readonly buffer TriangleBuffer
+layout(set = 0, binding = RENDER_BINDING_TRIANGLES, std430) readonly buffer TriangleBuffer
 {
     uvec4 triangles[]; // XYZ vertex indices; W: 0 dielectric, 2 conductor, 3 thin membrane.
 };
 #include "render_uniform.glsl"
-layout(set=0,binding = 11) uniform sampler2D soft_backdrop;
+
+const float MIN_RAY_ORIGIN_OFFSET = 0.0001;
+const float RELATIVE_RAY_ORIGIN_OFFSET = 0.00001;
+const uint THIN_MEMBRANE_MATERIAL = 3u;
+const uint SURFACE_RAY_MASK = 0x1u;
+const float MIN_SHADING_DENOMINATOR = 0.000001;
+const float SCHLICK_EXPONENT = 5.0;
+const float MIN_ENERGY_TABLE_COSINE = 0.001;
+const float ENERGY_TABLE_LAST_COORDINATE = 31.0;
+const uint ENERGY_TABLE_LAST_CELL = 30u;
+const uint ENERGY_TABLE_ROW_STRIDE = 32u;
+const uint ENERGY_TABLE_DIAGONAL_OFFSET = 33u;
+const float DIFFUSE_ROUGHNESS_THRESHOLD = 0.999;
+const float MIN_GGX_ALPHA = 0.002;
+const uint CONDUCTOR_MATERIAL = 2u;
+const float MIN_MEMBRANE_DIRECTION_COSINE = .2;
+const float CLEAR_MEMBRANE_PIGMENT_WEIGHT = .15;
+const float DIFFUSE_MEMBRANE_PIGMENT_WEIGHT = .35;
+const float BIT_REVERSE_WORD_BITS = 32.0;
+const float PIXEL_DIAGONAL_CONE_FACTOR = 2.828427125;
+const float CAMERA_NORMALIZATION_MARGIN = 0.00002;
+const float FOREGROUND_GUARD_DIAMETER_PIXELS = 17.0;
+const float FOREGROUND_NORMALIZATION_MARGIN = .00002;
+const float THIN_MEMBRANE_GUIDE_CODE = 3.0;
+
+layout(set=0,binding = RENDER_BINDING_SOURCE_A) uniform sampler2D soft_backdrop;
 
 struct Medium
 {
@@ -43,10 +69,8 @@ struct Medium
     vec4 scattering; // RGB coefficient; W outer fade fraction.
     vec4 absorption_phase;
 };
-layout(set = 0, binding = 5, std430) readonly buffer MediaBuffer { Medium media[]; };
-layout(set = 0, binding = 6, std430) readonly buffer EnergyBuffer { float ggx_energy[]; };
-
-
+layout(set = 0, binding = RENDER_BINDING_MEDIA, std430) readonly buffer MediaBuffer { Medium media[]; };
+layout(set = 0, binding = RENDER_BINDING_ENERGY, std430) readonly buffer EnergyBuffer { float ggx_energy[]; };
 
 const float PI = 3.14159265358979323846;
 const float RAY_MAX = 3.402823466e38;
@@ -61,13 +85,13 @@ mat3 hit_normal_to_world;
 
 float point_epsilon(vec3 point)
 {
-    return max(0.0001, 0.00001 * max(max(abs(point.x), abs(point.y)), abs(point.z)));
+    return max(MIN_RAY_ORIGIN_OFFSET, RELATIVE_RAY_ORIGIN_OFFSET * max(max(abs(point.x), abs(point.y)), abs(point.z)));
 }
 
 bool box_intersection(vec3 origin, vec3 direction, float distance, float margin, vec3 low, vec3 high)
 {
     float begin = 0.0, end = distance;
-    for (uint axis = 0u; axis < 3u; ++axis)
+    for (uint axis = 0u; axis < THIN_MEMBRANE_MATERIAL; ++axis)
     {
         if (direction[axis] == 0.0)
         {
@@ -99,7 +123,7 @@ bool closest_hit(vec3 origin, vec3 direction, out uint triangle_index,
     ++debug_closest_queries;
 #endif
     rayQueryInitializeEXT(query, scene_acceleration, gl_RayFlagsOpaqueEXT,
-                          0x1u, origin, 0.0, direction, RAY_MAX);
+                          SURFACE_RAY_MASK, origin, 0.0, direction, RAY_MAX);
     while (rayQueryProceedEXT(query))
     {
         // Opaque triangles are committed by traversal without an any-hit shader.
@@ -141,7 +165,7 @@ float medium_density(Medium medium, vec3 point)
 {
     if (medium.scattering.w<=0.0) return 1.0;
     float radius_fraction=length(point-medium.center_radius.xyz)/medium.center_radius.w;
-    float fade=clamp((1.0-radius_fraction)/max(medium.scattering.w,0.000001),0.0,1.0);
+    float fade=clamp((1.0-radius_fraction)/max(medium.scattering.w,MIN_SHADING_DENOMINATOR),0.0,1.0);
     return fade*fade*(3.0-2.0*fade);
 }
 
@@ -217,7 +241,7 @@ float fresnel(float cosine, float ior)
 {
     float f0 = (ior - 1.0) / (ior + 1.0);
     f0 *= f0;
-    return f0 + (1.0 - f0) * pow(1.0 - clamp(cosine, 0.0, 1.0), 5.0);
+    return f0 + (1.0 - f0) * pow(1.0 - clamp(cosine, 0.0, 1.0), SCHLICK_EXPONENT);
 }
 
 float ggx_distribution(float cosine, float alpha)
@@ -234,12 +258,12 @@ float ggx_mask(float cosine, float alpha)
 
 float directional_energy(float cosine, float roughness)
 {
-    vec2 grid = vec2(sqrt(clamp(cosine,0.001,1.0)),clamp(roughness,0.0,1.0))*31.0;
-    uvec2 cell = min(uvec2(grid),uvec2(30u));
+    vec2 grid = vec2(sqrt(clamp(cosine,MIN_ENERGY_TABLE_COSINE,1.0)),clamp(roughness,0.0,1.0))*ENERGY_TABLE_LAST_COORDINATE;
+    uvec2 cell = min(uvec2(grid),uvec2(ENERGY_TABLE_LAST_CELL));
     vec2 fraction = grid-vec2(cell);
-    uint base = cell.y*32u+cell.x;
+    uint base = cell.y*ENERGY_TABLE_ROW_STRIDE+cell.x;
     float low = mix(ggx_energy[base],ggx_energy[base+1u],fraction.x);
-    float high = mix(ggx_energy[base+32u],ggx_energy[base+33u],fraction.x);
+    float high = mix(ggx_energy[base+ENERGY_TABLE_ROW_STRIDE],ggx_energy[base+ENERGY_TABLE_DIAGONAL_OFFSET],fraction.x);
     return mix(low,high,fraction.y);
 }
 
@@ -248,16 +272,16 @@ vec3 evaluate_bsdf(vec3 normal, vec3 outgoing, vec3 incoming, vec3 albedo,
 {
     float ni = max(0.0, dot(normal, incoming)), no = max(0.0, dot(normal, outgoing));
     if (ni <= 0.0 || no <= 0.0) return vec3(0.0);
-    if (!metal && (roughness >= 0.999 || ior <= 1.0)) return albedo / PI;
+    if (!metal && (roughness >= DIFFUSE_ROUGHNESS_THRESHOLD || ior <= 1.0)) return albedo / PI;
     vec3 half_vector = normalize(incoming + outgoing);
-    float nh = max(0.0, dot(normal, half_vector)), oh = max(0.000001, dot(outgoing, half_vector));
-    float alpha = max(0.002, roughness*roughness);
+    float nh = max(0.0, dot(normal, half_vector)), oh = max(MIN_SHADING_DENOMINATOR, dot(outgoing, half_vector));
+    float alpha = max(MIN_GGX_ALPHA, roughness*roughness);
     float distribution = ggx_distribution(nh, alpha);
     if (metal)
     {
         // Vertex RGB is conductor normal-incidence reflectance (Schlick RGB
         // approximation), not diffuse albedo. No diffuse lobe in metal.
-        vec3 f = albedo + (vec3(1.0) - albedo) * pow(1.0 - oh, 5.0);
+        vec3 f = albedo + (vec3(1.0) - albedo) * pow(1.0 - oh, SCHLICK_EXPONENT);
         vec3 gain = vec3(1.0);
         if (render.quality.z != 0u)
         {
@@ -274,7 +298,7 @@ vec3 evaluate_bsdf(vec3 normal, vec3 outgoing, vec3 incoming, vec3 albedo,
 }
 
 struct InstanceStyle { vec4 tint,emission; };
-layout(set=0,binding = 15,std430) readonly buffer InstanceStyles { InstanceStyle instance_style[]; };
+layout(set=0,binding = RENDER_BINDING_INSTANCE_STYLES,std430) readonly buffer InstanceStyles { InstanceStyle instance_style[]; };
 
 struct Surface
 {
@@ -321,8 +345,8 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
 
     surface.point = point; surface.normal = normal; surface.geometric_normal = geometric_normal;
     surface.color = color; surface.roughness = roughness; surface.ior = ior;
-    surface.emission = emission; surface.metal = triangle.w == 2u;
-    surface.translucent=triangle.w==3u;
+    surface.emission = emission; surface.metal = triangle.w == CONDUCTOR_MATERIAL;
+    surface.translucent=triangle.w==THIN_MEMBRANE_MATERIAL;
     vec4 tint=instance_style[hit_instance].tint;
     surface.color=mix(surface.color,tint.rgb,tint.a);
     surface.emission+=instance_style[hit_instance].emission.x;
@@ -336,14 +360,14 @@ vec3 studio_visibility(vec3 origin,vec3 direction)
 #if defined(MICROSHIP_DEBUG_BUFFERS) && !defined(MICROSHIP_NO_QUERY_COUNTERS)
     ++debug_shadow_queries;
 #endif
-    rayQueryEXT q;rayQueryInitializeEXT(q,scene_acceleration,gl_RayFlagsNoOpaqueEXT,1u,origin,0.0,direction,RAY_MAX);
+    rayQueryEXT q;rayQueryInitializeEXT(q,scene_acceleration,gl_RayFlagsNoOpaqueEXT,SURFACE_RAY_MASK,origin,0.0,direction,RAY_MAX);
     vec3 visibility=vec3(1);
     while (rayQueryProceedEXT(q))
     {
         if (rayQueryGetIntersectionTypeEXT(q,false)!=gl_RayQueryCandidateIntersectionTriangleEXT) continue;
         uint index=rayQueryGetIntersectionPrimitiveIndexEXT(q,false)+rayQueryGetIntersectionInstanceCustomIndexEXT(q,false);
         uvec4 triangle=triangles[index];
-        if (triangle.w!=3u || render.thin_material.x<=0.0) return vec3(0);
+        if (triangle.w!=THIN_MEMBRANE_MATERIAL || render.thin_material.x<=0.0) return vec3(0);
         vec2 uv=rayQueryGetIntersectionBarycentricsEXT(q,false);vec3 w=vec3(1.0-uv.x-uv.y,uv);
         vec3 pigment=vertices[triangle.x].color.rgb*w.x+vertices[triangle.y].color.rgb*w.y+vertices[triangle.z].color.rgb*w.z;
         float clarity=render.thin_material.w,cosine=1.0;
@@ -351,9 +375,9 @@ vec3 studio_visibility(vec3 origin,vec3 direction)
         {
             vec3 n=vertices[triangle.x].normal.xyz*w.x+vertices[triangle.y].normal.xyz*w.y+vertices[triangle.z].normal.xyz*w.z;
             n=transpose(mat3(rayQueryGetIntersectionWorldToObjectEXT(q,false)))*n;
-            cosine=max(.2,abs(dot(normalize(n),direction)));
+            cosine=max(MIN_MEMBRANE_DIRECTION_COSINE,abs(dot(normalize(n),direction)));
         }
-        visibility*=mix(vec3(1),pigment,clarity>0.0 ? .15 : .35)*render.thin_material.x*(clarity>0.0 ? clarity : 1.0)*exp(-render.thin_material.y/cosine);
+        visibility*=mix(vec3(1),pigment,clarity>0.0 ? CLEAR_MEMBRANE_PIGMENT_WEIGHT : DIFFUSE_MEMBRANE_PIGMENT_WEIGHT)*render.thin_material.x*(clarity>0.0 ? clarity : 1.0)*exp(-render.thin_material.y/cosine);
     }
     return visibility*transmittance(origin,direction,RAY_MAX);
 }
@@ -367,7 +391,7 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected)
     if (cosine>0.0 && geometric_cosine>0.0)
         f=(1.0-transmission)*evaluate_bsdf(s.normal,outgoing,direction,s.color,s.roughness,s.ior,s.metal);
     else if (cosine<0.0 && geometric_cosine<0.0 && transmission>0.0)
-        f=s.color*(transmission*(1.0-render.thin_material.w)/PI)*exp(-render.thin_material.y/max(.2,-cosine));
+        f=s.color*(transmission*(1.0-render.thin_material.w)/PI)*exp(-render.thin_material.y/max(MIN_MEMBRANE_DIRECTION_COSINE,-cosine));
     else return vec3(0);
     vec3 origin=s.point+s.geometric_normal*(geometric_cosine>0.0 ? point_epsilon(s.point) : -point_epsilon(s.point));
     vec3 weighted=f*abs(cosine)*render.studio_color[selected].rgb;
@@ -375,22 +399,24 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected)
     return weighted*studio_visibility(origin,direction);
 }
 
+const float COSINE_GRADIENT_DENOMINATOR=3.0;
+
 vec3 ambient_surface(Surface s,vec3 outgoing)
 {
     // Cosine-weighted integral of the authored linear environment gradient.
     // Ambient fill is an approximation, with no traced diffuse bounces or AO.
-    vec3 diffuse=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5+s.normal.y/3.0);
+    vec3 diffuse=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5+s.normal.y/COSINE_GRADIENT_DENOMINATOR);
     vec3 reflected=environment_radiance(reflect(-outgoing,s.normal));
     float cosine=max(0.0,dot(s.normal,outgoing));
     float transmission=s.translucent ? render.thin_material.x : 0.0;
-    vec3 f=s.metal ? s.color+(vec3(1)-s.color)*pow(1.0-cosine,5.0) : vec3(fresnel(cosine,s.ior));
+    vec3 f=s.metal ? s.color+(vec3(1)-s.color)*pow(1.0-cosine,SCHLICK_EXPONENT) : vec3(fresnel(cosine,s.ior));
     vec3 result=s.metal ? f*reflected : (vec3(1)-f)*s.color*diffuse+f*reflected;
     result*=1.0-transmission;
     if (transmission>0.0)
     {
-        vec3 behind=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5-s.normal.y/3.0);
+        vec3 behind=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5-s.normal.y/COSINE_GRADIENT_DENOMINATOR);
         result+=s.color*behind*(transmission*(1.0-render.thin_material.w))*
-            exp(-render.thin_material.y/max(.2,cosine));
+            exp(-render.thin_material.y/max(MIN_MEMBRANE_DIRECTION_COSINE,cosine));
     }
     return result;
 }
@@ -421,7 +447,7 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel)
             ++debug_primary_hits;
             if (sample_index==0u)
             {
-                debug_vertex_hit=vec4(s.color,s.translucent ? 3.0 : 1.0);
+                debug_vertex_hit=vec4(s.color,s.translucent ? THIN_MEMBRANE_GUIDE_CODE : 1.0);
                 debug_normal_depth=vec4(s.normal,distance);
             }
         }
@@ -434,7 +460,7 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel)
 #endif
         float clear=s.translucent ? render.thin_material.x*render.thin_material.w : 0.0;
         if (clear<=0.0 || layer==render.settings.w) break;
-        weight*=clear*mix(vec3(1),s.color,.15)*exp(-render.thin_material.y/max(.2,abs(dot(s.normal,direction))));
+        weight*=clear*mix(vec3(1),s.color,CLEAR_MEMBRANE_PIGMENT_WEIGHT)*exp(-render.thin_material.y/max(MIN_MEMBRANE_DIRECTION_COSINE,abs(dot(s.normal,direction))));
         origin=s.point-s.geometric_normal*point_epsilon(s.point);
     }
     return radiance;
@@ -443,11 +469,11 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel)
 vec2 film_sample(uint index,uint count)
 {
     if (count==1u || ((count&1u)!=0u && index==count-1u)) return vec2(.5);
-    uint pairs=count/2u,pair=index/2u;
+    uint pairs=count/CONDUCTOR_MATERIAL,pair=index/CONDUCTOR_MATERIAL;
     // Mirrored pairs keep the centroid at the pixel center for every count.
     // The fixed seed changes film positions only; no frame or pixel RNG exists.
     vec2 sample_value=vec2((float(pair)+.5)/float(pairs),
-        fract(float(bitfieldReverse(pair^render.scene.x))*exp2(-32.0)+.5/float(pairs)));
+        fract(float(bitfieldReverse(pair^render.scene.x))*exp2(-BIT_REVERSE_WORD_BITS)+.5/float(pairs)));
     return (index&1u)==0u ? sample_value : vec2(1)-sample_value;
 }
 
@@ -465,7 +491,7 @@ bool pixel_may_intersect_medium(uvec2 pixel)
     vec3 axis = film_direction(pixel,vec2(0.5));
     // Normalization is Lipschitz with bound 2/|D|; unnormalized camera rays
     // have |D| >= 1. This covers every subpixel direction, including silhouettes.
-    float cone = min(2.0,2.828427125*render.display.y/float(render.settings.y));
+    float cone = min(2.0,PIXEL_DIAGONAL_CONE_FACTOR*render.display.y/float(render.settings.y));
     for (uint i = 0u; i < render.scene.y; ++i)
     {
         vec3 delta = media[i].center_radius.xyz-render.camera_position.xyz;
@@ -482,7 +508,7 @@ bool pixel_is_vacuum(uvec2 pixel)
     vec3 axis = film_direction(pixel,vec2(0.5));
     // Every subpixel direction is within this chord distance of the center ray.
     // The small additional margin covers floating-point camera normalization.
-    float cone = min(2.0,2.828427125*render.display.y/float(render.settings.y)+0.00002);
+    float cone = min(2.0,PIXEL_DIAGONAL_CONE_FACTOR*render.display.y/float(render.settings.y)+CAMERA_NORMALIZATION_MARGIN);
     vec3 center = 0.5*(render.scene_min.xyz+render.scene_max.xyz);
     float farthest = length(center-origin)+length(0.5*(render.scene_max.xyz-render.scene_min.xyz));
     if (isinf(farthest) || isnan(farthest)) return false;
@@ -507,7 +533,7 @@ bool pixel_only_background(uvec2 pixel)
     float farthest=length(center-origin)+length(.5*(high-low));
     if (isnan(farthest) || isinf(farthest)) return false;
     // Conservative subpixel cone plus an eight-pixel reconstruction guard band.
-    float cone=min(2.0,17.0*2.828427125*render.display.y/float(render.settings.y)+.00002);
+    float cone=min(2.0,FOREGROUND_GUARD_DIAMETER_PIXELS*PIXEL_DIAGONAL_CONE_FACTOR*render.display.y/float(render.settings.y)+FOREGROUND_NORMALIZATION_MARGIN);
     return !box_intersection(origin,film_direction(pixel,vec2(.5)),RAY_MAX,
         farthest*cone+point_epsilon(center),low,high);
 }
@@ -517,7 +543,6 @@ void main()
     uvec2 pixel = gl_GlobalInvocationID.xy;
     if (pixel.x >= render.settings.x || pixel.y >= render.settings.y)
         return;
-
 
 #ifndef MICROSHIP_VOLUME_PASS
 #ifndef MICROSHIP_DISABLE_VACUUM_SKIP
@@ -572,8 +597,8 @@ void main()
             if (!hit || depth==render.settings.w) break;
             Surface s;if (!surface_at(triangle,barycentric,direction,s) || !s.translucent) break;
             float clear=render.thin_material.x*render.thin_material.w;if (clear<=0.0) break;
-            weight*=transmittance(origin,direction,distance)*clear*mix(vec3(1),s.color,.15)
-                *exp(-render.thin_material.y/max(.2,abs(dot(s.normal,direction))));
+            weight*=transmittance(origin,direction,distance)*clear*mix(vec3(1),s.color,CLEAR_MEMBRANE_PIGMENT_WEIGHT)
+                *exp(-render.thin_material.y/max(MIN_MEMBRANE_DIRECTION_COSINE,abs(dot(s.normal,direction))));
             origin=s.point-s.geometric_normal*point_epsilon(s.point);
         }
     }

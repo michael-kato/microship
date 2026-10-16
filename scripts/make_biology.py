@@ -13,6 +13,197 @@ import random
 import struct
 import sys
 
+MAX_LOCAL_COORDINATE = 1.49
+GOLDEN_ANGLE_RADIANS = 2.39996323
+DEFAULT_ROUGHNESS = .82
+DEFAULT_IOR = 1.35
+MIN_MATERIAL_ROUGHNESS = .02
+MIN_MATERIAL_FREQUENCY = .1
+MAX_MATERIAL_FREQUENCY = 100
+ROUGHNESS_PRIMARY_WEIGHT = .65
+ROUGHNESS_Y_COUPLING = .71
+ROUGHNESS_Z_FREQUENCY_SCALE = .83
+ROUGHNESS_Y_PHASE_SCALE = .41
+ROUGHNESS_SECONDARY_WEIGHT = .35
+ROUGHNESS_SECONDARY_FREQUENCY_SCALE = .55
+ROUGHNESS_SECONDARY_Y_COUPLING = .43
+ROUGHNESS_SECONDARY_Z_COUPLING = .67
+PIGMENT_Y_COUPLING = .51
+PIGMENT_Z_COUPLING = .73
+PIGMENT_PHASE = .9
+PIGMENT_X_COUPLING = .67
+ROD_SIDES = 8
+ROD_TIP_RADIUS_SCALE = .55
+FRACTAL_REFERENCE_AXIS = (.37,.81,.45)
+BUD_ROUGHNESS = .65
+MIN_BRANCH_AXIS_LENGTH = .01
+SOURCE_PREVIEW_COLUMNS = 4
+SOURCE_PREVIEW_SPACING = 3.5
+CRISTAE_SIZE = (.018,.063,.018)
+VESICLE_SIZE = (.065,.055,.06)
+CELL_SHELL_SUBDIVISIONS = 5
+CELL_PRIMARY_DISPLACEMENT = .035
+CELL_FINE_DISPLACEMENT = .018
+CELL_VERTICAL_SCALE = .93
+CELL_RIM_PIGMENT_WEIGHT = .23
+RETICULUM_SAMPLES = 25
+RETICULUM_INTERVALS = 24
+RETICULUM_RING_SPACING = .06
+RETICULUM_Y_SCALE = .7
+RETICULUM_Z_BASE = .15
+RETICULUM_Z_RING_SPACING = .095
+RETICULUM_Z_WAVE_AMPLITUDE = .04
+SUBSTRATE_START_RADIUS = .12
+CRISTAE_SPACING = .07
+CRISTAE_DEPTH_OFFSET = .085
+VESICLE_ATTACHMENT_RADIUS = .065
+CELL_NOISE_X_FREQUENCY = 8
+CELL_NOISE_Y_FREQUENCY = 3
+CELL_NOISE_Z_FREQUENCY = 7
+CELL_NOISE_Y_FINE_COUPLING = 2
+CELL_FINE_NOISE_X_FREQUENCY = 17
+CELL_PIGMENT_Y_FREQUENCY = 3
+CELL_PIGMENT_Y_FINE_COUPLING = 2
+RETICULUM_Z_WAVE_FREQUENCY = 3
+BOMBER_CAPSID_SIZE = (.42,.3,.78)
+BOMBER_PAYLOAD_SIZE = (.19,.18,.2)
+VIRION_RADIUS = .58
+VIRUS_FIBRE_COUNT = 6
+VIRION_FIBRE_UP_COMPONENT = .2
+VIRION_FIBRE_ROOT_RADIUS = .45
+VIRION_FIBRE_LENGTH = .10
+VIRION_FIBRE_RADIUS = .012
+BOMBER_PAYLOAD_SPACING = .4
+BOMBER_PAYLOAD_X_OFFSET = .34
+BOMBER_PAYLOAD_Y_OFFSET = .1
+BOMBER_RIB_ROOT_X_OFFSET = .25
+BOMBER_RIB_ROOT_Y_OFFSET = .05
+BOMBER_RIB_Z_DIRECTION = .12
+BOMBER_RIB_LENGTH = .22
+BOMBER_RIB_RADIUS = .035
+IMMUNE_NUCLEUS_SIZE = (.19,.22,.12)
+IMMUNE_LOBE_SIZE = (.20,.17,.22)
+IMMUNE_GRANULE_SIZE = (.04,.04,.04)
+IMMUNE_BOMBER_RADIUS = .70
+IMMUNE_FIGHTER_RADIUS = .59
+IMMUNE_SURFACE_DISPLACEMENT = .09
+IMMUNE_SURFACE_X_FREQUENCY = 7
+IMMUNE_SURFACE_Z_FREQUENCY = 6
+IMMUNE_BOMBER_X_SCALE = 1.12
+IMMUNE_NUCLEUS_SPACING = .18
+IMMUNE_NUCLEUS_Y_OFFSET = .10
+IMMUNE_NUCLEUS_Z_OFFSET = .51
+IMMUNE_LOBE_Y_OFFSET = .2
+IMMUNE_GRANULE_COUNT = 10
+IMMUNE_GRANULE_X_RADIUS = .38
+IMMUNE_GRANULE_Y_RADIUS = .32
+IMMUNE_GRANULE_Z_OFFSET = .49
+IMMUNE_BRANCH_UP_COMPONENT = .1
+IMMUNE_BOMBER_BRANCH_LENGTH = .13
+IMMUNE_BRANCH_RADIUS = .022
+IMMUNE_FIGHTER_BRANCH_LENGTH = .09
+NODE_BASE_SIZE = (.24,.16,.24)
+NODE_BUD_SIZE = (.14,.14,.14)
+NODE_CROWN_SIZE = (.20,.17,.20)
+NODE_BASE_Y = .12
+NODE_FIRST_RING_Y = .25
+NODE_RING_SPACING = .16
+NODE_RING_BASE_RADIUS = .18
+NODE_RING_RADIUS_WAVE = .05
+NODE_RING_X_WAVE = .04
+NODE_RING_HALF_HEIGHT = .17
+NODE_BUD_COUNT = 5
+NODE_BUD_Y = .82
+NODE_CROWN_Y = .87
+SPORE_RADIUS = .48
+SPORE_RAY_COUNT = 9
+SPORE_RAY_ROOT_RADIUS = .4
+SPORE_RAY_LENGTH = .18
+SPORE_RAY_RADIUS = .045
+IMMUNE_STEM_LOBE_SIZE = (.18,.23,.14)
+IMMUNE_CROWN_SIZE = (.22,.25,.20)
+IMMUNE_FACTORY_GRANULE_SIZE = (.14,.17,.12)
+FUNGAL_CAP_STALK_SIZE = (.14,.28,.14)
+VIRUS_SHEATH_HALF_HEIGHT = .065
+VIRUS_HEAD_HEIGHT_SCALE = 1.25
+VIRUS_FACTORY_FIBRE_COUNT = 6
+VIRUS_FIBRE_BEND_Y = .32
+VIRUS_FIBRE_END_SPREAD_SCALE = 1.35
+VIRUS_FIBRE_END_Y = .65
+VIRUS_FIBRE_ROOT_Y = .12
+FACTORY_BRANCH_RADIUS = .025
+VIRUS_FIBRE_TIP_RADIUS = .018
+IMMUNE_STEM_LOBE_X = .09
+IMMUNE_FACTORY_BRANCH_UP_COMPONENT = .35
+IMMUNE_FACTORY_BRANCH_DEPTH_COMPONENT = .15
+IMMUNE_CROWN_RADIUS = .18
+IMMUNE_CROWN_Y = .08
+FACTORY_GRANULE_Y = .10
+FUNGAL_BRANCH_UP_COMPONENT = .7
+FUNGAL_CAP_Y = .14
+FUNGAL_CAP_HALF_HEIGHT = .16
+FUNGAL_SPORE_RING_RADIUS = .28
+FUNGAL_SPORE_RING_Y = .25
+BACKGROUND_GRID_X = 64
+BACKGROUND_GRID_Y = 40
+BACKGROUND_HALF_HEIGHT = 1.46
+BACKGROUND_HALF_WIDTH = 1.48
+BACKGROUND_PRIMARY_FOLD = .018
+BACKGROUND_PRIMARY_X_FREQUENCY = 11
+BACKGROUND_Y_MODULATION_FREQUENCY = 5
+BACKGROUND_SECONDARY_FOLD = .013
+BACKGROUND_SECONDARY_Y_FREQUENCY = 13
+BACKGROUND_FINE_FOLD = .006
+BACKGROUND_FINE_X_FREQUENCY = 29
+BACKGROUND_FINE_Y_FREQUENCY = 17
+BACKGROUND_RIDGE_BLEND = .55
+BACKGROUND_FIBRE_ROWS = 7
+BACKGROUND_FIBRE_START_Y = .72
+BACKGROUND_FIBRE_ROW_SPACING = .23
+BACKGROUND_FIBRE_SAMPLES = 20
+BACKGROUND_FIBRE_HALF_WIDTH = 1.38
+BACKGROUND_FIBRE_SPAN = 2.76
+BACKGROUND_FIBRE_INTERVALS = 19
+BACKGROUND_FIBRE_Y_WAVE = .025
+BACKGROUND_FIBRE_Z_WAVE = .015
+BACKGROUND_FIBRE_RADIUS = .007
+BACKGROUND_BLOOD_COUNT = 18
+BACKGROUND_BLOOD_HALF_HEIGHT = .7
+BACKGROUND_BLOOD_NEAR_Z = .08
+BACKGROUND_BLOOD_FAR_Z = .38
+BACKGROUND_CLEAR_HALF_WIDTH = .46
+BACKGROUND_CLEAR_HALF_HEIGHT = .22
+BACKGROUND_BLOOD_MAX_RADIUS = .05
+BACKGROUND_BLOOD_DEPTH_SCALE = .32
+BACKGROUND_VESICLE_COUNT = 26
+BACKGROUND_VESICLE_HALF_HEIGHT = .73
+BACKGROUND_VESICLE_NEAR_Z = .02
+BACKGROUND_VESICLE_FAR_Z = .28
+BACKGROUND_FIBRE_Y_FREQUENCY = 8
+BACKGROUND_FIBRE_Z_FREQUENCY = 7
+SPIKE_HEAD_SIZE = (.14,.14,.09)
+GROWTH_SEGMENT_RADIUS = .065
+GROWTH_TIP_RADIUS = .12
+GROWTH_TIP_ROUGHNESS = .55
+SPIKE_SHAFT_LENGTH = .87
+SPIKE_SHAFT_RADIUS = .075
+SPIKE_HEAD_Z = .91
+CELL_FINE_NOISE_Z_FREQUENCY = 5
+CELL_PIGMENT_XZ_FREQUENCY = 5
+IMMUNE_BOMBER_LOBE_COUNT = 7
+IMMUNE_BOMBER_BRANCH_COUNT = 6
+BOMBER_RIB_Y_DIRECTION = .25
+NODE_BUD_RING_RADIUS = .25
+IMMUNE_FACTORY_GRANULE_Z = .12
+FUNGAL_FACTORY_SPORE_RADIUS = .065
+FUNGAL_STALK_ROOT_Y = .10
+BACKGROUND_FIBRE_BASE_Z = .025
+BACKGROUND_BLOOD_MIN_RADIUS = .025
+BACKGROUND_BLOOD_HEIGHT_SCALE = .72
+BACKGROUND_VESICLE_RADIUS = .006
+IMMUNE_SURFACE_ATTACHMENT_RADIUS_SCALE = .8
+BACKGROUND_PARTICLE_HALF_WIDTH = 1.2
+
 out=Path(sys.argv[sys.argv.index('--')+1]).resolve()
 profiles=json.loads((out/'source/biology_profiles.json').read_text())
 def unique_fields(pairs):
@@ -34,8 +225,8 @@ for name,m in materials.items():
         raise ValueError('Invalid material fields: '+name)
     def number(value,low,high):
         return type(value) in (int,float) and math.isfinite(value) and low<=value<=high
-    if not (number(m['roughness_min'],.02,1) and number(m['roughness_max'],m['roughness_min'],1)
-            and number(m['ior'],1,3) and number(m['frequency'],.1,100)):
+    if not (number(m['roughness_min'],MIN_MATERIAL_ROUGHNESS,1) and number(m['roughness_max'],m['roughness_min'],1)
+            and number(m['ior'],1,3) and number(m['frequency'],MIN_MATERIAL_FREQUENCY,MAX_MATERIAL_FREQUENCY)):
         raise ValueError('Invalid material range: '+name)
     for key in ('pigment_low','pigment_high'):
         if not isinstance(m[key],list) or len(m[key])!=3 or not all(number(v,0,1) for v in m[key]):
@@ -50,7 +241,7 @@ def cell_part(pivot,movable=True,attachment=None,minimum_scale=0):
     component=len(components)
     components.append(dict(pivot=list(pivot),movable=movable,attachment=attachment,minimum_scale=minimum_scale))
 
-def finish(obj,color,roughness=.82,ior=1.35,smooth=True,material=0,surface=None):
+def finish(obj,color,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,smooth=True,material=0,surface=None):
     obj.data.transform(Matrix.LocRotScale(obj.location,obj.rotation_euler.to_quaternion(),obj.scale))
     obj.matrix_world=Matrix.Identity(4);mesh=obj.data
     colors=mesh.color_attributes.new(name='Color',type='FLOAT_COLOR',domain='POINT')
@@ -63,9 +254,9 @@ def finish(obj,color,roughness=.82,ior=1.35,smooth=True,material=0,surface=None)
         if m:
             x,y,z=v.co;f=m['frequency']
             # Broad object-space fields are baked once. No render-time noise or image maps.
-            wave=.5+.5*(.65*math.sin(f*x+.71*f*y)*math.cos(.83*f*z-.41*f*y)
-                         +.35*math.sin(.55*f*(x-.43*y+.67*z)))
-            pigment=.5+.5*math.sin(.67*f*x-.51*f*y+.73*f*z+.9)
+            wave=.5+.5*(ROUGHNESS_PRIMARY_WEIGHT*math.sin(f*x+ROUGHNESS_Y_COUPLING*f*y)*math.cos(ROUGHNESS_Z_FREQUENCY_SCALE*f*z-ROUGHNESS_Y_PHASE_SCALE*f*y)
+                         +ROUGHNESS_SECONDARY_WEIGHT*math.sin(ROUGHNESS_SECONDARY_FREQUENCY_SCALE*f*(x-ROUGHNESS_SECONDARY_Y_COUPLING*y+ROUGHNESS_SECONDARY_Z_COUPLING*z)))
+            pigment=.5+.5*math.sin(PIGMENT_X_COUPLING*f*x-PIGMENT_Y_COUPLING*f*y+PIGMENT_Z_COUPLING*f*z+PIGMENT_PHASE)
             rgb=tuple(rgb[i]*(m['pigment_low'][i]*(1-pigment)+m['pigment_high'][i]*pigment) for i in range(3))
             r=m['roughness_min']+(m['roughness_max']-m['roughness_min'])*wave
         colors.data[v.index].color=(*rgb,1)
@@ -77,14 +268,14 @@ def finish(obj,color,roughness=.82,ior=1.35,smooth=True,material=0,surface=None)
     for poly in mesh.polygons:poly.use_smooth=smooth
     mesh.update();parts.append(obj);return obj
 
-def sphere(center,size,color,sub=2,roughness=.82,ior=1.35,surface=None):
+def sphere(center,size,color,sub=2,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,surface=None):
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=sub,radius=1,location=center)
     obj=bpy.context.object;obj.scale=size
     return finish(obj,color,roughness,ior,surface=surface)
 
 def rod(a,b,radius,color,surface=None):
     a,b=Vector(a),Vector(b);delta=b-a
-    bpy.ops.mesh.primitive_cone_add(vertices=8,radius1=radius,radius2=radius*.55,depth=delta.length,location=(a+b)/2)
+    bpy.ops.mesh.primitive_cone_add(vertices=ROD_SIDES,radius1=radius,radius2=radius*ROD_TIP_RADIUS_SCALE,depth=delta.length,location=(a+b)/2)
     obj=bpy.context.object;obj.rotation_euler=delta.to_track_quat('Z','Y').to_euler()
     return finish(obj,color,surface=surface)
 
@@ -92,11 +283,11 @@ def branches(start,direction,length,radius,depth,color,planar=False,buds=None,su
     p=profiles['fractal'];start=Vector(start);direction=Vector(direction).normalized();end=start+direction*length
     rod(start,end,radius,color,surface)
     if depth==0:
-        if buds:sphere(end,(radius*3,)*3,buds,1,.65,surface=bud_surface)
+        if buds:sphere(end,(radius*3,)*3,buds,1,BUD_ROUGHNESS,surface=bud_surface)
         return
-    axis=Vector((0,0,1)) if planar else Vector((.37,.81,.45))
+    axis=Vector((0,0,1)) if planar else Vector(FRACTAL_REFERENCE_AXIS)
     side=direction.cross(axis)
-    if side.length<.01:side=direction.cross(Vector((1,0,0)))
+    if side.length<MIN_BRANCH_AXIS_LENGTH:side=direction.cross(Vector((1,0,0)))
     side.normalize()
     for sign in (-1,1):
         jitter=rng.uniform(-p['jitter'],p['jitter'])
@@ -135,27 +326,27 @@ def export(name,anatomy=False):
             if part['minimum_scale']:d['minimum_scale']=part['minimum_scale']
             definitions.append(d);first+=count
         (out/(name+'.parts.json')).write_text(json.dumps({'$schema':'../schemas/mesh-parts.schema.json','vertices':len(records),'parts':definitions},indent=2)+'\n')
-    if any(abs(x)>1.49 for row in records for x in row[:3]):raise RuntimeError(name+' exceeds local mesh bounds')
+    if any(abs(x)>MAX_LOCAL_COORDINATE for row in records for x in row[:3]):raise RuntimeError(name+' exceeds local mesh bounds')
     with (out/(name+'.fmesh')).open('wb') as f:
         f.write(struct.pack('<8sII',b'FLMESH01',len(records),len(indices)))
         for row in records:f.write(struct.pack('<12f',*row))
         for row in indices:f.write(struct.pack('<4I',*row))
-    obj.location=((len(models)%4)*3.5,0,(len(models)//4)*3.5)
+    obj.location=((len(models)%SOURCE_PREVIEW_COLUMNS)*SOURCE_PREVIEW_SPACING,0,(len(models)//SOURCE_PREVIEW_COLUMNS)*SOURCE_PREVIEW_SPACING)
     models.append(obj);parts=[];print(name,len(records),'vertices',len(indices),'triangles',flush=True)
 
 def cell(name,key):
     global components
     components=[];cell_part((0,0,0),False)
     p=profiles[key]
-    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=5,radius=1)
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=CELL_SHELL_SUBDIVISIONS,radius=1)
     obj=bpy.context.object
     for v in obj.data.vertices:
         n=v.co.normalized();x,y,z=n
-        noise=.035*math.sin(8*x+3*y)*math.sin(7*z-2*y)+.018*math.sin(17*x-5*z)
-        v.co=n*(1+noise);v.co.y*=.93
+        noise=CELL_PRIMARY_DISPLACEMENT*math.sin(CELL_NOISE_X_FREQUENCY*x+CELL_NOISE_Y_FREQUENCY*y)*math.sin(CELL_NOISE_Z_FREQUENCY*z-CELL_NOISE_Y_FINE_COUPLING*y)+CELL_FINE_DISPLACEMENT*math.sin(CELL_FINE_NOISE_X_FREQUENCY*x-CELL_FINE_NOISE_Z_FREQUENCY*z)
+        v.co=n*(1+noise);v.co.y*=CELL_VERTICAL_SCALE
     def pigment(v):
-        n=v.normalized();wave=.5+.5*math.sin(5*n.x+3*n.y)*math.sin(5*n.z-2*n.y)
-        return tuple(p['membrane'][i]*(1-.23*wave)+p['rim'][i]*(.23*wave) for i in range(3))
+        n=v.normalized();wave=.5+.5*math.sin(CELL_PIGMENT_XZ_FREQUENCY*n.x+CELL_PIGMENT_Y_FREQUENCY*n.y)*math.sin(CELL_PIGMENT_XZ_FREQUENCY*n.z-CELL_PIGMENT_Y_FINE_COUPLING*n.y)
+        return tuple(p['membrane'][i]*(1-CELL_RIM_PIGMENT_WEIGHT*wave)+p['rim'][i]*(CELL_RIM_PIGMENT_WEIGHT*wave) for i in range(CELL_PIGMENT_Y_FREQUENCY))
     finish(obj,pigment,material=3,surface='membrane')
     inner=profiles['interior']
     center=Vector(inner['nucleus_center'])
@@ -168,81 +359,81 @@ def cell(name,key):
         sphere(center,inner['mitochondrion_size'],inner['mitochondrion_color'],2,surface='mitochondrion')
         # Mitochondrial cristae are geometry rather than painted lines.
         for j in range(3):
-            c=Vector(center)+Vector(((j-1)*.07,0,.085))
-            sphere(c,(.018,.063,.018),p['nucleus'],1,surface='cristae')
+            c=Vector(center)+Vector(((j-1)*CRISTAE_SPACING,0,CRISTAE_DEPTH_OFFSET))
+            sphere(c,CRISTAE_SIZE,p['nucleus'],1,surface='cristae')
     for index,center in enumerate(inner['vesicle_centers']):
         center=Vector(center)
-        cell_part(center,attachment=center+center.normalized()*.065,minimum_scale=inner['vesicle_minimum_radius'][index])
-        sphere(center,(.065,.055,.06),p['vesicle'],2,surface='vesicle')
+        cell_part(center,attachment=center+center.normalized()*VESICLE_ATTACHMENT_RADIUS,minimum_scale=inner['vesicle_minimum_radius'][index])
+        sphere(center,VESICLE_SIZE,p['vesicle'],2,surface='vesicle')
     # Curved endoplasmic reticulum surrounding the nucleus, inside the shell.
     cell_part((0,0,0))
     for ring in range(3):
         previous=None
-        for j in range(25):
-            angle=j*math.tau/24;radius=inner['reticulum_radius']+ring*.06
-            point=(radius*math.cos(angle),radius*.7*math.sin(angle),-.15+ring*.095+.04*math.sin(angle*3))
+        for j in range(RETICULUM_SAMPLES):
+            angle=j*math.tau/RETICULUM_INTERVALS;radius=inner['reticulum_radius']+ring*RETICULUM_RING_SPACING
+            point=(radius*math.cos(angle),radius*RETICULUM_Y_SCALE*math.sin(angle),-RETICULUM_Z_BASE+ring*RETICULUM_Z_RING_SPACING+RETICULUM_Z_WAVE_AMPLITUDE*math.sin(angle*RETICULUM_Z_WAVE_FREQUENCY))
             if previous:rod(previous,point,inner['reticulum_tube'],inner['reticulum_color'],'reticulum')
             previous=point
     substrate=profiles['substrate']
     cell_part((0,0,0))
     for i in range(substrate['roots']):
-        angle=i*2.39996323;y=1-2*(i+.5)/substrate['roots'];r=math.sqrt(1-y*y)
+        angle=i*GOLDEN_ANGLE_RADIANS;y=1-2*(i+.5)/substrate['roots'];r=math.sqrt(1-y*y)
         direction=Vector((r*math.cos(angle),y,r*math.sin(angle)))
-        branches(direction*.12,direction,substrate['length'],substrate['radius'],substrate['depth'],substrate['color'],surface='substrate')
+        branches(direction*SUBSTRATE_START_RADIUS,direction,substrate['length'],substrate['radius'],substrate['depth'],substrate['color'],surface='substrate')
     export(name,True)
 
 def virus(large):
     p=profiles['virus']
     if not large:
-        sphere((0,0,0),(.58,.58,.58),p['body'],2,surface='virus_capsid')
-        for i in range(6):
-            a=i*math.tau/6;d=Vector((math.cos(a),math.sin(a),.2))
-            branches(d*.45,d,.10,.012,2,p['spikes'],surface='virus_fibre')
+        sphere((0,0,0),(VIRION_RADIUS,VIRION_RADIUS,VIRION_RADIUS),p['body'],2,surface='virus_capsid')
+        for i in range(VIRUS_FIBRE_COUNT):
+            a=i*math.tau/VIRUS_FIBRE_COUNT;d=Vector((math.cos(a),math.sin(a),VIRION_FIBRE_UP_COMPONENT))
+            branches(d*VIRION_FIBRE_ROOT_RADIUS,d,VIRION_FIBRE_LENGTH,VIRION_FIBRE_RADIUS,2,p['spikes'],surface='virus_fibre')
         # Detachable spikes are instances of virus_spike.fmesh at runtime.
     else:
         # A broad capsid with paired payload sacs and repeated forked ribs.
-        sphere((0,0,0),(.42,.3,.78),p['body'],2,surface='virus_capsid')
+        sphere((0,0,0),BOMBER_CAPSID_SIZE,p['body'],2,surface='virus_capsid')
         for side in (-1,1):
             for j in range(3):
-                z=(j-1)*.4;sphere((side*.34,-.1,z),(.19,.18,.2),p['core'],1,surface='vesicle')
-                branches((side*.25,.05,z),(side,.25,.12),.22,.035,3,p['spikes'],buds=p['body'],surface='virus_fibre',bud_surface='virus_capsid')
+                z=(j-1)*BOMBER_PAYLOAD_SPACING;sphere((side*BOMBER_PAYLOAD_X_OFFSET,-BOMBER_PAYLOAD_Y_OFFSET,z),BOMBER_PAYLOAD_SIZE,p['core'],1,surface='vesicle')
+                branches((side*BOMBER_RIB_ROOT_X_OFFSET,BOMBER_RIB_ROOT_Y_OFFSET,z),(side,BOMBER_RIB_Y_DIRECTION,BOMBER_RIB_Z_DIRECTION),BOMBER_RIB_LENGTH,BOMBER_RIB_RADIUS,3,p['spikes'],buds=p['body'],surface='virus_fibre',bud_surface='virus_capsid')
     export('virus_'+('bomber' if large else 'virion'))
 
 def immune(large):
-    p=profiles['immune'];radius=.70 if large else .59
+    p=profiles['immune'];radius=IMMUNE_BOMBER_RADIUS if large else IMMUNE_FIGHTER_RADIUS
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=3,radius=1)
     obj=bpy.context.object
     for v in obj.data.vertices:
-        n=v.co.normalized();x,y,z=n;v.co=n*radius*(1+.09*math.sin(7*x+2*y)*math.sin(6*z-y))
-        if large:v.co.x*=1.12
+        n=v.co.normalized();x,y,z=n;v.co=n*radius*(1+IMMUNE_SURFACE_DISPLACEMENT*math.sin(IMMUNE_SURFACE_X_FREQUENCY*x+2*y)*math.sin(IMMUNE_SURFACE_Z_FREQUENCY*z-y))
+        if large:v.co.x*=IMMUNE_BOMBER_X_SCALE
     finish(obj,p['body'],surface='immune_surface')
     for i in range(3 if not large else 2):
-        sphere(((i-1)*.18,.10,.51),(.19,.22,.12),p['nucleus'],2,surface='nucleus')
-    for i in range(7 if large else 4):
-        a=i*math.tau/(7 if large else 4)
-        sphere((math.cos(a)*radius*.8,-.2,math.sin(a)*radius*.8),(.20,.17,.22),p['body'],2,surface='immune_surface')
-    for i in range(10):
-        a=i*2.39996323;sphere((.38*math.cos(a),.32*math.sin(a),.49),(.04,.04,.04),p['granules'],1,surface='immune_granule')
-    for i in range(6 if large else 4):
-        a=i*math.tau/(6 if large else 4);d=Vector((math.cos(a),math.sin(a),.1))
-        branches(d*radius*.8,d,.13 if large else .09,.022,2,p['body'],buds=p['granules'],surface='immune_surface',bud_surface='immune_granule')
+        sphere(((i-1)*IMMUNE_NUCLEUS_SPACING,IMMUNE_NUCLEUS_Y_OFFSET,IMMUNE_NUCLEUS_Z_OFFSET),IMMUNE_NUCLEUS_SIZE,p['nucleus'],2,surface='nucleus')
+    for i in range(IMMUNE_BOMBER_LOBE_COUNT if large else 4):
+        a=i*math.tau/(IMMUNE_BOMBER_LOBE_COUNT if large else 4)
+        sphere((math.cos(a)*radius*IMMUNE_SURFACE_ATTACHMENT_RADIUS_SCALE,-IMMUNE_LOBE_Y_OFFSET,math.sin(a)*radius*IMMUNE_SURFACE_ATTACHMENT_RADIUS_SCALE),IMMUNE_LOBE_SIZE,p['body'],2,surface='immune_surface')
+    for i in range(IMMUNE_GRANULE_COUNT):
+        a=i*GOLDEN_ANGLE_RADIANS;sphere((IMMUNE_GRANULE_X_RADIUS*math.cos(a),IMMUNE_GRANULE_Y_RADIUS*math.sin(a),IMMUNE_GRANULE_Z_OFFSET),IMMUNE_GRANULE_SIZE,p['granules'],1,surface='immune_granule')
+    for i in range(IMMUNE_BOMBER_BRANCH_COUNT if large else 4):
+        a=i*math.tau/(IMMUNE_BOMBER_BRANCH_COUNT if large else 4);d=Vector((math.cos(a),math.sin(a),IMMUNE_BRANCH_UP_COMPONENT))
+        branches(d*radius*IMMUNE_SURFACE_ATTACHMENT_RADIUS_SCALE,d,IMMUNE_BOMBER_BRANCH_LENGTH if large else IMMUNE_FIGHTER_BRANCH_LENGTH,IMMUNE_BRANCH_RADIUS,2,p['body'],buds=p['granules'],surface='immune_surface',bud_surface='immune_granule')
     export('immune_'+('bomber' if large else 'leukocyte'))
 
 def node():
-    p=profiles['node'];sphere((0,.12,0),(.24,.16,.24),p['stem'],2)
+    p=profiles['node'];sphere((0,NODE_BASE_Y,0),NODE_BASE_SIZE,p['stem'],2)
     for i in range(4):
-        y=.25+i*.16;r=.18+.05*math.sin(i)
-        sphere((.04*math.sin(i*2),y,0),(r,.17,r),p['membrane'],2)
-    for i in range(5):
-        a=i*math.tau/5;sphere((.25*math.cos(a),.82,.25*math.sin(a)),(.14,.14,.14),p['buds'],2)
-    sphere((0,.87,0),(.20,.17,.20),p['membrane'],2)
+        y=NODE_FIRST_RING_Y+i*NODE_RING_SPACING;r=NODE_RING_BASE_RADIUS+NODE_RING_RADIUS_WAVE*math.sin(i)
+        sphere((NODE_RING_X_WAVE*math.sin(i*2),y,0),(r,NODE_RING_HALF_HEIGHT,r),p['membrane'],2)
+    for i in range(NODE_BUD_COUNT):
+        a=i*math.tau/NODE_BUD_COUNT;sphere((NODE_BUD_RING_RADIUS*math.cos(a),NODE_BUD_Y,NODE_BUD_RING_RADIUS*math.sin(a)),NODE_BUD_SIZE,p['buds'],2)
+    sphere((0,NODE_CROWN_Y,0),NODE_CROWN_SIZE,p['membrane'],2)
     export('cell_replication_node')
 
 def spore():
-    p=profiles['fungal_spore'];sphere((0,0,0),(.48,.48,.48),p['body'],3,surface='fungal_spore')
-    for i in range(9):
-        a=i*2.39996323;y=1-2*(i+.5)/9;r=math.sqrt(1-y*y);d=Vector((r*math.cos(a),y,r*math.sin(a)))
-        branches(d*.4,d,.18,.045,2,p['rays'],buds=p['core'],surface='fungal_stalk',bud_surface='fungal_spore')
+    p=profiles['fungal_spore'];sphere((0,0,0),(SPORE_RADIUS,SPORE_RADIUS,SPORE_RADIUS),p['body'],3,surface='fungal_spore')
+    for i in range(SPORE_RAY_COUNT):
+        a=i*GOLDEN_ANGLE_RADIANS;y=1-2*(i+.5)/SPORE_RAY_COUNT;r=math.sqrt(1-y*y);d=Vector((r*math.cos(a),y,r*math.sin(a)))
+        branches(d*SPORE_RAY_ROOT_RADIUS,d,SPORE_RAY_LENGTH,SPORE_RAY_RADIUS,2,p['rays'],buds=p['core'],surface='fungal_stalk',bud_surface='fungal_spore')
     export('fungal_spore')
 
 def factory(side):
@@ -253,40 +444,40 @@ def factory(side):
         # Repeated sheath rings, an angular capsid, and six bent tail fibres.
         for i in range(f['rings']):
             y=(i+.5)/f['rings']
-            sphere((0,y,0),(f['sheath_radius'],.065,f['sheath_radius']),p['spikes'],1,surface='virus_sheath')
+            sphere((0,y,0),(f['sheath_radius'],VIRUS_SHEATH_HALF_HEIGHT,f['sheath_radius']),p['spikes'],1,surface='virus_sheath')
         rod((0,0,0),(0,1,0),f['shaft_radius'],p['body'],'virus_sheath' if side=='virus' else 'immune_surface')
         export('virus_stem')
         bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1,radius=1)
-        obj=bpy.context.object;obj.scale=(f['head_radius'],f['head_radius']*1.25,f['head_radius'])
+        obj=bpy.context.object;obj.scale=(f['head_radius'],f['head_radius']*VIRUS_HEAD_HEIGHT_SCALE,f['head_radius'])
         finish(obj,p['body'],smooth=False,surface='virus_capsid')
-        for i in range(6):
-            a=i*math.tau/6;d=Vector((math.cos(a),0,math.sin(a)))
-            bend=d*f['fibre_spread']+Vector((0,-.32,0));end=d*f['fibre_spread']*1.35+Vector((0,-.65,0))
-            rod((0,-.12,0),bend,.025,p['spikes'],'virus_fibre');rod(bend,end,.018,p['core'],'virus_fibre')
+        for i in range(VIRUS_FACTORY_FIBRE_COUNT):
+            a=i*math.tau/VIRUS_FACTORY_FIBRE_COUNT;d=Vector((math.cos(a),0,math.sin(a)))
+            bend=d*f['fibre_spread']+Vector((0,-VIRUS_FIBRE_BEND_Y,0));end=d*f['fibre_spread']*VIRUS_FIBRE_END_SPREAD_SCALE+Vector((0,-VIRUS_FIBRE_END_Y,0))
+            rod((0,-VIRUS_FIBRE_ROOT_Y,0),bend,FACTORY_BRANCH_RADIUS,p['spikes'],'virus_fibre');rod(bend,end,VIRUS_FIBRE_TIP_RADIUS,p['core'],'virus_fibre')
         export('virus_head')
     elif side=='immune':
         rod((0,0,0),(0,1,0),f['shaft_radius'],p['body'],'virus_sheath' if side=='virus' else 'immune_surface')
         for i in range(f['lobes']):
             y=(i+.5)/f['lobes'];sign=-1 if i%2 else 1
-            sphere((sign*.09,y,0),(.18,.23,.14),p['body'],2,surface='immune_surface')
-            branches((0,y,0),(sign,.35,.15),f['spread'],.025,2,p['body'],buds=p['granules'],surface='immune_surface',bud_surface='immune_granule')
+            sphere((sign*IMMUNE_STEM_LOBE_X,y,0),IMMUNE_STEM_LOBE_SIZE,p['body'],2,surface='immune_surface')
+            branches((0,y,0),(sign,IMMUNE_FACTORY_BRANCH_UP_COMPONENT,IMMUNE_FACTORY_BRANCH_DEPTH_COMPONENT),f['spread'],FACTORY_BRANCH_RADIUS,2,p['body'],buds=p['granules'],surface='immune_surface',bud_surface='immune_granule')
         export('immune_stem')
         for i in range(f['crown_lobes']):
             a=i*math.tau/f['crown_lobes']
-            sphere((.18*math.cos(a),.08,.18*math.sin(a)),(.22,.25,.20),p['body'],2,surface='immune_surface')
-        sphere((0,.10,.12),(.14,.17,.12),p['granules'],2,surface='immune_granule')
+            sphere((IMMUNE_CROWN_RADIUS*math.cos(a),IMMUNE_CROWN_Y,IMMUNE_CROWN_RADIUS*math.sin(a)),IMMUNE_CROWN_SIZE,p['body'],2,surface='immune_surface')
+        sphere((0,FACTORY_GRANULE_Y,IMMUNE_FACTORY_GRANULE_Z),IMMUNE_FACTORY_GRANULE_SIZE,p['granules'],2,surface='immune_granule')
         export('immune_head')
     else:
         rod((0,0,0),(0,1,0),f['shaft_radius'],p['rays'],'fungal_stalk')
         for i in range(f['forks']):
-            a=i*2.39996323;y=(i+.5)/f['forks']
-            branches((0,y,0),(math.cos(a),.7,math.sin(a)),f['spread'],.025,2,p['body'],buds=p['core'],surface='fungal_stalk',bud_surface='fungal_spore')
+            a=i*GOLDEN_ANGLE_RADIANS;y=(i+.5)/f['forks']
+            branches((0,y,0),(math.cos(a),FUNGAL_BRANCH_UP_COMPONENT,math.sin(a)),f['spread'],FACTORY_BRANCH_RADIUS,2,p['body'],buds=p['core'],surface='fungal_stalk',bud_surface='fungal_spore')
         export('fungal_stem')
-        sphere((0,-.10,0),(.14,.28,.14),p['rays'],2,surface='fungal_stalk')
-        sphere((0,.14,0),(f['cap_radius'],.16,f['cap_radius']),p['body'],2,surface='fungal_cap')
+        sphere((0,-FUNGAL_STALK_ROOT_Y,0),FUNGAL_CAP_STALK_SIZE,p['rays'],2,surface='fungal_stalk')
+        sphere((0,FUNGAL_CAP_Y,0),(f['cap_radius'],FUNGAL_CAP_HALF_HEIGHT,f['cap_radius']),p['body'],2,surface='fungal_cap')
         for i in range(f['spores']):
-            a=i*2.39996323
-            sphere((.28*math.cos(a),.25,.28*math.sin(a)),(.065,)*3,p['core'],1,surface='fungal_spore')
+            a=i*GOLDEN_ANGLE_RADIANS
+            sphere((FUNGAL_SPORE_RING_RADIUS*math.cos(a),FUNGAL_SPORE_RING_Y,FUNGAL_SPORE_RING_RADIUS*math.sin(a)),(FUNGAL_FACTORY_SPORE_RADIUS,)*3,p['core'],1,surface='fungal_spore')
         export('fungal_head')
     # The complete model is used by the non-staged presentation path.
     for i,source in enumerate(models[-2:]):
@@ -297,12 +488,12 @@ def factory(side):
     rng.setstate(saved)
 
 def background(name,key):
-    p=profiles[key];vertices=[];faces=[];nx,ny=64,40
+    p=profiles[key];vertices=[];faces=[];nx,ny=BACKGROUND_GRID_X,BACKGROUND_GRID_Y
     for j in range(ny+1):
-        y=(j/ny*2-1)*1.46
+        y=(j/ny*2-1)*BACKGROUND_HALF_HEIGHT
         for i in range(nx+1):
-            x=(i/nx*2-1)*1.48
-            z=.018*math.sin(11*x+2*math.sin(5*y))+.013*math.cos(13*y-3*x)+.006*math.sin(29*x+17*y)
+            x=(i/nx*2-1)*BACKGROUND_HALF_WIDTH
+            z=BACKGROUND_PRIMARY_FOLD*math.sin(BACKGROUND_PRIMARY_X_FREQUENCY*x+2*math.sin(BACKGROUND_Y_MODULATION_FREQUENCY*y))+BACKGROUND_SECONDARY_FOLD*math.cos(BACKGROUND_SECONDARY_Y_FREQUENCY*y-3*x)+BACKGROUND_FINE_FOLD*math.sin(BACKGROUND_FINE_X_FREQUENCY*x+BACKGROUND_FINE_Y_FREQUENCY*y)
             vertices.append((x,y,z))
     for j in range(ny):
         for i in range(nx):
@@ -311,35 +502,35 @@ def background(name,key):
     obj=bpy.data.objects.new(name,mesh);bpy.context.collection.objects.link(obj)
     def pigment(v):
         # Broad cytoplasm gradients and membrane/fiber folds, all baked to vertices.
-        x,y,z=v;f=.5+.5*math.sin(11*x+2*math.sin(5*y))*math.cos(13*y-3*x)
-        return tuple(p['base'][i]*(1-.55*f)+p['ridge'][i]*.55*f for i in range(3))
+        x,y,z=v;f=.5+.5*math.sin(BACKGROUND_PRIMARY_X_FREQUENCY*x+2*math.sin(BACKGROUND_Y_MODULATION_FREQUENCY*y))*math.cos(BACKGROUND_SECONDARY_Y_FREQUENCY*y-3*x)
+        return tuple(p['base'][i]*(1-BACKGROUND_RIDGE_BLEND*f)+p['ridge'][i]*BACKGROUND_RIDGE_BLEND*f for i in range(3))
     finish(obj,pigment,1,1)
-    for j in range(7):
-        y=-.72+j*.23
+    for j in range(BACKGROUND_FIBRE_ROWS):
+        y=-BACKGROUND_FIBRE_START_Y+j*BACKGROUND_FIBRE_ROW_SPACING
         last=None
-        for i in range(20):
-            x=-1.38+i*2.76/19;point=(x,y+.025*math.sin(x*8+j),.025+.015*math.cos(x*7+j))
-            if last:rod(last,point,.007,p['fiber'])
+        for i in range(BACKGROUND_FIBRE_SAMPLES):
+            x=-BACKGROUND_FIBRE_HALF_WIDTH+i*BACKGROUND_FIBRE_SPAN/BACKGROUND_FIBRE_INTERVALS;point=(x,y+BACKGROUND_FIBRE_Y_WAVE*math.sin(x*BACKGROUND_FIBRE_Y_FREQUENCY+j),BACKGROUND_FIBRE_BASE_Z+BACKGROUND_FIBRE_Z_WAVE*math.cos(x*BACKGROUND_FIBRE_Z_FREQUENCY+j))
+            if last:rod(last,point,BACKGROUND_FIBRE_RADIUS,p['fiber'])
             last=point
     # Blood cells and small extracellular vesicles occupy depth behind the play field.
-    for i in range(18):
-        x=rng.uniform(-1.2,1.2);y=rng.uniform(-.7,.7);z=rng.uniform(.08,.38)
-        if abs(x)<.46 and abs(y)<.22:continue
-        radius=rng.uniform(.025,.05)
-        sphere((x,y,z),(radius,radius*.72,radius*.32),p['blood'],2,1,1)
-    for i in range(26):
-        x=rng.uniform(-1.2,1.2);y=rng.uniform(-.73,.73);z=rng.uniform(.02,.28)
-        sphere((x,y,z),(.006,.006,.006),p['ridge'],1,1,1)
+    for i in range(BACKGROUND_BLOOD_COUNT):
+        x=rng.uniform(-BACKGROUND_PARTICLE_HALF_WIDTH,BACKGROUND_PARTICLE_HALF_WIDTH);y=rng.uniform(-BACKGROUND_BLOOD_HALF_HEIGHT,BACKGROUND_BLOOD_HALF_HEIGHT);z=rng.uniform(BACKGROUND_BLOOD_NEAR_Z,BACKGROUND_BLOOD_FAR_Z)
+        if abs(x)<BACKGROUND_CLEAR_HALF_WIDTH and abs(y)<BACKGROUND_CLEAR_HALF_HEIGHT:continue
+        radius=rng.uniform(BACKGROUND_BLOOD_MIN_RADIUS,BACKGROUND_BLOOD_MAX_RADIUS)
+        sphere((x,y,z),(radius,radius*BACKGROUND_BLOOD_HEIGHT_SCALE,radius*BACKGROUND_BLOOD_DEPTH_SCALE),p['blood'],2,1,1)
+    for i in range(BACKGROUND_VESICLE_COUNT):
+        x=rng.uniform(-BACKGROUND_PARTICLE_HALF_WIDTH,BACKGROUND_PARTICLE_HALF_WIDTH);y=rng.uniform(-BACKGROUND_VESICLE_HALF_HEIGHT,BACKGROUND_VESICLE_HALF_HEIGHT);z=rng.uniform(BACKGROUND_VESICLE_NEAR_Z,BACKGROUND_VESICLE_FAR_Z)
+        sphere((x,y,z),(BACKGROUND_VESICLE_RADIUS,BACKGROUND_VESICLE_RADIUS,BACKGROUND_VESICLE_RADIUS),p['ridge'],1,1,1)
     export(name)
 
 cell('cell_infected','infected_cell');cell('cell_healthy','healthy_cell');cell('cell_neutral','neutral_cell')
 virus(False);virus(True);immune(False);immune(True);node();factory('virus');factory('immune');factory('fungal_spore')
 spore()
 # A single tapered local +Y segment. Runtime poses extend segments in sequence.
-rod((0,0,0),(0,1,0),.065,(1,1,1));export('growth_segment')
-sphere((0,0,0),(.12,.12,.12),(1,1,1),2,.55);export('growth_tip')
+rod((0,0,0),(0,1,0),GROWTH_SEGMENT_RADIUS,(1,1,1));export('growth_segment')
+sphere((0,0,0),(GROWTH_TIP_RADIUS,GROWTH_TIP_RADIUS,GROWTH_TIP_RADIUS),(1,1,1),2,GROWTH_TIP_ROUGHNESS);export('growth_tip')
 # One reusable shaft and head, local +Z; attached, flying and embedded use this mesh.
-rod((0,0,0),(0,0,.87),.075,(1,1,1),'spike');sphere((0,0,.91),(.14,.14,.09),(1,1,1),1,surface='spike')
+rod((0,0,0),(0,0,SPIKE_SHAFT_LENGTH),SPIKE_SHAFT_RADIUS,(1,1,1),'spike');sphere((0,0,SPIKE_HEAD_Z),SPIKE_HEAD_SIZE,(1,1,1),1,surface='spike')
 export('virus_spike')
 rng=random.Random(profiles['seed'])
 background('tissue_background','tissue');background('bloodstream_background','bloodstream')

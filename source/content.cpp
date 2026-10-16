@@ -4,6 +4,48 @@
 #include <string.h>
 #include <stdio.h>
 #include <cmath>
+#include "asset_limits.h"
+
+static const int MAX_BUILDING_SEED = 16777215;
+static const int MAX_BUILDING_PRODUCTION = 10;
+static const int MAX_BUILDING_SPACING = 10;
+static const int MAX_BRANCH_EMERGENCE_SECONDS = 300;
+static const int MAX_BUILDING_WIDTH = 10000;
+static const int MAX_BUILDING_HEIGHT = 10000;
+static const int MAX_BUILDING_COLLECTION = 10000;
+static const int MAX_BUILDING_HEALTH = 10000;
+static const int MAX_BUILDING_GROWTH_SECONDS = 10000;
+static const int MAX_BUILDING_HEAD_RADIUS = 10;
+static const int MAX_BUILDING_STEM_RADIUS = 10;
+static const int MAX_UNIT_TARGETS = 2;
+static const int MAX_UNIT_INTERVAL_FACTOR = 100;
+static const int MAX_UNIT_CUE_RADIUS = 1000;
+static const int MAX_UNIT_PICK_RADIUS = 1000;
+static const int MAX_UNIT_SEPARATION = 10000;
+static const int MAX_UNIT_SHOT_INTERVAL = 10000;
+static const int MAX_UNIT_COST = 10000;
+static const int MAX_UNIT_RESPONSE_SECONDS = 10;
+static const int MAX_UNIT_LEASH_RADIUS = 100;
+static const int MAX_UNIT_COLONIZE_RADIUS = 100;
+static const int MAX_UNIT_STRUCTURE_RADIUS = 100;
+static const int MAX_UNIT_TARGET_RADIUS = 100;
+static const int MAX_UNIT_RANGE = 10000;
+static const int MAX_UNIT_HEALTH = 10000;
+static const int MAX_UNIT_SPEED = 10000;
+static const int MAX_UNIT_YAW_DEGREES = 360000;
+static const int MAX_UNIT_SCALE = 1000;
+static const int MAX_UNIT_LIFETIME = 300;
+static const int MAX_UNIT_BLAST_RADIUS = 100;
+static const int MAX_UNIT_SEEK_RADIUS = 10000;
+static const int MAX_CELL_TINT_SECONDS = 3600;
+static const double MAX_CELL_INTERIOR_VARIATION = .15;
+static const double MAX_CELL_SHAPE_VARIATION = .12;
+static const int MAX_NORMAL_COMPONENT = 100;
+static const float MIN_NORMAL_SQUARED_LENGTH = .01f;
+static const int MAX_NORMAL_SQUARED_LENGTH = 10000;
+static const int MAX_ESTABLISHMENT_SECONDS = 10000;
+static const int MAX_BRANCH_HEALTH = 10000;
+static const int MAX_BRANCH_REGROW_SECONDS = 300;
 
 int content_faction(const Content* c,const char* name)
 {
@@ -44,12 +86,12 @@ int content_producer(const Content* c,const char* name)
 Color content_color(const Content* c,Faction faction) { return c->factions[faction].color; }
 static bool definition_name(Json j,char* name)
 {
-    return json_string(json_get(j,"name"),name,32);
+    return json_string(json_get(j,"name"),name,ASSET_NAME_CAPACITY);
 }
 static Vec3 normal(Json j)
 {
-    Vec3 n=json_vector(j,-100,100);float length=dot(n,n);
-    if (length<.01f || length>10000) json_error(j,"normal must have squared length in [.01,10000]");
+    Vec3 n=json_vector(j,-MAX_NORMAL_COMPONENT,MAX_NORMAL_COMPONENT);float length=dot(n,n);
+    if (length<MIN_NORMAL_SQUARED_LENGTH || length>MAX_NORMAL_SQUARED_LENGTH) json_error(j,"normal must have squared length in [.01,10000]");
     return length>0 ? normalize(n) : n;
 }
 static bool load_bodies(Content* c,Json root,const char* path)
@@ -57,9 +99,9 @@ static bool load_bodies(Content* c,Json root,const char* path)
     json_object(root,"$schema|bodies");JsonArray a=json_array(json_get(root,"bodies"),MAX_BODY_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|label|geometry|model|hosts_site|variation");BodyDefinition b={};char geometry[32]={};
-        definition_name(j,b.name);json_string(json_get(j,"label"),b.label,32);
-        json_string(json_get(j,"geometry"),geometry,32);b.hosts_site=json_bool(json_get(j,"hosts_site"));
+        json_object(j,"name|label|geometry|model|hosts_site|variation");BodyDefinition b={};char geometry[ASSET_NAME_CAPACITY]={};
+        definition_name(j,b.name);json_string(json_get(j,"label"),b.label,ASSET_NAME_CAPACITY);
+        json_string(json_get(j,"geometry"),geometry,ASSET_NAME_CAPACITY);b.hosts_site=json_bool(json_get(j,"hosts_site"));
         if (!strcmp(geometry,"mesh")) json_path(json_get(j,"model"),path,b.model_path);
         else if (strcmp(geometry,"sphere") || json_present(json_find(j,"model"))) json_error(j,"geometry must be mesh with a model, or sphere without a model");
         Json variation=json_find(j,"variation");
@@ -67,8 +109,8 @@ static bool load_bodies(Content* c,Json root,const char* path)
         {
             json_object(variation,"parts|shape|interior");
             json_path(json_get(variation,"parts"),path,b.parts_path);
-            b.shape_variation=json_float(json_get(variation,"shape"),0,.12);
-            b.part_variation=json_float(json_get(variation,"interior"),0,.15);
+            b.shape_variation=json_float(json_get(variation,"shape"),0,MAX_CELL_SHAPE_VARIATION);
+            b.part_variation=json_float(json_get(variation,"interior"),0,MAX_CELL_INTERIOR_VARIATION);
             if (!b.model_path[0]) json_error(variation,"variation requires a mesh");
         }
         if (content_body(c,b.name)>=0) return json_error(j,"duplicate body definition");
@@ -86,10 +128,10 @@ static bool load_factions(Content* c,Json root)
         if (json_present(appearance))
         {
             json_object(appearance,"tint|strength|seconds");f.cell_tint=json_color(json_get(appearance,"tint"));
-            f.cell_strength=json_float(json_get(appearance,"strength"),0,1);f.transform_seconds=json_positive(json_get(appearance,"seconds"),3600);
+            f.cell_strength=json_float(json_get(appearance,"strength"),0,1);f.transform_seconds=json_positive(json_get(appearance,"seconds"),MAX_CELL_TINT_SECONDS);
         }
         uint32_t id=json_uint(json_get(j,"id"),1,MAX_FACTIONS-1);
-        definition_name(j,f.name);json_string(json_get(j,"label"),f.label,32);f.color=json_color(json_get(j,"color"));
+        definition_name(j,f.name);json_string(json_get(j,"label"),f.label,ASSET_NAME_CAPACITY);f.color=json_color(json_get(j,"color"));
         if (c->factions[id].declared || content_faction(c,f.name)>=0) return json_error(j,"duplicate or reserved faction ID or name");
         Json p=json_find(j,"production");
         if (json_present(p))
@@ -97,13 +139,13 @@ static bool load_factions(Content* c,Json root)
             json_object(p,"building|default_unit|assault_unit|mode");
             Json mode=json_find(p,"mode");if (json_present(mode))
             {
-                char value[32]={};json_string(mode,value,32);
+                char value[ASSET_NAME_CAPACITY]={};json_string(mode,value,ASSET_NAME_CAPACITY);
                 if (!strcmp(value,"spores")) f.automatic=true;
                 else if (strcmp(value,"manufacture")) json_error(mode,"production mode must be manufacture or spores");
             }
-            json_string(json_get(p,"building"),f.producer_name,32);
-            json_string(json_get(p,"default_unit"),f.default_name,32);
-            json_string(json_get(p,"assault_unit"),f.assault_name,32);
+            json_string(json_get(p,"building"),f.producer_name,ASSET_NAME_CAPACITY);
+            json_string(json_get(p,"default_unit"),f.default_name,ASSET_NAME_CAPACITY);
+            json_string(json_get(p,"assault_unit"),f.assault_name,ASSET_NAME_CAPACITY);
         }
         f.declared=true;c->factions[id]=f;
     }
@@ -116,8 +158,8 @@ static bool load_groups(Content* c,Json root)
     {
         json_object(j,"id|key|selection|singular|plural");GroupDefinition g={};
         uint32_t id=json_uint(json_get(j,"id"),0,MAX_GROUPS-1);
-        json_string(json_get(j,"key"),g.key,32);json_string(json_get(j,"selection"),g.selection,32);
-        json_string(json_get(j,"singular"),g.singular,32);json_string(json_get(j,"plural"),g.plural,32);
+        json_string(json_get(j,"key"),g.key,ASSET_NAME_CAPACITY);json_string(json_get(j,"selection"),g.selection,ASSET_NAME_CAPACITY);
+        json_string(json_get(j,"singular"),g.singular,ASSET_NAME_CAPACITY);json_string(json_get(j,"plural"),g.plural,ASSET_NAME_CAPACITY);
         if (c->groups[id].declared || !strcmp(g.key,"all") || !strcmp(g.selection,"all")
             || content_group(c,g.key)>=0 || content_group(c,g.selection)>=0) return json_error(j,"duplicate or reserved group ID or name");
         g.declared=true;c->groups[id]=g;
@@ -134,48 +176,48 @@ static bool load_units(Content* c,Json root,const char* path)
         Json attack=json_find(j,"attack");
         if (json_present(attack))
         {
-            json_object(attack,"mode|seek_radius|blast_radius|lifetime|friendly_fire");char mode[32]={};json_string(json_get(attack,"mode"),mode,32);
+            json_object(attack,"mode|seek_radius|blast_radius|lifetime|friendly_fire");char mode[ASSET_NAME_CAPACITY]={};json_string(json_get(attack,"mode"),mode,ASSET_NAME_CAPACITY);
             if (!strcmp(mode,"digest")) u.attack=ATTACK_DIGEST;
             else if (!strcmp(mode,"spore"))
             {
-                u.attack=ATTACK_SPORE;u.seek_radius=json_positive(json_get(attack,"seek_radius"),10000);
-                u.blast_radius=json_positive(json_get(attack,"blast_radius"),100);u.lifetime=json_positive(json_get(attack,"lifetime"),300);
+                u.attack=ATTACK_SPORE;u.seek_radius=json_positive(json_get(attack,"seek_radius"),MAX_UNIT_SEEK_RADIUS);
+                u.blast_radius=json_positive(json_get(attack,"blast_radius"),MAX_UNIT_BLAST_RADIUS);u.lifetime=json_positive(json_get(attack,"lifetime"),MAX_UNIT_LIFETIME);
                 u.friendly_fire=json_bool(json_get(attack,"friendly_fire"));
             }
             else if (strcmp(mode,"projectile")) json_error(attack,"unknown attack mode");
             if (u.attack!=ATTACK_SPORE && (json_present(json_find(attack,"seek_radius")) || json_present(json_find(attack,"blast_radius")) || json_present(json_find(attack,"lifetime")) || json_present(json_find(attack,"friendly_fire"))))
                 json_error(attack,"spore parameters require spore mode");
         }
-        json_string(json_get(j,"faction"),u.faction_name,32);json_string(json_get(j,"group"),u.group_name,32);
+        json_string(json_get(j,"faction"),u.faction_name,ASSET_NAME_CAPACITY);json_string(json_get(j,"group"),u.group_name,ASSET_NAME_CAPACITY);
         json_path(json_get(j,"model"),path,u.model_path);
-        u.scale=json_positive(json_get(j,"scale"),1000);u.yaw_degrees=json_float(json_get(j,"yaw_degrees"),-360000,360000);
+        u.scale=json_positive(json_get(j,"scale"),MAX_UNIT_SCALE);u.yaw_degrees=json_float(json_get(j,"yaw_degrees"),-MAX_UNIT_YAW_DEGREES,MAX_UNIT_YAW_DEGREES);
         u.color=json_color(json_get(j,"tint"));
-        u.speed=json_positive(json_get(j,"speed"),10000);
-        u.health=json_positive(json_get(j,"health"),10000);
-        u.range=json_positive(json_get(j,"range"),10000);
+        u.speed=json_positive(json_get(j,"speed"),MAX_UNIT_SPEED);
+        u.health=json_positive(json_get(j,"health"),MAX_UNIT_HEALTH);
+        u.range=json_positive(json_get(j,"range"),MAX_UNIT_RANGE);
         u.unit_radius=u.structure_radius=u.range;u.cruise_fraction=1;
         Json autonomy=json_find(j,"autonomy");
         if (json_present(autonomy))
         {
             json_object(autonomy,"unit_radius|structure_radius|colonize_radius|leash_radius|response_seconds|cruise_fraction");
-            u.unit_radius=json_float(json_get(autonomy,"unit_radius"),0,100);
-            u.structure_radius=json_float(json_get(autonomy,"structure_radius"),0,100);
-            u.colonize_radius=json_float(json_get(autonomy,"colonize_radius"),0,100);
-            u.leash_radius=json_positive(json_get(autonomy,"leash_radius"),100);
-            u.response_seconds=json_float(json_get(autonomy,"response_seconds"),0,10);
+            u.unit_radius=json_float(json_get(autonomy,"unit_radius"),0,MAX_UNIT_TARGET_RADIUS);
+            u.structure_radius=json_float(json_get(autonomy,"structure_radius"),0,MAX_UNIT_STRUCTURE_RADIUS);
+            u.colonize_radius=json_float(json_get(autonomy,"colonize_radius"),0,MAX_UNIT_COLONIZE_RADIUS);
+            u.leash_radius=json_positive(json_get(autonomy,"leash_radius"),MAX_UNIT_LEASH_RADIUS);
+            u.response_seconds=json_float(json_get(autonomy,"response_seconds"),0,MAX_UNIT_RESPONSE_SECONDS);
             u.cruise_fraction=json_positive(json_get(autonomy,"cruise_fraction"),1);
         }
-        u.cost=json_positive(json_get(j,"cost"),10000);
-        u.shot_interval=json_positive(json_get(j,"shot_interval"),10000);
-        u.separation=json_positive(json_get(j,"separation"),10000);
-        u.pick_radius=json_positive(json_get(j,"pick_radius"),1000);
-        u.cue_radius=json_positive(json_get(j,"cue_radius"),1000);
-        u.hits=json_uint(json_get(j,"hits"),1,32);
+        u.cost=json_positive(json_get(j,"cost"),MAX_UNIT_COST);
+        u.shot_interval=json_positive(json_get(j,"shot_interval"),MAX_UNIT_SHOT_INTERVAL);
+        u.separation=json_positive(json_get(j,"separation"),MAX_UNIT_SEPARATION);
+        u.pick_radius=json_positive(json_get(j,"pick_radius"),MAX_UNIT_PICK_RADIUS);
+        u.cue_radius=json_positive(json_get(j,"cue_radius"),MAX_UNIT_CUE_RADIUS);
+        u.hits=json_uint(json_get(j,"hits"),1,MAX_HIT_COUNT);
         u.colonizes=json_bool(json_get(j,"colonizes"));u.detaches=json_bool(json_get(j,"detaches"));u.trails=json_bool(json_get(j,"trails"));
-        JsonArray targets=json_array(json_get(j,"targets"),2);Json target={};
+        JsonArray targets=json_array(json_get(j,"targets"),MAX_UNIT_TARGETS);Json target={};
         while (json_next(&targets,&target))
         {
-            char name[32]={};json_string(target,name,32);
+            char name[ASSET_NAME_CAPACITY]={};json_string(target,name,ASSET_NAME_CAPACITY);
             uint32_t bit=!strcmp(name,"units") ? TARGET_UNITS : !strcmp(name,"structures") ? TARGET_STRUCTURES : 0;
             if (!bit || (u.targets&bit)) return json_error(target,"unknown or duplicate target category");
             u.targets|=bit;
@@ -183,11 +225,11 @@ static bool load_units(Content* c,Json root,const char* path)
         Json secondary=json_find(j,"secondary_attack");u.secondary_interval=1;
         if (json_present(secondary))
         {
-            json_object(secondary,"targets|interval_factor");u.secondary_interval=json_float(json_get(secondary,"interval_factor"),1,100);
-            JsonArray a=json_array(json_get(secondary,"targets"),2);
+            json_object(secondary,"targets|interval_factor");u.secondary_interval=json_float(json_get(secondary,"interval_factor"),1,MAX_UNIT_INTERVAL_FACTOR);
+            JsonArray a=json_array(json_get(secondary,"targets"),MAX_UNIT_TARGETS);
             while (json_next(&a,&target))
             {
-                char name[32]={};json_string(target,name,32);
+                char name[ASSET_NAME_CAPACITY]={};json_string(target,name,ASSET_NAME_CAPACITY);
                 uint32_t bit=!strcmp(name,"units") ? TARGET_UNITS : !strcmp(name,"structures") ? TARGET_STRUCTURES : 0;
                 if (!bit || (bit&(u.targets|u.secondary_targets))) return json_error(target,"secondary targets must be distinct from primary targets");
                 u.secondary_targets|=bit;
@@ -208,8 +250,8 @@ static bool load_buildings(Content* c,Json root,const char* path)
         if (json_present(navigation))
         {
             json_object(navigation,"stem_radius|head_radius");
-            p.stem_radius=json_positive(json_get(navigation,"stem_radius"),10);
-            p.head_radius=json_positive(json_get(navigation,"head_radius"),10);
+            p.stem_radius=json_positive(json_get(navigation,"stem_radius"),MAX_BUILDING_STEM_RADIUS);
+            p.head_radius=json_positive(json_get(navigation,"head_radius"),MAX_BUILDING_HEAD_RADIUS);
         }
         Json growth=json_find(j,"growth_meshes");
         if (json_present(growth))
@@ -217,41 +259,41 @@ static bool load_buildings(Content* c,Json root,const char* path)
             json_object(growth,"segment|tip");json_path(json_get(growth,"segment"),path,p.segment_path);
             json_path(json_get(growth,"tip"),path,p.tip_path);
         }
-        definition_name(j,p.name);json_string(json_get(j,"faction"),p.faction_name,32);json_path(json_get(j,"model"),path,p.model_path);
-        p.growth_seconds=json_positive(json_get(j,"growth_seconds"),10000);
+        definition_name(j,p.name);json_string(json_get(j,"faction"),p.faction_name,ASSET_NAME_CAPACITY);json_path(json_get(j,"model"),path,p.model_path);
+        p.growth_seconds=json_positive(json_get(j,"growth_seconds"),MAX_BUILDING_GROWTH_SECONDS);
         Json establishment=json_find(j,"establishment_seconds");
-        if (json_present(establishment)) p.establishment_seconds=json_positive(establishment,10000);
-        p.health=json_positive(json_get(j,"health"),10000);
-        p.collection=json_positive(json_get(j,"collection"),10000);
-        p.height=json_positive(json_get(j,"height"),10000);
-        p.width=json_positive(json_get(j,"width"),10000);
-        p.hits=json_uint(json_get(j,"hits"),1,32);Json b=json_get(j,"branches");
+        if (json_present(establishment)) p.establishment_seconds=json_positive(establishment,MAX_ESTABLISHMENT_SECONDS);
+        p.health=json_positive(json_get(j,"health"),MAX_BUILDING_HEALTH);
+        p.collection=json_positive(json_get(j,"collection"),MAX_BUILDING_COLLECTION);
+        p.height=json_positive(json_get(j,"height"),MAX_BUILDING_HEIGHT);
+        p.width=json_positive(json_get(j,"width"),MAX_BUILDING_WIDTH);
+        p.hits=json_uint(json_get(j,"hits"),1,MAX_HIT_COUNT);Json b=json_get(j,"branches");
         json_object(b,"seconds|count|spacing|production|seed|normal|health|hits|regrow_seconds|roots|grammar");
-        char roots[32]={},grammar[32]={};
+        char roots[ASSET_NAME_CAPACITY]={},grammar[ASSET_NAME_CAPACITY]={};
         Json roots_json=json_find(b,"roots"),grammar_json=json_find(b,"grammar");
         if (json_present(roots_json))
         {
-            json_string(roots_json,roots,32);
+            json_string(roots_json,roots,ASSET_NAME_CAPACITY);
             p.branches.organelle_roots=!strcmp(roots,"organelles");
             if (!p.branches.organelle_roots && strcmp(roots,"single")) json_error(roots_json,"roots must be organelles or single");
         }
         if (json_present(grammar_json))
         {
-            json_string(grammar_json,grammar,32);
+            json_string(grammar_json,grammar,ASSET_NAME_CAPACITY);
             if (!strcmp(grammar,"fan")) p.branches.grammar=GROWTH_FAN;
             else if (!strcmp(grammar,"hypha")) p.branches.grammar=GROWTH_HYPHA;
             else if (strcmp(grammar,"axial")) json_error(grammar_json,"grammar must be axial, fan or hypha");
         }
         Json branch_health=json_find(b,"health"),branch_hits=json_find(b,"hits");
-        p.branches.health=json_present(branch_health) ? json_positive(branch_health,10000) : p.health;
-        p.branches.hits=json_present(branch_hits) ? json_uint(branch_hits,1,32) : p.hits;
-        p.branches.seconds=json_positive(json_get(b,"seconds"),300);
-        Json regrow=json_find(b,"regrow_seconds");p.branches.regrow_seconds=json_present(regrow) ? json_positive(regrow,300) : p.branches.seconds;
+        p.branches.health=json_present(branch_health) ? json_positive(branch_health,MAX_BRANCH_HEALTH) : p.health;
+        p.branches.hits=json_present(branch_hits) ? json_uint(branch_hits,1,MAX_HIT_COUNT) : p.hits;
+        p.branches.seconds=json_positive(json_get(b,"seconds"),MAX_BRANCH_EMERGENCE_SECONDS);
+        Json regrow=json_find(b,"regrow_seconds");p.branches.regrow_seconds=json_present(regrow) ? json_positive(regrow,MAX_BRANCH_REGROW_SECONDS) : p.branches.seconds;
         p.branches.count=json_uint(json_get(b,"count"),1,MAX_FACTORY_STRUCTURES);
-        p.branches.spacing=json_positive(json_get(b,"spacing"),10);
-        p.branches.production=json_positive(json_get(b,"production"),10);
-        p.branches.seed=json_uint(json_get(b,"seed"),0,16777215);
-        p.branches.normal=normal(json_get(b,"normal"));p.branches.fields=3;
+        p.branches.spacing=json_positive(json_get(b,"spacing"),MAX_BUILDING_SPACING);
+        p.branches.production=json_positive(json_get(b,"production"),MAX_BUILDING_PRODUCTION);
+        p.branches.seed=json_uint(json_get(b,"seed"),0,MAX_BUILDING_SEED);
+        p.branches.normal=normal(json_get(b,"normal"));p.branches.fields=BRANCH_FIELDS_COMPLETE;
         if (content_producer(c,p.name)>=0) return json_error(j,"duplicate building definition");
         c->producers[c->producer_count++]=p;
     }
@@ -262,9 +304,9 @@ bool content_load(Content* content,const char* path)
     JsonDocument manifest;if (!json_load(&manifest,path)) return false;
     Json root=json_root(&manifest);json_object(root,"$schema|bodies|factions|groups|units|buildings");
     const char* keys[]={"bodies","factions","groups","units","buildings"};
-    for (uint32_t i=0;i<5 && manifest.valid;++i)
+    for (uint32_t i=0;i<sizeof(keys)/sizeof(keys[0]) && manifest.valid;++i)
     {
-        char file[256]={};if (!json_path(json_get(root,keys[i]),path,file)) return false;
+        char file[ASSET_PATH_CAPACITY]={};if (!json_path(json_get(root,keys[i]),path,file)) return false;
         JsonDocument document;if (!json_load(&document,file)) return false;Json data=json_root(&document);
         bool valid=i==0 ? load_bodies(content,data,file) : i==1 ? load_factions(content,data) : i==2 ? load_groups(content,data)
             : i==3 ? load_units(content,data,file) : load_buildings(content,data,file);
@@ -285,7 +327,7 @@ bool content_finish(Content* c,const char* path)
     for (uint32_t i=0;valid && i<c->producer_count;++i)
     {
         ProducerDefinition* p=&c->producers[i];int faction=content_faction(c,p->faction_name);
-        if (faction<=0 || p->branches.fields!=3) { valid=false;break; }
+        if (faction<=0 || p->branches.fields!=BRANCH_FIELDS_COMPLETE) { valid=false;break; }
         if (p->branches.organelle_roots && !p->segment_path[0]) { valid=false;break; }
         p->faction=(Faction)faction;
     }

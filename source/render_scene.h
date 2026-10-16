@@ -6,12 +6,13 @@
 #include <vector>
 
 // CPU render input. No game rules or graphics API resources are stored here.
+enum { INSTANCE_STYLE_FLOATS=8 };
 struct RenderInstance
 {
     float transform[3][4];
     uint32_t mesh, mask;
     bool background;
-    float style[8];
+    float style[INSTANCE_STYLE_FLOATS];
 };
 struct RenderMedium
 {
@@ -19,7 +20,7 @@ struct RenderMedium
 };
 struct RenderLight { Vec3 direction; Color color; float irradiance; };
 struct EffectSegment { float start[4],end[4],color[4]; };
-enum { EFFECT_TILE=16, MAX_EFFECT_SEGMENTS=8192, MAX_EFFECT_REFERENCES=MAX_EFFECT_SEGMENTS*64 };
+enum { EFFECT_TILE=16, MAX_EFFECT_SEGMENTS=8192, MAX_EFFECT_TILES_PER_SEGMENT=64, MAX_EFFECT_REFERENCES=MAX_EFFECT_SEGMENTS*MAX_EFFECT_TILES_PER_SEGMENT };
 struct RenderScene
 {
     Geometry geometry;

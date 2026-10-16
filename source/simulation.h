@@ -5,7 +5,11 @@
 #include "sound_events.h"
 
 enum { MAX_UNITS = 256, NO_BODY = -1, MAX_PROJECTILES=512, MAX_POPS=256, TRAIL_POINTS=8 };
+enum { SIMULATION_MESSAGE_CAPACITY=96 };
+enum { SIMULATION_TICKS_PER_SECOND=60, UNIT_LAUNCH_SECONDS=2 };
 enum { MAX_SPIKES=32, MAX_EMBEDDED=2, GROWTH_SEGMENTS=4,MAX_LIMB_DEBRIS=256 };
+static const float SIMULATION_TICKS_PER_SECOND_FLOAT=(float)SIMULATION_TICKS_PER_SECOND;
+static const double SIMULATION_TICKS_PER_SECOND_DOUBLE=(double)SIMULATION_TICKS_PER_SECOND;
 struct EmbeddedSpike { Vec3 direction,anchor; Faction faction; };
 enum UnitTask { TASK_PATROL,TASK_MOVE,TASK_ATTACK_UNIT,TASK_ATTACK_STRUCTURE,TASK_COLONIZE,TASK_LAUNCH };
 struct Unit
@@ -113,7 +117,7 @@ struct Simulation
     uint32_t order_tick,order_count;
     int32_t outcome; // 0 playing, 1 won, -1 lost.
     bool paused;
-    char message[96];
+    char message[SIMULATION_MESSAGE_CAPACITY];
     uint32_t shots, hits, deaths;
     uint32_t avoidance_events,factory_contacts;
     uint32_t digestions,spore_bursts,digest_heals;

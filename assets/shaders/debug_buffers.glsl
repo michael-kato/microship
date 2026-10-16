@@ -1,3 +1,4 @@
+#include "render_bindings.glsl"
 // Current-frame surface guides and diagnostic AOVs. No lighting history.
 struct DebugPixel
 {
@@ -8,6 +9,6 @@ struct DebugPixel
     vec4 volume;       // Current-frame in-scattering; W: actual shadow BVH queries.
 };
 #ifndef MICROSHIP_DEBUG_BINDING
-#define MICROSHIP_DEBUG_BINDING 8
+#define MICROSHIP_DEBUG_BINDING RENDER_BINDING_DEBUG
 #endif
 layout(set = 0, binding = MICROSHIP_DEBUG_BINDING, std430) buffer DebugBuffer { DebugPixel debug_pixels[]; };

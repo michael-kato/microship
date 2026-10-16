@@ -1,6 +1,9 @@
 #include "camera.h"
 #include "render_config.h"
 #include "vector_math.h"
+#include "math_constants.h"
+
+static const float ZOOM_EXPONENT_PER_WHEEL_STEP = 0.12f;
 
 void camera_initialize(Camera* camera, const RenderConfig* config)
 {
@@ -17,11 +20,11 @@ void camera_apply_input(Camera* camera, const PointerInput* input, const RenderC
     Vec3 right = normalize(cross(forward, camera->up));
     Vec3 up = cross(right, forward);
     float units_per_pixel = 2.0f * distance
-        * std::tan(config->vertical_fov_degrees * 0.00872664626f) / config->height;
+        * std::tan(config->vertical_fov_degrees * HALF_DEGREES_TO_RADIANS) / config->height;
     Vec3 translation = add(scale(right, -input->drag_x * units_per_pixel),
                            scale(up, input->drag_y * units_per_pixel));
     camera->target = add(camera->target, translation);
-    float zoom = distance * std::exp(-input->wheel * 0.12f);
+    float zoom = distance * std::exp(-input->wheel * ZOOM_EXPONENT_PER_WHEEL_STEP);
     if (zoom < config->camera_min_distance) zoom = config->camera_min_distance;
     if (zoom > config->camera_max_distance) zoom = config->camera_max_distance;
     // Preserve the point under the cursor on the target plane while dollying.

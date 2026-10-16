@@ -1,28 +1,106 @@
 #include "simulation.h"
 #include "vector_math.h"
+#include "factory_shape.h"
 #include "geometry.h"
 #include "flight.h"
 #include <stdio.h>
 #include <string.h>
 #include <algorithm>
 
+static const float GOLDEN_ANGLE_RADIANS = 2.39996323f;
+static const float UNIT_UP_AXIS_PARALLEL_LIMIT = .95f;
+static const unsigned int BRANCH_RANDOM_MULTIPLIER = 1664525u;
+static const unsigned int BRANCH_RANDOM_INCREMENT = 1013904223u;
+static const int RANDOM_DISCARDED_BITS = 8;
+static const int RANDOM_SIGNED_HALF_RANGE = 8388608;
+static const unsigned int SEED_INDEX_MULTIPLIER = 747796405u;
+static const int RANDOM_UNSIGNED_RANGE = 16777216;
+static const int RESPONSE_PHASE_COUNT = 13;
+static const int MAX_MOVE_COORDINATE = 1000000;
+static const float POSITION_EPSILON = .0001f;
+static const float ATTENTION_RETENTION_RADIUS_SCALE = 1.35f;
+static const float FULL_TURN_RADIANS = 6.28318530718f;
+static const float INITIAL_NEAREST_DISTANCE = 1e20f;
+static const unsigned int TARGET_SEED_MULTIPLIER = 2891336453u;
+static const float INITIAL_ENEMY_DISTANCE = 1e30f;
+static const float INITIAL_FACTORY_GROWTH = .02f;
+static const float FACTORY_AXIS_PARALLEL_LIMIT = .9f;
+static const float CHILD_LIMB_LENGTH_SCALE = 1.8f;
+static const float AXIAL_SPREAD = .12f;
+static const float FAN_SPREAD = .8f;
+static const float HYPHA_SPREAD = .5f;
+static const float AXIAL_BEND = .04f;
+static const float FAN_BEND = .14f;
+static const float HYPHA_BEND = .3f;
+static const float LIMB_RADIAL_DIRECTION_WEIGHT = 1.5f;
+static const float BRANCH_JITTER_SCALE = .35f;
+static const float BRANCH_MIN_HEIGHT_SCALE = .65f;
+static const int BRANCH_HEIGHT_VARIANTS = 100;
+static const float BRANCH_HEIGHT_STEP = .003f;
+static const float BRANCH_NORMAL_JITTER_SCALE = .4f;
+static const int HYPHA_CHAIN_LIMBS = 3;
+static const int FIRE_COOLDOWN_PHASE_COUNT = 5;
+static const float FIRE_COOLDOWN_PHASE_SECONDS = .04f;
+static const float SHOT_ENDPOINT_EPSILON = .001f;
+static const float UNIT_RATE_MIN_SCALE = .8f;
+static const float UNIT_RATE_SCALE_RANGE = .4f;
+static const int UNIT_RATE_VARIANTS = 7;
+static const int UNIT_RATE_INTERVALS = 6;
+static const float COLONIZE_SURFACE_OFFSET = .25f;
+static const float LEGACY_ORBIT_SURFACE_OFFSET = 1.3f;
+static const float ORBIT_AXIS_PARALLEL_LIMIT = .9f;
+static const float LEGACY_ORBIT_SPREAD_PER_SQRT_INDEX = .06f;
+static const float ORBIT_HEIGHT_PHASE_PER_GENERATION = .7f;
+static const float STRAFE_ENTRY_RANGE_SCALE = 1.1f;
+static const float ATTACK_STOP_RANGE_SCALE = .85f;
+static const float STEERING_DIRECTION_EPSILON = .001f;
+static const float SPORE_TARGET_SCORE_VARIATION = .3f;
+static const float STRAFE_PREFERRED_RANGE_SCALE = .72f;
+static const float LANDING_APPROACH_RADIUS = 1.5f;
+static const float CELL_AVOIDANCE_LOOKAHEAD_SECONDS = .35f;
+static const float CELL_COLLISION_RADIUS_SCALE = 1.08f;
+static const float CELL_AVOIDANCE_CLEARANCE = .6f;
+static const float MIN_HEADING_SPEED = .02f;
+static const int BANK_RESPONSE_GAIN = 5;
+static const float CELL_COLLISION_CLEARANCE = .12f;
+static const float MOVE_COMPLETION_RADIUS = .15f;
+static const float ORBIT_HEIGHT_RADIUS_SCALE = .4f;
+static const int FLIGHT_POSITION_GAIN = 3;
+static const int ORBIT_RADIAL_WAVE_FREQUENCY = 2;
+static const int ORBIT_HEIGHT_WAVE_FREQUENCY = 3;
+static const int LAUNCH_GOAL_DISTANCE = 3;
+static const float DEBRIS_VELOCITY_JITTER = .6f;
+static const float DEBRIS_AXIS_JITTER = .35f;
+static const float MIN_FRACTURE_SEGMENT_FRACTION = .001f;
+static const float SPIKE_INDEX_AZIMUTH_RADIANS = 2.094395102f;
+static const float CHILD_SUPPORT_GROWTH_FRACTION = .75f;
+static const float HIT_ANCHOR_JITTER_SCALE = .18f;
+static const float EMBEDDED_SPIKE_LENGTH_SCALE = .55f;
+static const float LANDING_COMPLETION_RADIUS = .35f;
+static const float PRODUCTION_AXIS_PARALLEL_LIMIT = .9f;
+static const float NEW_UNIT_TIP_CLEARANCE_SCALE = .4f;
+static const float SPIKE_HIT_OUTWARD_WEIGHT = .75f;
+static const float SPIKE_HIT_TANGENT_WEIGHT = .65f;
+static const float HIT_EFFECT_LIFETIME_SCALE = 1.8f;
+static const float LEGACY_ORBIT_BASE_RADIUS_SCALE = .25f;
+
 static float length(Vec3 v) { return std::sqrt(dot(v,v)); }
 static void sound(Simulation* s,SoundKind kind,Vec3 position)
 {
     ++s->sounds.totals[kind];
     if (kind!=SOUND_ORDER && kind!=SOUND_WIN && kind!=SOUND_LOSE && !simulation_in_sight(s,position,0)) return;
-    if (s->sounds.count==64) { ++s->sounds.dropped;return; }
+    if (s->sounds.count==MAX_SOUND_EVENTS) { ++s->sounds.dropped;return; }
     s->sounds.pending[s->sounds.count++]=SoundEvent{position,kind};
 }
 
 Vec3 simulation_spike_direction(uint32_t index,uint32_t count)
 {
-    float y=1-2*(index+.5f)/count,angle=index*2.39996323f,r=std::sqrt(std::fmax(0.0f,1-y*y));
+    float y=1-2*(index+.5f)/count,angle=index*GOLDEN_ANGLE_RADIANS,r=std::sqrt(std::fmax(0.0f,1-y*y));
     return Vec3{r*std::cos(angle),y,r*std::sin(angle)};
 }
 void simulation_unit_axes(const Unit* u,Vec3* right,Vec3* up,Vec3* forward)
 {
-    *forward=u->forward;Vec3 axis=std::fabs(forward->y)<.95f ? Vec3{0,1,0} : Vec3{1,0,0};
+    *forward=u->forward;Vec3 axis=std::fabs(forward->y)<UNIT_UP_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0};
     Vec3 x=normalize(cross(axis,*forward)),y=cross(*forward,x);float c=std::cos(u->bank),v=std::sin(u->bank);
     *right=add(scale(x,c),scale(y,v));*up=subtract(scale(y,c),scale(x,v));
 }
@@ -74,7 +152,7 @@ void simulation_update_sight(Simulation* s)
 void simulation_producer_axes(const ProducerDefinition* definition,Vec3* right,Vec3* up,Vec3* normal)
 {
     *normal=definition->branches.normal;
-    Vec3 axis=std::fabs(normal->y)<.95f ? Vec3{0,1,0} : Vec3{0,0,1};
+    Vec3 axis=std::fabs(normal->y)<UNIT_UP_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{0,0,1};
     *right=normalize(cross(axis,*normal));*up=cross(*normal,*right);
 }
 Vec3 simulation_structure_position(const Simulation* s,uint32_t p,uint32_t structure)
@@ -88,11 +166,11 @@ Vec3 simulation_structure_position(const Simulation* s,uint32_t p,uint32_t struc
         Vec3 right,normal;simulation_producer_axes(simulation_producer_definition(s,p),&right,&up,&normal);
         if (structure) { base=add(base,c->branches[structure-1].offset);growth=c->branches[structure-1].growth; }
     }
-    return add(base,scale(up,simulation_producer_definition(s,p)->height*std::fmax(.02f,growth)));
+    return add(base,scale(up,simulation_producer_definition(s,p)->height*std::fmax(INITIAL_FACTORY_GROWTH,growth)));
 }
 
 static uint32_t branch_random(uint32_t* seed)
-{ *seed=*seed*1664525u+1013904223u;return *seed; }
+{ *seed=*seed*BRANCH_RANDOM_MULTIPLIER+BRANCH_RANDOM_INCREMENT;return *seed; }
 Vec3 simulation_growth_point(const Simulation* s,uint32_t p,uint32_t k,float growth)
 {
     float t=std::fmax(0.0f,std::fmin(1.0f,growth))*GROWTH_SEGMENTS;
@@ -100,7 +178,7 @@ Vec3 simulation_growth_point(const Simulation* s,uint32_t p,uint32_t k,float gro
     const Vec3* points=s->colonies[p].stems[k];
     return add(points[j],scale(subtract(points[j+1],points[j]),t-j));
 }
-static float signed_random(uint32_t* seed) { return (branch_random(seed)>>8)*(1.0f/8388608)-1; }
+static float signed_random(uint32_t* seed) { return (branch_random(seed)>>RANDOM_DISCARDED_BITS)*(1.0f/RANDOM_SIGNED_HALF_RANGE)-1; }
 float simulation_structure_growth(const Simulation* s,uint32_t p,uint32_t k)
 {
     const Colony& c=s->colonies[p];const ProducerDefinition& d=*simulation_producer_definition(s,p);
@@ -126,7 +204,7 @@ static void prepare_factory(Simulation* s,uint32_t p)
 {
     Colony* c=&s->colonies[p];const BranchRules* f=&simulation_producer_definition(s,p)->branches;
     Vec3 right,up,normal;simulation_producer_axes(simulation_producer_definition(s,p),&right,&up,&normal);
-    uint32_t seed=f->seed+p*747796405u;
+    uint32_t seed=f->seed+p*SEED_INDEX_MULTIPLIER;
     const Body& body=s->world.bodies[p];
     c->root_count=f->organelle_roots ? body.factory_root_count : 1;
     for (uint32_t k=0;k<f->count;++k)
@@ -134,7 +212,7 @@ static void prepare_factory(Simulation* s,uint32_t p)
         if (k<c->root_count) c->parents[k]=-1;
         else if (!f->organelle_roots) c->parents[k]=(k-1)/2;
         else if (f->grammar==GROWTH_FAN) c->parents[k]=((k-c->root_count)/2)%c->root_count;
-        else if (f->grammar==GROWTH_HYPHA && (k-c->root_count)%3) c->parents[k]=k-1;
+        else if (f->grammar==GROWTH_HYPHA && (k-c->root_count)%HYPHA_CHAIN_LIMBS) c->parents[k]=k-1;
         else c->parents[k]=(k-c->root_count)%c->root_count;
     }
     if (simulation_producer_definition(s,p)->segment_path[0])
@@ -146,14 +224,14 @@ static void prepare_factory(Simulation* s,uint32_t p)
             Vec3 start=parent>=0 ? c->stems[parent][GROWTH_SEGMENTS-1] : body.factory_roots[k];
             c->stems[k][0]=start;
             Vec3 radial=normalize(subtract(start,body.position));
-            Vec3 side=normalize(cross(std::fabs(radial.y)<.9f ? Vec3{0,1,0} : Vec3{1,0,0},radial));
+            Vec3 side=normalize(cross(std::fabs(radial.y)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0},radial));
             Vec3 other=cross(radial,side);float sign=k%2 ? -1.0f : 1.0f;
-            float extent=parent>=0 ? f->spacing*1.8f : simulation_producer_definition(s,p)->height;
-            float spread=f->grammar==GROWTH_AXIAL ? .12f : f->grammar==GROWTH_FAN ? .8f : .5f;
-            float bend=f->grammar==GROWTH_AXIAL ? .04f : f->grammar==GROWTH_FAN ? .14f : .3f;
+            float extent=parent>=0 ? f->spacing*CHILD_LIMB_LENGTH_SCALE : simulation_producer_definition(s,p)->height;
+            float spread=f->grammar==GROWTH_AXIAL ? AXIAL_SPREAD : f->grammar==GROWTH_FAN ? FAN_SPREAD : HYPHA_SPREAD;
+            float bend=f->grammar==GROWTH_AXIAL ? AXIAL_BEND : f->grammar==GROWTH_FAN ? FAN_BEND : HYPHA_BEND;
             for (uint32_t j=1;j<=GROWTH_SEGMENTS;++j)
             {
-                Vec3 direction=normalize(add(scale(radial,1.5f),add(scale(side,(parent>=0 ? sign*spread : 0)+signed_random(&seed)*bend),scale(other,signed_random(&seed)*bend))));
+                Vec3 direction=normalize(add(scale(radial,LIMB_RADIAL_DIRECTION_WEIGHT),add(scale(side,(parent>=0 ? sign*spread : 0)+signed_random(&seed)*bend),scale(other,signed_random(&seed)*bend))));
                 c->stems[k][j]=add(c->stems[k][j-1],scale(direction,extent/GROWTH_SEGMENTS));
                 radial=normalize(subtract(c->stems[k][j],body.position));
             }
@@ -166,9 +244,9 @@ static void prepare_factory(Simulation* s,uint32_t p)
         uint32_t parent=(j-1)/2,depth=0;for (uint32_t v=j+1;v>1;v>>=1) ++depth;
         float side=j%2 ? -1.0f : 1.0f;
         float width=f->spacing/std::sqrt((float)depth);
-        float jitter=((branch_random(&seed)>>8)*(1.0f/16777216)-.5f)*width*.35f;
-        Vec3 offset=add(scale(right,side*width+jitter),scale(up,width*(.65f+(branch_random(&seed)%100)*.003f)));
-        offset=add(offset,scale(normal,jitter*.4f));
+        float jitter=((branch_random(&seed)>>RANDOM_DISCARDED_BITS)*(1.0f/RANDOM_UNSIGNED_RANGE)-HYPHA_SPREAD)*width*BRANCH_JITTER_SCALE;
+        Vec3 offset=add(scale(right,side*width+jitter),scale(up,width*(BRANCH_MIN_HEIGHT_SCALE+(branch_random(&seed)%BRANCH_HEIGHT_VARIANTS)*BRANCH_HEIGHT_STEP)));
+        offset=add(offset,scale(normal,jitter*BRANCH_NORMAL_JITTER_SCALE));
         c->branches[j-1].offset=add(parent ? c->branches[parent-1].offset : Vec3{},offset);
     }
 }
@@ -178,12 +256,12 @@ static void establish_colony(Simulation* s,uint32_t p,Faction faction)
     Colony* c=&s->colonies[p];Vec3 surface=c->surface;uint32_t generation=c->generation+1;
     *c=Colony();c->surface=surface;c->generation=generation;c->faction=faction;
     c->type=s->world.content.factions[faction].producer;
-    c->health=simulation_producer_definition(s,p)->health;c->growth=.02f;c->priority=s->world.content.factions[faction].default_unit;
+    c->health=simulation_producer_definition(s,p)->health;c->growth=INITIAL_FACTORY_GROWTH;c->priority=s->world.content.factions[faction].default_unit;
     c->active=true;c->root_generation=1;
     s->world.bodies[p].owner=faction;
     if (s->world.gameplay.enabled) prepare_factory(s,p);
     if (simulation_producer_definition(s,p)->establishment_seconds>0) c->growth=0;
-    else for (uint32_t k=1;k<c->root_count;++k) { c->branches[k-1].health=simulation_producer_definition(s,p)->health;c->branches[k-1].growth=.02f;c->branches[k-1].generation=1; }
+    else for (uint32_t k=1;k<c->root_count;++k) { c->branches[k-1].health=simulation_producer_definition(s,p)->health;c->branches[k-1].growth=INITIAL_FACTORY_GROWTH;c->branches[k-1].generation=1; }
     sound(s,SOUND_COLONIZE,c->surface);
 }
 
@@ -195,13 +273,13 @@ static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,const 
             const UnitDefinition* definition=&s->world.content.units[type];
             Unit unit={};
             unit.latch=-1;
-            unit.attention=-1;unit.response_timer=definition->response_seconds*((s->next_generation+1)%13)/13;
+            unit.attention=-1;unit.response_timer=definition->response_seconds*((s->next_generation+1)%RESPONSE_PHASE_COUNT)/RESPONSE_PHASE_COUNT;
             unit.position=position;unit.forward=Vec3{0,0,1};unit.type=type;unit.faction=definition->faction;
             if (heading) { unit.forward=*heading;unit.hatched=true; }
             unit.health=definition->health;
             unit.target=target;unit.generation=++s->next_generation;
             for (uint32_t j=0;j<s->world.spikes.count;++j) unit.spikes[j]=1;
-            unit.orbit_phase=unit.generation*2.39996323f;unit.cooldown=(unit.generation%5)*.04f;
+            unit.orbit_phase=unit.generation*GOLDEN_ANGLE_RADIANS;unit.cooldown=(unit.generation%FIRE_COOLDOWN_PHASE_COUNT)*FIRE_COOLDOWN_PHASE_SECONDS;
             s->trails[i]=Trail();s->trails[i].points[0]=position;s->trails[i].count=1;
             s->units[i]=unit;++s->births;
             sound(s,SOUND_BIRTH,position);
@@ -296,7 +374,7 @@ void simulation_move_to(Simulation* s,Vec3 destination)
 {
     if (s->world.content.factions[s->world.player_faction].automatic) return;
     if (s->outcome || !std::isfinite(destination.x) || !std::isfinite(destination.y) || !std::isfinite(destination.z)
-        || std::fabs(destination.x)>1000000 || std::fabs(destination.y)>1000000 || std::fabs(destination.z)>1000000) return;
+        || std::fabs(destination.x)>MAX_MOVE_COORDINATE || std::fabs(destination.y)>MAX_MOVE_COORDINATE || std::fabs(destination.z)>MAX_MOVE_COORDINATE) return;
     uint32_t count=0;
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (s->units[i].health>0 && s->units[i].selected)
@@ -332,8 +410,6 @@ static Vec3 colony_tip(const Simulation* s, uint32_t p)
     return c.surface;
 }
 
-
-
 static bool defended(const Simulation* s, uint32_t p, Faction faction)
 {
     const Body* cell=&s->world.bodies[p];
@@ -347,14 +423,14 @@ static bool defended(const Simulation* s, uint32_t p, Faction faction)
 static bool clear_shot(const Simulation* s, Vec3 from, Vec3 to,int32_t structure_cell=NO_BODY)
 {
     Vec3 delta=subtract(to,from);float distance=length(delta);
-    if (distance<.0001f) return true;
+    if (distance<POSITION_EPSILON) return true;
     Vec3 direction=scale(delta,1.0f/distance);
     for (uint32_t p=0;p<s->world.body_count;++p)
     {
         if ((int32_t)p==structure_cell) continue;
         Vec3 offset=subtract(from,s->world.bodies[p].position);float along=dot(offset,direction);
         float radius=s->world.bodies[p].radius,disc=along*along-dot(offset,offset)+radius*radius;
-        if (disc>0 && -along+std::sqrt(disc)>.001f && -along-std::sqrt(disc)<distance-.001f) return false;
+        if (disc>0 && -along+std::sqrt(disc)>SHOT_ENDPOINT_EPSILON && -along-std::sqrt(disc)<distance-SHOT_ENDPOINT_EPSILON) return false;
     }
     return true;
 }
@@ -386,7 +462,7 @@ static bool attention_valid(const Simulation* s,const Unit& u,const Vec3* positi
         point=simulation_structure_position(s,u.attention,u.attention_structure);radius=d.structure_radius;
     }
     else return false;
-    return within_leash(s,u,point) && length(subtract(point,u.position))<=radius*1.35f;
+    return within_leash(s,u,point) && length(subtract(point,u.position))<=radius*ATTENTION_RETENTION_RADIUS_SCALE;
 }
 static void local_task(Simulation* s,Unit* u,const Vec3* positions,float dt)
 {
@@ -395,7 +471,7 @@ static void local_task(Simulation* s,Unit* u,const Vec3* positions,float dt)
     if (!valid) { u->attention=-1;u->task=TASK_PATROL; }
     u->response_timer-=dt;
     if (u->response_timer>0) return;
-    u->response_timer=d.response_seconds*(.8f+.4f*(u->generation%7)/6);
+    u->response_timer=d.response_seconds*(UNIT_RATE_MIN_SCALE+UNIT_RATE_SCALE_RANGE*(u->generation%UNIT_RATE_VARIANTS)/UNIT_RATE_INTERVALS);
     if (valid) return;
     for (uint32_t pass=0;pass<2;++pass)
     {
@@ -468,33 +544,33 @@ static void move_units(Simulation* s, float dt)
         if (!u->moving && s->colonies[p].active && s->colonies[p].faction==u->faction) u->commanded=false;
         bool colonizing=simulation_unit_definition(s,u)->colonizes && u->target>=0 && s->world.content.bodies[s->world.bodies[p].type].hosts_site
             && !s->colonies[p].active && !defended(s,p,u->faction);
-        Vec3 goal=u->moving ? u->destination : add(s->colonies[p].surface,scale(s->world.bodies[p].colony_normal,colonizing ? .25f : 1.3f));
+        Vec3 goal=u->moving ? u->destination : add(s->colonies[p].surface,scale(s->world.bodies[p].colony_normal,colonizing ? COLONIZE_SURFACE_OFFSET : LEGACY_ORBIT_SURFACE_OFFSET));
         if (!u->moving && !colonizing)
         {
             Vec3 normal=s->world.bodies[p].colony_normal;
-            Vec3 axis=std::fabs(normal.z)<.9f ? Vec3{0,0,1} : Vec3{1,0,0};
+            Vec3 axis=std::fabs(normal.z)<ORBIT_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0};
             Vec3 tangent=normalize(cross(normal,axis)),bitangent=cross(tangent,normal);
-            float angle=u->generation*2.39996323f;
+            float angle=u->generation*GOLDEN_ANGLE_RADIANS;
             if (s->world.combat.enabled)
             {
-                float rate=(.8f+.4f*(u->generation%7)/6)*(u->generation%3 ? 1 : -1);
-                u->orbit_phase=std::fmod(u->orbit_phase+s->world.combat.orbit_speed*rate*dt,6.28318530718f);angle=u->orbit_phase;
+                float rate=(UNIT_RATE_MIN_SCALE+UNIT_RATE_SCALE_RANGE*(u->generation%UNIT_RATE_VARIANTS)/UNIT_RATE_INTERVALS)*(u->generation%3 ? 1 : -1);
+                u->orbit_phase=std::fmod(u->orbit_phase+s->world.combat.orbit_speed*rate*dt,FULL_TURN_RADIANS);angle=u->orbit_phase;
             }
-            float spread=s->world.bodies[p].radius*(.25f+.06f*std::sqrt((float)i+1));
+            float spread=s->world.bodies[p].radius*(LEGACY_ORBIT_BASE_RADIUS_SCALE+LEGACY_ORBIT_SPREAD_PER_SQRT_INDEX*std::sqrt((float)i+1));
             if (s->world.combat.enabled)
             {
-                spread=s->world.bodies[p].radius+flight->orbit_clearance+flight->weave_radius*std::sin(2*angle+u->generation);
-                float height=.4f*s->world.bodies[p].radius+flight->weave_height*std::sin(3*angle+u->generation*.7f);
+                spread=s->world.bodies[p].radius+flight->orbit_clearance+flight->weave_radius*std::sin(ORBIT_RADIAL_WAVE_FREQUENCY*angle+u->generation);
+                float height=ORBIT_HEIGHT_RADIUS_SCALE*s->world.bodies[p].radius+flight->weave_height*std::sin(ORBIT_HEIGHT_WAVE_FREQUENCY*angle+u->generation*ORBIT_HEIGHT_PHASE_PER_GENERATION);
                 goal=add(s->world.bodies[p].position,scale(normal,height));
             }
             goal=add(goal,add(scale(tangent,std::cos(angle)*spread),scale(bitangent,std::sin(angle)*spread)));
             local_task(s,u,positions,dt);
             if (u->task==TASK_ATTACK_UNIT) goal=positions[u->attention];
             else if (u->task==TASK_ATTACK_STRUCTURE) goal=simulation_structure_position(s,u->attention,u->attention_structure);
-            else if (u->task==TASK_COLONIZE) goal=add(s->colonies[u->target].surface,scale(s->world.bodies[u->target].colony_normal,.25f));
+            else if (u->task==TASK_COLONIZE) goal=add(s->colonies[u->target].surface,scale(s->world.bodies[u->target].colony_normal,COLONIZE_SURFACE_OFFSET));
             else if (u->commanded && s->colonies[p].active && s->colonies[p].faction!=u->faction)
             {
-                float nearest=1e20f;
+                float nearest=INITIAL_NEAREST_DISTANCE;
                 for (uint32_t k=0;k<simulation_producer_definition(s,p)->branches.count;++k)
                 {
                     if (structure_health(&s->colonies[p],k)<=0) continue;
@@ -509,17 +585,17 @@ static void move_units(Simulation* s, float dt)
             if (u->task==TASK_ATTACK_UNIT || u->task==TASK_ATTACK_STRUCTURE)
             {
                 float nearest=length(subtract(goal,u->position));
-                if (definition->attack==ATTACK_PROJECTILE && flight->flight_enabled && nearest<definition->range*1.1f)
+                if (definition->attack==ATTACK_PROJECTILE && flight->flight_enabled && nearest<definition->range*STRAFE_ENTRY_RANGE_SCALE)
                 { combat_target=goal;strafe=true; }
-                else if (nearest<definition->range*.85f) goal=u->position;
+                else if (nearest<definition->range*ATTACK_STOP_RANGE_SCALE) goal=u->position;
             }
         }
         if (u->moving) u->task=TASK_MOVE;
         else if (colonizing) u->task=TASK_COLONIZE;
-        if (u->hatched && u->age<2 && !u->moving && !u->commanded && definition->attack!=ATTACK_SPORE)
+        if (u->hatched && u->age<UNIT_LAUNCH_SECONDS && !u->moving && !u->commanded && definition->attack!=ATTACK_SPORE)
         {
             Vec3 radial=subtract(u->position,s->world.bodies[p].position);
-            if (dot(radial,radial)>.001f) goal=add(u->position,scale(normalize(radial),3));
+            if (dot(radial,radial)>STEERING_DIRECTION_EPSILON) goal=add(u->position,scale(normalize(radial),LAUNCH_GOAL_DISTANCE));
             u->task=TASK_LAUNCH;u->attention=-1;
         }
         if (definition->attack==ATTACK_SPORE)
@@ -527,8 +603,8 @@ static void move_units(Simulation* s, float dt)
             float nearest=definition->seek_radius;bool found=false;
             for (uint32_t j=0;j<MAX_UNITS;++j) if (s->units[j].health>0 && s->units[j].faction!=u->faction)
             {
-                float d=length(subtract(positions[j],u->position));uint32_t seed=u->generation*747796405u+s->units[j].generation*2891336453u;
-                float score=d*(1+.3f*signed_random(&seed));
+                float d=length(subtract(positions[j],u->position));uint32_t seed=u->generation*SEED_INDEX_MULTIPLIER+s->units[j].generation*TARGET_SEED_MULTIPLIER;
+                float score=d*(1+SPORE_TARGET_SCORE_VARIATION*signed_random(&seed));
                 if (d<definition->seek_radius && score<nearest) { nearest=score;goal=positions[j];found=true; }
             }
             if (!found) for (uint32_t j=0;j<s->world.body_count;++j) if (s->colonies[j].active && s->colonies[j].faction!=u->faction)
@@ -540,15 +616,15 @@ static void move_units(Simulation* s, float dt)
         float speed=definition->speed*((u->task==TASK_PATROL || u->task==TASK_LAUNCH) ? definition->cruise_fraction : 1);
         if (flight->flight_enabled)
         {
-            Vec3 desired=distance>.0001f ? scale(delta,std::fmin(speed,distance*3)/distance) : Vec3{};
+            Vec3 desired=distance>POSITION_EPSILON ? scale(delta,std::fmin(speed,distance*FLIGHT_POSITION_GAIN)/distance) : Vec3{};
             if (strafe)
             {
                 Vec3 away=subtract(u->position,combat_target);float d=length(away);
-                if (d>.001f)
+                if (d>STEERING_DIRECTION_EPSILON)
                 {
                     away=scale(away,1/d);Vec3 side=cross(s->world.bodies[p].colony_normal,away);
-                    if (dot(side,side)>.001f) side=normalize(side);
-                    desired=add(scale(side,speed*.7f),scale(away,(simulation_unit_definition(s,u)->range*.72f-d)*3));
+                    if (dot(side,side)>STEERING_DIRECTION_EPSILON) side=normalize(side);
+                    desired=add(scale(side,speed*ORBIT_HEIGHT_PHASE_PER_GENERATION),scale(away,(simulation_unit_definition(s,u)->range*STRAFE_PREFERRED_RANGE_SCALE-d)*FLIGHT_POSITION_GAIN));
                 }
             }
             // Read a stable pass input: separation must not depend on unit update order.
@@ -557,57 +633,55 @@ static void move_units(Simulation* s, float dt)
                 {
                     Vec3 apart=subtract(positions[i],positions[j]);float d=length(apart);
                     float spacing=flight->separation*std::fmax(simulation_unit_definition(s,u)->separation,simulation_unit_definition(s,&s->units[j])->separation);
-                    if (d<spacing && d>.0001f) desired=add(desired,scale(apart,speed*(1-d/spacing)/d));
+                    if (d<spacing && d>POSITION_EPSILON) desired=add(desired,scale(apart,speed*(1-d/spacing)/d));
                 }
             // Steer around a cell before the hard collision shell becomes necessary.
             for (uint32_t j=0;j<s->world.body_count;++j)
             {
-                if (colonizing && j==p && distance<1.5f) continue;
+                if (colonizing && j==p && distance<LANDING_APPROACH_RADIUS) continue;
                 if (definition->attack==ATTACK_DIGEST && u->task==TASK_ATTACK_STRUCTURE && u->attention==(int32_t)j) continue;
-                Vec3 probe=add(u->position,scale(velocities[i],.35f));
+                Vec3 probe=add(u->position,scale(velocities[i],CELL_AVOIDANCE_LOOKAHEAD_SECONDS));
                 Vec3 away=subtract(probe,s->world.bodies[j].position);float d=length(away);
-                float safe=s->world.bodies[j].radius*1.08f+.6f;
-                if (d<safe && d>.001f) desired=add(desired,scale(away,speed*3*(1-d/safe)/d));
+                float safe=s->world.bodies[j].radius*CELL_COLLISION_RADIUS_SCALE+CELL_AVOIDANCE_CLEARANCE;
+                if (d<safe && d>STEERING_DIRECTION_EPSILON) desired=add(desired,scale(away,speed*FLIGHT_POSITION_GAIN*(1-d/safe)/d));
             }
             desired=flight_avoid(s,obstacles,*u,desired,speed);
             float desired_speed=length(desired);if (desired_speed>speed) desired=scale(desired,speed/desired_speed);
             Vec3 change=subtract(desired,velocities[i]);float change_length=length(change);
             if (change_length>flight->acceleration*dt) change=scale(change,flight->acceleration*dt/change_length);
             u->velocity=add(velocities[i],change);u->position=add(u->position,scale(u->velocity,dt));
-            if (length(u->velocity)>.02f)
+            if (length(u->velocity)>MIN_HEADING_SPEED)
             {
                 Vec3 heading=normalize(u->velocity),side=cross(Vec3{0,1,0},u->forward);
                 float blend=1-std::exp(-flight->turn_rate*dt);
-                float bank=-dot(subtract(heading,u->forward),side)*5;
+                float bank=-dot(subtract(heading,u->forward),side)*BANK_RESPONSE_GAIN;
                 u->bank+=(std::fmax(-flight->bank,std::fmin(flight->bank,bank))-u->bank)*blend;
                 Vec3 forward=add(scale(u->forward,1-blend),scale(heading,blend));
-                if (length(forward)>.001f) u->forward=normalize(forward);
+                if (length(forward)>STEERING_DIRECTION_EPSILON) u->forward=normalize(forward);
             }
         }
-        else if (distance>.0001f) u->position=add(u->position,scale(delta,std::fmin(1.0f,speed*dt/distance)));
+        else if (distance>POSITION_EPSILON) u->position=add(u->position,scale(delta,std::fmin(1.0f,speed*dt/distance)));
         // Conservative spherical collision keeps transit outside cell terrain.
         for (uint32_t p2=0;p2<s->world.body_count;++p2)
         {
             Vec3 offset=subtract(u->position,s->world.bodies[p2].position);float radial=length(offset);
-            float clearance=s->world.bodies[p2].radius*1.08f+.12f;
-            if (colonizing && p2==p && distance<1.5f) continue;
+            float clearance=s->world.bodies[p2].radius*CELL_COLLISION_RADIUS_SCALE+CELL_COLLISION_CLEARANCE;
+            if (colonizing && p2==p && distance<LANDING_APPROACH_RADIUS) continue;
             if (definition->attack==ATTACK_DIGEST && u->task==TASK_ATTACK_STRUCTURE && u->attention==(int32_t)p2) continue;
-            if (radial<clearance && radial>.0001f)
+            if (radial<clearance && radial>POSITION_EPSILON)
                 u->position=add(s->world.bodies[p2].position,scale(offset,clearance/radial));
         }
         if (flight->flight_enabled) flight_clip(s,obstacles,u,positions[i]);
-        if (u->moving && length(subtract(u->destination,u->position))<.15f)
+        if (u->moving && length(subtract(u->destination,u->position))<MOVE_COMPLETION_RADIUS)
         {
             u->moving=false;u->commanded=false;u->attention=-1;u->response_timer=0;
-            float nearest=1e20f;int32_t home=home_body(s,u->faction);
+            float nearest=INITIAL_NEAREST_DISTANCE;int32_t home=home_body(s,u->faction);
             for (uint32_t b=0;b<s->world.body_count;++b) if (u->faction!=s->world.player_faction || simulation_body_known(s,b))
             { float distance=length(subtract(u->position,s->world.bodies[b].position));if (distance<nearest) { nearest=distance;home=b; } }
             u->target=home;
         }
     }
 }
-
-
 
 static void pop_body(Simulation* s,Vec3 position,Faction faction,bool unit_death,float blast_radius=0)
 {
@@ -690,14 +764,14 @@ static void fracture_limb(Simulation* s,uint32_t p,uint32_t k,float old_growth,f
     ++s->limbs_broken;sound(s,SOUND_BREAK,simulation_structure_position(s,p,k));
     const CombatVisuals& fx=s->world.combat;if (fx.break_seconds<=0) return;
     float growth=old_growth;
-    uint32_t seed=s->world.bodies[p].seed^s->tick_count^(k*747796405u);
+    uint32_t seed=s->world.bodies[p].seed^s->tick_count^(k*SEED_INDEX_MULTIPLIER);
     for (uint32_t j=0;j<=GROWTH_SEGMENTS;++j)
     {
         bool tip=j==GROWTH_SEGMENTS;
         float amount=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_SEGMENTS-j));
         if (tip)
         { if (growth<(k ? c.branches[k-1].growth : c.growth)) continue; }
-        else if (j<retained*GROWTH_SEGMENTS || amount<=.001f) continue;
+        else if (j<retained*GROWTH_SEGMENTS || amount<=MIN_FRACTURE_SEGMENT_FRACTION) continue;
         uint32_t slot=0;while (slot<MAX_LIMB_DEBRIS && s->debris[slot].seconds>0) ++slot;
         if (slot==MAX_LIMB_DEBRIS)
         {
@@ -713,11 +787,11 @@ static void fracture_limb(Simulation* s,uint32_t p,uint32_t k,float old_growth,f
         else { d.start=c.stems[k][j];d.end=add(d.start,scale(subtract(c.stems[k][j+1],d.start),amount)); }
         Vec3 radial=normalize(subtract(d.start,s->world.bodies[p].position));
         Vec3 jitter={signed_random(&seed),signed_random(&seed),signed_random(&seed)};
-        d.velocity=scale(add(radial,scale(jitter,.6f)),fx.break_speed);
+        d.velocity=scale(add(radial,scale(jitter,DEBRIS_VELOCITY_JITTER)),fx.break_speed);
         // This axis always has a nonzero radial component.
-        d.axis=normalize(add(radial,scale(jitter,.35f)));d.spin=signed_random(&seed)*fx.break_spin;
-        d.radius=tip ? definition.width*(c.parents[k]>=0 ? .7f : 1)*(.4f+.6f*growth)
-            : definition.width*(1-.12f*j)*(c.parents[k]>=0 ? .65f : 1)*(.55f+.45f*growth);
+        d.axis=normalize(add(radial,scale(jitter,DEBRIS_AXIS_JITTER)));d.spin=signed_random(&seed)*fx.break_spin;
+        d.radius=tip ? definition.width*(c.parents[k]>=0 ? FACTORY_CHILD_HEAD_WIDTH_SCALE : 1)*(FACTORY_HEAD_START_WIDTH_SCALE+DEBRIS_VELOCITY_JITTER*growth)
+            : definition.width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j)*(c.parents[k]>=0 ? FACTORY_CHILD_STEM_WIDTH_SCALE : 1)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
         d.seconds=fx.break_seconds;d.producer=c.type;d.faction=c.faction;s->debris[slot]=d;
     }
 }
@@ -801,7 +875,7 @@ static void projectile_combat(Simulation* s,float dt)
         if (s->world.spikes.enabled && simulation_unit_definition(s,u)->detaches)
         {
             int spike=-1;float best=-2;Vec3 x,y,z;simulation_unit_axes(u,&x,&y,&z);
-            Vec3 aim=subtract(destination,start);float aim_length=length(aim);aim=aim_length>.0001f ? scale(aim,1/aim_length) : u->forward;
+            Vec3 aim=subtract(destination,start);float aim_length=length(aim);aim=aim_length>POSITION_EPSILON ? scale(aim,1/aim_length) : u->forward;
             for (uint32_t j=0;j<s->world.spikes.count;++j) if (u->spikes[j]>=1)
             {
                 Vec3 local=simulation_spike_direction(j,s->world.spikes.count);
@@ -822,14 +896,14 @@ static void projectile_combat(Simulation* s,float dt)
             uint32_t wounds=colony ? structure_wounds(&s->colonies[target],structure) : s->units[target].wounds;
             uint32_t socket=(wounds+incoming[index]++)%3;
             Vec3 outward=subtract(start,destination);float distance=length(outward);
-            outward=distance>.0001f ? scale(outward,1/distance) : Vec3{0,0,1};
-            Vec3 axis=std::fabs(outward.y)<.95f ? Vec3{0,1,0} : Vec3{1,0,0};
-            Vec3 x=normalize(cross(axis,outward)),y=cross(outward,x);float angle=socket*2.094395102f;
-            Vec3 normal=normalize(add(scale(outward,.75f),add(scale(x,.65f*std::cos(angle)),scale(y,.65f*std::sin(angle)))));
-            p.anchor=colony ? scale(normal,simulation_producer_definition(s,(uint32_t)target)->width*.18f) : local_direction(&s->units[target],scale(normal,.55f));
+            outward=distance>POSITION_EPSILON ? scale(outward,1/distance) : Vec3{0,0,1};
+            Vec3 axis=std::fabs(outward.y)<UNIT_UP_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0};
+            Vec3 x=normalize(cross(axis,outward)),y=cross(outward,x);float angle=socket*SPIKE_INDEX_AZIMUTH_RADIANS;
+            Vec3 normal=normalize(add(scale(outward,SPIKE_HIT_OUTWARD_WEIGHT),add(scale(x,SPIKE_HIT_TANGENT_WEIGHT*std::cos(angle)),scale(y,SPIKE_HIT_TANGENT_WEIGHT*std::sin(angle)))));
+            p.anchor=colony ? scale(normal,simulation_producer_definition(s,(uint32_t)target)->width*HIT_ANCHOR_JITTER_SCALE) : local_direction(&s->units[target],scale(normal,EMBEDDED_SPIKE_LENGTH_SCALE));
             destination=add(destination,colony ? p.anchor : scale(world_direction(&s->units[target],p.anchor),simulation_unit_definition(s,&s->units[target])->scale));
         }
-        Vec3 aim=subtract(destination,start);float aim_length=length(aim);p.direction=aim_length>.0001f ? scale(aim,1/aim_length) : u->forward;p.launch_scale=launch_scale;
+        Vec3 aim=subtract(destination,start);float aim_length=length(aim);p.direction=aim_length>POSITION_EPSILON ? scale(aim,1/aim_length) : u->forward;p.launch_scale=launch_scale;
         p.generation=colony ? s->colonies[target].generation : s->units[target].generation;
         p.structure_generation=colony ? structure_generation(&s->colonies[target],structure) : 0;
         p.active=true;s->projectiles[slot]=p;
@@ -850,7 +924,7 @@ static void projectile_combat(Simulation* s,float dt)
         Vec3 next=d<=step ? target : add(p->position,scale(delta,step/d));
         if (!clear_shot(s,p->position,next,p->colony ? p->target : NO_BODY)) { p->active=false;continue; }
         p->previous=p->position;p->position=next;
-        if (d>.0001f) p->direction=scale(delta,1/d);
+        if (d>POSITION_EPSILON) p->direction=scale(delta,1/d);
         if (d<=step)
         {
             if (s->world.spikes.enabled)
@@ -865,7 +939,7 @@ static void projectile_combat(Simulation* s,float dt)
                 }
             }
             uint32_t slot=s->hits%MAX_POPS;
-            Impact impact={};impact.position=target;impact.duration=v->flash_seconds*1.8f;impact.faction=p->faction;
+            Impact impact={};impact.position=target;impact.duration=v->flash_seconds*HIT_EFFECT_LIFETIME_SCALE;impact.faction=p->faction;
             s->impacts[slot]=impact;
             p->active=false;++s->hits;sound(s,SOUND_HIT,target);
         }
@@ -926,7 +1000,7 @@ static void projectile_combat(Simulation* s,float dt)
                 c->branch_timer=0;
             }
             // Children attach at the start of the last segment. Loss of that support detaches them.
-            if (retained<=.75f)
+            if (retained<=CHILD_SUPPORT_GROWTH_FRACTION)
                 for (uint32_t j=k+1;j<definition.branches.count;++j)
                 {
                     int32_t ancestor=c->parents[j];
@@ -961,8 +1035,8 @@ static void colonize_cells(Simulation* s, float dt)
         }
         if (u->landing<0) u->landing=0;
         if (c->active) continue;
-        Vec3 goal=add(c->surface,scale(s->world.bodies[p].colony_normal,.25f));
-        if (length(subtract(u->position,goal))>.35f) continue;
+        Vec3 goal=add(c->surface,scale(s->world.bodies[p].colony_normal,COLONIZE_SURFACE_OFFSET));
+        if (length(subtract(u->position,goal))>LANDING_COMPLETION_RADIUS) continue;
         u->landing+=dt;
         if (u->landing<s->world.gameplay.landing_seconds) continue;
         establish_colony(s,p,u->faction);u->health=0;u->selected=false;s->trails[i]=Trail();++s->landings;
@@ -1000,7 +1074,7 @@ static void grow_colonies(Simulation* s, float dt)
             bool due=first ? c->establishment_age>k*slot : c->branch_timer>=f.seconds;
             if (*health<=0 && *timer<=0 && ready && due)
             {
-                c->branch_timer=0;*health=parent<0 ? d.health : f.health;*growth=first ? 0 : .02f;*wounds=0;++*generation;
+                c->branch_timer=0;*health=parent<0 ? d.health : f.health;*growth=first ? 0 : INITIAL_FACTORY_GROWTH;*wounds=0;++*generation;
                 memset(embedded,0,sizeof(EmbeddedSpike)*MAX_EMBEDDED);sound(s,SOUND_GROW,simulation_structure_position(s,p,k));
             }
             if (*health<=0) continue;
@@ -1041,16 +1115,16 @@ static void grow_colonies(Simulation* s, float dt)
         if (c->manufacturing<1) continue;
         uint32_t type=c->building_kind;const UnitDefinition* definition=&s->world.content.units[type];
         Vec3 normal=s->world.bodies[p].colony_normal;
-        Vec3 axis=std::fabs(normal.z)<.9f ? Vec3{0,0,1} : Vec3{1,0,0};
+        Vec3 axis=std::fabs(normal.z)<PRODUCTION_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0};
         Vec3 tangent=normalize(cross(normal,axis));
-        float angle=(s->next_generation+1)*2.39996323f,spread=definition->scale*2;
+        float angle=(s->next_generation+1)*GOLDEN_ANGLE_RADIANS,spread=definition->scale*2;
         Vec3 position=add(add(colony_tip(s,p),scale(normal,1.0f)),
             add(scale(tangent,std::cos(angle)*spread),scale(cross(tangent,normal),std::sin(angle)*spread)));
         if (d.segment_path[0])
         {
             Vec3 tip=simulation_structure_position(s,p,c->production_tip);
             normal=normalize(subtract(tip,s->world.bodies[p].position));
-            position=add(tip,scale(normal,definition->scale*.4f));
+            position=add(tip,scale(normal,definition->scale*NEW_UNIT_TIP_CLEARANCE_SCALE));
         }
         if (spawn(s,type,position,(int)p,&normal))
         { c->building=false;c->manufacturing=0;c->capacity_blocked=false; }
@@ -1061,7 +1135,7 @@ static void grow_colonies(Simulation* s, float dt)
 static void enemy_orders(Simulation* s)
 {
     Faction enemy=s->world.opponent_faction;
-    int home=home_body(s,enemy),target=-1;float nearest=1e30f;bool assault_ready=false;
+    int home=home_body(s,enemy),target=-1;float nearest=INITIAL_ENEMY_DISTANCE;bool assault_ready=false;
     bool attack=s->time_seconds>=s->world.gameplay.enemy_attack_seconds;
     for (uint32_t p=0;p<s->world.body_count;++p) if (s->world.content.bodies[s->world.bodies[p].type].hosts_site && s->world.bodies[p].owner!=enemy
         && (s->home_owner[p]==FACTION_NEUTRAL || attack))
@@ -1098,10 +1172,10 @@ static void outcome(Simulation* s)
 void simulation_step(Simulation* s)
 {
     if (s->paused) return;
-    const float dt=1.0f/60.0f;
+    const float dt=1.0f/SIMULATION_TICKS_PER_SECOND_FLOAT;
     if (s->outcome)
     {
-        if (s->world.combat.enabled) { advance_visuals(s,dt);recover_units(s,dt);for (uint32_t i=0;i<MAX_PROJECTILES;++i) s->projectiles[i].active=false;simulation_set_time(s,s->time_seconds+1.0/60.0); }
+        if (s->world.combat.enabled) { advance_visuals(s,dt);recover_units(s,dt);for (uint32_t i=0;i<MAX_PROJECTILES;++i) s->projectiles[i].active=false;simulation_set_time(s,s->time_seconds+1.0/SIMULATION_TICKS_PER_SECOND_DOUBLE); }
         return;
     }
     if (s->world.gameplay.enabled)
@@ -1131,7 +1205,7 @@ void simulation_step(Simulation* s)
             }
         }
     }
-    ++s->tick_count;simulation_set_time(s,s->time_seconds+1.0/60.0);
+    ++s->tick_count;simulation_set_time(s,s->time_seconds+1.0/SIMULATION_TICKS_PER_SECOND_DOUBLE);
 }
 
 bool simulation_write_state(const Simulation* s, const char* path)

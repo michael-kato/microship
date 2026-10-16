@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "types.h"
 #include "content.h"
+#include "asset_limits.h"
 
 struct Body
 {
@@ -13,7 +14,7 @@ struct Body
     Vec3 position;
     float radius;
     Color color;
-    char model_path[256];
+    char model_path[ASSET_PATH_CAPACITY];
     Vec3 colony_normal;
     Vec3 factory_root;
     Vec3 factory_roots[MAX_FACTORY_STRUCTURES];
@@ -26,7 +27,7 @@ struct Body
 
 struct Spawn
 {
-    char type_name[32];
+    char type_name[ASSET_NAME_CAPACITY];
     uint32_t type;
     Vec3 position;
 };
@@ -35,7 +36,7 @@ struct Background
     Vec3 position;
     float scale;
     Color color;
-    char model_path[256];
+    char model_path[ASSET_PATH_CAPACITY];
 };
 enum { MAX_BODIES=16,MAX_SPAWNS=64 };
 struct GameplayRules
@@ -43,6 +44,7 @@ struct GameplayRules
     bool enabled;
     float storage,manufacture_seconds,landing_seconds,enemy_attack_seconds;
 };
+enum { COMBAT_FIELD_PROJECTILE=1, COMBAT_FIELD_ORBIT=2, COMBAT_FIELD_DAMAGE=4, COMBAT_FIELDS_COMPLETE=7, STUDIO_LIGHTS_COMPLETE=7 };
 struct StudioLight { Vec3 direction; Color color; float irradiance; };
 struct CombatVisuals
 {
@@ -59,7 +61,7 @@ struct CombatVisuals
 struct SpikeRules
 {
     bool enabled,recovery_set,injury_set;
-    char model[256];
+    char model[ASSET_PATH_CAPACITY];
     uint32_t count;
     float root,length,regrow,scale,heal_interval,heal_delay,heal_clearance;
     Color injury[2];
@@ -72,7 +74,7 @@ struct World
     Spawn spawns[MAX_SPAWNS];
     uint32_t spawn_count;
     Content content;
-    char content_path[256];
+    char content_path[ASSET_PATH_CAPACITY];
     GameplayRules gameplay;
     float sight_radius;
     Faction player_faction,opponent_faction;

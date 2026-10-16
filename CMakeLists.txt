@@ -27,7 +27,7 @@ foreach(debug_variant IN ITEMS surface volume guide_surface)
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
         COMMAND ${GLSLC} --target-env=vulkan1.2 -O ${debug_flags}
             "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/ray_trace.comp" -o "${debug_output}"
-        DEPENDS assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl
+        DEPENDS assets/shaders/render_bindings.glsl assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl
             assets/shaders/debug_buffers.glsl VERBATIM)
     list(APPEND debug_outputs "${debug_output}")
 endforeach()
@@ -35,32 +35,32 @@ set(backdrop_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/backdrop.comp.sp
 add_custom_command(OUTPUT "${backdrop_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/backdrop.comp" -o "${backdrop_output}"
-    DEPENDS assets/shaders/backdrop.comp assets/shaders/render_uniform.glsl VERBATIM)
+    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/backdrop.comp assets/shaders/render_uniform.glsl VERBATIM)
 set(effects_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/effects.comp.spv")
 add_custom_command(OUTPUT "${effects_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/effects.comp" -o "${effects_output}"
-    DEPENDS assets/shaders/effects.comp assets/shaders/render_uniform.glsl assets/shaders/debug_buffers.glsl VERBATIM)
+    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/effects.comp assets/shaders/render_uniform.glsl assets/shaders/debug_buffers.glsl VERBATIM)
 set(debug_overlay "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/debug.comp.spv")
 add_custom_command(OUTPUT "${debug_overlay}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/debug.comp" -o "${debug_overlay}"
-    DEPENDS assets/shaders/debug.comp assets/shaders/debug_buffers.glsl VERBATIM)
+    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/hud_layout.glsl assets/shaders/debug.comp assets/shaders/debug_buffers.glsl VERBATIM)
 add_custom_command(OUTPUT "${volume_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DMICROSHIP_VOLUME_PASS=1
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/ray_trace.comp" -o "${volume_output}"
-    DEPENDS assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl VERBATIM)
+    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl VERBATIM)
 add_custom_command(OUTPUT "${bloom_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/bloom.comp" -o "${bloom_output}"
-    DEPENDS assets/shaders/bloom.comp assets/shaders/debug_buffers.glsl VERBATIM)
+    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/bloom.comp assets/shaders/debug_buffers.glsl VERBATIM)
 add_custom_command(OUTPUT "${shader_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/ray_trace.comp" -o "${shader_output}"
-    DEPENDS assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl
+    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl
     VERBATIM)
 file(GLOB model_files CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/models/*.fmesh")
 set(json_license "${CMAKE_CURRENT_BINARY_DIR}/licenses/json.txt")

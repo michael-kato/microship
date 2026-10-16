@@ -14,9 +14,18 @@
 #endif
 #include <windows.h>
 
+static const int MAX_COMMAND_SAMPLES = 4096;
+static const int MAX_COMMAND_TICKS = 1000000;
+static const int EXECUTABLE_PATH_CAPACITY = 4096;
+static const int MAX_COMMAND_REAL_MAGNITUDE = 1000000;
+static const int DECIMAL_RADIX = 10;
+static const int MAX_CLIENT_PIXEL_COORDINATE = 65535;
+static const double MAX_CURSOR_ANCHOR_COORDINATE = 100000.0;
+static const int MAX_AUDIO_CAPTURE_TICKS = 3600;
+
 static bool asset_paths(char* world, char* config, char* shader,char* audio,size_t capacity)
 {
-    char executable[4096];
+    char executable[EXECUTABLE_PATH_CAPACITY];
     DWORD count = GetModuleFileNameA(0, executable, sizeof(executable));
     if (!count || count >= sizeof(executable))
         return false;
@@ -28,7 +37,7 @@ static bool asset_paths(char* world, char* config, char* shader,char* audio,size
     if (!slash)
         return false;
     *slash = 0;
-    char manifest[4096];
+    char manifest[EXECUTABLE_PATH_CAPACITY];
     int length=snprintf(manifest,sizeof(manifest),"%s/assets/startup.json",executable);
     if (length<=0 || (size_t)length>=sizeof(manifest)) return false;
     JsonDocument document;if (!json_load(&document,manifest)) return false;
@@ -60,7 +69,7 @@ static bool parse_real(const char* text, double* value)
     char* end = 0;
     errno = 0;
     double parsed = strtod(text, &end);
-    if (!text[0] || *end || errno || !std::isfinite(parsed) || std::fabs(parsed) > 1000000) return false;
+    if (!text[0] || *end || errno || !std::isfinite(parsed) || std::fabs(parsed) > MAX_COMMAND_REAL_MAGNITUDE) return false;
     *value = parsed;
     return true;
 }
@@ -74,7 +83,7 @@ static bool parse_integer(const char* text, uint32_t minimum, uint32_t maximum, 
             return false;
     errno = 0;
     char* end = 0;
-    unsigned long long parsed = strtoull(text, &end, 10);
+    unsigned long long parsed = strtoull(text, &end, DECIMAL_RADIX);
     if (errno || *end || parsed < minimum || parsed > maximum)
         return false;
     *value = (uint32_t)parsed;
@@ -85,7 +94,7 @@ int main(int argc, char** argv)
 {
     setvbuf(stdout,0,_IONBF,0);
     GameOptions options = {};
-    char world_path[4096], config_path[4096], shader_path[4096],audio_path[4096];
+    char world_path[EXECUTABLE_PATH_CAPACITY], config_path[EXECUTABLE_PATH_CAPACITY], shader_path[EXECUTABLE_PATH_CAPACITY],audio_path[EXECUTABLE_PATH_CAPACITY];
     if (!asset_paths(world_path, config_path, shader_path,audio_path,sizeof(world_path)))
     {
         fprintf(stderr, "Cannot locate assets beside the microship executable.\n");
@@ -146,12 +155,12 @@ int main(int argc, char** argv)
             else if (strcmp(flag, "--step-seconds") == 0) options.step_seconds = value;
             else if (click || command)
             {
-                if (value<0 || value>65535 || second<0 || second>65535 || value!=std::floor(value) || second!=std::floor(second))
+                if (value<0 || value>MAX_CLIENT_PIXEL_COORDINATE || second<0 || second>MAX_CLIENT_PIXEL_COORDINATE || value!=std::floor(value) || second!=std::floor(second))
                 { fprintf(stderr,"Pointer controls require integer client coordinates in [0,65535].\n");return 2; }
                 if (click) { options.camera_input.click=true;options.camera_input.click_x=(int32_t)value;options.camera_input.click_y=(int32_t)second; }
                 else { options.camera_input.command=true;options.camera_input.command_x=(int32_t)value;options.camera_input.command_y=(int32_t)second; }
             }
-            else if (pointer) { options.camera_input.pointer_x=(int32_t)std::fmax(-100000.0,std::fmin(100000.0,value));options.camera_input.pointer_y=(int32_t)std::fmax(-100000.0,std::fmin(100000.0,second));options.camera_input.pointer_valid=true; }
+            else if (pointer) { options.camera_input.pointer_x=(int32_t)std::fmax(-MAX_CURSOR_ANCHOR_COORDINATE,std::fmin(MAX_CURSOR_ANCHOR_COORDINATE,value));options.camera_input.pointer_y=(int32_t)std::fmax(-MAX_CURSOR_ANCHOR_COORDINATE,std::fmin(MAX_CURSOR_ANCHOR_COORDINATE,second));options.camera_input.pointer_valid=true; }
             else if (drag) { options.camera_input.drag_x = (float)value; options.camera_input.drag_y = (float)second; }
             else options.camera_input.wheel = (float)value;
         }
@@ -190,7 +199,7 @@ int main(int argc, char** argv)
             const char* flag = argv[i];
             uint32_t value = 0;
             bool seed = strcmp(flag, "--seed") == 0 || strcmp(flag,"--world-seed")==0;
-            uint32_t maximum = strcmp(flag, "--samples") == 0 ? 4096 : strcmp(flag,"--ticks")==0 ? 1000000 : UINT32_MAX;
+            uint32_t maximum = strcmp(flag, "--samples") == 0 ? MAX_COMMAND_SAMPLES : strcmp(flag,"--ticks")==0 ? MAX_COMMAND_TICKS : UINT32_MAX;
             if (++i == argc || !parse_integer(argv[i], seed ? 0 : 1, maximum, &value))
             {
                 fprintf(stderr, "%s requires an integer in [%u, %u].\n", flag, seed ? 0 : 1, maximum);
@@ -215,7 +224,7 @@ int main(int argc, char** argv)
             return 2;
         }
     }
-    if (options.audio_capture_path && (!options.smoke || !options.ticks || options.ticks>3600))
+    if (options.audio_capture_path && (!options.smoke || !options.ticks || options.ticks>MAX_AUDIO_CAPTURE_TICKS))
     { fprintf(stderr,"--audio-capture requires --smoke and --ticks in [1,3600].\n");return 2; }
     if (options.smoke && (options.headless || options.capture_path || options.frames))
     {

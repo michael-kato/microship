@@ -1,20 +1,39 @@
 #version 460
 #extension GL_EXT_ray_query : require
 #extension GL_GOOGLE_include_directive : require
+#include "render_bindings.glsl"
 #include "render_uniform.glsl"
+
+const int BLUR_HALF_TAPS = 24;
+const float BLUR_HALF_TAPS_FLOAT = 24.0;
+const float BLUR_GAUSSIAN_FALLOFF = 4.5;
+const float WAVE_CROSS_AXIS_SCALE = .7;
+const float ENVIRONMENT_FILL_SCALE = 0.025;
+const uint BACKDROP_RAY_MASK = 4u;
+const float RAY_MAX = 3.402823466e38;
+const float SILHOUETTE_FADE_COSINE = 0.45;
+const float PULSE_SPATIAL_FREQUENCY = 4.0;
+const float PRIMARY_PULSE_EXPONENT = 18.0;
+const float SECONDARY_PULSE_WEIGHT = .35;
+const float SECONDARY_PULSE_PHASE = .8;
+const float STUDIO_AMBIENT_WEIGHT = .10;
+const float VEIN_BASE_GLOW = .2;
+const float VEIN_PULSE_GLOW = 3.5;
+const float FACING_GLOW_WEIGHT = 0.55;
+const float SECONDARY_PULSE_EXPONENT = 24.0;
 
 // Decorative background only: one center-ray visibility query, vertex color,
 // approximate ambient shading/emission, then two native-resolution blur passes.
 // This layer never supplies indirect illumination or gameplay collision.
-layout(local_size_x=8,local_size_y=8) in;
-layout(set=0,binding = 0) uniform accelerationStructureEXT scene_acceleration;
+layout(local_size_x=COMPUTE_GROUP_SIZE,local_size_y=COMPUTE_GROUP_SIZE) in;
+layout(set=0,binding = RENDER_BINDING_ACCELERATION) uniform accelerationStructureEXT scene_acceleration;
 struct Vertex { vec4 position,normal,color; };
-layout(set=0,binding = 2,std430) readonly buffer Vertices { Vertex vertices[]; };
-layout(set=0,binding = 3,std430) readonly buffer Triangles { uvec4 triangles[]; };
-layout(set=0,binding = 9,rgba16f) uniform writeonly image2D background_a;
-layout(set=0,binding = 10,rgba16f) uniform writeonly image2D background_b;
-layout(set=0,binding = 11) uniform sampler2D source_a;
-layout(set=0,binding = 12) uniform sampler2D source_b;
+layout(set=0,binding = RENDER_BINDING_VERTICES,std430) readonly buffer Vertices { Vertex vertices[]; };
+layout(set=0,binding = RENDER_BINDING_TRIANGLES,std430) readonly buffer Triangles { uvec4 triangles[]; };
+layout(set=0,binding = RENDER_BINDING_BACKGROUND_A,rgba16f) uniform writeonly image2D background_a;
+layout(set=0,binding = RENDER_BINDING_BACKGROUND_B,rgba16f) uniform writeonly image2D background_b;
+layout(set=0,binding = RENDER_BINDING_SOURCE_A) uniform sampler2D source_a;
+layout(set=0,binding = RENDER_BINDING_SOURCE_B) uniform sampler2D source_b;
 layout(push_constant) uniform BackgroundPass { int pass; int unused0; int unused1; int unused2; } filter_pass;
 
 void main()
@@ -28,9 +47,9 @@ void main()
         // the 49-tap Gaussian; no geometry guides or lighting paths.
         vec2 axis=filter_pass.pass==1 ? vec2(1.0/extent.x,0) : vec2(0,1.0/extent.y);
         vec3 sum=vec3(0);float weights=0;
-        for (int i=-24;i<=24;++i)
+        for (int i=-BLUR_HALF_TAPS;i<=BLUR_HALF_TAPS;++i)
         {
-            float x=float(i)/24.0,weight=exp(-4.5*x*x);
+            float x=float(i)/BLUR_HALF_TAPS_FLOAT,weight=exp(-BLUR_GAUSSIAN_FALLOFF*x*x);
             vec2 position=uv+axis*(x*render.backdrop_style.x);
             sum+=weight*(filter_pass.pass==1 ? textureLod(source_a,position,0).rgb : textureLod(source_b,position,0).rgb);
             weights+=weight;
@@ -42,13 +61,13 @@ void main()
     vec2 film=uv*2.0-1.0;film.y=-film.y;
     float time=render.backdrop_wave.w;
     film+=render.backdrop_wave.x*vec2(sin(render.backdrop_wave.y*uv.y+time*render.backdrop_wave.z),
-        .7*sin(render.backdrop_wave.y*uv.x+time*render.backdrop_wave.z*.7));
+        WAVE_CROSS_AXIS_SCALE*sin(render.backdrop_wave.y*uv.x+time*render.backdrop_wave.z*WAVE_CROSS_AXIS_SCALE));
     vec3 direction=normalize(render.camera_forward.xyz+film.x*render.display.y*render.display.z*render.camera_right.xyz
         +film.y*render.display.y*render.camera_up.xyz);
     vec3 environment=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,0.5+0.5*direction.y);
-    vec3 color=environment*0.025*render.backdrop_style.z;
+    vec3 color=environment*ENVIRONMENT_FILL_SCALE*render.backdrop_style.z;
     rayQueryEXT query;
-    rayQueryInitializeEXT(query,scene_acceleration,gl_RayFlagsOpaqueEXT,4u,render.camera_position.xyz,0.0,direction,3.402823466e38);
+    rayQueryInitializeEXT(query,scene_acceleration,gl_RayFlagsOpaqueEXT,BACKDROP_RAY_MASK,render.camera_position.xyz,0.0,direction,RAY_MAX);
     while (rayQueryProceedEXT(query)) {}
     if (rayQueryGetIntersectionTypeEXT(query,true)!=gl_RayQueryCommittedIntersectionNoneEXT)
     {
@@ -62,13 +81,13 @@ void main()
         vec3 normal=normalize(normal_to_world*(a.normal.xyz*w.x+b.normal.xyz*w.y+c.normal.xyz*w.z));
         float facing=abs(dot(normal,-direction));
         // A soft edge rolloff suppresses sparse-filter silhouette ringing.
-        float shape=smoothstep(0.0,0.45,facing);
+        float shape=smoothstep(0.0,SILHOUETTE_FADE_COSINE,facing);
         float vein=a.normal.w*w.x+b.normal.w*w.y+c.normal.w*w.z;
-        float phase=render.backdrop_animation.z-uv.x*4.0;
-        float pulse=pow(max(0.0,sin(phase)),18.0)+.35*pow(max(0.0,sin(phase-.8)),24.0);
+        float phase=render.backdrop_animation.z-uv.x*PULSE_SPATIAL_FREQUENCY;
+        float pulse=pow(max(0.0,sin(phase)),PRIMARY_PULSE_EXPONENT)+SECONDARY_PULSE_WEIGHT*pow(max(0.0,sin(phase-SECONDARY_PULSE_PHASE)),SECONDARY_PULSE_EXPONENT);
         vec3 ambient=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,0.5+0.5*normal.y);
-        for (int i=0;i<3;++i) ambient+=render.studio_color[i].rgb*(.10*max(0.0,dot(normal,render.studio_direction[i].xyz)));
-        color+=pigment*shape*(render.backdrop_style.y*(.2+vein*pulse*3.5)*(0.45+0.55*facing)
+        for (int i=0;i<3;++i) ambient+=render.studio_color[i].rgb*(STUDIO_AMBIENT_WEIGHT*max(0.0,dot(normal,render.studio_direction[i].xyz)));
+        color+=pigment*shape*(render.backdrop_style.y*(VEIN_BASE_GLOW+vein*pulse*VEIN_PULSE_GLOW)*(SILHOUETTE_FADE_COSINE+FACING_GLOW_WEIGHT*facing)
             +ambient*render.backdrop_style.z);
     }
     imageStore(background_a,pixel,vec4(color,1));

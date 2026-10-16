@@ -3,28 +3,52 @@
 #include "camera.h"
 #include "render_config.h"
 #include "vector_math.h"
+#include "math_constants.h"
 #include <algorithm>
 #include <stdio.h>
 #include <string.h>
 
+static const float EFFECT_NEAR_CLIP_DISTANCE = .1f;
+static const float MIN_TRAIL_SEGMENT_SQUARED_LENGTH = .000001f;
+static const float MIN_EFFECT_RADIUS_PIXELS = .65f;
+static const float SELECTION_CUE_ALPHA = .45f;
+static const float BLAST_CORE_RADIUS_SCALE = .18f;
+static const int BLAST_RING_SEGMENTS = 16;
+static const float FULL_TURN_RADIANS = 6.2831853f;
+static const int DEATH_BURST_RAYS = 7;
+static const float BURST_GOLDEN_ANGLE_RADIANS = 2.399963f;
+static const float HIT_RADIUS_SCALE = .55f;
+static const float HIT_RADIUS_START_TIME = .02f;
+static const int HIT_BURST_RAYS = 5;
+static const float HIT_RAY_INNER_RADIUS_SCALE = .4f;
+static const float DEATH_CORE_START_RADIUS_SCALE = .2f;
+static const float DEATH_CORE_GROWTH_RADIUS_SCALE = 1.3f;
+static const float DEATH_RAY_INNER_GROWTH_SCALE = .8f;
+static const float DEATH_RAY_OUTER_GROWTH_SCALE = 1.7f;
+static const float DEATH_RAY_WIDTH_SCALE = .6f;
+static const float DEATH_RAY_INNER_START_RADIUS_SCALE = .1f;
+static const float HIT_RAY_WIDTH_SCALE = .55f;
+static const int EFFECT_TILE_RADIUS_MARGIN_PIXELS = 2;
+static const float DEATH_RAY_OUTER_START_RADIUS_SCALE = .2f;
+
 struct Projection { Vec3 eye,forward,right,up; float pixels,cx,cy; };
 static bool project(const Projection& p,Vec3 world,float* screen)
 {
-    Vec3 v=subtract(world,p.eye);float z=dot(v,p.forward);if (z<=.1f) return false;
+    Vec3 v=subtract(world,p.eye);float z=dot(v,p.forward);if (z<=EFFECT_NEAR_CLIP_DISTANCE) return false;
     screen[0]=p.cx+dot(v,p.right)*p.pixels/z;screen[1]=p.cy-dot(v,p.up)*p.pixels/z;
     screen[2]=std::sqrt(dot(v,v));screen[3]=p.pixels/z;return true;
 }
 static void segment(EffectSegment* output,uint32_t* count,const Projection& p,Vec3 a,Vec3 b,float width,Color color,float alpha,int kind)
 {
-    if (*count>=MAX_EFFECT_SEGMENTS || (kind==0 && dot(subtract(a,b),subtract(a,b))<.000001f)) return;
+    if (*count>=MAX_EFFECT_SEGMENTS || (kind==0 && dot(subtract(a,b),subtract(a,b))<MIN_TRAIL_SEGMENT_SQUARED_LENGTH)) return;
     EffectSegment e={};if (!project(p,a,e.start) || !project(p,b,e.end)) return;
-    e.start[3]=std::fmax(.65f,e.start[3]*width);e.end[3]=(float)kind;
+    e.start[3]=std::fmax(MIN_EFFECT_RADIUS_PIXELS,e.start[3]*width);e.end[3]=(float)kind;
     e.color[0]=color.r;e.color[1]=color.g;e.color[2]=color.b;e.color[3]=alpha;
     output[(*count)++]=e;
 }
 static bool tile_rectangle(const EffectSegment& e,uint32_t width,uint32_t height,int* r)
 {
-    float radius=e.start[3]+2;
+    float radius=e.start[3]+EFFECT_TILE_RADIUS_MARGIN_PIXELS;
     r[0]=(int)std::floor((std::fmin(e.start[0],e.end[0])-radius)/EFFECT_TILE);
     r[1]=(int)std::floor((std::fmin(e.start[1],e.end[1])-radius)/EFFECT_TILE);
     r[2]=(int)std::floor((std::fmax(e.start[0],e.end[0])+radius)/EFFECT_TILE);
@@ -42,7 +66,7 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
     if (!s->world.combat.enabled) return true;
     Projection p={};p.eye=camera->position;p.forward=normalize(subtract(camera->target,camera->position));
     p.right=normalize(cross(p.forward,camera->up));p.up=cross(p.right,p.forward);
-    p.cx=config->width*.5f;p.cy=config->height*.5f;p.pixels=config->height/(2*std::tan(config->vertical_fov_degrees*.00872664626f));
+    p.cx=config->width*.5f;p.cy=config->height*.5f;p.pixels=config->height/(2*std::tan(config->vertical_fov_degrees*HALF_DEGREES_TO_RADIANS));
     const CombatVisuals* v=&s->world.combat;
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
@@ -60,7 +84,7 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
         const Unit* u=&s->units[i];if (u->health<=0 || !s->visible_units[i]) continue;
         Color color=content_color(&s->world.content,u->faction);
         if (u->selected)
-            segment(output,count,p,u->position,u->position,simulation_unit_definition(s,u)->cue_radius,color,.45f,3);
+            segment(output,count,p,u->position,u->position,simulation_unit_definition(s,u)->cue_radius,color,SELECTION_CUE_ALPHA,3);
     }
     for (uint32_t i=0;i<MAX_POPS;++i)
     {
@@ -69,36 +93,36 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
         if (pop->blast_radius>0)
         {
             float radius=pop->blast_radius*ease;Color color=content_color(&s->world.content,pop->faction);
-            segment(output,count,p,pop->position,pop->position,pop->blast_radius*.18f,color,(1-t)*(1-t),2);
-            for (uint32_t j=0;j<16;++j)
+            segment(output,count,p,pop->position,pop->position,pop->blast_radius*BLAST_CORE_RADIUS_SCALE,color,(1-t)*(1-t),2);
+            for (uint32_t j=0;j<BLAST_RING_SEGMENTS;++j)
             {
-                float a=j*6.2831853f/16,b=(j+1)*6.2831853f/16;
+                float a=j*FULL_TURN_RADIANS/BLAST_RING_SEGMENTS,b=(j+1)*FULL_TURN_RADIANS/BLAST_RING_SEGMENTS;
                 Vec3 x=add(pop->position,scale(add(scale(p.right,std::cos(a)),scale(p.up,std::sin(a))),radius));
                 Vec3 y=add(pop->position,scale(add(scale(p.right,std::cos(b)),scale(p.up,std::sin(b))),radius));
                 segment(output,count,p,x,y,v->trail_width,color,1-t,1);
             }
             continue;
         }
-        segment(output,count,p,pop->position,pop->position,v->pop_radius*(.2f+1.3f*ease),content_color(&s->world.content,pop->faction),(1-t)*(1-t),2);
-        for (int j=0;j<7;++j)
+        segment(output,count,p,pop->position,pop->position,v->pop_radius*(DEATH_CORE_START_RADIUS_SCALE+DEATH_CORE_GROWTH_RADIUS_SCALE*ease),content_color(&s->world.content,pop->faction),(1-t)*(1-t),2);
+        for (int j=0;j<DEATH_BURST_RAYS;++j)
         {
-            float angle=j*6.2831853f/7+i*2.399963f;
+            float angle=j*FULL_TURN_RADIANS/DEATH_BURST_RAYS+i*BURST_GOLDEN_ANGLE_RADIANS;
             Vec3 direction=add(scale(p.right,std::cos(angle)),scale(p.up,std::sin(angle)));
-            Vec3 a=add(pop->position,scale(direction,v->pop_radius*(.1f+ease*.8f)));
-            Vec3 b=add(pop->position,scale(direction,v->pop_radius*(.2f+ease*1.7f)));
-            segment(output,count,p,a,b,v->trail_width*.6f,content_color(&s->world.content,pop->faction),1-t,1);
+            Vec3 a=add(pop->position,scale(direction,v->pop_radius*(DEATH_RAY_INNER_START_RADIUS_SCALE+ease*DEATH_RAY_INNER_GROWTH_SCALE)));
+            Vec3 b=add(pop->position,scale(direction,v->pop_radius*(DEATH_RAY_OUTER_START_RADIUS_SCALE+ease*DEATH_RAY_OUTER_GROWTH_SCALE)));
+            segment(output,count,p,a,b,v->trail_width*DEATH_RAY_WIDTH_SCALE,content_color(&s->world.content,pop->faction),1-t,1);
         }
     }
     for (uint32_t i=0;i<MAX_POPS;++i)
     {
         const Impact* hit=&s->impacts[i];if (hit->duration<=0 || !simulation_in_sight(s,hit->position,0)) continue;
-        float t=hit->age/hit->duration,radius=v->pop_radius*.55f*std::sqrt(t+.02f);
-        for (int j=0;j<5;++j)
+        float t=hit->age/hit->duration,radius=v->pop_radius*HIT_RADIUS_SCALE*std::sqrt(t+HIT_RADIUS_START_TIME);
+        for (int j=0;j<HIT_BURST_RAYS;++j)
         {
-            float angle=j*6.2831853f/5+i*2.399963f;
+            float angle=j*FULL_TURN_RADIANS/HIT_BURST_RAYS+i*BURST_GOLDEN_ANGLE_RADIANS;
             Vec3 direction=add(scale(p.right,std::cos(angle)),scale(p.up,std::sin(angle)));
-            segment(output,count,p,add(hit->position,scale(direction,radius*.4f)),add(hit->position,scale(direction,radius)),
-                v->trail_width*.55f,v->flash,(1-t)*(1-t),1);
+            segment(output,count,p,add(hit->position,scale(direction,radius*HIT_RAY_INNER_RADIUS_SCALE)),add(hit->position,scale(direction,radius)),
+                v->trail_width*HIT_RAY_WIDTH_SCALE,v->flash,(1-t)*(1-t),1);
         }
     }
     for (uint32_t i=0;i<*count;++i)

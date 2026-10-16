@@ -1,8 +1,60 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
+#include "render_bindings.glsl"
 #include "debug_buffers.glsl"
-layout(local_size_x=8,local_size_y=8) in;
-layout(set=0,binding = 1,rgba8) uniform image2D display_image;
+#include "hud_layout.glsl"
+
+const float SRGB_POWER_SCALE = 1.055;
+const float SRGB_GAMMA = 2.4;
+const float SRGB_POWER_OFFSET = 0.055;
+const float SRGB_LINEAR_SCALE = 12.92;
+const float SRGB_LINEAR_THRESHOLD = 0.0031308;
+const int MIN_DEBUG_PANEL_EXTENT = 96;
+const int PANEL_LABEL_BOTTOM = 20;
+const int PANEL_LABEL_CHARACTER_SPACING = 10;
+const uint PACKED_CHARACTER_MASK = 255u;
+const int PANEL_CONTENT_HORIZONTAL_MARGIN = 12;
+const int PANEL_CONTENT_VERTICAL_MARGIN = 34;
+const int PANEL_CONTENT_TOP = 28;
+const float SELECTION_LINE_INNER_PIXELS = .6;
+const float SELECTION_LINE_OUTER_PIXELS = 1.6;
+const float SELECTION_DASH_INNER = .15;
+const float SELECTION_DASH_OUTER = .35;
+const float SELECTION_DASH_FREQUENCY = 6.0;
+const float SELECTION_ALPHA = .75;
+const float ORDER_RING_SPEED_PIXELS = 35.0;
+const float ORDER_RING_INNER_PIXELS = .5;
+const float ORDER_RING_OUTER_PIXELS = 2.5;
+const float ORDER_RING_ALPHA = .85;
+const float HOVER_LINE_INNER_PIXELS = .4;
+const float HOVER_LINE_OUTER_PIXELS = 1.5;
+const float HOVER_ALPHA = .45;
+const float STATS_BACKGROUND_BRIGHTNESS = 0.18;
+const int FLEET_CARD_WIDTH = 580;
+const int SITE_CARD_WIDTH = 440;
+const int FLEET_CARD_HALF_HEIGHT = 60;
+const int SITE_CARD_HALF_HEIGHT = 70;
+const int CARD_CORNER_INSET = 9;
+const int FLEET_CARD_INNER_HALF_HEIGHT = 51;
+const int SITE_CARD_INNER_HALF_HEIGHT = 61;
+const float CARD_CORNER_RADIUS = 8.0;
+const float CARD_ALPHA = .90;
+const float CARD_BORDER_ALPHA = .28;
+const float CARD_ACCENT_STRIP_BRIGHTNESS = .8;
+const int CARD_TEXT_MARGIN = 14;
+const int PROGRESS_TOP = 114;
+const int PROGRESS_BOTTOM = 128;
+const int PROGRESS_DIVIDER = 120;
+const int PROGRESS_RIGHT = 426;
+const float PROGRESS_WIDTH = 412.0;
+const float PROGRESS_ACCENT_BRIGHTNESS = .7;
+const int GROWTH_LINE_TOP = 33;
+const int GROWTH_LINE_BOTTOM = 35;
+const float GROWTH_LINE_BACKGROUND = .16;
+const float VIGNETTE_STRENGTH = .18;
+const float VIGNETTE_RADIUS_SCALE = 1.4;
+layout(local_size_x=COMPUTE_GROUP_SIZE,local_size_y=COMPUTE_GROUP_SIZE) in;
+layout(set=0,binding = RENDER_BINDING_BEAUTY,rgba8) uniform image2D display_image;
 layout(push_constant) uniform Debug {
     uvec4 header; // Width, height, buffer views, stats.
     vec4 settings; // Exposure, surface spp, depth scale, unused.
@@ -11,18 +63,39 @@ layout(push_constant) uniform Debug {
     ivec4 hover;
 } debug;
 
+const vec3 DEBUG_BACKGROUND_COLOR=vec3(0.012,0.016,0.022);
+const vec3 DEBUG_PANEL_BORDER_COLOR=vec3(0.2,0.24,0.28);
+const vec3 DEBUG_PANEL_LABEL_COLOR=vec3(0.8,0.88,0.96);
+const vec3 HOSTILE_SELECTION_COLOR=vec3(1.0,.42,.48);
+const vec3 HOVER_COLOR=vec3(.94,.86,.78);
+const vec3 STATS_TEXT_COLOR=vec3(0.92,0.97,0.87);
+const vec3 CARD_BACKGROUND_COLOR=vec3(.028,.025,.044);
+const vec3 CARD_MESSAGE_COLOR=vec3(1.0,.88,.7);
+const vec3 CARD_TEXT_COLOR=vec3(.83,.85,.87);
+const vec3 PROGRESS_TRACK_COLOR=vec3(.1,.10,.13);
+const vec3 MANUFACTURE_PROGRESS_COLOR=vec3(.96,.69,.42);
+
+const int DEBUG_MASK_VEC4_COUNT=1570;
+
 // Procedural 4x7 glyphs: no font texture or atlas.
-layout(set=0,binding = 4,std140) uniform DebugText {
-    uvec4 glyphs[32];
-    uvec4 mask[1570]; // Native 512x92 debug text plus 960x160 gameplay text, packed in bits.
+layout(set=0,binding = RENDER_BINDING_UNIFORM,std140) uniform DebugText {
+    uvec4 glyphs[FONT_GLYPH_COUNT/4];
+    uvec4 mask[DEBUG_MASK_VEC4_COUNT]; // Native 512x92 debug text plus 960x160 gameplay text, packed in bits.
 } text_data;
 
 uint glyph(uint character)
 {
-    return character<128u ? text_data.glyphs[character/4u][character%4u] : 0u;
+    return character<uint(FONT_GLYPH_COUNT) ? text_data.glyphs[character/4u][character%4u] : 0u;
 }
 
-const uint panel_text[72]=uint[72](
+const int PANEL_LABEL_TOP=6;
+const int CARD_TEXT_TOP=12;
+const int CARD_ROW_HEIGHT=24;
+const int CARD_TEXT_HORIZONTAL_PADDING=28;
+const int DEBUG_PANEL_COUNT=9;
+const int PANEL_LABEL_WORDS=8;
+// ASCII bytes, four characters per word, one label per row.
+const uint panel_text[DEBUG_PANEL_COUNT*PANEL_LABEL_WORDS]=uint[DEBUG_PANEL_COUNT*PANEL_LABEL_WORDS](
     0x55414542u,0x00005954u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,
     0x454e494cu,0x48205241u,0x00005244u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,
     0x45524944u,0x2f205443u,0x4d414320u,0x00415245u,0x00000000u,0x00000000u,0x00000000u,0x00000000u,
@@ -34,17 +107,16 @@ const uint panel_text[72]=uint[72](
     0x52455551u,0x20534549u,0x4c432052u,0x5345534fu,0x20472054u,0x44414853u,0x0000574fu,0x00000000u
 );
 
-
 bool ink(uint character, ivec2 cell)
 {
-    if (cell.x<0 || cell.y<0 || cell.x>=4 || cell.y>=7) return false;
-    return (glyph(character) & (1u << uint(cell.y*4+cell.x)))!=0u;
+    if (cell.x<0 || cell.y<0 || cell.x>=FONT_GLYPH_WIDTH || cell.y>=FONT_GLYPH_HEIGHT) return false;
+    return (glyph(character) & (1u << uint(cell.y*FONT_GLYPH_WIDTH+cell.x)))!=0u;
 }
 
 vec3 srgb(vec3 linear)
 {
-    return mix(1.055*pow(linear,vec3(1.0/2.4))-0.055,
-               12.92*linear,lessThanEqual(linear,vec3(0.0031308)));
+    return mix(SRGB_POWER_SCALE*pow(linear,vec3(1.0/SRGB_GAMMA))-SRGB_POWER_OFFSET,
+               SRGB_LINEAR_SCALE*linear,lessThanEqual(linear,vec3(SRGB_LINEAR_THRESHOLD)));
 }
 
 vec3 radiance_display(vec3 value)
@@ -53,17 +125,27 @@ vec3 radiance_display(vec3 value)
     return srgb(linear/(vec3(1)+linear));
 }
 
+const uint PANEL_DISPLAY=0u;
+const uint PANEL_LINEAR_HDR=1u;
+const uint PANEL_DIRECT=2u;
+const uint PANEL_AMBIENT=3u;
+const uint PANEL_VERTEX_COLOR=4u;
+const uint PANEL_NORMAL=5u;
+const uint PANEL_DEPTH=6u;
+const uint PANEL_VOLUME=7u;
+const float THIN_MEMBRANE_GUIDE_CODE=3.0;
+const float QUERY_DISPLAY_SCALE=4.0;
 vec3 buffer_value(uint panel, DebugPixel data)
 {
-    if (panel==0u) return unpackUnorm4x8(floatBitsToUint(data.direct.w)).rgb;
-    if (panel==1u) return radiance_display(data.surface.rgb+data.volume.rgb);
-    if (panel==2u) return radiance_display(data.direct.rgb);
-    if (panel==3u) return radiance_display(max(data.surface.rgb-data.direct.rgb,vec3(0)));
-    if (panel==4u) return (data.vertex_hit.w==1.0 || data.vertex_hit.w==3.0) ? srgb(clamp(data.vertex_hit.rgb,0.0,1.0)) : vec3(0);
-    if (panel==5u) return (data.vertex_hit.w==1.0 || data.vertex_hit.w==3.0) ? 0.5+0.5*data.normal_depth.xyz : vec3(0);
-    if (panel==6u) return data.vertex_hit.w>0.0 ? vec3(1.0/(1.0+data.normal_depth.w/debug.settings.z)) : vec3(0);
-    if (panel==7u) return radiance_display(data.volume.rgb);
-    return clamp(vec3(data.surface.w,data.volume.w,0.0)/(max(debug.settings.y,1.0)*4.0),0.0,1.0);
+    if (panel==PANEL_DISPLAY) return unpackUnorm4x8(floatBitsToUint(data.direct.w)).rgb;
+    if (panel==PANEL_LINEAR_HDR) return radiance_display(data.surface.rgb+data.volume.rgb);
+    if (panel==PANEL_DIRECT) return radiance_display(data.direct.rgb);
+    if (panel==PANEL_AMBIENT) return radiance_display(max(data.surface.rgb-data.direct.rgb,vec3(0)));
+    if (panel==PANEL_VERTEX_COLOR) return (data.vertex_hit.w==1.0 || data.vertex_hit.w==THIN_MEMBRANE_GUIDE_CODE) ? srgb(clamp(data.vertex_hit.rgb,0.0,1.0)) : vec3(0);
+    if (panel==PANEL_NORMAL) return (data.vertex_hit.w==1.0 || data.vertex_hit.w==THIN_MEMBRANE_GUIDE_CODE) ? 0.5+0.5*data.normal_depth.xyz : vec3(0);
+    if (panel==PANEL_DEPTH) return data.vertex_hit.w>0.0 ? vec3(1.0/(1.0+data.normal_depth.w/debug.settings.z)) : vec3(0);
+    if (panel==PANEL_VOLUME) return radiance_display(data.volume.rgb);
+    return clamp(vec3(data.surface.w,data.volume.w,0.0)/(max(debug.settings.y,1.0)*QUERY_DISPLAY_SCALE),0.0,1.0);
 }
 
 void main()
@@ -71,32 +153,32 @@ void main()
     ivec2 pixel=ivec2(gl_GlobalInvocationID.xy), extent=ivec2(debug.header.xy);
     if (any(greaterThanEqual(pixel,extent))) return;
     bool views=debug.header.z!=0u, stats=debug.header.w!=0u;
-    int top=stats ? 92 : 0;
+    int top=stats ? STATS_TEXT_HEIGHT : 0;
     vec3 value;
     if (views)
     {
-        value=vec3(0.012,0.016,0.022);
-        if (pixel.y>=top && extent.y>top+96 && extent.x>=96)
+        value=DEBUG_BACKGROUND_COLOR;
+        if (pixel.y>=top && extent.y>top+MIN_DEBUG_PANEL_EXTENT && extent.x>=MIN_DEBUG_PANEL_EXTENT)
         {
             ivec2 cell=min(ivec2(2),ivec2(pixel.x*3/extent.x,(pixel.y-top)*3/(extent.y-top)));
             ivec2 start=ivec2(cell.x*extent.x/3,top+cell.y*(extent.y-top)/3);
             ivec2 end=ivec2((cell.x+1)*extent.x/3,top+(cell.y+1)*(extent.y-top)/3);
             uint panel=uint(cell.y*3+cell.x);
             ivec2 local=pixel-start;
-            if (local.x==0 || local.y==0) value=vec3(0.2,0.24,0.28);
-            if (local.y>=6 && local.y<20 && local.x>=8)
+            if (local.x==0 || local.y==0) value=DEBUG_PANEL_BORDER_COLOR;
+            if (local.y>=PANEL_LABEL_TOP && local.y<PANEL_LABEL_BOTTOM && local.x>=TEXT_MARGIN)
             {
-                int index=(local.x-8)/10;
-                if (index<32)
+                int index=(local.x-TEXT_MARGIN)/PANEL_LABEL_CHARACTER_SPACING;
+                if (index<PANEL_LABEL_WORDS*4)
                 {
-                    uint character=(panel_text[panel*8u+uint(index)/4u] >> (8u*(uint(index)%4u))) & 255u;
-                    if (ink(character,ivec2(((local.x-8)%10)/2,(local.y-6)/2))) value=vec3(0.8,0.88,0.96);
+                    uint character=(panel_text[panel*uint(PANEL_LABEL_WORDS)+uint(index)/4u] >> (uint(TEXT_MASK_BYTE_BITS)*(uint(index)%4u))) & PACKED_CHARACTER_MASK;
+                    if (ink(character,ivec2(((local.x-TEXT_MARGIN)%PANEL_LABEL_CHARACTER_SPACING)/2,(local.y-PANEL_LABEL_TOP)/2))) value=DEBUG_PANEL_LABEL_COLOR;
                 }
             }
-            vec2 available=vec2(end-start)-vec2(12,34);
+            vec2 available=vec2(end-start)-vec2(PANEL_CONTENT_HORIZONTAL_MARGIN,PANEL_CONTENT_VERTICAL_MARGIN);
             float scale=min(available.x/float(extent.x),available.y/float(extent.y));
             ivec2 size=ivec2(floor(vec2(extent)*scale));
-            ivec2 offset=ivec2((end.x-start.x-size.x)/2,28+(int(available.y)-size.y)/2);
+            ivec2 offset=ivec2((end.x-start.x-size.x)/2,PANEL_CONTENT_TOP+(int(available.y)-size.y)/2);
             ivec2 location=local-offset;
             if (all(greaterThanEqual(location,ivec2(0))) && all(lessThan(location,size)))
             {
@@ -107,80 +189,80 @@ void main()
     }
     else value=imageLoad(display_image,pixel).rgb;
     vec3 accent=debug.accent.rgb;
-    vec3 selected=debug.accent.w<0.0 ? vec3(1.0,.42,.48) : accent;
+    vec3 selected=debug.accent.w<0.0 ? HOSTILE_SELECTION_COLOR : accent;
     if (!views && debug.settings.w>0.0)
     {
         vec2 d=vec2(pixel-debug.marker.xy);
         float radial=length(d),angle=atan(d.y,d.x);
         if (debug.marker.w!=0)
         {
-            float line=1.0-smoothstep(.6,1.6,abs(radial-float(debug.marker.z)));
-            float dash=smoothstep(.15,.35,abs(sin(angle*6.0)));
-            value=mix(value,selected,line*dash*.75);
+            float line=1.0-smoothstep(SELECTION_LINE_INNER_PIXELS,SELECTION_LINE_OUTER_PIXELS,abs(radial-float(debug.marker.z)));
+            float dash=smoothstep(SELECTION_DASH_INNER,SELECTION_DASH_OUTER,abs(sin(angle*SELECTION_DASH_FREQUENCY)));
+            value=mix(value,selected,line*dash*SELECTION_ALPHA);
             float age=debug.feedback.x;
             if (age>=0.0 && age<1.0)
             {
-                float ring=float(debug.marker.z)+age*35.0;
-                float pulse=(1.0-age)*(1.0-smoothstep(.5,2.5,abs(radial-ring)));
-                value=mix(value,accent,pulse*.85);
+                float ring=float(debug.marker.z)+age*ORDER_RING_SPEED_PIXELS;
+                float pulse=(1.0-age)*(1.0-smoothstep(ORDER_RING_INNER_PIXELS,ORDER_RING_OUTER_PIXELS,abs(radial-ring)));
+                value=mix(value,accent,pulse*ORDER_RING_ALPHA);
             }
         }
         if (debug.hover.w!=0)
         {
-            float line=1.0-smoothstep(.4,1.5,abs(length(vec2(pixel-debug.hover.xy))-float(debug.hover.z)));
-            value=mix(value,vec3(.94,.86,.78),line*.45);
+            float line=1.0-smoothstep(HOVER_LINE_INNER_PIXELS,HOVER_LINE_OUTER_PIXELS,abs(length(vec2(pixel-debug.hover.xy))-float(debug.hover.z)));
+            value=mix(value,HOVER_COLOR,line*HOVER_ALPHA);
         }
     }
-    if (stats && pixel.x<512 && pixel.y<92)
+    if (stats && pixel.x<STATS_TEXT_WIDTH && pixel.y<STATS_TEXT_HEIGHT)
     {
-        value=views ? vec3(0.012,0.016,0.022) : value*0.18;
-        uint bit=uint(pixel.y*512+pixel.x), word=bit/32u;
-        if ((text_data.mask[word/4u][word%4u] & (1u << (bit%32u)))!=0u)
-            value=vec3(0.92,0.97,0.87);
+        value=views ? DEBUG_BACKGROUND_COLOR : value*STATS_BACKGROUND_BRIGHTNESS;
+        uint bit=uint(pixel.y*STATS_TEXT_WIDTH+pixel.x), word=bit/uint(TEXT_MASK_WORD_BITS);
+        if ((text_data.mask[word/4u][word%4u] & (1u << (bit%uint(TEXT_MASK_WORD_BITS))))!=0u)
+            value=STATS_TEXT_COLOR;
     }
     if (!views && debug.settings.w>0.0)
     {
         // Two compact tactical cards. Text is a CPU-generated bit mask, never a texture.
-        bool left=pixel.x>=24 && pixel.x<604 && pixel.y>=extent.y-144 && pixel.y<extent.y-24;
-        bool right=pixel.x>=extent.x-464 && pixel.x<extent.x-24 && pixel.y>=extent.y-164 && pixel.y<extent.y-24;
+        bool left=pixel.x>=HUD_PANEL_MARGIN && pixel.x<HUD_FLEET_PANEL_RIGHT && pixel.y>=extent.y-HUD_PANEL_HEIGHT && pixel.y<extent.y-HUD_PANEL_MARGIN;
+        bool right=pixel.x>=extent.x-HUD_SITE_PANEL_LEFT_INSET && pixel.x<extent.x-HUD_PANEL_MARGIN && pixel.y>=extent.y-HUD_BOTTOM_BAND_HEIGHT && pixel.y<extent.y-HUD_PANEL_MARGIN;
         if (left || right)
         {
-            ivec2 local=pixel-ivec2(left ? 24 : extent.x-464,left ? extent.y-144 : extent.y-164);
-            int width=left ? 580 : 440;
-            vec2 q=abs(vec2(local)-vec2(width*.5,left ? 60 : 70))-vec2(width*.5-9,left ? 51 : 61);
-            float edge=length(max(q,vec2(0)))+min(max(q.x,q.y),0.0)-8.0;
+            ivec2 local=pixel-ivec2(left ? HUD_PANEL_MARGIN : extent.x-HUD_SITE_PANEL_LEFT_INSET,left ? extent.y-HUD_PANEL_HEIGHT : extent.y-HUD_BOTTOM_BAND_HEIGHT);
+            int width=left ? FLEET_CARD_WIDTH : SITE_CARD_WIDTH;
+            vec2 q=abs(vec2(local)-vec2(width*ORDER_RING_INNER_PIXELS,left ? FLEET_CARD_HALF_HEIGHT : SITE_CARD_HALF_HEIGHT))-vec2(width*ORDER_RING_INNER_PIXELS-CARD_CORNER_INSET,left ? FLEET_CARD_INNER_HALF_HEIGHT : SITE_CARD_INNER_HALF_HEIGHT);
+            float edge=length(max(q,vec2(0)))+min(max(q.x,q.y),0.0)-CARD_CORNER_RADIUS;
             if (edge<0.0)
             {
-                vec3 base=vec3(.028,.025,.044);
-                value=mix(value,base,.90);
-                if (edge> -1.0) value=mix(value,accent,.28);
-                if (local.x<3) value=accent*.8;
-                int row=(local.y-12)/24;
+                vec3 base=CARD_BACKGROUND_COLOR;
+                value=mix(value,base,CARD_ALPHA);
+                if (edge> -1.0) value=mix(value,accent,CARD_BORDER_ALPHA);
+                if (local.x<3) value=accent*CARD_ACCENT_STRIP_BRIGHTNESS;
+                int row=(local.y-CARD_TEXT_TOP)/CARD_ROW_HEIGHT;
                 int line=row+(left ? 0 : 4);
-                ivec2 letter=ivec2(local.x-14,(local.y-12)%24);
-                if (local.y>=12 && row<4 && letter.x>=0 && letter.y<14 && letter.x<width-28)
+                ivec2 letter=ivec2(local.x-CARD_TEXT_MARGIN,(local.y-CARD_TEXT_TOP)%CARD_ROW_HEIGHT);
+                if (local.y>=CARD_TEXT_TOP && row<4 && letter.x>=0 && letter.y<CARD_TEXT_MARGIN && letter.x<width-CARD_TEXT_HORIZONTAL_PADDING)
                 {
-                    uint bit=uint(512*92+(8+line*18+letter.y)*960+8+letter.x),word=bit/32u;
-                    if ((text_data.mask[word/4u][word%4u] & (1u << (bit%32u)))!=0u)
-                        value=row==0 ? accent : row==2 && left ? vec3(1.0,.88,.7) : vec3(.83,.85,.87);
+                    uint bit=uint(STATS_TEXT_WIDTH*STATS_TEXT_HEIGHT+(TEXT_MARGIN+line*HUD_LINE_SPACING+letter.y)*HUD_TEXT_WIDTH+TEXT_MARGIN+letter.x),word=bit/uint(TEXT_MASK_WORD_BITS);
+                    if ((text_data.mask[word/4u][word%4u] & (1u << (bit%uint(TEXT_MASK_WORD_BITS))))!=0u)
+                        value=row==0 ? accent : row==2 && left ? CARD_MESSAGE_COLOR : CARD_TEXT_COLOR;
                 }
-                if (!left && local.y>=114 && local.y<128)
+                if (!left && local.y>=PROGRESS_TOP && local.y<PROGRESS_BOTTOM)
                 {
-                    int bar=local.y<120 ? 0 : 1;
+                    int bar=local.y<PROGRESS_DIVIDER ? 0 : 1;
                     float progress=bar==0 ? debug.status.z : debug.status.w;
-                    value=vec3(.1,.10,.13);
-                    if (local.x>=14 && local.x<426 && float(local.x-14)/412.0<progress)
-                        value=bar==0 ? accent*.7 : vec3(.96,.69,.42);
+                    value=PROGRESS_TRACK_COLOR;
+                    if (local.x>=CARD_TEXT_MARGIN && local.x<PROGRESS_RIGHT && float(local.x-CARD_TEXT_MARGIN)/PROGRESS_WIDTH<progress)
+                        value=bar==0 ? accent*PROGRESS_ACCENT_BRIGHTNESS : MANUFACTURE_PROGRESS_COLOR;
                 }
-                if (!left && debug.status.x>=0.0 && local.y>=33 && local.y<35 && local.x>=14 && local.x<426)
-                { value=selected*.16;if (float(local.x-14)/412.0<debug.status.x) value=selected*.75; }
+                if (!left && debug.status.x>=0.0 && local.y>=GROWTH_LINE_TOP && local.y<GROWTH_LINE_BOTTOM && local.x>=CARD_TEXT_MARGIN && local.x<PROGRESS_RIGHT)
+                { value=selected*GROWTH_LINE_BACKGROUND;if (float(local.x-CARD_TEXT_MARGIN)/PROGRESS_WIDTH<debug.status.x) value=selected*SELECTION_ALPHA; }
             }
         }
         // Current scene vignette, outside the HUD. No image history or blur.
         else
         {
-            vec2 uv=(vec2(pixel)+.5)/vec2(extent);
-            value*=1.0-.18*pow(clamp(length((uv-.5)*1.4),0.0,1.0),2.0);
+            vec2 uv=(vec2(pixel)+ORDER_RING_INNER_PIXELS)/vec2(extent);
+            value*=1.0-VIGNETTE_STRENGTH*pow(clamp(length((uv-ORDER_RING_INNER_PIXELS)*VIGNETTE_RADIUS_SCALE),0.0,1.0),2.0);
         }
     }
     imageStore(display_image,pixel,vec4(value,1.0));

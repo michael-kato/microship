@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+static const int DRAG_THRESHOLD_PIXELS = 5;
+static const int KEY_WAS_DOWN_BIT = 30;
+static const int KEY_PRESSED_MASK = 0x8000;
 
 static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam, LPARAM lparam)
 {
@@ -53,7 +56,7 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
         int32_t x = (short)LOWORD(lparam), y = (short)HIWORD(lparam);
         window->input.pointer_x=x;window->input.pointer_y=y;window->input.pointer_valid=true;
         if (!window->dragging) return 0;
-        if (abs(x-window->press_x)+abs(y-window->press_y)>5) window->moved=true;
+        if (abs(x-window->press_x)+abs(y-window->press_y)>DRAG_THRESHOLD_PIXELS) window->moved=true;
         if (window->moved)
         { window->input.drag_x += x - window->pointer_x;window->input.drag_y += y - window->pointer_y; }
         window->pointer_x = x;
@@ -69,7 +72,7 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
     }
     if (window && message==WM_RBUTTONUP)
     { window->input.command=true;window->input.command_x=(short)LOWORD(lparam);window->input.command_y=(short)HIWORD(lparam);return 0; }
-    if (window && message == WM_KEYDOWN && !(lparam & (1L << 30)))
+    if (window && message == WM_KEYDOWN && !(lparam & (1L << KEY_WAS_DOWN_BIT)))
     {
         if (wparam == VK_F1) { window->input.toggle_stats = !window->input.toggle_stats; return 0; }
         if (wparam == VK_F2) { window->input.toggle_buffers = !window->input.toggle_buffers; return 0; }
@@ -137,7 +140,7 @@ bool window_poll(Window* window, PointerInput* input)
         DispatchMessageA(&message);
     }
     *input = window->input;
-    input->additive=(GetKeyState(VK_SHIFT)&0x8000)!=0;
+    input->additive=(GetKeyState(VK_SHIFT)&KEY_PRESSED_MASK)!=0;
     POINT point;
     if (GetCursorPos(&point) && ScreenToClient(window->handle,&point))
     { input->pointer_x=point.x;input->pointer_y=point.y;input->pointer_valid=true; }

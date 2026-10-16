@@ -7,6 +7,13 @@
 #include <errno.h>
 #include <cmath>
 
+static const int DECIMAL_RADIX = 10;
+static const int MAX_REPLAY_ORDERS = 512;
+static const int REPLAY_LINE_CAPACITY = 256;
+static const int REPLAY_TOKEN_CAPACITY = 32;
+static const int MOVE_COMMAND_FIELD_COUNT = 5;
+static const int MAX_MOVE_COORDINATE = 1000000;
+
 enum OrderKind { SELECT, TARGET, INSPECT, PRIORITY, MOVE };
 struct Order { uint32_t tick; OrderKind kind; uint32_t argument; Vec3 destination; };
 
@@ -14,33 +21,33 @@ static bool integer(const char* text, uint32_t maximum, uint32_t* value)
 {
     if (!*text) return false;
     for (const char* p=text;*p;++p) if (*p<'0' || *p>'9') return false;
-    errno=0;char* end=0;unsigned long long n=strtoull(text,&end,10);
+    errno=0;char* end=0;unsigned long long n=strtoull(text,&end,DECIMAL_RADIX);
     if (errno || *end || n>maximum) return false;
     *value=(uint32_t)n;return true;
 }
 
 bool orders_run(Simulation* s, const char* path, uint32_t ticks,Audio* audio)
 {
-    Order orders[512]={};uint32_t count=0;
+    Order orders[MAX_REPLAY_ORDERS]={};uint32_t count=0;
     if (path)
     {
         if (!s->world.gameplay.enabled || !ticks) { fprintf(stderr,"Replay requires a gameplay world and positive --ticks.\n");return false; }
         FILE* file=fopen(path,"rb");if (!file) { fprintf(stderr,"Cannot open orders '%s'.\n",path);return false; }
-        char line[256];bool valid=true;
+        char line[REPLAY_LINE_CAPACITY];bool valid=true;
         while (fgets(line,sizeof(line),file))
         {
             char* comment=strchr(line,'#');if (comment) *comment=0;
-            char tick[32],command[32],argument[32],extra;int fields=sscanf(line,"%31s %31s %31s %c",tick,command,argument,&extra);
+            char tick[REPLAY_TOKEN_CAPACITY],command[REPLAY_TOKEN_CAPACITY],argument[REPLAY_TOKEN_CAPACITY],extra;int fields=sscanf(line,"%31s %31s %31s %c",tick,command,argument,&extra);
             if (fields<=0) continue;
-            if (count==512 || fields<3) { valid=false;break; }
+            if (count==MAX_REPLAY_ORDERS || fields<3) { valid=false;break; }
             Order order={};
             if (!integer(tick,ticks-1,&order.tick) || (count && order.tick<orders[count-1].tick)) { valid=false;break; }
             if (!strcmp(command,"move"))
             {
                 order.kind=MOVE;Vec3* v=&order.destination;
-                if (sscanf(line,"%31s %31s %f %f %f %c",tick,command,&v->x,&v->y,&v->z,&extra)!=5
+                if (sscanf(line,"%31s %31s %f %f %f %c",tick,command,&v->x,&v->y,&v->z,&extra)!=MOVE_COMMAND_FIELD_COUNT
                     || !std::isfinite(v->x) || !std::isfinite(v->y) || !std::isfinite(v->z)
-                    || std::fabs(v->x)>1000000 || std::fabs(v->y)>1000000 || std::fabs(v->z)>1000000) { valid=false;break; }
+                    || std::fabs(v->x)>MAX_MOVE_COORDINATE || std::fabs(v->y)>MAX_MOVE_COORDINATE || std::fabs(v->z)>MAX_MOVE_COORDINATE) { valid=false;break; }
             }
             else if (fields!=3) { valid=false;break; }
             else if (!strcmp(command,"select"))

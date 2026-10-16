@@ -4,10 +4,35 @@
 #include "camera.h"
 #include "effects.h"
 #include "vector_math.h"
+#include "math_constants.h"
+#include "factory_shape.h"
 #include <string.h>
 #include <stdio.h>
 #include <new>
 #include <algorithm>
+
+static const float MIN_VISIBLE_SPIKE_GROWTH = .001f;
+static const float MIN_EMBEDDED_DIRECTION_SQUARED = .01f;
+static const float EMBEDDED_SPIKE_LENGTH_SCALE = .45f;
+static const float PROJECTILE_SHRINK_SECONDS = .06f;
+static const float MIN_VISUAL_MOTION_SQUARED = .000001f;
+static const float MIN_LEGACY_FACTORY_GROWTH = .02f;
+static const double FULL_TURN_RADIANS = 6.283185307179586;
+static const double BACKDROP_AXIS_PHASE_OFFSET = .7;
+static const float SPAWN_SCALE_SECONDS = .25f;
+static const float SPAWN_START_SCALE = .3f;
+static const float SPAWN_GROWTH_SCALE = .7f;
+static const float LANDING_SHRINK_SCALE = .8f;
+static const float SPIKE_AXIS_PARALLEL_LIMIT = .95f;
+static const float EMBEDDED_SPIKE_OUTWARD_SCALE = .7f;
+static const float INJURY_TINT_STRENGTH = .95f;
+static const float HIT_FLASH_TINT_STRENGTH = .9f;
+static const float HIT_FLASH_EMISSION_STRENGTH = .6f;
+static const float MIN_VISIBLE_STEM_EXTENSION = .0001f;
+static const float FACTORY_AXIS_PARALLEL_LIMIT = .9f;
+static const float FACTORY_FACTION_TINT_STRENGTH = .25f;
+static const float BUD_START_SCALE = .08f;
+static const float BUD_GROWTH_SCALE = .92f;
 
 static void set_instance(Presentation* p,uint32_t slot,uint32_t mesh,Vec3 position,Vec3 x,Vec3 y,Vec3 z)
 {
@@ -75,7 +100,7 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
         p->attached_base=p->debris_base+(w->gameplay.enabled ? MAX_LIMB_DEBRIS : 0);
         p->flying_base=p->attached_base+(w->spikes.enabled ? MAX_UNITS*w->spikes.count : 0);
         p->embedded_base=p->flying_base+(w->spikes.enabled ? MAX_PROJECTILES : 0);
-        p->background_slot=p->embedded_base+(w->spikes.enabled ? 2*(MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES) : 0);
+        p->background_slot=p->embedded_base+(w->spikes.enabled ? MAX_EMBEDDED*(MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES) : 0);
         scene->instances.resize(p->background_slot+1);
         scene->effects.resize(MAX_EFFECT_SEGMENTS);
         scene->tile_count=((config->width+EFFECT_TILE-1)/EFFECT_TILE)*((config->height+EFFECT_TILE-1)/EFFECT_TILE);
@@ -100,8 +125,8 @@ static float unit_visual_scale(const Simulation* s,const Unit* unit)
 {
     float size=simulation_unit_definition(s,unit)->scale;
     if (!s->world.combat.flight_enabled) return size;
-    float t=unit->hatched ? 1 : std::fmin(1.0f,unit->age/.25f);t=t*t*(3-2*t);size*=.3f+.7f*t;
-    if (unit->landing>0) size*=1-.8f*std::fmin(1.0f,unit->landing/s->world.gameplay.landing_seconds);
+    float t=unit->hatched ? 1 : std::fmin(1.0f,unit->age/SPAWN_SCALE_SECONDS);t=t*t*(3-2*t);size*=SPAWN_START_SCALE+SPAWN_GROWTH_SCALE*t;
+    if (unit->landing>0) size*=1-LANDING_SHRINK_SCALE*std::fmin(1.0f,unit->landing/s->world.gameplay.landing_seconds);
     return size;
 }
 
@@ -111,7 +136,7 @@ static uint32_t factory_instance_slot(const Presentation* state,uint32_t cell,ui
 { return state->factory_base+cell*MAX_FACTORY_STRUCTURES+structure; }
 static void spike_instance(Presentation* state,uint32_t slot,Vec3 root,Vec3 direction,float length,float width,Color color)
 {
-    Vec3 axis=std::fabs(direction.y)<.95f ? Vec3{0,1,0} : Vec3{1,0,0};
+    Vec3 axis=std::fabs(direction.y)<SPIKE_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0};
     Vec3 x=normalize(cross(axis,direction)),y=cross(direction,x);
     set_instance(state,slot,state->spike_mesh,root,scale(x,width),scale(y,width),scale(direction,length));
     float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=1;
@@ -129,23 +154,23 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
         if (simulation_unit_definition(s,u)->detaches)
             for (uint32_t j=0;j<r->count;++j)
             {
-                float growth=u->spikes[j];if (growth<=.001f) continue;
+                float growth=u->spikes[j];if (growth<=MIN_VISIBLE_SPIKE_GROWTH) continue;
                 Vec3 dir=posed_direction(simulation_spike_direction(j,r->count),x,y,z);
                 spike_instance(state,state->attached_base+i*r->count+j,add(u->position,scale(dir,r->root*size)),dir,
                     size*r->length*growth,size*.5f*growth,color);++state->attached_spikes;
             }
         for (uint32_t j=0;j<u->wounds && j<MAX_EMBEDDED;++j)
         {
-            if (dot(u->embedded[j].direction,u->embedded[j].direction)<.01f) continue;
-            Vec3 outward=posed_direction(u->embedded[j].direction,x,y,z);float length=std::fmax(r->scale,size*.45f);
-            Vec3 root=add(add(u->position,scale(posed_direction(u->embedded[j].anchor,x,y,z),size)),scale(outward,length*.7f));
-            spike_instance(state,embedded+i*2+j,root,scale(outward,-1),length,length*.5f,content_color(&s->world.content,u->embedded[j].faction));++state->embedded_spikes;
+            if (dot(u->embedded[j].direction,u->embedded[j].direction)<MIN_EMBEDDED_DIRECTION_SQUARED) continue;
+            Vec3 outward=posed_direction(u->embedded[j].direction,x,y,z);float length=std::fmax(r->scale,size*EMBEDDED_SPIKE_LENGTH_SCALE);
+            Vec3 root=add(add(u->position,scale(posed_direction(u->embedded[j].anchor,x,y,z),size)),scale(outward,length*EMBEDDED_SPIKE_OUTWARD_SCALE));
+            spike_instance(state,embedded+i*MAX_EMBEDDED+j,root,scale(outward,-1),length,length*.5f,content_color(&s->world.content,u->embedded[j].faction));++state->embedded_spikes;
         }
     }
     for (uint32_t i=0;i<MAX_PROJECTILES;++i)
     {
         const Projectile* p=&s->projectiles[i];if (!p->active || !simulation_in_sight(s,p->position,0)) continue;
-        float blend=std::fmin(1.0f,p->age/.06f),length=p->launch_scale+(r->scale-p->launch_scale)*blend;
+        float blend=std::fmin(1.0f,p->age/PROJECTILE_SHRINK_SECONDS),length=p->launch_scale+(r->scale-p->launch_scale)*blend;
         spike_instance(state,flying+i,p->position,p->direction,length,length*.5f,content_color(&s->world.content,p->faction));++state->flying_spikes;
     }
     for (uint32_t i=0;i<s->world.body_count;++i)
@@ -161,16 +186,16 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
             Vec3 tip=simulation_structure_position(s,i,k);
             for (uint32_t j=0;j<wounds && j<MAX_EMBEDDED;++j)
             {
-                if (dot(spikes[j].direction,spikes[j].direction)<.01f) continue;
+                if (dot(spikes[j].direction,spikes[j].direction)<MIN_EMBEDDED_DIRECTION_SQUARED) continue;
                 Vec3 outward=spikes[j].direction;float length=r->scale*2;
-                spike_instance(state,embedded+MAX_UNITS*2+(i*MAX_FACTORY_STRUCTURES+k)*2+j,
-                    add(add(tip,spikes[j].anchor),scale(outward,length*.7f)),scale(outward,-1),length,length*.5f,
+                spike_instance(state,embedded+MAX_UNITS*MAX_EMBEDDED+(i*MAX_FACTORY_STRUCTURES+k)*MAX_EMBEDDED+j,
+                    add(add(tip,spikes[j].anchor),scale(outward,length*EMBEDDED_SPIKE_OUTWARD_SCALE)),scale(outward,-1),length,length*.5f,
                     content_color(&s->world.content,spikes[j].faction));++state->embedded_spikes;
             }
             if (wounds)
             {
                 Color tint=r->injury[std::min(1u,wounds-1)];float* style=state->scene.instances[factory_instance_slot(state,i,k)].style;
-                style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=.95f;
+                style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=INJURY_TINT_STRENGTH;
             }
         }
     }
@@ -182,7 +207,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         const Unit* unit=&s->units[i];if (unit->health<=0 || !s->visible_units[i]) continue;
-        const UnitDefinition* definition=simulation_unit_definition(s,unit);float yaw=definition->yaw_degrees*.01745329252f;
+        const UnitDefinition* definition=simulation_unit_definition(s,unit);float yaw=definition->yaw_degrees*DEGREES_TO_RADIANS;
         if (unit->target>=0)
         {
             Vec3 delta=subtract(s->world.bodies[unit->target].position,unit->position);
@@ -191,13 +216,13 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
         if (s->world.combat.enabled)
         {
             Vec3 velocity=subtract(unit->position,s->trails[i].points[0]);
-            if (dot(velocity,velocity)>.000001f) yaw=std::atan2(velocity.x,velocity.z);
+            if (dot(velocity,velocity)>MIN_VISUAL_MOTION_SQUARED) yaw=std::atan2(velocity.x,velocity.z);
             const CombatVisuals* fx=&s->world.combat;
             bool flash=unit->flash>0;float flash_strength=flash ? std::sqrt(unit->flash/fx->flash_seconds) : 0;Color tint=flash ? fx->flash : fx->injured;
             if (!flash && unit->wounds) tint=s->world.spikes.injury[std::min(1u,unit->wounds-1)];
             float* style=state->scene.instances[state->unit_base+i].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;
-            style[3]=flash ? .9f*flash_strength : (unit->wounds ? .95f : 0);
-            style[4]=flash ? .6f*flash_strength : 0;
+            style[3]=flash ? HIT_FLASH_TINT_STRENGTH*flash_strength : (unit->wounds ? INJURY_TINT_STRENGTH : 0);
+            style[4]=flash ? HIT_FLASH_EMISSION_STRENGTH*flash_strength : 0;
         }
         if (s->world.combat.flight_enabled)
         {
@@ -226,30 +251,30 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                     for (uint32_t j=0;j<GROWTH_SEGMENTS;++j)
                     {
                         float extension=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_SEGMENTS-j));
-                        if (extension<=.0001f) continue;
+                        if (extension<=MIN_VISIBLE_STEM_EXTENSION) continue;
                         Vec3 start=colony->stems[k][j],delta=scale(subtract(colony->stems[k][j+1],start),extension);
-                        Vec3 y=normalize(delta),x=normalize(cross(std::fabs(y.z)<.9f ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
-                        float width=definition->width*(1-.12f*j)*(colony->parents[k]>=0 ? .65f : 1)*(.55f+.45f*growth);
+                        Vec3 y=normalize(delta),x=normalize(cross(std::fabs(y.z)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
+                        float width=definition->width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j)*(colony->parents[k]>=0 ? FACTORY_CHILD_STEM_WIDTH_SCALE : 1)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
                         uint32_t slot=state->stem_base+(p*MAX_FACTORY_STRUCTURES+k)*GROWTH_SEGMENTS+j;
                         set_instance(state,slot,state->segment_meshes[colony->type],start,scale(x,width),delta,scale(z,width));
                         uint32_t wounds=k ? colony->branches[k-1].wounds : colony->wounds;
                         Color tint=wounds ? s->world.spikes.injury[std::min(1u,wounds-1)] : color;
-                        float* style=state->scene.instances[slot].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=wounds ? .95f : .25f;
+                        float* style=state->scene.instances[slot].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=wounds ? INJURY_TINT_STRENGTH : FACTORY_FACTION_TINT_STRENGTH;
                     }
-                    float size=definition->width*(colony->parents[k]>=0 ? .7f : 1)*(.4f+.6f*growth);
+                    float size=definition->width*(colony->parents[k]>=0 ? FACTORY_CHILD_HEAD_WIDTH_SCALE : 1)*(FACTORY_HEAD_START_WIDTH_SCALE+FACTORY_HEAD_GROWTH_WIDTH_SCALE*growth);
                     uint32_t slot=factory_instance_slot(state,p,k);
                     Vec3 tip=simulation_structure_position(s,p,k),y=normalize(subtract(tip,colony->stems[k][0]));
-                    Vec3 x=normalize(cross(std::fabs(y.z)<.9f ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
+                    Vec3 x=normalize(cross(std::fabs(y.z)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
                     if (growth>=(k ? colony->branches[k-1].growth : colony->growth))
                         set_instance(state,slot,state->tip_meshes[colony->type],tip,scale(x,size),scale(y,size),scale(z,size));
-                    float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=.25f;
+                    float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=FACTORY_FACTION_TINT_STRENGTH;
                 }
                 if (colony->building)
                 {
                     const UnitDefinition& u=s->world.content.units[colony->building_kind];float t=colony->manufacturing;
-                    float size=u.scale*(.08f+.92f*t*t*(3-2*t));Vec3 tip=simulation_structure_position(s,p,colony->production_tip);
+                    float size=u.scale*(BUD_START_SCALE+BUD_GROWTH_SCALE*t*t*(3-2*t));Vec3 tip=simulation_structure_position(s,p,colony->production_tip);
                     Vec3 z=normalize(subtract(tip,s->world.bodies[p].position));
-                    Vec3 x=normalize(cross(std::fabs(z.y)<.9f ? Vec3{0,1,0} : Vec3{1,0,0},z)),y=cross(z,x);
+                    Vec3 x=normalize(cross(std::fabs(z.y)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0},z)),y=cross(z,x);
                     set_instance(state,state->bud_base+p,state->unit_meshes[colony->building_kind],tip,scale(x,size),scale(y,size),scale(z,size));
                 }
                 continue;
@@ -258,7 +283,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
             for (uint32_t k=0;k<simulation_producer_definition(s,p)->branches.count;++k)
             {
                 const FactoryStructure* b=k ? &colony->branches[k-1] : 0;if ((k ? b->health : colony->health)<=0) continue;
-                float growth=std::fmax(.02f,k ? b->growth : colony->growth);
+                float growth=std::fmax(MIN_LEGACY_FACTORY_GROWTH,k ? b->growth : colony->growth);
                 Vec3 position=k ? add(colony->surface,b->offset) : colony->surface;
                 float width=simulation_producer_definition(s,p)->width*growth;
                 set_instance(state,factory_instance_slot(state,p,k),state->factory_meshes[colony->type],position,
@@ -271,16 +296,15 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
     {
         const LimbDebris& d=s->debris[i];if (d.seconds<=0 || !simulation_in_sight(s,d.start,0)) continue;
         float shrink=std::fmin(1.0f,(d.seconds-d.age)/s->world.combat.break_shrink);
-        Vec3 delta=subtract(d.end,d.start),y=normalize(delta),x=normalize(cross(std::fabs(y.z)<.9f ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
+        Vec3 delta=subtract(d.end,d.start),y=normalize(delta),x=normalize(cross(std::fabs(y.z)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
         uint32_t slot=state->debris_base+i;
         set_instance(state,slot,d.tip ? state->tip_meshes[d.producer] : state->segment_meshes[d.producer],d.start,
             scale(x,d.radius*shrink),d.tip ? scale(y,d.radius*shrink) : scale(delta,shrink),scale(z,d.radius*shrink));
         Color color=content_color(&s->world.content,d.faction);float* style=state->scene.instances[slot].style;
-        style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=.25f;
+        style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=FACTORY_FACTION_TINT_STRENGTH;
     }
     update_spike_instances(state,simulation);
 }
-
 
 bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera,const RenderConfig* config)
 {
@@ -311,18 +335,18 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
         for (uint32_t i=0;i<w->spawn_count;++i)
         {
             const Spawn* spawn=&w->spawns[i];const UnitDefinition* definition=&w->content.units[spawn->type];
-            float c=std::cos(definition->yaw_degrees*.01745329252f)*definition->scale;
-            float v=std::sin(definition->yaw_degrees*.01745329252f)*definition->scale;
+            float c=std::cos(definition->yaw_degrees*DEGREES_TO_RADIANS)*definition->scale;
+            float v=std::sin(definition->yaw_degrees*DEGREES_TO_RADIANS)*definition->scale;
             set_instance(p,p->unit_base+i,p->unit_meshes[spawn->type],spawn->position,Vec3{c,0,-v},Vec3{0,definition->scale,0},Vec3{v,0,c});
         }
     scene->time_seconds=s->time_seconds;
     if (w->backdrop.model_path[0])
     {
-        double phase=s->time_seconds*6.283185307179586/(w->backdrop_soft ? w->backdrop_period : 1);
+        double phase=s->time_seconds*FULL_TURN_RADIANS/(w->backdrop_soft ? w->backdrop_period : 1);
         scene->background_animation[0]=(float)std::sin(phase);scene->background_animation[1]=(float)std::cos(phase);
-        scene->background_animation[2]=(float)std::fmod(phase,6.283185307179586);
+        scene->background_animation[2]=(float)std::fmod(phase,FULL_TURN_RADIANS);
         float pulse=w->backdrop_soft ? w->backdrop_pulse : 0;
-        Vec3 stretch={1+pulse*(float)std::sin(phase),1+pulse*(float)std::sin(phase+.7),1},center=w->backdrop.position;
+        Vec3 stretch={1+pulse*(float)std::sin(phase),1+pulse*(float)std::sin(phase+BACKDROP_AXIS_PHASE_OFFSET),1},center=w->backdrop.position;
         set_instance(p,p->background_slot,p->background_mesh,Vec3{center.x*(1-stretch.x),center.y*(1-stretch.y),0},
             Vec3{stretch.x,0,0},Vec3{0,stretch.y,0},Vec3{0,0,1});
         scene->instances[p->background_slot].mask=w->backdrop_soft ? 4 : 1;

@@ -1,3 +1,4 @@
+// ASCII-indexed 4 by 7 glyph rows packed into 32-bit words.
 // Procedural 4x7 diagnostic glyph coefficients; no image/font texture.
 static const uint32_t debug_glyphs[128] = {
     0x0000000u,0x0000000u,0x0000000u,0x0000000u,0x0000000u,0x0000000u,0x0000000u,0x0000000u,

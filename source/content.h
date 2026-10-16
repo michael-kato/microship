@@ -2,17 +2,19 @@
 #define MICROSHIP_CONTENT_H
 #include "types.h"
 #include <stdint.h>
+#include "asset_limits.h"
 
 typedef uint32_t Faction;
 enum { FACTION_NEUTRAL=0, MAX_FACTIONS=9, MAX_GROUPS=8, MAX_UNIT_TYPES=32, MAX_PRODUCER_TYPES=8, MAX_BODY_TYPES=32, MAX_FACTORY_STRUCTURES=16 };
+enum { MAX_HIT_COUNT=32, BRANCH_FIELDS_COMPLETE=3 };
 enum GrowthGrammar { GROWTH_AXIAL,GROWTH_FAN,GROWTH_HYPHA };
 enum { TARGET_UNITS=1, TARGET_STRUCTURES=2 };
 enum AttackMode { ATTACK_PROJECTILE,ATTACK_DIGEST,ATTACK_SPORE };
-struct GroupDefinition { bool declared;char key[32],selection[32],singular[32],plural[32]; };
+struct GroupDefinition { bool declared;char key[ASSET_NAME_CAPACITY],selection[ASSET_NAME_CAPACITY],singular[ASSET_NAME_CAPACITY],plural[ASSET_NAME_CAPACITY]; };
 struct FactionDefinition
 {
     bool declared;
-    char name[32],label[32],producer_name[32],default_name[32],assault_name[32];
+    char name[ASSET_NAME_CAPACITY],label[ASSET_NAME_CAPACITY],producer_name[ASSET_NAME_CAPACITY],default_name[ASSET_NAME_CAPACITY],assault_name[ASSET_NAME_CAPACITY];
     Color color;
     uint32_t producer,default_unit,assault_unit;
     bool automatic;
@@ -21,7 +23,7 @@ struct FactionDefinition
 };
 struct UnitDefinition
 {
-    char name[32],faction_name[32],group_name[32],model_path[256];
+    char name[ASSET_NAME_CAPACITY],faction_name[ASSET_NAME_CAPACITY],group_name[ASSET_NAME_CAPACITY],model_path[ASSET_PATH_CAPACITY];
     Faction faction;
     uint32_t group,targets,secondary_targets,hits;
     float secondary_interval;
@@ -46,8 +48,8 @@ struct BranchRules
 };
 struct ProducerDefinition
 {
-    char name[32],faction_name[32],model_path[256];
-    char segment_path[256],tip_path[256];
+    char name[ASSET_NAME_CAPACITY],faction_name[ASSET_NAME_CAPACITY],model_path[ASSET_PATH_CAPACITY];
+    char segment_path[ASSET_PATH_CAPACITY],tip_path[ASSET_PATH_CAPACITY];
     Faction faction;
     float growth_seconds,establishment_seconds,health,collection,height,width;
     float stem_radius,head_radius;
@@ -56,8 +58,8 @@ struct ProducerDefinition
 };
 struct BodyDefinition
 {
-    char name[32],label[32],model_path[256];
-    char parts_path[256];
+    char name[ASSET_NAME_CAPACITY],label[ASSET_NAME_CAPACITY],model_path[ASSET_PATH_CAPACITY];
+    char parts_path[ASSET_PATH_CAPACITY];
     float shape_variation,part_variation;
     bool hosts_site;
 };
@@ -65,7 +67,7 @@ struct Content
 {
     BodyDefinition bodies[MAX_BODY_TYPES];
     uint32_t body_count;
-    char resource_label[32];
+    char resource_label[ASSET_NAME_CAPACITY];
     FactionDefinition factions[MAX_FACTIONS];
     GroupDefinition groups[MAX_GROUPS];
     UnitDefinition units[MAX_UNIT_TYPES];

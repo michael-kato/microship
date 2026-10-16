@@ -8,6 +8,21 @@
 #include <float.h>
 #include <string.h>
 
+static const int MESH_MAGIC_BYTES = 8;
+static const int MAX_MESH_VERTICES = 1000000;
+static const int MAX_MESH_TRIANGLES = 2000000;
+static const double HALF_TURN_DEGREES = 180.0;
+static const int MAX_VERTEX_EMISSION = 10000;
+static const float MIN_NORMAL_SQUARED_LENGTH = .98f;
+static const float MAX_NORMAL_SQUARED_LENGTH = 1.02f;
+static const float MIN_MATERIAL_ROUGHNESS = .02f;
+static const float MAX_LOCAL_COORDINATE = 1.5f;
+static const int MAX_SCENE_MESHES = 128;
+static const int MAX_SPHERE_SEGMENTS = 512;
+static const int MAX_SPHERE_RINGS = 256;
+static const float SURFACE_DETERMINANT_EPSILON = 1e-8f;
+static const float FACTORY_SURFACE_INSET = .015f;
+
 static const double PI = 3.14159265358979323846;
 
 static bool add_vertex(Geometry* geometry, Vec3 center, float radius, Color color,
@@ -117,11 +132,11 @@ static bool validate_areas(Geometry* geometry)
 
 static bool mesh_header(FILE* file, uint32_t* vertex_count, uint32_t* triangle_count)
 {
-    char magic[8];
-    return fread(magic, 1, 8, file) == 8 && memcmp(magic, "FLMESH01", 8) == 0
+    char magic[MESH_MAGIC_BYTES];
+    return fread(magic, 1, MESH_MAGIC_BYTES, file) == MESH_MAGIC_BYTES && memcmp(magic, "FLMESH01", MESH_MAGIC_BYTES) == 0
         && fread(vertex_count, 4, 1, file) == 1 && fread(triangle_count, 4, 1, file) == 1
-        && *vertex_count >= 3 && *vertex_count <= 1000000
-        && *triangle_count > 0 && *triangle_count <= 2000000;
+        && *vertex_count >= 3 && *vertex_count <= MAX_MESH_VERTICES
+        && *triangle_count > 0 && *triangle_count <= MAX_MESH_TRIANGLES;
 }
 
 static bool mesh_counts(const char* path, uint32_t* vertices, uint32_t* triangles)
@@ -136,7 +151,7 @@ static bool mesh_counts(const char* path, uint32_t* vertices, uint32_t* triangle
 static bool add_model(Geometry* geometry, const char* path, Vec3 position, float scale,
     Color color, float yaw_degrees,const MeshSource* source=0)
 {
-    float angle = yaw_degrees * (float)(PI / 180.0);
+    float angle = yaw_degrees * (float)(PI / HALF_TURN_DEGREES);
     float cosine = std::cos(angle), sine = std::sin(angle);
     FILE* file = fopen(path, "rb");
     uint32_t vertex_count = 0, triangle_count = 0;
@@ -166,10 +181,10 @@ static bool add_model(Geometry* geometry, const char* path, Vec3 position, float
             valid = valid && std::isfinite(v->position[j]) && std::isfinite(v->normal[j]) && std::isfinite(v->color[j]);
         float normal_squared = v->normal[0]*v->normal[0]+v->normal[1]*v->normal[1]+v->normal[2]*v->normal[2];
         valid = valid && v->position[3] >= 1 && v->position[3] <= 3
-            && v->normal[3] >= 0 && v->normal[3] <= 10000
-            && normal_squared > .98f && normal_squared < 1.02f
-            && v->color[3] >= .02f && v->color[3] <= 1;
-        valid = valid && std::fabs(v->position[0]) <= 1.5f && std::fabs(v->position[2]) <= 1.5f;
+            && v->normal[3] >= 0 && v->normal[3] <= MAX_VERTEX_EMISSION
+            && normal_squared > MIN_NORMAL_SQUARED_LENGTH && normal_squared < MAX_NORMAL_SQUARED_LENGTH
+            && v->color[3] >= MIN_MATERIAL_ROUGHNESS && v->color[3] <= 1;
+        valid = valid && std::fabs(v->position[0]) <= MAX_LOCAL_COORDINATE && std::fabs(v->position[2]) <= MAX_LOCAL_COORDINATE;
         float x = v->position[0], z = v->position[2];
         v->position[0] = cosine * x + sine * z;
         v->position[2] = -sine * x + cosine * z;
@@ -180,7 +195,7 @@ static bool add_model(Geometry* geometry, const char* path, Vec3 position, float
         const float tint[] = {color.r, color.g, color.b};
         for (uint32_t j = 0; j < 3; ++j)
         {
-            valid = valid && std::fabs(v->position[j]) <= 1.5f && v->color[j] >= 0 && v->color[j] <= 1;
+            valid = valid && std::fabs(v->position[j]) <= MAX_LOCAL_COORDINATE && v->color[j] >= 0 && v->color[j] <= 1;
             v->position[j] = center[j] + scale * v->position[j];
             v->color[j] *= tint[j];
             valid = valid && std::isfinite(v->position[j]);
@@ -202,8 +217,8 @@ static bool add_model(Geometry* geometry, const char* path, Vec3 position, float
 
 bool geometry_build(Geometry* geometry,const MeshSource* sources,uint32_t count,const RenderConfig* config)
 {
-    if (!count || count>128 || config->sphere_segments<3 || config->sphere_segments>512
-        || config->sphere_rings<2 || config->sphere_rings>256)
+    if (!count || count>MAX_SCENE_MESHES || config->sphere_segments<3 || config->sphere_segments>MAX_SPHERE_SEGMENTS
+        || config->sphere_rings<2 || config->sphere_rings>MAX_SPHERE_RINGS)
     { fprintf(stderr,"geometry: invalid mesh count or sphere subdivisions\n");return false; }
     uint32_t vertex_capacity=0,triangle_capacity=0;
     for (uint32_t i=0;i<count;++i)
@@ -211,7 +226,7 @@ bool geometry_build(Geometry* geometry,const MeshSource* sources,uint32_t count,
         uint32_t vertices=2+(config->sphere_rings-1)*config->sphere_segments;
         uint32_t triangles=2*config->sphere_segments*(config->sphere_rings-1);
         if (sources[i].path[0] && !mesh_counts(sources[i].path,&vertices,&triangles)) return false;
-        if (vertices>1000000-vertex_capacity || triangles>2000000-triangle_capacity)
+        if (vertices>MAX_MESH_VERTICES-vertex_capacity || triangles>MAX_MESH_TRIANGLES-triangle_capacity)
         { fprintf(stderr,"geometry: scene exceeds mesh capacity\n");return false; }
         vertex_capacity+=vertices;triangle_capacity+=triangles;
     }
@@ -266,12 +281,12 @@ bool geometry_surface_point(const char* path,Vec3 position,float radius,Vec3 nor
         }
         Vec3 edge1=subtract(v[1],v[0]),edge2=subtract(v[2],v[0]);
         Vec3 h=cross(normal,edge2);float determinant=dot(edge1,h);
-        if (std::fabs(determinant)<1e-8f) continue;
+        if (std::fabs(determinant)<SURFACE_DETERMINANT_EPSILON) continue;
         Vec3 offset=scale(v[0],-1),q=cross(offset,edge1);
         float u=dot(offset,h)/determinant,vv=dot(normal,q)/determinant;
         if (u<0 || vv<0 || u+vv>1) continue;
         surface=std::fmax(surface,dot(edge2,q)/determinant);
     }
     if (surface<=0) { fprintf(stderr,"Surface ray missed mesh.\n");return false; }
-    *point=add(position,scale(normal,surface-.015f));return true;
+    *point=add(position,scale(normal,surface-FACTORY_SURFACE_INSET));return true;
 }

@@ -1,5 +1,6 @@
+#include "render_bindings.glsl"
 // Append-only layout shared with C++ RenderUniform. No sampled lighting history.
-layout(set = 0, binding = 4, std140) uniform RenderUniform
+layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
 {
     vec4 camera_position;
     vec4 camera_forward;

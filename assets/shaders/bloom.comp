@@ -1,14 +1,23 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
-#define MICROSHIP_DEBUG_BINDING 3
+#include "render_bindings.glsl"
+#define MICROSHIP_DEBUG_BINDING BLOOM_BINDING_DEBUG
 #include "debug_buffers.glsl"
+
+const float SRGB_POWER_SCALE = 1.055;
+const float SRGB_GAMMA = 2.4;
+const float SRGB_POWER_OFFSET = 0.055;
+const float SRGB_LINEAR_SCALE = 12.92;
+const float SRGB_LINEAR_THRESHOLD = 0.0031308;
+const float GAUSSIAN_RADIUS_SIGMAS = 3.0;
+const float MIN_BLOOM_PEAK = 0.000001;
 
 // A separable, native-resolution glare filter. Both passes overwrite this
 // frame's buffers; neither samples a preceding frame or changes resolution.
-layout(local_size_x = 8, local_size_y = 8) in;
-layout(set = 0, binding = 0, rgba32f) uniform readonly image2D beauty;
-layout(set = 0, binding = 1, rgba32f) uniform image2D horizontal;
-layout(set = 0, binding = 2, rgba8) uniform writeonly image2D display_image;
+layout(local_size_x = COMPUTE_GROUP_SIZE, local_size_y = COMPUTE_GROUP_SIZE) in;
+layout(set = 0, binding = BLOOM_BINDING_BEAUTY, rgba32f) uniform readonly image2D beauty;
+layout(set = 0, binding = BLOOM_BINDING_HORIZONTAL, rgba32f) uniform image2D horizontal;
+layout(set = 0, binding = BLOOM_BINDING_DISPLAY, rgba8) uniform writeonly image2D display_image;
 layout(push_constant) uniform Bloom
 {
     ivec2 extent;
@@ -22,8 +31,8 @@ layout(push_constant) uniform Bloom
 
 vec3 linear_to_srgb(vec3 linear)
 {
-    return mix(1.055 * pow(linear, vec3(1.0 / 2.4)) - 0.055,
-               12.92 * linear, lessThanEqual(linear, vec3(0.0031308)));
+    return mix(SRGB_POWER_SCALE * pow(linear, vec3(1.0 / SRGB_GAMMA)) - SRGB_POWER_OFFSET,
+               SRGB_LINEAR_SCALE * linear, lessThanEqual(linear, vec3(SRGB_LINEAR_THRESHOLD)));
 }
 
 void write_display(ivec2 pixel,vec3 linear)
@@ -47,7 +56,7 @@ void main()
     }
     vec3 sum = vec3(0.0);
     float weight_sum = 0.0;
-    float sigma = max(0.5, float(bloom.radius) / 3.0);
+    float sigma = max(0.5, float(bloom.radius) / GAUSSIAN_RADIUS_SIGMAS);
     for (int offset = -bloom.radius; offset <= bloom.radius; ++offset)
     {
         float weight = exp(-0.5 * float(offset * offset) / (sigma * sigma));
@@ -59,7 +68,7 @@ void main()
         {
             value = imageLoad(beauty, sample_pixel).rgb;
             float peak = max(value.r, max(value.g, value.b));
-            value *= max(0.0, peak - bloom.threshold) / max(peak, 0.000001);
+            value *= max(0.0, peak - bloom.threshold) / max(peak, MIN_BLOOM_PEAK);
         }
         else value = imageLoad(horizontal, sample_pixel).rgb;
         sum += value * weight;

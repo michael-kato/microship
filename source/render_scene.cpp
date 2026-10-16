@@ -3,6 +3,11 @@
 #include <float.h>
 #include <stdio.h>
 
+static const float MIN_BOUNDS_MARGIN = .0001f;
+static const float RELATIVE_BOUNDS_MARGIN = .00001f;
+static const unsigned int VALID_INSTANCE_MASK_BITS = 5u;
+static const int INSTANCE_STYLE_VALUE_COUNT = 8;
+
 void render_scene_bounds(RenderScene* scene)
 {
     for (uint32_t axis=0;axis<3;++axis)
@@ -24,7 +29,7 @@ void render_scene_bounds(RenderScene* scene)
                 midpoint+=value*.5f*(mesh->low[column]+mesh->high[column]);
                 radius+=std::fabs(value)*.5f*(mesh->high[column]-mesh->low[column]);
             }
-            radius+=std::fmax(.0001f,.00001f*(std::fabs(midpoint)+radius));
+            radius+=std::fmax(MIN_BOUNDS_MARGIN,RELATIVE_BOUNDS_MARGIN*(std::fabs(midpoint)+radius));
             scene->bounds_min[row]=std::fmin(scene->bounds_min[row],midpoint-radius);
             scene->bounds_max[row]=std::fmax(scene->bounds_max[row],midpoint+radius);
             if (instance->background) continue;
@@ -43,10 +48,10 @@ bool render_scene_validate(const RenderScene* scene)
     for (uint32_t i=0;valid && i<scene->instances.size();++i)
     {
         const RenderInstance* instance=&scene->instances[i];
-        valid=instance->mesh<scene->geometry.meshes.size() && !(instance->mask&~5u);
+        valid=instance->mesh<scene->geometry.meshes.size() && !(instance->mask&~VALID_INSTANCE_MASK_BITS);
         for (uint32_t row=0;row<3;++row)
             for (uint32_t column=0;column<4;++column) valid=valid && std::isfinite(instance->transform[row][column]);
-        for (uint32_t j=0;j<8;++j) valid=valid && std::isfinite(instance->style[j]);
+        for (uint32_t j=0;j<INSTANCE_STYLE_VALUE_COUNT;++j) valid=valid && std::isfinite(instance->style[j]);
     }
     for (uint32_t i=0;valid && i<scene->media.size();++i)
     {
@@ -90,7 +95,7 @@ bool render_scene_write(const RenderScene* scene,const char* path)
         for (uint32_t row=0;row<3;++row) for (uint32_t column=0;column<4;++column)
             fprintf(file,"%s%.6f",row || column ? "," : "",instance->transform[row][column]);
         fprintf(file,"],\"style\":[");
-        for (uint32_t j=0;j<8;++j) fprintf(file,"%s%.6f",j ? "," : "",instance->style[j]);
+        for (uint32_t j=0;j<INSTANCE_STYLE_VALUE_COUNT;++j) fprintf(file,"%s%.6f",j ? "," : "",instance->style[j]);
         fprintf(file,"]}");
     }
     fprintf(file,"],\"media\":[");

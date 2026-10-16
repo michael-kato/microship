@@ -20,6 +20,14 @@ from gpu_environment import check_gpu_environment
 from authored_assets import stage_world, write_world
 from copy import deepcopy
 
+NATIVE_WIDTH = 1920
+NATIVE_HEIGHT = 1080
+DEFAULT_FILM_SAMPLES = 6
+MAX_PROCESS_SECONDS = 10
+FROZEN_SCENE_SECONDS = 60
+MAX_SAMPLE_STARTS = 8
+MAX_BATCH_SECONDS = 30
+MILLISECONDS_PER_SECOND = 1000
 
 def setting(data, name, value):
     updated=deepcopy(data)
@@ -29,34 +37,32 @@ def setting(data, name, value):
             return updated
     raise RuntimeError(f'Unknown rendering setting: {name}')
 
-
 def numbers(pattern, log, frames, allow_zero=False):
     values = [float(value) for value in re.findall(pattern, log)]
     if len(values) != frames or any(value < 0 if allow_zero else value <= 0 for value in values):
         raise RuntimeError('Application did not report valid timings for every frame')
     return values
 
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('binary', type=Path)
     parser.add_argument('--run', action='store_true', help='Explicitly launch GPU diagnostics')
-    parser.add_argument('--width', type=int, default=1920)
-    parser.add_argument('--height', type=int, default=1080)
-    parser.add_argument('--samples', type=int, default=6)
+    parser.add_argument('--width', type=int, default=NATIVE_WIDTH)
+    parser.add_argument('--height', type=int, default=NATIVE_HEIGHT)
+    parser.add_argument('--samples', type=int, default=DEFAULT_FILM_SAMPLES)
     parser.add_argument('--volume-samples', type=int, default=1)
     parser.add_argument('--frames', type=int, default=2)
     parser.add_argument('--rounds', type=int, default=1)
-    parser.add_argument('--timeout', type=float, default=10,
+    parser.add_argument('--timeout', type=float, default=MAX_PROCESS_SECONDS,
                         help='Host timeout per process; cannot recover a hung GPU driver')
-    parser.add_argument('--time', type=float, default=60, help='Frozen scene timestamp; not workload duration')
+    parser.add_argument('--time', type=float, default=FROZEN_SCENE_SECONDS, help='Frozen scene timestamp; not workload duration')
     parser.add_argument('--output', type=Path, default=Path('build/profiling/diagnostic'))
     args = parser.parse_args()
     if args.binary.suffix.lower() != '.exe':
         parser.error('Profile the Windows .exe; Linux runs it through Proton')
-    if not ((args.width,args.height) == (1920,1080)
-            and 1 <= args.samples <= 8 and 0 <= args.volume_samples <= 8-args.samples and 1 <= args.frames <= 2
-            and 1 <= args.rounds <= 2 and 0 < args.timeout <= 10):
+    if not ((args.width,args.height) == (NATIVE_WIDTH,NATIVE_HEIGHT)
+            and 1 <= args.samples <= MAX_SAMPLE_STARTS and 0 <= args.volume_samples <= MAX_SAMPLE_STARTS-args.samples and 1 <= args.frames <= 2
+            and 1 <= args.rounds <= 2 and 0 < args.timeout <= MAX_PROCESS_SECONDS):
         parser.error('Diagnostics require native 1920x1080, 1-8 total surface/volume spp, 1-2 frames, '
                      '1-2 rounds, and a process timeout of at most 10 seconds')
     if args.run:
@@ -75,7 +81,7 @@ def main():
                        ('samples_per_pixel',args.samples),('rays_per_pixel',args.volume_samples)):
         config=setting(config,name,value)
     background=int('soft' in world['appearance'].get('backdrop',{}))
-    if args.samples+args.volume_samples+background>8:
+    if args.samples+args.volume_samples+background>MAX_SAMPLE_STARTS:
         parser.error('Background queries count toward the eight-sample cap')
     single=deepcopy(world)
     for building in single['content']['buildings']:building['branches'].update(count=1,roots='single')
@@ -106,7 +112,7 @@ def main():
             'background_queries_per_pixel': background,
             'total_candidates_per_pixel': args.samples+args.volume_samples+background,
             'frames_per_run': args.frames, 'rounds': args.rounds,
-            'process_timeout_seconds': args.timeout, 'total_timeout_seconds': 30,
+            'process_timeout_seconds': args.timeout, 'total_timeout_seconds': MAX_BATCH_SECONDS,
             'cases': [name for name, _, _ in cases],
             'note': 'Native-resolution direct ray tracing with fixed film samples and deterministic volume integration. No 256-sample reference is run.'}
     (output / 'plan.json').write_text(json.dumps(plan, indent=2))
@@ -114,7 +120,7 @@ def main():
         print(f'Prepared {len(cases)} cases at {args.width}x{args.height}, {args.samples} spp. '
               'No application launched. Add --run only when GPU testing is resumed.')
         return 0
-    deadline = time.perf_counter() + 30
+    deadline = time.perf_counter() + MAX_BATCH_SECONDS
     for round_index in range(args.rounds):
         # Reverse alternate rounds to reduce systematic warmup/order bias.
         for name, _, _ in (cases if round_index % 2 == 0 else reversed(cases)):
@@ -167,9 +173,8 @@ def main():
         result = results[name]
         app = statistics.mean(result['application_ms'])
         print(f'{name:28} {statistics.mean(result["trace_ms"]):9.3f}'
-              f' {statistics.mean(result["bloom_ms"]):10.3f} {app:10.3f} {1000/app:9.2f}')
+              f' {statistics.mean(result["bloom_ms"]):10.3f} {app:10.3f} {MILLISECONDS_PER_SECOND/app:9.2f}')
     return 0
-
 
 if __name__ == '__main__':
     try:

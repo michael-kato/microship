@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "types.h"
+#include "asset_limits.h"
 
 // Startup-only document ownership. No JSON nodes survive loading.
 struct JsonDocument
@@ -32,7 +33,7 @@ float json_positive(Json,double maximum);
 uint32_t json_uint(Json,uint32_t minimum,uint32_t maximum);
 bool json_bool(Json);
 bool json_string(Json,char* output,size_t capacity);
-bool json_path(Json,const char* source,char* output,size_t capacity=256);
+bool json_path(Json,const char* source,char* output,size_t capacity=ASSET_PATH_CAPACITY);
 Vec3 json_vector(Json,double minimum,double maximum);
 Color json_color(Json,double maximum=1);
 #endif
