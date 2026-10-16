@@ -6,12 +6,22 @@
   "effects": "../presentation/combat.json",
   "match": {
     "player": "virus",
-    "opponent": "immune"
+    "opponent": "immune",
+    "starts": [
+      {
+        "faction": "virus",
+        "cell": 0
+      },
+      {
+        "faction": "immune",
+        "cell": 1
+      }
+    ]
   },
   "bodies": [
     {
       "type": "unclaimed",
-      "owner": "virus",
+      "owner": "neutral",
       "position": [
         -52.0,
         -4.0,
@@ -46,7 +56,7 @@
     },
     {
       "type": "unclaimed",
-      "owner": "immune",
+      "owner": "neutral",
       "position": [
         48.0,
         14.0,

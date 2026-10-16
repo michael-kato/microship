@@ -8,7 +8,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from asset_data import stage_world, units, branches, change, remove, write_world
+from asset_data import established_world, units, branches, change, remove, write_world
 
 root=Path(__file__).resolve().parents[2]
 binary=Path(sys.argv[1]).resolve()
@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix='microship-content-') as directory:
                     assert drawing['bounds_min'][row]-.001<=value<=drawing['bounds_max'][row]+.001,(name,'bounds',value)
         return game,drawing,result.stdout
 
-    text=stage_world(root/'assets/levels/biology-virus.json',out)
+    text=established_world(root/'assets/levels/biology-virus.json',out)
     order='0 cell 0\n0 priority bomber\n'
     base,scene,log=run('baseline',text,1800,order)
     roughness=scene['meshes'][0]['roughness']
@@ -96,7 +96,7 @@ with tempfile.TemporaryDirectory(prefix='microship-content-') as directory:
     stayed,_,_=run('colonization-capability',passive,1800,'0 select fighters\n0 move -30 0 6.4\n240 order 2\n')
     assert stayed['colonies'][2]['faction']==0,'A type without colonization consumed a unit'
 
-    compact=stage_world(root/'tests/e2e/scenes/biology-two-virus.json',out)
+    compact=established_world(root/'tests/e2e/scenes/biology-two-virus.json',out)
     changed=units(compact,group='fighter',targets=['structures'])
     for u in changed['content']['units']:u.pop('secondary_attack',None)
     for spawn in changed['spawns']:

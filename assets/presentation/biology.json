@@ -1,9 +1,9 @@
 {
   "$schema": "../schemas/appearance.schema.json",
   "ambient": [
-    0.07,
-    0.055,
-    0.065
+    0.04,
+    0.032,
+    0.038
   ],
   "gradient": {
     "top": [
@@ -55,7 +55,7 @@
         0.76,
         0.68
       ],
-      "irradiance": 4.0
+      "irradiance": 6.5
     },
     "fill": {
       "direction": [
@@ -68,7 +68,7 @@
         0.8,
         1.0
       ],
-      "irradiance": 1.3
+      "irradiance": 0.75
     },
     "rim": {
       "direction": [
@@ -81,12 +81,33 @@
         0.38,
         0.5
       ],
-      "irradiance": 3.5
+      "irradiance": 6
     }
   },
   "thin_surface": {
     "transmission": 0.82,
     "absorption": 0.025,
     "clarity": 0.9
+  },
+  "atmosphere": {
+    "center": [
+      0,
+      0,
+      0
+    ],
+    "radius": 160,
+    "edge_fade": 0.2,
+    "scattering": [
+      0.003,
+      0.0045,
+      0.006
+    ],
+    "absorption": 0.0007,
+    "anisotropy": 0.45
+  },
+  "fog": {
+    "blur_radius": 96,
+    "sight_feather": 2,
+    "plane_z": 0
   }
 }

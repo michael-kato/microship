@@ -99,6 +99,7 @@ struct Simulation
 {
     SoundEvents sounds;
     World world;
+    bool faction_established[MAX_FACTIONS];
     uint32_t tick_count;
     double time_seconds;
     Unit units[MAX_UNITS];

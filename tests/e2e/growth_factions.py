@@ -9,14 +9,14 @@ import subprocess
 import sys
 import tempfile
 import wave
-from asset_data import stage_world,write_world,change
+from asset_data import established_world,write_world,change
 
 repo_root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(repo_root/'scripts/proton_run.py'),str(binary)]
 count=0
 with tempfile.TemporaryDirectory(prefix='microship-growth-') as directory:
     out=Path(directory)
-    def stage(side):return stage_world(repo_root/'assets/levels'/('biology-'+side+'.json'),out)
+    def stage(side):return established_world(repo_root/'assets/levels'/('biology-'+side+'.json'),out)
     def run(name,data,ticks=1,extra=(),orders='',expected=0):
         global count
         level=out/(name+'-world.json');write_world(level,data)
@@ -53,8 +53,8 @@ with tempfile.TemporaryDirectory(prefix='microship-growth-') as directory:
                     delta=[v-u for u,v in zip(x,y)];radial=[u-v for u,v in zip(x,center)]
                     assert sum(u*v for u,v in zip(delta,radial))>0,'A stem grew toward the cell center'
                     assert math.dist(y,center)>math.dist(x,center)
-    early,er=run('early',base,1000)
-    late,lr=run('mature',base,1400)
+    early,er=run('early',base,2000)
+    late,lr=run('mature',base,2800)
     assert 0<early['colonies'][0]['structures'][10]['growth']<1
     assert late['colonies'][0]['structures'][10]['growth']==1
     assert len(lr['instances'])>len(er['instances']),'Growth did not add stem segments'
@@ -62,9 +62,9 @@ with tempfile.TemporaryDirectory(prefix='microship-growth-') as directory:
     assert reset['colonies'][0]['root']==a['colonies'][0]['root'] and reset['tick']==0
     assert all(c['structures'][c['root_count']]['health']==0 for c in reset['colonies'] if c['health']>0)
     audio=out/'growth.wav'
-    audible,_=run('sound',base,1800,extra=('--audio-capture',str(audio)))
+    audible,_=run('sound',base,3000,extra=('--audio-capture',str(audio)))
     with wave.open(str(audio)) as f:
-        assert (f.getnchannels(),f.getsampwidth(),f.getframerate(),f.getnframes())==(1,2,48000,1800*800)
+        assert (f.getnchannels(),f.getsampwidth(),f.getframerate(),f.getnframes())==(1,2,48000,3000*800)
         samples=array.array('h',f.readframes(f.getnframes()))
         assert max(abs(x) for x in samples)<=30000 and sum(x!=0 for x in samples)>4800
     assert audible['sound_events']['growth']>0 and audible['sound_events']['mature']>0 and audible['sound_events']['birth']>11
@@ -160,7 +160,7 @@ with tempfile.TemporaryDirectory(prefix='microship-growth-') as directory:
         c=initial['colonies'][cell];assert initial['landings']==1 and c['active']
         start=360-round(c['establishment_age']*60)
         previous=0
-        for seconds in (10,30,60,89,91):
+        for seconds in (20,60,121,178,182):
             state,_=run(name+'-'+str(seconds),colony,start+seconds*60)
             c=state['colonies'][cell];structures=c['structures']
             alive=[v for v in structures if v['health']>0]
@@ -168,16 +168,17 @@ with tempfile.TemporaryDirectory(prefix='microship-growth-') as directory:
             assert len(growing)<=1,(name,seconds,'Parallel emergence',structures)
             assert all(v['health']==0 and v['growth']==0 for v in structures[len(alive):]),'A later factory emerged first'
             assert all(v['parent']<0 or structures[v['parent']]['growth']==1 for v in alive),'A child grew before its support'
-            maximum=1+(len(structures)-c['root_count'])*.12
+            definition=next(b for b in colony['content']['buildings'] if b['faction']==side)
+            maximum=1+(len(structures)-c['root_count'])*definition['branches']['production']
             assert previous<c['production']<=maximum+.00001,(name,seconds,c['production'])
             previous=c['production']
-            if seconds<90:
-                assert len(alive)==math.ceil(seconds/(90/len(structures))), (name,seconds,len(alive))
+            if seconds<180:
+                assert len(alive)==math.ceil(seconds/(180/len(structures))), (name,seconds,len(alive))
                 assert c['production']<maximum
             else:
                 assert len(alive)==len(structures) and not growing
                 assert abs(c['production']-maximum)<.00001
-        reset,_=run(name+'-restart',colony,start+91*60,extra=('--restart',))
+        reset,_=run(name+'-restart',colony,start+182*60,extra=('--restart',))
         assert not reset['colonies'][cell]['active'] and reset['colonies'][cell]['establishment_age']==0
     for seconds in (60,120):
         tuned=deepcopy(colony)
@@ -186,8 +187,8 @@ with tempfile.TemporaryDirectory(prefix='microship-growth-') as directory:
         complete,_=run('establish-tuned-full-'+str(seconds),tuned,start+(seconds+1)*60)
         assert sum(v['growth']==1 for v in midpoint['colonies'][cell]['structures']) in (7,8)
         assert all(v['growth']==1 for v in complete['colonies'][cell]['structures'])
-    productive=deepcopy(colony);productive['rules']['economy']['manufacture_seconds']=6
-    producing,_=run('establish-produces-before-full',productive,start+30*60)
+    productive=deepcopy(colony);productive['rules']['economy']['manufacture_seconds']=12
+    producing,_=run('establish-produces-before-full',productive,start+90*60)
     assert any(u['target']==cell and u['faction']==2 for u in producing['units']), 'A growing colony did not produce units'
     run('zero-establishment',change(base,'content.buildings.0.establishment_seconds',0),expected=1)
     run('negative-establishment',change(base,'content.buildings.0.establishment_seconds',-1),expected=1)

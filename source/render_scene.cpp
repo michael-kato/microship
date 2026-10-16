@@ -44,7 +44,11 @@ bool render_scene_validate(const RenderScene* scene)
     bool valid=!scene->geometry.meshes.empty() && !scene->instances.empty()
         && scene->effect_count<=scene->effects.size() && scene->effects.size()<=MAX_EFFECT_SEGMENTS
         && scene->effect_tiles.size()==2*scene->tile_count+1+MAX_EFFECT_REFERENCES
-        && std::isfinite(scene->time_seconds);
+        && std::isfinite(scene->time_seconds) && scene->sight_count<=MAX_RENDER_SIGHT
+        && std::isfinite(scene->fog_blur) && scene->fog_blur>=0 && scene->fog_blur<=256
+        && std::isfinite(scene->fog_feather) && (scene->fog_blur==0 || scene->fog_feather>0) && std::isfinite(scene->fog_plane_z);
+    for (uint32_t i=0;valid && i<scene->sight_count;++i)
+        for (uint32_t j=0;j<4;++j) valid=valid && std::isfinite(scene->sight[i].center_radius[j]) && (j<3 || scene->sight[i].center_radius[j]>0);
     for (uint32_t i=0;valid && i<scene->instances.size();++i)
     {
         const RenderInstance* instance=&scene->instances[i];
@@ -104,7 +108,10 @@ bool render_scene_write(const RenderScene* scene,const char* path)
         const RenderMedium* m=&scene->media[i];
         fprintf(file,"%s[%.6f,%.6f,%.6f,%.6f]",i ? "," : "",m->center_radius[0],m->center_radius[1],m->center_radius[2],m->center_radius[3]);
     }
-    fprintf(file,"],\"bounds_min\":[%.6f,%.6f,%.6f],\"bounds_max\":[%.6f,%.6f,%.6f],\"effects\":%u}\n",
+    fprintf(file,"],\"fog\":{\"blur_radius\":%.6f,\"sight_feather\":%.6f,\"plane_z\":%.6f,\"sight\":[",scene->fog_blur,scene->fog_feather,scene->fog_plane_z);
+    for (uint32_t i=0;i<scene->sight_count;++i)
+    { const float* v=scene->sight[i].center_radius;fprintf(file,"%s[%.6f,%.6f,%.6f,%.6f]",i ? "," : "",v[0],v[1],v[2],v[3]); }
+    fprintf(file,"]},\"bounds_min\":[%.6f,%.6f,%.6f],\"bounds_max\":[%.6f,%.6f,%.6f],\"effects\":%u}\n",
         scene->bounds_min[0],scene->bounds_min[1],scene->bounds_min[2],scene->bounds_max[0],scene->bounds_max[1],scene->bounds_max[2],scene->effect_count);
     bool valid=!ferror(file);if (fclose(file)) valid=false;return valid;
 }

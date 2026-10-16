@@ -36,6 +36,11 @@ add_custom_command(OUTPUT "${backdrop_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/backdrop.comp" -o "${backdrop_output}"
     DEPENDS assets/shaders/render_bindings.glsl assets/shaders/backdrop.comp assets/shaders/render_uniform.glsl VERBATIM)
+set(fog_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/fog.comp.spv")
+add_custom_command(OUTPUT "${fog_output}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
+    COMMAND ${GLSLC} --target-env=vulkan1.2 -O "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/fog.comp" -o "${fog_output}"
+    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/fog.comp assets/shaders/render_uniform.glsl VERBATIM)
 set(effects_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/effects.comp.spv")
 add_custom_command(OUTPUT "${effects_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
@@ -105,7 +110,7 @@ foreach(model IN LISTS model_files)
         DEPENDS "${model}" VERBATIM)
     list(APPEND model_outputs "${model_output}")
 endforeach()
-add_custom_target(microship_assets DEPENDS "${effects_output}" "${backdrop_output}" "${json_license}" "${shader_output}" "${bloom_output}" "${volume_output}" "${debug_overlay}" ${debug_outputs} ${model_outputs} ${asset_outputs})
+add_custom_target(microship_assets DEPENDS "${fog_output}" "${effects_output}" "${backdrop_output}" "${json_license}" "${shader_output}" "${bloom_output}" "${volume_output}" "${debug_overlay}" ${debug_outputs} ${model_outputs} ${asset_outputs})
 
 add_executable(microship
     source/content.cpp source/asset_json.cpp
@@ -181,6 +186,10 @@ set_tests_properties(navigation PROPERTIES TIMEOUT 60)
 add_test(NAME production_ratio COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/production_ratio.py $<TARGET_FILE:microship>)
 set_tests_properties(production_ratio PROPERTIES TIMEOUT 45)
+
+add_test(NAME startup COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/startup.py $<TARGET_FILE:microship>)
+set_tests_properties(startup PROPERTIES TIMEOUT 60)
 
 option(MICROSHIP_GPU_TESTS "Run real hardware Vulkan E2E scenarios (explicit opt-in)" OFF)
 if(MICROSHIP_GPU_TESTS)

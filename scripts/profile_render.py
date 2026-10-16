@@ -160,7 +160,7 @@ def main():
             result['trace_ms'] += numbers(r'GPU trace: ([\d.]+) ms', log, args.frames)
             result['surface_ms'] += numbers(r'GPU surface: ([\d.]+) ms', log, args.frames)
             result['volume_ms'] += numbers(r'GPU volumes: ([\d.]+) ms', log, args.frames, allow_zero=True)
-            result['bloom_ms'] += numbers(r'GPU bloom/display: ([\d.]+) ms', log, args.frames)
+            result['bloom_ms'] += numbers(r'GPU (?:fog/)?bloom/display: ([\d.]+) ms', log, args.frames)
             result['application_ms'] += numbers(r'Application frame: ([\d.]+) ms', log, args.frames)
             result['runs'].append({'round': round_index + 1,
                                    'process_seconds': time.perf_counter() - started})

@@ -6,12 +6,22 @@
   "effects": "../presentation/combat.json",
   "match": {
     "player": "fungus",
-    "opponent": "virus"
+    "opponent": "virus",
+    "starts": [
+      {
+        "faction": "fungus",
+        "cell": 0
+      },
+      {
+        "faction": "virus",
+        "cell": 1
+      }
+    ]
   },
   "bodies": [
     {
       "type": "unclaimed",
-      "owner": "fungus",
+      "owner": "neutral",
       "position": [
         -52.0,
         -4.0,
@@ -46,7 +56,7 @@
     },
     {
       "type": "unclaimed",
-      "owner": "virus",
+      "owner": "neutral",
       "position": [
         48.0,
         14.0,
@@ -186,6 +196,14 @@
     }
   ],
   "spawns": [
+    {
+      "type": "fungal_founder",
+      "position": [
+        -52,
+        -1.2,
+        6.4
+      ]
+    },
     {
       "type": "swarm_bomber",
       "position": [

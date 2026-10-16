@@ -8,7 +8,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from asset_data import stage_world,change,remove,write_world
+from asset_data import established_world,change,remove,write_world
 
 root=Path(__file__).resolve().parents[2]
 binary=Path(sys.argv[1]).resolve()
@@ -89,7 +89,7 @@ with tempfile.TemporaryDirectory(prefix='microship-polish-') as directory:
         picked,_=run('unit-'+name,extra=('--select-group','1','--click',str(x),str(y),*extra))
         assert sum(u['selected'] for u in picked['units'])==expected,'Unit pick/additive selection failed'
     # Malformed authored flight data must fail at the actual application boundary.
-    text=stage_world(world,out)
+    text=established_world(world,out)
     for name,field,value in [('zero-acceleration','acceleration',0),('bad-separation','separation',-1),('bad-bank','bank',2)]:
         scene=out/(name+'-world.json');write_world(scene,change(text,'rules.flight.'+field,value))
         run(name,scene=scene,expected=1)

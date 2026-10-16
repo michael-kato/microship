@@ -8,7 +8,7 @@ import struct
 import subprocess
 import sys
 import tempfile
-from asset_data import stage_world, write_world, change, remove
+from asset_data import established_world, write_world, change, remove
 
 root=Path(__file__).resolve().parents[2]
 binary=Path(sys.argv[1]).resolve()
@@ -39,7 +39,7 @@ def failure(result,path):
 
 with tempfile.TemporaryDirectory(prefix='microship-json-e2e-') as directory:
     out=Path(directory);scene=out/'editable.json'
-    base=stage_world(root/'assets/levels/biology-virus.json',out)
+    base=established_world(root/'assets/levels/biology-virus.json',out)
     minimal=dict(content=dict(bodies=[dict(name='fixture',label='BODY',geometry='sphere',hosts_site=False)],
                 factions=[dict(id=1,name='virus',label='VIRUS',color=[.45,.9,.75]),dict(id=2,name='immune',label='IMMUNE',color=[1,.55,.65])],
                 groups=[],units=[],buildings=[]),appearance=dict(ambient=[.07,.055,.065]),

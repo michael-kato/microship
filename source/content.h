@@ -5,7 +5,7 @@
 #include "asset_limits.h"
 
 typedef uint32_t Faction;
-enum { FACTION_NEUTRAL=0, MAX_FACTIONS=9, MAX_GROUPS=8, MAX_UNIT_TYPES=32, MAX_PRODUCER_TYPES=8, MAX_BODY_TYPES=32, MAX_FACTORY_STRUCTURES=16 };
+enum { FACTION_NEUTRAL=0, MAX_FACTIONS=9, MAX_GROUPS=8, MAX_UNIT_TYPES=32, MAX_PRODUCER_TYPES=8, MAX_BODY_TYPES=32, MAX_FACTORY_STRUCTURES=32 };
 enum { MAX_HIT_COUNT=32, BRANCH_FIELDS_COMPLETE=3 };
 enum GrowthGrammar { GROWTH_AXIAL,GROWTH_FAN,GROWTH_HYPHA };
 enum { TARGET_UNITS=1, TARGET_STRUCTURES=2 };
@@ -53,6 +53,9 @@ struct ProducerDefinition
     Faction faction;
     float growth_seconds,establishment_seconds,health,collection,height,width;
     float stem_radius,head_radius;
+    Vec3 growth_plane_normal;
+    float growth_depth_ratio;
+    bool growth_plane_enabled;
     uint32_t hits;
     BranchRules branches;
 };

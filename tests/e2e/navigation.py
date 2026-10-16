@@ -8,7 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-from asset_data import stage_world,write_world,change
+from asset_data import established_world,write_world,change
 
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('binary',type=Path)
@@ -18,7 +18,7 @@ command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'sc
 count=0
 with tempfile.TemporaryDirectory(prefix='microship-navigation-') as directory:
     out=Path(directory)
-    base=stage_world(root/'assets/levels/biology-virus.json',out)
+    base=established_world(root/'assets/levels/biology-virus.json',out)
     base['rules']['economy']['manufacture_seconds']=1000
     base['rules']['ai']['expansion_delay']=300
     base['rules'].pop('exploration',None)

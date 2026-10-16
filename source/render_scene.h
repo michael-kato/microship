@@ -18,6 +18,8 @@ struct RenderMedium
 {
     float center_radius[4], scattering[4], absorption_phase[4];
 };
+enum { MAX_RENDER_SIGHT=272 };
+struct RenderSight { float center_radius[4]; };
 struct RenderLight { Vec3 direction; Color color; float irradiance; };
 struct EffectSegment { float start[4],end[4],color[4]; };
 enum { EFFECT_TILE=16, MAX_EFFECT_SEGMENTS=8192, MAX_EFFECT_TILES_PER_SEGMENT=64, MAX_EFFECT_REFERENCES=MAX_EFFECT_SEGMENTS*MAX_EFFECT_TILES_PER_SEGMENT };
@@ -29,6 +31,9 @@ struct RenderScene
     std::vector<EffectSegment> effects;
     std::vector<uint32_t> effect_tiles;
     uint32_t effect_count, tile_count;
+    RenderSight sight[MAX_RENDER_SIGHT];
+    uint32_t sight_count;
+    float fog_blur,fog_feather,fog_plane_z;
     Color ambient, ambient_top, ambient_bottom;
     RenderLight lights[3];
     float thin_transmission, thin_absorption, thin_clarity;

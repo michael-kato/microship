@@ -7,7 +7,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from asset_data import stage_world,change,remove,write_world
+from asset_data import established_world,change,remove,write_world
 
 
 def require(condition,message):
@@ -21,7 +21,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='microship-biology-e2e-') as directory:
         out=Path(directory)
         def stage(source):
-            return stage_world(source,out)
+            return established_world(source,out)
         def run(name,text,ticks=1,orders='',expected=0,extra=()):
             nonlocal count
             scene=out/(name+'-world.json');write_world(scene,text)
@@ -41,10 +41,10 @@ def main():
             initial=run(side+'-initial',text)
             require(initial['player_faction']==player and len(initial['units'])==11,side+': wrong side')
             require(sum(u['faction']==player and u['kind']==0 for u in initial['units'])==6,side+': starting force')
-            require(initial['colonies'][home]['health']==240 and initial['colonies'][home]['growth']==1,side+': missing starting factory')
+            require(initial['colonies'][home]['health']==(240 if player==1 else 480) and initial['colonies'][home]['growth']==1,side+': missing starting factory')
             mature=run(side+'-production',text,1800)
             require(mature['births']>11,side+': no nutrient-funded production')
-            require(sum(s['health']>0 for s in mature['colonies'][home]['structures'])==7,side+': no branch growth')
+            require(sum(s['health']>0 for s in mature['colonies'][home]['structures'])==6,side+': no branch growth')
             dark=change(text,'appearance.ambient',[0,0,0])
             dark_state=run(side+'-lighting-independent',dark,1800)
             require(mature['colonies']==dark_state['colonies'] and mature['units']==dark_state['units'],side+': lighting changed gameplay')

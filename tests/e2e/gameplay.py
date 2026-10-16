@@ -8,7 +8,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from asset_data import stage_world,units,producers,branches,change,remove,write_world
+from asset_data import established_world,units,producers,branches,change,remove,write_world
 
 root=Path(__file__).resolve().parents[2]
 binary=Path(sys.argv[1]).resolve()
@@ -17,7 +17,7 @@ count=0
 with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
     out=Path(directory)
     def stage(side):
-        return stage_world(root/'assets/levels'/('biology-'+side+'.json'),out)
+        return established_world(root/'assets/levels'/('biology-'+side+'.json'),out)
     def run(name,text,ticks=1,orders='',extra=(),expected=0):
         global count
         scene=out/(name+'-world.json');write_world(scene,text)
@@ -60,19 +60,19 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
         assert all(u['target']==home for u in hidden['units'] if u['selected'])
         for group in ('fighters','bombers'):
             captured,_=run(side+'-colonize-'+group,text,1800,f'0 select {group}\n0 move '+('-30 0 6.4' if side=='virus' else '24 9 6.4')+f'\n240 order {neutral}\n')
-            assert captured['colonies'][neutral]['faction']==player and captured['colonies'][neutral]['growth']==1,(side,group,'colonization failed')
+            assert captured['colonies'][neutral]['faction']==player and captured['colonies'][neutral]['active'] and 0<captured['colonies'][neutral]['growth']<=1,(side,group,'colonization failed')
             original={u['generation'] for u in initial['units'] if u['faction']==player}
             remaining={u['generation'] for u in captured['units']}
             assert len(original-remaining)==1,'More than one player unit was consumed for one cell'
             assert captured['outcome']==0,'A neutral capture ended the match'
         early,_=run(side+'-one-structure',text,900)
-        grown,_=run(side+'-branch-growth',text,1800)
+        grown,_=run(side+'-branch-growth',text,3000)
         single=branches(text,count=1)
-        baseline,_=run(side+'-single-production',single,1800)
+        baseline,_=run(side+'-single-production',single,3000)
         assert active(early['colonies'][home])==10 and active(grown['colonies'][home])==11
         own=lambda s:sum(u['faction']==player for u in s['units'])
         assert grown['colonies'][home]['production']>baseline['colonies'][home]['production'],'New structures did not increase production rate'
-        priority,_=run(side+'-produce-bombers',text,1200,f'0 cell {home}\n0 priority bomber\n')
+        priority,_=run(side+'-produce-bombers',text,2400,f'0 cell {home}\n0 priority bomber\n')
         assert sum(u['faction']==player and u['kind']==1 for u in priority['units'])>1
         enemy_pos='48 14 7' if side=='virus' else '-52 -4 7'
         scout=f'0 select fighters\n0 move {enemy_pos}\n'
@@ -103,17 +103,17 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
     for unit in compact['content']['units']:unit.pop('secondary_attack',None)
     fighters,_=run('fighters-cannot-bomb',compact,2400,'0 select fighters\n0 order 1\n')
     assert fighters['effects']['hits']>0 and fighters['effects']['deaths']>0,'No unit combat'
-    assert fighters['colonies'][1]['health']==240 and fighters['colonies'][1]['wounds']==0,'Fighters damaged a factory'
+    assert fighters['colonies'][1]['health']==480 and fighters['colonies'][1]['wounds']==0,'Fighters damaged a factory'
     # Move defenders away while keeping both reusable templates in the scene.
     no_defenders=change(compact,'spawns',compact['spawns'])
     for spawn in no_defenders['spawns']:
         if spawn['type'].startswith('immune_'):spawn['position'][0]=1000
-    bombers,_=run('bombers-destroy-factory',no_defenders,2400,'0 select bombers\n0 order 1\n')
+    bombers,_=run('bombers-destroy-factory',no_defenders,5400,'0 select bombers\n0 order 1\n')
     assert bombers['colonies'][1]['health']==0 and bombers['outcome']==1,'Bomber did not destroy the enemy factory'
     expanded_target=branches(no_defenders,seconds=1,count=9)
     for building in expanded_target['content']['buildings']:
         building['health']=80;building['hits']=3;building['branches'].update(health=45,hits=2)
-    destroyed,_=run('destroy-grown-factory',expanded_target,2400,'0 select bombers\n0 order 1\n')
+    destroyed,_=run('destroy-grown-factory',expanded_target,5400,'0 select bombers\n0 order 1\n')
     assert destroyed['colonies'][1]['health']==0
     assert all(s['health']==0 for s in destroyed['colonies'][1]['structures']),'Root death left live branches'
     text=stage('virus')
@@ -126,7 +126,7 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
     for name,bad in [
         ('unsupported-bio-owner',change(text,'bodies.1.owner','robotic')),
         ('missing-factory-side',remove(text,'content.buildings.1')),
-        ('invalid-branch-count',branches(text,count=17)),
+        ('invalid-branch-count',branches(text,count=33)),
         ('zero-plane',branches(text,normal=[0,0,0])),
         ('invalid-sight',change(text,'rules.exploration.sight_radius',float('nan'))),
         ('missing-factory-mesh',change(text,'content.buildings.0.model','missing.fmesh')),

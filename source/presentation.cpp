@@ -108,6 +108,8 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
         for (uint32_t i=0;i<w->body_count;++i)
             if (w->bodies[i].interior_radius>0)
             { p->medium_bodies[scene->media.size()]=(int32_t)i;scene->media.push_back(RenderMedium{}); }
+        if (w->atmosphere_enabled)
+        { p->medium_bodies[scene->media.size()]=-1;scene->media.push_back(RenderMedium{}); }
     }
     catch (const std::bad_alloc&) { fprintf(stderr,"Cannot allocate game presentation storage.\n");return false; }
     scene->ambient=w->ambient;scene->ambient_top=w->ambient_top;scene->ambient_bottom=w->ambient_bottom;
@@ -306,25 +308,58 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
     update_spike_instances(state,simulation);
 }
 
+static void add_sight(RenderScene* scene,Vec3 center,float radius)
+{
+    // Keep the same union of spheres. Remove only spheres fully contained in another.
+    for (uint32_t i=0;i<scene->sight_count;)
+    {
+        const float* v=scene->sight[i].center_radius;
+        Vec3 delta=subtract(center,Vec3{v[0],v[1],v[2]});float distance=std::sqrt(dot(delta,delta));
+        if (distance+radius<=v[3]) return;
+        if (distance+v[3]<=radius) scene->sight[i]=scene->sight[--scene->sight_count];
+        else ++i;
+    }
+    RenderSight& out=scene->sight[scene->sight_count++];
+    out.center_radius[0]=center.x;out.center_radius[1]=center.y;out.center_radius[2]=center.z;out.center_radius[3]=radius;
+}
+
 bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera,const RenderConfig* config)
 {
     RenderScene* scene=&p->scene;const World* w=&s->world;
+    static_assert(MAX_RENDER_SIGHT>=MAX_UNITS+MAX_BODIES,"Sight source capacity");
+    scene->sight_count=0;scene->fog_blur=w->sight_radius>0 ? w->fog_blur : 0;
+    scene->fog_feather=w->fog_feather;scene->fog_plane_z=w->fog_plane_z;
+    if (scene->fog_blur>0)
+    {
+        for (uint32_t i=0;i<w->body_count;++i)
+            if (s->colonies[i].active && s->colonies[i].faction==w->player_faction)
+                add_sight(scene,w->bodies[i].position,w->sight_radius+w->bodies[i].radius);
+        for (uint32_t i=0;i<MAX_UNITS;++i)
+            if (s->units[i].health>0 && s->units[i].faction==w->player_faction) add_sight(scene,s->units[i].position,w->sight_radius);
+    }
     memset(scene->instances.data(),0,scene->instances.size()*sizeof(RenderInstance));
     for (uint32_t i=0;i<scene->instances.size();++i)
         for (uint32_t axis=0;axis<3;++axis) scene->instances[i].transform[axis][axis]=1;
     for (uint32_t i=0;i<w->body_count;++i)
-        if (simulation_body_known(s,i))
+        if (simulation_body_known(s,i) || scene->fog_blur>0)
         {
             set_instance(p,p->body_base+i,p->body_meshes[i],Vec3{},Vec3{1,0,0},Vec3{0,1,0},Vec3{0,0,1});
             const CellAppearance& a=s->cell_appearance[i];float* style=scene->instances[p->body_base+i].style;
-            style[0]=a.tint.r;style[1]=a.tint.g;style[2]=a.tint.b;style[3]=a.strength;
+            style[0]=a.tint.r;style[1]=a.tint.g;style[2]=a.tint.b;style[3]=s->visible_bodies[i] ? a.strength : 0;
         }
     for (uint32_t i=0;i<scene->media.size();++i)
     {
-        const Body* c=&w->bodies[p->medium_bodies[i]];RenderMedium* medium=&scene->media[i];
-        *medium=RenderMedium();
+        RenderMedium* medium=&scene->media[i];*medium=RenderMedium();
+        if (p->medium_bodies[i]<0)
+        {
+            medium->center_radius[0]=w->atmosphere_center.x;medium->center_radius[1]=w->atmosphere_center.y;medium->center_radius[2]=w->atmosphere_center.z;medium->center_radius[3]=w->atmosphere_radius;
+            medium->scattering[0]=w->atmosphere_scattering.r;medium->scattering[1]=w->atmosphere_scattering.g;medium->scattering[2]=w->atmosphere_scattering.b;medium->scattering[3]=w->atmosphere_fade;
+            medium->absorption_phase[0]=medium->absorption_phase[1]=medium->absorption_phase[2]=w->atmosphere_absorption;medium->absorption_phase[3]=w->atmosphere_phase;
+            continue;
+        }
+        const Body* c=&w->bodies[p->medium_bodies[i]];
         medium->center_radius[0]=c->position.x;medium->center_radius[1]=c->position.y;medium->center_radius[2]=c->position.z;
-        medium->center_radius[3]=simulation_body_known(s,p->medium_bodies[i]) ? c->radius*c->interior_radius : 0;
+        medium->center_radius[3]=(simulation_body_known(s,p->medium_bodies[i]) || scene->fog_blur>0) ? c->radius*c->interior_radius : 0;
         medium->scattering[0]=c->interior_scattering.r;medium->scattering[1]=c->interior_scattering.g;medium->scattering[2]=c->interior_scattering.b;
         medium->scattering[3]=c->interior_fade;
         medium->absorption_phase[0]=medium->absorption_phase[1]=medium->absorption_phase[2]=c->interior_absorption;

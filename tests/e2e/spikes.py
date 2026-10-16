@@ -7,7 +7,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from asset_data import stage_world,units,producers,branches,change,remove,write_world
+from asset_data import established_world,units,producers,branches,change,remove,write_world
 
 root=Path(__file__).resolve().parents[2]
 binary=Path(sys.argv[1]).resolve()
@@ -16,7 +16,7 @@ count=0
 with tempfile.TemporaryDirectory(prefix='microship-spikes-') as directory:
     out=Path(directory)
     def stage(side):
-        data=stage_world(root/'tests/e2e/scenes'/('biology-two-'+side+'.json'),out)
+        data=established_world(root/'tests/e2e/scenes'/('biology-two-'+side+'.json'),out)
         # Symmetric projectile fixture for exact arrival, hit-count and recovery checks.
         # Default immune units use the separate digestion scenarios.
         for u in data['content']['units']:
@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix='microship-spikes-') as directory:
             if u['faction']=='immune':
                 fighter=u['group']=='fighter'
                 u.update(attack={'mode':'projectile'},health=36 if fighter else 60,hits=3,range=3.2,shot_interval=1 if fighter else 3)
-        return data
+        return producers(data,health=240,hits=12)
     def run(name,text,ticks=1,orders='',expected=0,extra=()):
         global count
         scene=out/(name+'-world.json');write_world(scene,text)

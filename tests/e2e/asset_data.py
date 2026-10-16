@@ -6,6 +6,13 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
 from authored_assets import stage_world, write_world
 
 
+def established_world(source,directory):
+    """Stage an existing-factory scenario. Startup checks use stage_world directly."""
+    data=stage_world(source,directory)
+    for start in data['match'].pop('starts',[]):data['bodies'][start['cell']]['owner']=start['faction']
+    return data
+
+
 def change(data,path,value):
     result=deepcopy(data);parent=result;parts=path.split('.')
     for key in parts[:-1]:parent=parent[int(key) if isinstance(parent,list) else key]

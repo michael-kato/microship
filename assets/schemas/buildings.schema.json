@@ -61,7 +61,7 @@
               "count": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 16
+                "maximum": 32
               },
               "spacing": {
                 "type": "number",
@@ -162,6 +162,24 @@
             "type": "number",
             "exclusiveMinimum": 0,
             "maximum": 10000
+          },
+          "growth_plane": {
+            "type": "object",
+            "properties": {
+              "normal": {
+                "$ref": "shared.schema.json#/$defs/normal"
+              },
+              "depth_ratio": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "normal",
+              "depth_ratio"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

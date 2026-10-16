@@ -26,6 +26,29 @@
         },
         "opponent": {
           "$ref": "shared.schema.json#/$defs/name"
+        },
+        "starts": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "properties": {
+              "faction": {
+                "$ref": "shared.schema.json#/$defs/name"
+              },
+              "cell": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 15
+              }
+            },
+            "required": [
+              "faction",
+              "cell"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "required": [

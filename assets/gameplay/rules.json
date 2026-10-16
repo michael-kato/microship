@@ -3,7 +3,7 @@
   "resource_label": "NUTRIENTS",
   "economy": {
     "storage": 180.0,
-    "manufacture_seconds": 6,
+    "manufacture_seconds": 12,
     "landing_seconds": 1.5,
     "enemy_attack_seconds": 140.0
   },
@@ -22,8 +22,8 @@
     "turn_rate": 2.5,
     "separation": 0.55,
     "bank": 0.55,
-    "lookahead_seconds": 1,
-    "obstacle_clearance": 0.35
+    "lookahead_seconds": 2,
+    "obstacle_clearance": 1
   },
   "spikes": {
     "count": 22,

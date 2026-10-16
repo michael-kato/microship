@@ -5,18 +5,18 @@
       "name": "virus_factory",
       "faction": "virus",
       "model": "../models/virus_factory.fmesh",
-      "growth_seconds": 7,
-      "establishment_seconds": 90,
+      "growth_seconds": 14,
+      "establishment_seconds": 180,
       "health": 240,
-      "collection": 5.0,
+      "collection": 2.5,
       "height": 3.5,
       "width": 1.35,
       "hits": 12,
       "branches": {
-        "seconds": 16,
-        "count": 16,
-        "spacing": 1.15,
-        "production": 0.12,
+        "seconds": 32,
+        "count": 24,
+        "spacing": 1.4,
+        "production": 0.05,
         "seed": 4721,
         "normal": [
           0.0,
@@ -25,7 +25,7 @@
         ],
         "health": 150,
         "hits": 8,
-        "regrow_seconds": 24,
+        "regrow_seconds": 48,
         "roots": "organelles",
         "grammar": "axial"
       },
@@ -36,21 +36,29 @@
       "navigation": {
         "stem_radius": 0.15,
         "head_radius": 0.85
+      },
+      "growth_plane": {
+        "normal": [
+          0,
+          0.28734789,
+          0.95782629
+        ],
+        "depth_ratio": 0.15
       }
     },
     {
       "name": "immune_factory",
       "faction": "immune",
       "model": "../models/immune_factory.fmesh",
-      "growth_seconds": 7,
-      "establishment_seconds": 90,
-      "health": 240,
-      "collection": 5.0,
+      "growth_seconds": 14,
+      "establishment_seconds": 180,
+      "health": 480,
+      "collection": 2.5,
       "height": 3.5,
       "width": 1.35,
-      "hits": 12,
+      "hits": 24,
       "branches": {
-        "seconds": 16,
+        "seconds": 32,
         "count": 16,
         "spacing": 1.15,
         "production": 0.12,
@@ -60,9 +68,9 @@
           0.29,
           0.957
         ],
-        "health": 150,
-        "hits": 8,
-        "regrow_seconds": 24,
+        "health": 300,
+        "hits": 16,
+        "regrow_seconds": 48,
         "roots": "organelles",
         "grammar": "fan"
       },
@@ -73,21 +81,29 @@
       "navigation": {
         "stem_radius": 0.55,
         "head_radius": 0.55
+      },
+      "growth_plane": {
+        "normal": [
+          0,
+          0.28734789,
+          0.95782629
+        ],
+        "depth_ratio": 0.15
       }
     },
     {
       "name": "fungal_emitter",
       "faction": "fungus",
       "model": "../models/fungal_factory.fmesh",
-      "growth_seconds": 7,
-      "establishment_seconds": 90,
+      "growth_seconds": 14,
+      "establishment_seconds": 180,
       "health": 240,
-      "collection": 5.0,
+      "collection": 2.5,
       "height": 3.5,
       "width": 1.35,
       "hits": 12,
       "branches": {
-        "seconds": 16,
+        "seconds": 32,
         "count": 16,
         "spacing": 1.15,
         "production": 0.12,
@@ -99,7 +115,7 @@
         ],
         "health": 150,
         "hits": 8,
-        "regrow_seconds": 24,
+        "regrow_seconds": 48,
         "roots": "organelles",
         "grammar": "hypha"
       },
@@ -110,6 +126,14 @@
       "navigation": {
         "stem_radius": 0.55,
         "head_radius": 0.55
+      },
+      "growth_plane": {
+        "normal": [
+          0,
+          0.28734789,
+          0.95782629
+        ],
+        "depth_ratio": 0.15
       }
     }
   ]

@@ -263,6 +263,79 @@
         "tint"
       ],
       "additionalProperties": false
+    },
+    "atmosphere": {
+      "type": "object",
+      "properties": {
+        "center": {
+          "$ref": "shared.schema.json#/$defs/position"
+        },
+        "radius": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "edge_fade": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "scattering": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "absorption": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "anisotropy": {
+          "type": "number",
+          "minimum": -0.95,
+          "maximum": 0.95
+        }
+      },
+      "required": [
+        "center",
+        "radius",
+        "edge_fade",
+        "scattering",
+        "absorption",
+        "anisotropy"
+      ],
+      "additionalProperties": false
+    },
+    "fog": {
+      "type": "object",
+      "properties": {
+        "blur_radius": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "sight_feather": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        },
+        "plane_z": {
+          "type": "number",
+          "minimum": -1000000,
+          "maximum": 1000000
+        }
+      },
+      "required": [
+        "blur_radius",
+        "sight_feather",
+        "plane_z"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [

@@ -138,7 +138,7 @@ static void gameplay_input(Game* game, PointerInput* input, const RenderConfig* 
     {
         int p=s->selected_body;
         if (p<0) for (uint32_t j=0;j<s->world.body_count;++j)
-            if (s->world.bodies[j].owner==s->world.player_faction) { p=(int)j;break; }
+            if (s->home_owner[j]==s->world.player_faction) { p=(int)j;break; }
         if (p>=0)
         { Vec3 offset=subtract(game->camera.position,game->camera.target);game->camera.target=s->world.bodies[p].position;game->camera.position=add(game->camera.target,offset); }
     }

@@ -245,7 +245,13 @@ static bool load_buildings(Content* c,Json root,const char* path)
     json_object(root,"$schema|buildings");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|model|growth_seconds|establishment_seconds|health|collection|height|width|hits|branches|growth_meshes|navigation");ProducerDefinition p={};
+        json_object(j,"name|faction|model|growth_seconds|establishment_seconds|health|collection|height|width|hits|branches|growth_meshes|navigation|growth_plane");ProducerDefinition p={};
+        Json plane=json_find(j,"growth_plane");
+        if (json_present(plane))
+        {
+            json_object(plane,"normal|depth_ratio");p.growth_plane_normal=normal(json_get(plane,"normal"));
+            p.growth_depth_ratio=json_float(json_get(plane,"depth_ratio"),0,1);p.growth_plane_enabled=true;
+        }
         Json navigation=json_find(j,"navigation");
         if (json_present(navigation))
         {

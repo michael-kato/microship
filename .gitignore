@@ -4,6 +4,8 @@ __pycache__/
 *.pyo
 *.md
 !/README.md
+!/BUILDING.md
+!/GAMEPLAY.md
 !/assets/README.md
 !/third_party/json/README.md
 /screenshots/

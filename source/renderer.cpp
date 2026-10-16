@@ -26,7 +26,7 @@
 
 static const int GPU_VERTEX_BYTES = 48;
 static const int GPU_MEDIUM_BYTES = 48;
-static const int GPU_RENDER_UNIFORM_BYTES = 416;
+static const int GPU_RENDER_UNIFORM_BYTES = 432;
 static const int GPU_DEBUG_PUSH_BYTES = 112;
 static const double MILLISECONDS_PER_SECOND = 1000.0;
 static const double BINARY_UNIT_SCALE = 1024.0;
@@ -83,6 +83,7 @@ struct RenderUniform
     uint32_t background_quality[4];
     float backdrop_style[4], backdrop_animation[4];
     float studio_direction[3][4], studio_color[3][4], thin_material[4], backdrop_wave[4];
+    float fog[4];
 };
 
 static_assert(sizeof(GpuVertex) == GPU_VERTEX_BYTES, "Vertex shader layout");
@@ -158,7 +159,7 @@ struct RendererState
     GpuBuffer energy;
     GpuBuffer debug_pixels;
     GpuBuffer debug_text;
-    GpuBuffer effects, effect_tiles, instance_styles;
+    GpuBuffer effects, effect_tiles, instance_styles,sight;
     std::vector<float> style_data;
     uint32_t effect_count, effect_tile_count;
     GpuBuffer uniform;
@@ -187,7 +188,7 @@ struct RendererState
     VkDescriptorPool bloom_descriptor_pool;
     VkDescriptorSet bloom_descriptors;
     VkPipelineLayout bloom_layout;
-    VkPipeline bloom_pipeline;
+    VkPipeline bloom_pipeline,fog_pipeline;
     VkPipeline guide_surface_pipeline;
     VkImage output;
     VkDeviceMemory output_memory;
@@ -671,7 +672,8 @@ static void scene_uniform(RenderUniform* uniform,const RenderScene* scene)
     memcpy(uniform->backdrop_animation,scene->background_animation,sizeof(uniform->backdrop_animation));
     memcpy(uniform->scene_min,scene->bounds_min,3*sizeof(float));memcpy(uniform->scene_max,scene->bounds_max,3*sizeof(float));
     memcpy(uniform->foreground_min,scene->foreground_min,3*sizeof(float));memcpy(uniform->foreground_max,scene->foreground_max,3*sizeof(float));
-    uniform->scene[1]=(uint32_t)scene->media.size();
+    uniform->scene[1]=(uint32_t)scene->media.size();uniform->scene[2]=scene->sight_count;
+    uniform->fog[0]=scene->fog_blur;uniform->fog[1]=scene->fog_feather;uniform->fog[2]=scene->fog_plane_z;
 }
 
 static void scene_instances(RendererState* state,const RenderScene* scene)
@@ -756,9 +758,11 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
     if (!create_buffer(state, &state->energy, MICROFACET_TABLE_SIZE*MICROFACET_TABLE_SIZE*sizeof(float),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, host)) return false;
     microfacet_energy_table((float*)state->energy.mapped);
+    if (!create_buffer(state,&state->sight,sizeof(scene->sight),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host)) return false;
     state->medium_count=(uint32_t)scene->media.size();
     if (!create_buffer(state,&state->media,(state->medium_count ? state->medium_count : 1)*sizeof(RenderMedium),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host)) return false;
     if (state->medium_count) memcpy(state->media.mapped,scene->media.data(),state->medium_count*sizeof(RenderMedium));
+    memcpy(state->sight.mapped,scene->sight,sizeof(scene->sight));
     state->effect_tile_count=scene->tile_count;state->effect_tile_size=scene->effect_tiles.size();
     state->uniform_data=uniform;memcpy(state->uniform.mapped,&uniform,sizeof(uniform));
     return true;
@@ -1094,7 +1098,8 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
     for (uint32_t i = 0; i < BLOOM_DESCRIPTOR_COUNT; ++i)
     {
         bindings[i].binding = i;
-        bindings[i].descriptorType = i == BLOOM_BINDING_DEBUG ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        bindings[i].descriptorType = i==BLOOM_BINDING_UNIFORM ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER :
+            (i==BLOOM_BINDING_DEBUG || i==BLOOM_BINDING_SIGHT) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         bindings[i].descriptorCount = 1;
         bindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     }
@@ -1103,11 +1108,11 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
     layout.bindingCount = BLOOM_DESCRIPTOR_COUNT;
     layout.pBindings = bindings;
     if (!vk_ok(vkCreateDescriptorSetLayout(state->device, &layout, 0, &state->bloom_descriptor_layout), "Create bloom descriptor layout")) return false;
-    VkDescriptorPoolSize sizes[] = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,3},{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,1}};
+    VkDescriptorPoolSize sizes[] = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,3},{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,2},{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,1}};
     VkDescriptorPoolCreateInfo pool = {};
     pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool.maxSets = 1;
-    pool.poolSizeCount = 2;
+    pool.poolSizeCount = 3;
     pool.pPoolSizes = sizes;
     if (!vk_ok(vkCreateDescriptorPool(state->device, &pool, 0, &state->bloom_descriptor_pool), "Create bloom descriptor pool")) return false;
     VkDescriptorSetAllocateInfo allocate = {};
@@ -1138,6 +1143,15 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
     writes[BLOOM_BINDING_DEBUG].descriptorCount = 1;
     writes[BLOOM_BINDING_DEBUG].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     writes[BLOOM_BINDING_DEBUG].pBufferInfo = &debug_buffer;
+    VkDescriptorBufferInfo extra_buffers[]={{state->uniform.handle,0,state->uniform.size},{state->sight.handle,0,state->sight.size}};
+    for (uint32_t i=0;i<2;++i)
+    {
+        uint32_t binding=BLOOM_BINDING_UNIFORM+i;
+        writes[binding].sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;writes[binding].dstSet=state->bloom_descriptors;
+        writes[binding].dstBinding=binding;writes[binding].descriptorCount=1;
+        writes[binding].descriptorType=i ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writes[binding].pBufferInfo=&extra_buffers[i];
+    }
     vkUpdateDescriptorSets(state->device, BLOOM_DESCRIPTOR_COUNT, writes, 0, 0);
     VkPushConstantRange constants = {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(BloomParameters)};
     VkPipelineLayoutCreateInfo pipeline_layout = {};
@@ -1147,7 +1161,8 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
     pipeline_layout.pushConstantRangeCount = 1;
     pipeline_layout.pPushConstantRanges = &constants;
     if (!vk_ok(vkCreatePipelineLayout(state->device, &pipeline_layout, 0, &state->bloom_layout), "Create bloom pipeline layout")) return false;
-    return load_companion(state,ray_trace_path,"bloom.comp.spv",state->bloom_layout,&state->bloom_pipeline);
+    return load_companion(state,ray_trace_path,"bloom.comp.spv",state->bloom_layout,&state->bloom_pipeline)
+        && load_companion(state,ray_trace_path,"fog.comp.spv",state->bloom_layout,&state->fog_pipeline);
 }
 
 static bool create_debug(RendererState* state, const char* builtin_shader_path)
@@ -1446,6 +1461,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     { fprintf(stderr,"Render scene storage changed after initialization.\n");return false; }
     scene_instances(state,scene);
     if (state->medium_count) memcpy(state->media.mapped,scene->media.data(),state->medium_count*sizeof(RenderMedium));
+    memcpy(state->sight.mapped,scene->sight,sizeof(scene->sight));
     {
         memcpy(state->instances.mapped,state->instance_data.data(),state->instances.size);
         VkAccelerationStructureGeometryKHR geometry = {};
@@ -1569,6 +1585,28 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     bloom.strength = state->config.bloom_strength;
     bloom.exposure = state->config.exposure;
     bloom.debug_views = renderer->debug_views ? 1.0f : 0.0f;
+    if (scene->fog_blur>0 && !renderer->debug_views)
+    {
+        image_barrier(state->command,state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+        image_barrier(state->command,state->hdr,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+        vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->fog_pipeline);
+        vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->bloom_layout,0,1,&state->bloom_descriptors,0,0);
+        for (int pass=0;pass<2;++pass)
+        {
+            bloom.pass=pass;
+            vkCmdPushConstants(state->command,state->bloom_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,sizeof(bloom),&bloom);
+            vkCmdDispatch(state->command,(state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,(state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,1);
+            image_barrier(state->command,pass ? state->hdr : state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+                VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+        }
+        image_barrier(state->command,state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+            VK_ACCESS_SHADER_READ_BIT,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+        bloom.pass=0;
+    }
     vkCmdBindPipeline(state->command, VK_PIPELINE_BIND_POINT_COMPUTE, state->bloom_pipeline);
     vkCmdBindDescriptorSets(state->command, VK_PIPELINE_BIND_POINT_COMPUTE, state->bloom_layout, 0, 1, &state->bloom_descriptors, 0, 0);
     if (bloom.strength>0.0f)
@@ -1631,7 +1669,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     double scale=state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND;
     renderer->gpu_frame_ms=gpu_ticks*scale;
     printf("GPU acceleration update: %.3f ms; GPU effects: %.3f ms.\n",as_ticks*scale,fx_ticks*scale);
-    printf("GPU bloom/display: %.3f ms; total render: %.3f ms\n",bloom_ms,renderer->gpu_frame_ms);
+    printf("GPU fog/bloom/display: %.3f ms; total render: %.3f ms\n",bloom_ms,renderer->gpu_frame_ms);
     printf("GPU debug overlay: %.3f ms; buffer views %u; FPS stats %u.\n",debug_ms,
         renderer->debug_views ? 1u : 0u,renderer->debug_stats ? 1u : 0u);
     state->trace_ms = milliseconds;
@@ -1682,6 +1720,7 @@ bool renderer_shutdown(Renderer* renderer)
             if (state->backdrop_memory[i]) vkFreeMemory(state->device,state->backdrop_memory[i],0);
         }
         if (state->guide_surface_pipeline) vkDestroyPipeline(state->device,state->guide_surface_pipeline,0);
+        if (state->fog_pipeline) vkDestroyPipeline(state->device,state->fog_pipeline,0);
         if (state->bloom_pipeline) vkDestroyPipeline(state->device, state->bloom_pipeline, 0);
         if (state->bloom_layout) vkDestroyPipelineLayout(state->device, state->bloom_layout, 0);
         if (state->bloom_descriptor_pool) vkDestroyDescriptorPool(state->device, state->bloom_descriptor_pool, 0);
@@ -1713,7 +1752,7 @@ bool renderer_shutdown(Renderer* renderer)
         if (state->tlas) state->destroy_as(state->device, state->tlas, 0);
         GpuBuffer* buffers[] = { &state->vertices, &state->triangles, &state->indices, &state->instances,
             &state->tlas_buffer, &state->tlas_scratch,
-            &state->uniform, &state->readback, &state->media, &state->energy,
+            &state->uniform, &state->readback, &state->media, &state->energy, &state->sight,
             &state->debug_pixels, &state->debug_text, &state->effects, &state->effect_tiles, &state->instance_styles };
         for (uint32_t i = 0; i < sizeof(buffers)/sizeof(buffers[0]); ++i) destroy_buffer(state, buffers[i]);
         if (state->output_view) vkDestroyImageView(state->device, state->output_view, 0);

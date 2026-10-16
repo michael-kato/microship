@@ -207,13 +207,32 @@ static bool load_effects(World* w,const char* path)
 static bool load_appearance(World* w,const char* path)
 {
     JsonDocument d;if (!json_load(&d,path)) return false;Json root=json_root(&d);
-    json_object(root,"$schema|ambient|gradient|lights|thin_surface|backdrop");
+    json_object(root,"$schema|ambient|gradient|lights|thin_surface|backdrop|atmosphere|fog");
     w->ambient=json_color(json_get(root,"ambient"),MAX_AMBIENT_RADIANCE);w->ambient_enabled=true;
     Json gradient=json_find(root,"gradient");
     if (json_present(gradient))
     {
         json_object(gradient,"top|bottom");w->ambient_top=json_color(json_get(gradient,"top"),MAX_GRADIENT_TOP_RADIANCE);
         w->ambient_bottom=json_color(json_get(gradient,"bottom"),MAX_GRADIENT_BOTTOM_RADIANCE);w->ambient_gradient=true;
+    }
+    Json atmosphere=json_find(root,"atmosphere");
+    if (json_present(atmosphere))
+    {
+        json_object(atmosphere,"center|radius|edge_fade|scattering|absorption|anisotropy");
+        w->atmosphere_center=json_vector(json_get(atmosphere,"center"),-MAX_BACKDROP_COORDINATE,MAX_BACKDROP_COORDINATE);
+        w->atmosphere_radius=json_positive(json_get(atmosphere,"radius"),MAX_BACKDROP_SCALE);
+        w->atmosphere_fade=json_float(json_get(atmosphere,"edge_fade"),0,1);
+        w->atmosphere_scattering=json_color(json_get(atmosphere,"scattering"),1);
+        w->atmosphere_absorption=json_float(json_get(atmosphere,"absorption"),0,1);
+        w->atmosphere_phase=json_float(json_get(atmosphere,"anisotropy"),-.95f,.95f);w->atmosphere_enabled=true;
+    }
+    Json fog=json_find(root,"fog");
+    if (json_present(fog))
+    {
+        json_object(fog,"blur_radius|sight_feather|plane_z");
+        w->fog_blur=json_float(json_get(fog,"blur_radius"),1,256);
+        w->fog_feather=json_positive(json_get(fog,"sight_feather"),100);
+        w->fog_plane_z=json_float(json_get(fog,"plane_z"),-MAX_BACKDROP_COORDINATE,MAX_BACKDROP_COORDINATE);
     }
     Json lights=json_find(root,"lights");
     if (json_present(lights))
@@ -316,6 +335,14 @@ static bool validate_world(const World* world,const char* path)
     {
         if (!world->content.resource_label[0] || !world->content.producer_count || !world->spikes.enabled)
         { fprintf(stderr,"%s: gameplay requires producer and spike definitions\n",path);return false; }
+        if (world->neutral_start)
+            for (uint32_t side=0;side<2;++side)
+            {
+                Faction faction=side ? world->opponent_faction : world->player_faction;bool founder=false;
+                for (uint32_t i=0;i<world->spawn_count;++i)
+                { const UnitDefinition& u=world->content.units[world->spawns[i].type];founder=founder || (u.faction==faction && u.colonizes); }
+                if (!founder) { fprintf(stderr,"%s: each neutral-start side requires a craft that can establish a site\n",path);return false; }
+            }
         for (uint32_t f=1;f<MAX_FACTIONS;++f) if (world->content.factions[f].declared
             && !world->content.factions[f].producer_name[0])
         { fprintf(stderr,"%s: gameplay factions require production definitions\n",path);return false; }
@@ -353,10 +380,29 @@ bool world_load(World* world,const char* path)
     Json rules=json_find(root,"rules");if (json_present(rules) && (!json_path(rules,path,file) || !load_rules(&loaded,file))) return false;
     Json effects=json_find(root,"effects");if (json_present(effects) && (!json_path(effects,path,file) || !load_effects(&loaded,file))) return false;
     if (!json_path(json_get(root,"appearance"),path,file) || !load_appearance(&loaded,file)) return false;
-    Json match=json_get(root,"match");json_object(match,"player|opponent");
+    Json match=json_get(root,"match");json_object(match,"player|opponent|starts");
     loaded.player_faction=read_owner(&loaded,json_get(match,"player"));loaded.opponent_faction=read_owner(&loaded,json_get(match,"opponent"));
     if (!loaded.player_faction || !loaded.opponent_faction || loaded.player_faction==loaded.opponent_faction)
         return json_error(match,"match requires two distinct non-neutral factions");
-    if (!load_placements(&loaded,root) || !validate_world(&loaded,path)) return false;
+    if (!load_placements(&loaded,root)) return false;
+    for (uint32_t p=0;p<loaded.body_count;++p) loaded.start_owner[p]=loaded.bodies[p].owner;
+    Json starts=json_find(match,"starts");
+    if (json_present(starts))
+    {
+        loaded.neutral_start=true;bool seen[MAX_FACTIONS]={};bool cells[MAX_BODIES]={};
+        JsonArray entries=json_array(starts,2);Json entry={};uint32_t count=0;
+        while (json_next(&entries,&entry))
+        {
+            json_object(entry,"faction|cell");Faction faction=read_owner(&loaded,json_get(entry,"faction"));
+            uint32_t cell=json_uint(json_get(entry,"cell"),0,loaded.body_count ? loaded.body_count-1 : 0);
+            if (!loaded.body_count || (faction!=loaded.player_faction && faction!=loaded.opponent_faction)
+                || seen[faction] || cells[cell] || loaded.bodies[cell].owner!=FACTION_NEUTRAL
+                || !loaded.content.bodies[loaded.bodies[cell].type].hosts_site) return json_error(entry,"starts require distinct match factions and neutral production cells");
+            seen[faction]=true;cells[cell]=true;loaded.start_owner[cell]=faction;++count;
+        }
+        if (count!=2) return json_error(starts,"starts require both match factions");
+        for (uint32_t p=0;p<loaded.body_count;++p) if (loaded.bodies[p].owner!=FACTION_NEUTRAL) return json_error(starts,"neutral starts cannot contain established factories");
+    }
+    if (!validate_world(&loaded,path)) return false;
     *world=loaded;return true;
 }

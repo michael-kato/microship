@@ -132,6 +132,10 @@ bool simulation_in_sight(const Simulation* s,Vec3 position,float radius)
             && length(subtract(position,s->units[i].position))<reach) return true;
     return false;
 }
+static bool opening_orbit(const Simulation* s,const Unit& unit)
+{
+    return s->world.neutral_start && !s->faction_established[unit.faction] && !unit.commanded;
+}
 bool simulation_body_known(const Simulation* s,uint32_t p)
 { return p<s->world.body_count && (s->world.sight_radius<=0 || s->discovered[p]); }
 
@@ -200,6 +204,14 @@ float simulation_production(const Simulation* s,uint32_t p)
     }
     return production;
 }
+static Vec3 factory_direction(Vec3 direction,const ProducerDefinition& definition)
+{
+    if (!definition.growth_plane_enabled) return direction;
+    Vec3 n=definition.growth_plane_normal;float depth=dot(direction,n);
+    Vec3 flat=subtract(direction,scale(n,depth));
+    if (dot(flat,flat)<.000001f) flat=cross(n,std::fabs(n.y)<.9f ? Vec3{0,1,0} : Vec3{1,0,0});
+    return normalize(add(normalize(flat),scale(n,depth*definition.growth_depth_ratio)));
+}
 static void prepare_factory(Simulation* s,uint32_t p)
 {
     Colony* c=&s->colonies[p];const BranchRules* f=&simulation_producer_definition(s,p)->branches;
@@ -213,7 +225,7 @@ static void prepare_factory(Simulation* s,uint32_t p)
         else if (!f->organelle_roots) c->parents[k]=(k-1)/2;
         else if (f->grammar==GROWTH_FAN) c->parents[k]=((k-c->root_count)/2)%c->root_count;
         else if (f->grammar==GROWTH_HYPHA && (k-c->root_count)%HYPHA_CHAIN_LIMBS) c->parents[k]=k-1;
-        else c->parents[k]=(k-c->root_count)%c->root_count;
+        else c->parents[k]=f->grammar==GROWTH_AXIAL ? k-c->root_count : (k-c->root_count)%c->root_count;
     }
     if (simulation_producer_definition(s,p)->segment_path[0])
     {
@@ -232,6 +244,7 @@ static void prepare_factory(Simulation* s,uint32_t p)
             for (uint32_t j=1;j<=GROWTH_SEGMENTS;++j)
             {
                 Vec3 direction=normalize(add(scale(radial,LIMB_RADIAL_DIRECTION_WEIGHT),add(scale(side,(parent>=0 ? sign*spread : 0)+signed_random(&seed)*bend),scale(other,signed_random(&seed)*bend))));
+                direction=factory_direction(direction,*simulation_producer_definition(s,p));
                 c->stems[k][j]=add(c->stems[k][j-1],scale(direction,extent/GROWTH_SEGMENTS));
                 radial=normalize(subtract(c->stems[k][j],body.position));
             }
@@ -259,7 +272,7 @@ static void establish_colony(Simulation* s,uint32_t p,Faction faction)
     c->health=simulation_producer_definition(s,p)->health;c->growth=INITIAL_FACTORY_GROWTH;c->priority=s->world.content.factions[faction].default_unit;
     c->fighter_percent=s->world.content.units[c->priority].group==0 ? 100 : 0;c->production_error=50;
     c->active=true;c->root_generation=1;
-    s->world.bodies[p].owner=faction;
+    s->world.bodies[p].owner=faction;s->faction_established[faction]=true;
     if (s->world.gameplay.enabled) prepare_factory(s,p);
     if (simulation_producer_definition(s,p)->establishment_seconds>0) c->growth=0;
     else for (uint32_t k=1;k<c->root_count;++k) { c->branches[k-1].health=simulation_producer_definition(s,p)->health;c->branches[k-1].growth=INITIAL_FACTORY_GROWTH;c->branches[k-1].generation=1; }
@@ -294,7 +307,7 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
     *s=Simulation();s->selected_body=s->order_body=NO_BODY;
     if (!world_load(&s->world,world_path)) return false;
     if (seed) for (uint32_t i=0;i<s->world.body_count;++i) s->world.bodies[i].seed^=seed;
-    for (uint32_t i=0;i<s->world.body_count;++i) s->home_owner[i]=s->world.bodies[i].owner;
+    for (uint32_t i=0;i<s->world.body_count;++i) s->home_owner[i]=s->world.start_owner[i];
     if (!s->world.gameplay.enabled) return true;
     if (home_body(s,s->world.player_faction)<0 || home_body(s,s->world.opponent_faction)<0)
     { fprintf(stderr,"Both match sides require a home body.\n");return false; }
@@ -318,7 +331,7 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
     }
     if (s->world.gameplay.enabled)
         for (uint32_t p=0;p<s->world.body_count;++p)
-            if (s->home_owner[p]!=FACTION_NEUTRAL && s->world.content.bodies[s->world.bodies[p].type].hosts_site)
+            if (s->world.bodies[p].owner!=FACTION_NEUTRAL && s->world.content.bodies[s->world.bodies[p].type].hosts_site)
             {
                 establish_colony(s,p,s->home_owner[p]);s->colonies[p].growth=1;
                 Colony& c=s->colonies[p];const ProducerDefinition& d=*simulation_producer_definition(s,p);
@@ -332,6 +345,11 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
     {
         s->selected_body=home_body(s,s->world.player_faction);
         snprintf(s->message,sizeof(s->message),"SEEKING SPORES LAUNCH AUTOMATICALLY FROM HOME.");
+    }
+    if (s->world.neutral_start)
+    {
+        s->selected_body=home_body(s,s->world.player_faction);
+        snprintf(s->message,sizeof(s->message),"SELECT CRAFT / RIGHT-CLICK YOUR NEUTRAL CELL TO ESTABLISH A SITE.");
     }
     return true;
 }
@@ -485,7 +503,7 @@ static bool attention_valid(const Simulation* s,const Unit& u,const Vec3* positi
     else return false;
     return within_leash(s,u,point) && length(subtract(point,u.position))<=radius*ATTENTION_RETENTION_RADIUS_SCALE;
 }
-static void local_task(Simulation* s,Unit* u,const Vec3* positions,float dt)
+static void local_task(Simulation* s,Unit* u,const Vec3* positions,const int32_t settlers[MAX_BODIES][MAX_FACTIONS],float dt)
 {
     const UnitDefinition& d=*simulation_unit_definition(s,u);
     bool valid=attention_valid(s,*u,positions);
@@ -520,11 +538,12 @@ static void local_task(Simulation* s,Unit* u,const Vec3* positions,float dt)
         }
         if (u->attention>=0) return;
     }
-    if (u->commanded || !d.colonizes || d.colonize_radius<=0) return;
+    if (opening_orbit(s,*u) || u->commanded || !d.colonizes || d.colonize_radius<=0) return;
     float nearest=d.colonize_radius;int32_t chosen=-1;
     for (uint32_t p=0;p<s->world.body_count;++p)
     {
         if (!s->world.content.bodies[s->world.bodies[p].type].hosts_site || s->colonies[p].active
+            || (settlers[p][u->faction]>=0 && settlers[p][u->faction]!=(int32_t)(u-s->units))
             || (u->faction==s->world.player_faction && !simulation_body_known(s,p))) continue;
         float distance=length(subtract(u->position,s->world.bodies[p].position))-s->world.bodies[p].radius;
         if (distance<nearest && !defended(s,p,u->faction)) { nearest=distance;chosen=p; }
@@ -538,6 +557,18 @@ static void move_units(Simulation* s, float dt)
     FlightObstacles obstacles;flight_obstacles(s,&obstacles);
     Vec3 positions[MAX_UNITS],velocities[MAX_UNITS];
     for (uint32_t i=0;i<MAX_UNITS;++i) { positions[i]=s->units[i].position;velocities[i]=s->units[i].velocity; }
+    // One approach slot per side and cell keeps a group from blocking its own landing point.
+    int32_t settlers[MAX_BODIES][MAX_FACTIONS];
+    for (uint32_t p=0;p<MAX_BODIES;++p) for (uint32_t f=0;f<MAX_FACTIONS;++f) settlers[p][f]=-1;
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    {
+        const Unit& u=s->units[i];
+        if (u.health<=0 || u.moving || u.target<0 || opening_orbit(s,u) || !simulation_unit_definition(s,&u)->colonizes) continue;
+        uint32_t p=(uint32_t)u.target;
+        if (s->colonies[p].active || defended(s,p,u.faction)) continue;
+        int32_t old=settlers[p][u.faction];Vec3 goal=s->colonies[p].surface;
+        if (old<0 || length(subtract(positions[i],goal))<length(subtract(positions[old],goal))) settlers[p][u.faction]=(int32_t)i;
+    }
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         Unit* u=&s->units[i];
@@ -563,7 +594,7 @@ static void move_units(Simulation* s, float dt)
         Vec3 combat_target={};bool strafe=false;
         uint32_t p=(uint32_t)u->target;
         if (!u->moving && s->colonies[p].active && s->colonies[p].faction==u->faction) u->commanded=false;
-        bool colonizing=simulation_unit_definition(s,u)->colonizes && u->target>=0 && s->world.content.bodies[s->world.bodies[p].type].hosts_site
+        bool colonizing=u->target>=0 && settlers[p][u->faction]==(int32_t)i && !opening_orbit(s,*u) && simulation_unit_definition(s,u)->colonizes && s->world.content.bodies[s->world.bodies[p].type].hosts_site
             && !s->colonies[p].active && !defended(s,p,u->faction);
         Vec3 goal=u->moving ? u->destination : add(s->colonies[p].surface,scale(s->world.bodies[p].colony_normal,colonizing ? COLONIZE_SURFACE_OFFSET : LEGACY_ORBIT_SURFACE_OFFSET));
         if (!u->moving && !colonizing)
@@ -585,7 +616,7 @@ static void move_units(Simulation* s, float dt)
                 goal=add(s->world.bodies[p].position,scale(normal,height));
             }
             goal=add(goal,add(scale(tangent,std::cos(angle)*spread),scale(bitangent,std::sin(angle)*spread)));
-            local_task(s,u,positions,dt);
+            local_task(s,u,positions,settlers,dt);
             if (u->task==TASK_ATTACK_UNIT) goal=positions[u->attention];
             else if (u->task==TASK_ATTACK_STRUCTURE) goal=simulation_structure_position(s,u->attention,u->attention_structure);
             else if (u->task==TASK_COLONIZE) goal=add(s->colonies[u->target].surface,scale(s->world.bodies[u->target].colony_normal,COLONIZE_SURFACE_OFFSET));
@@ -650,7 +681,7 @@ static void move_units(Simulation* s, float dt)
             }
             // Read a stable pass input: separation must not depend on unit update order.
             for (uint32_t j=0;j<MAX_UNITS;++j)
-                if (j!=i && s->units[j].health>0)
+                if (j!=i && s->units[j].health>0 && !(colonizing && s->units[j].faction==u->faction && s->units[j].target==u->target))
                 {
                     Vec3 apart=subtract(positions[i],positions[j]);float d=length(apart);
                     float spacing=flight->separation*std::fmax(simulation_unit_definition(s,u)->separation,simulation_unit_definition(s,&s->units[j])->separation);
@@ -1044,7 +1075,7 @@ static void colonize_cells(Simulation* s, float dt)
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         Unit* u=&s->units[i];
-        if (u->health<=0 || u->target<0 || !simulation_unit_definition(s,u)->colonizes
+        if (u->health<=0 || u->target<0 || u->task!=TASK_COLONIZE || opening_orbit(s,*u) || !simulation_unit_definition(s,u)->colonizes
             || !s->world.content.bodies[s->world.bodies[u->target].type].hosts_site) continue;
         uint32_t p=(uint32_t)u->target;Colony* c=&s->colonies[p];
         if (defended(s,p,u->faction))
@@ -1176,22 +1207,33 @@ static void enemy_orders(Simulation* s)
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         Unit* u=&s->units[i];if (u->health<=0 || u->faction!=enemy) continue;
-        int32_t next=expand && target>=0 ? target : home;
+        bool establishing=s->world.neutral_start && !s->faction_established[enemy];
+        int32_t next=!establishing && expand && target>=0 ? target : home;
         if (u->target!=next) { u->attention=-1;u->response_timer=0; }
-        u->target=next;u->commanded=expand && target>=0;
+        u->target=next;u->commanded=expand && (establishing || target>=0);
     }
+    Faction player=s->world.player_faction;
+    if (s->world.neutral_start && !s->faction_established[player] && s->world.content.factions[player].automatic && expand)
+        for (uint32_t i=0;i<MAX_UNITS;++i)
+            if (s->units[i].health>0 && s->units[i].faction==player && simulation_unit_definition(s,&s->units[i])->colonizes)
+            { s->units[i].target=home_body(s,player);s->units[i].commanded=true; }
+
 }
 
 static void outcome(Simulation* s)
 {
-    bool friendly=false,hostile=false,units=false;
+    bool friendly=false,hostile=false,units=false,enemy_units=false;
     for (uint32_t p=0;p<s->world.body_count;++p) if (s->colonies[p].active)
     {
         friendly=friendly || s->colonies[p].faction==s->world.player_faction;
         hostile=hostile || s->colonies[p].faction!=s->world.player_faction;
     }
-    for (uint32_t i=0;i<MAX_UNITS;++i) units=units || (s->units[i].health>0 && s->units[i].faction==s->world.player_faction);
-    if (friendly && !hostile) { s->outcome=1;sound(s,SOUND_WIN,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"VICTORY: ENEMY PRODUCTION SITES DESTROYED. R TO RESTART."); }
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    {
+        units=units || (s->units[i].health>0 && s->units[i].faction==s->world.player_faction);
+        enemy_units=enemy_units || (s->units[i].health>0 && s->units[i].faction==s->world.opponent_faction);
+    }
+    if (friendly && !hostile && (s->faction_established[s->world.opponent_faction] || !enemy_units)) { s->outcome=1;sound(s,SOUND_WIN,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"VICTORY: ENEMY PRODUCTION SITES DESTROYED. R TO RESTART."); }
     else if (!friendly && !units) { s->outcome=-1;sound(s,SOUND_LOSE,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"COLONY LOST. R TO RESTART."); }
 }
 
