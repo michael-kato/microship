@@ -75,6 +75,7 @@ struct Colony
     uint32_t wounds;
     EmbeddedSpike embedded[MAX_EMBEDDED];
     float branch_timer;
+    float establishment_age;
     FactoryStructure branches[MAX_FACTORY_STRUCTURES-1];
     Vec3 stems[MAX_FACTORY_STRUCTURES][GROWTH_SEGMENTS+1];
     uint32_t production_tip;

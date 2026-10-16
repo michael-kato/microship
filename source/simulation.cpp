@@ -182,7 +182,8 @@ static void establish_colony(Simulation* s,uint32_t p,Faction faction)
     c->active=true;c->root_generation=1;
     s->world.bodies[p].owner=faction;
     if (s->world.gameplay.enabled) prepare_factory(s,p);
-    for (uint32_t k=1;k<c->root_count;++k) { c->branches[k-1].health=simulation_producer_definition(s,p)->health;c->branches[k-1].growth=.02f;c->branches[k-1].generation=1; }
+    if (simulation_producer_definition(s,p)->establishment_seconds>0) c->growth=0;
+    else for (uint32_t k=1;k<c->root_count;++k) { c->branches[k-1].health=simulation_producer_definition(s,p)->health;c->branches[k-1].growth=.02f;c->branches[k-1].generation=1; }
     sound(s,SOUND_COLONIZE,c->surface);
 }
 
@@ -241,7 +242,10 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
             if (s->home_owner[p]!=FACTION_NEUTRAL && s->world.content.bodies[s->world.bodies[p].type].hosts_site)
             {
                 establish_colony(s,p,s->home_owner[p]);s->colonies[p].growth=1;
-                for (uint32_t k=1;k<s->colonies[p].root_count;++k) s->colonies[p].branches[k-1].growth=1;
+                Colony& c=s->colonies[p];const ProducerDefinition& d=*simulation_producer_definition(s,p);
+                c.establishment_age=d.establishment_seconds;
+                for (uint32_t k=1;k<c.root_count;++k)
+                { c.branches[k-1].health=d.health;c.branches[k-1].growth=1;c.branches[k-1].generation=1; }
             }
     simulation_update_sight(s);
     snprintf(s->message,sizeof(s->message),"RIGHT-CLICK OPEN SPACE TO SCOUT. ORDER A KNOWN BODY TO INTERACT.");
@@ -974,6 +978,10 @@ static void grow_colonies(Simulation* s, float dt)
         Colony* c=&s->colonies[p];if (!c->active) continue;
         const ProducerDefinition& d=*simulation_producer_definition(s,p);
         const BranchRules& f=d.branches;
+        // Initial construction has one time slot per structure. Damage keeps its regrowth delay.
+        bool establishing=c->establishment_age<d.establishment_seconds;
+        c->establishment_age=std::fmin(d.establishment_seconds,c->establishment_age+dt);
+        float slot=d.establishment_seconds/f.count;
         c->branch_timer+=dt;
         bool mature=false;
         for (uint32_t k=0;k<f.count;++k)
@@ -988,13 +996,18 @@ static void grow_colonies(Simulation* s, float dt)
             int32_t parent=c->parents[k];
             *timer=std::fmax(0.0f,*timer-dt);
             bool ready=parent<0 || ((parent ? c->branches[parent-1].health : c->health)>0 && simulation_structure_growth(s,p,parent)>=1);
-            if (*health<=0 && *timer<=0 && ready && c->branch_timer>=f.seconds)
+            bool first=establishing && *generation==0;
+            bool due=first ? c->establishment_age>k*slot : c->branch_timer>=f.seconds;
+            if (*health<=0 && *timer<=0 && ready && due)
             {
-                c->branch_timer=0;*health=parent<0 ? d.health : f.health;*growth=.02f;*wounds=0;++*generation;
+                c->branch_timer=0;*health=parent<0 ? d.health : f.health;*growth=first ? 0 : .02f;*wounds=0;++*generation;
                 memset(embedded,0,sizeof(EmbeddedSpike)*MAX_EMBEDDED);sound(s,SOUND_GROW,simulation_structure_position(s,p,k));
             }
             if (*health<=0) continue;
-            float old=*growth;*growth=std::fmin(1.0f,*growth+dt/d.growth_seconds);
+            float old=*growth;
+            if (establishing && *generation==1)
+                *growth=std::fmin(1.0f,*growth+std::fmin(dt,std::fmax(0.0f,c->establishment_age-k*slot))/slot);
+            else *growth=std::fmin(1.0f,*growth+dt/d.growth_seconds);
             if (old<1 && *growth>=1) sound(s,SOUND_MATURE,simulation_structure_position(s,p,k));
             mature=mature || *growth>=1;
         }
@@ -1136,7 +1149,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
         fprintf(file,"%s{\"%s\":%u,\"faction\":%d,\"health\":%.6f,\"growth\":%.6f,\"%s\":%.6f,\"energy\":%.6f,\"building\":%s,\"priority\":%d,\"manufacturing\":%.6f,\"capacity_blocked\":%s,\"wounds\":%u",
             p ? "," : "","cell",p,(int)c->faction,c->health,c->growth,"nutrients",c->uptake,c->energy,c->building ? "true" : "false",(int)(c->faction ? s->world.content.units[c->priority].group : 0),c->manufacturing,c->capacity_blocked ? "true" : "false",c->wounds);
         const Body& body=s->world.bodies[p];
-        fprintf(file,",\"active\":%s,\"root_count\":%u,\"production\":%.6f,\"attachments\":[",c->active ? "true" : "false",c->root_count,c->active ? simulation_production(s,p) : 0);
+        fprintf(file,",\"active\":%s,\"establishment_age\":%.6f,\"root_count\":%u,\"production\":%.6f,\"attachments\":[",c->active ? "true" : "false",c->establishment_age,c->root_count,c->active ? simulation_production(s,p) : 0);
         for (uint32_t k=0;k<body.factory_root_count;++k) { Vec3 v=body.factory_roots[k];fprintf(file,"%s[%.6f,%.6f,%.6f]",k ? "," : "",v.x,v.y,v.z); }
         fprintf(file,"]");
         fprintf(file,",\"appearance\":{\"tint\":[%.6f,%.6f,%.6f],\"strength\":%.6f}",s->cell_appearance[p].tint.r,s->cell_appearance[p].tint.g,s->cell_appearance[p].tint.b,s->cell_appearance[p].strength);

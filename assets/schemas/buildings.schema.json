@@ -157,6 +157,11 @@
               "head_radius"
             ],
             "additionalProperties": false
+          },
+          "establishment_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
           }
         },
         "required": [

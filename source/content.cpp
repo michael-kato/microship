@@ -203,7 +203,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
     json_object(root,"$schema|buildings");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|model|growth_seconds|health|collection|height|width|hits|branches|growth_meshes|navigation");ProducerDefinition p={};
+        json_object(j,"name|faction|model|growth_seconds|establishment_seconds|health|collection|height|width|hits|branches|growth_meshes|navigation");ProducerDefinition p={};
         Json navigation=json_find(j,"navigation");
         if (json_present(navigation))
         {
@@ -219,6 +219,8 @@ static bool load_buildings(Content* c,Json root,const char* path)
         }
         definition_name(j,p.name);json_string(json_get(j,"faction"),p.faction_name,32);json_path(json_get(j,"model"),path,p.model_path);
         p.growth_seconds=json_positive(json_get(j,"growth_seconds"),10000);
+        Json establishment=json_find(j,"establishment_seconds");
+        if (json_present(establishment)) p.establishment_seconds=json_positive(establishment,10000);
         p.health=json_positive(json_get(j,"health"),10000);
         p.collection=json_positive(json_get(j,"collection"),10000);
         p.height=json_positive(json_get(j,"height"),10000);

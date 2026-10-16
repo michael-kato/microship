@@ -173,7 +173,7 @@ add_test(NAME data_assets COMMAND ${Python3_EXECUTABLE}
 set_tests_properties(data_assets PROPERTIES TIMEOUT 45)
 add_test(NAME growth_factions COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/growth_factions.py $<TARGET_FILE:microship>)
-set_tests_properties(growth_factions PROPERTIES TIMEOUT 45)
+set_tests_properties(growth_factions PROPERTIES TIMEOUT 60)
 add_test(NAME navigation COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/navigation.py $<TARGET_FILE:microship>)
 set_tests_properties(navigation PROPERTIES TIMEOUT 60)

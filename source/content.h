@@ -49,7 +49,7 @@ struct ProducerDefinition
     char name[32],faction_name[32],model_path[256];
     char segment_path[256],tip_path[256];
     Faction faction;
-    float growth_seconds,health,collection,height,width;
+    float growth_seconds,establishment_seconds,health,collection,height,width;
     float stem_radius,head_radius;
     uint32_t hits;
     BranchRules branches;

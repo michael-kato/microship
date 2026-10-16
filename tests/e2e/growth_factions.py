@@ -11,12 +11,12 @@ import tempfile
 import wave
 from asset_data import stage_world,write_world,change
 
-root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
-command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
+repo_root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
+command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(repo_root/'scripts/proton_run.py'),str(binary)]
 count=0
 with tempfile.TemporaryDirectory(prefix='microship-growth-') as directory:
     out=Path(directory)
-    def stage(side):return stage_world(root/'assets/levels'/('biology-'+side+'.json'),out)
+    def stage(side):return stage_world(repo_root/'assets/levels'/('biology-'+side+'.json'),out)
     def run(name,data,ticks=1,extra=(),orders='',expected=0):
         global count
         level=out/(name+'-world.json');write_world(level,data)
@@ -146,6 +146,53 @@ with tempfile.TemporaryDirectory(prefix='microship-growth-') as directory:
     root=rebuilt['colonies'][0]['structures'][0]
     assert root['health']==240 and root['generation']==2 and root['wounds']==0, root
     assert rebuilt['colonies'][0]['structures'][1]['generation']==1, 'Regrowth replaced an unrelated root'
+    # Settle through normal flight and landing, then measure the complete capacity ramp.
+    for side,cell,kind in [('virus',2,'virus_fighter'),('virus',3,'virus_fighter'),
+                           ('virus',4,'virus_fighter'),('immune',2,'immune_fighter')]:
+        colony=stage(side);colony['rules'].pop('exploration',None)
+        colony['rules']['economy']['manufacture_seconds']=1000
+        colony['rules']['ai']['expansion_delay']=300
+        colony['rules']['economy']['enemy_attack_seconds']=300
+        body=colony['bodies'][cell]
+        colony['spawns']=[dict(type=kind,position=[c+n*(body['radius']+.25) for c,n in zip(body['position'],body['site']['normal'])])]
+        name=f'establish-{side}-{cell}'
+        initial,_=run(name+'-land',colony,360)
+        c=initial['colonies'][cell];assert initial['landings']==1 and c['active']
+        start=360-round(c['establishment_age']*60)
+        previous=0
+        for seconds in (10,30,60,89,91):
+            state,_=run(name+'-'+str(seconds),colony,start+seconds*60)
+            c=state['colonies'][cell];structures=c['structures']
+            alive=[v for v in structures if v['health']>0]
+            growing=[v for v in alive if v['growth']<1]
+            assert len(growing)<=1,(name,seconds,'Parallel emergence',structures)
+            assert all(v['health']==0 and v['growth']==0 for v in structures[len(alive):]),'A later factory emerged first'
+            assert all(v['parent']<0 or structures[v['parent']]['growth']==1 for v in alive),'A child grew before its support'
+            maximum=1+(len(structures)-c['root_count'])*.12
+            assert previous<c['production']<=maximum+.00001,(name,seconds,c['production'])
+            previous=c['production']
+            if seconds<90:
+                assert len(alive)==math.ceil(seconds/(90/len(structures))), (name,seconds,len(alive))
+                assert c['production']<maximum
+            else:
+                assert len(alive)==len(structures) and not growing
+                assert abs(c['production']-maximum)<.00001
+        reset,_=run(name+'-restart',colony,start+91*60,extra=('--restart',))
+        assert not reset['colonies'][cell]['active'] and reset['colonies'][cell]['establishment_age']==0
+    for seconds in (60,120):
+        tuned=deepcopy(colony)
+        for producer in tuned['content']['buildings']:producer['establishment_seconds']=seconds
+        midpoint,_=run('establish-tuned-half-'+str(seconds),tuned,start+seconds*30)
+        complete,_=run('establish-tuned-full-'+str(seconds),tuned,start+(seconds+1)*60)
+        assert sum(v['growth']==1 for v in midpoint['colonies'][cell]['structures']) in (7,8)
+        assert all(v['growth']==1 for v in complete['colonies'][cell]['structures'])
+    productive=deepcopy(colony);productive['rules']['economy']['manufacture_seconds']=6
+    producing,_=run('establish-produces-before-full',productive,start+30*60)
+    assert any(u['target']==cell and u['faction']==2 for u in producing['units']), 'A growing colony did not produce units'
+    run('zero-establishment',change(base,'content.buildings.0.establishment_seconds',0),expected=1)
+    run('negative-establishment',change(base,'content.buildings.0.establishment_seconds',-1),expected=1)
+    run('excess-establishment',change(base,'content.buildings.0.establishment_seconds',10001),expected=1)
+    run('text-establishment',change(base,'content.buildings.0.establishment_seconds','90'),expected=1)
     parts_path=(out/base['content']['bodies'][2]['variation']['parts']).resolve()
     metadata=json.loads(parts_path.read_text());metadata['parts'][0]['minimum_scale']=-1
     bad_parts=out/'invalid-size-parts.json';bad_parts.write_text(json.dumps(metadata))
