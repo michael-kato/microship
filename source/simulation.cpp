@@ -257,6 +257,7 @@ static void establish_colony(Simulation* s,uint32_t p,Faction faction)
     *c=Colony();c->surface=surface;c->generation=generation;c->faction=faction;
     c->type=s->world.content.factions[faction].producer;
     c->health=simulation_producer_definition(s,p)->health;c->growth=INITIAL_FACTORY_GROWTH;c->priority=s->world.content.factions[faction].default_unit;
+    c->fighter_percent=s->world.content.units[c->priority].group==0 ? 100 : 0;c->production_error=50;
     c->active=true;c->root_generation=1;
     s->world.bodies[p].owner=faction;
     if (s->world.gameplay.enabled) prepare_factory(s,p);
@@ -393,13 +394,33 @@ void simulation_priority_type(Simulation* s,uint32_t type)
     if (p<0 || !simulation_body_known(s,(uint32_t)p) || !s->colonies[p].active || s->colonies[p].faction!=s->world.player_faction)
     { snprintf(s->message,sizeof(s->message),"SELECT YOUR PRODUCTION SITE FIRST");return; }
     if (type>=s->world.content.unit_count || s->world.content.units[type].faction!=s->colonies[p].faction) return;
-    s->colonies[p].priority=type;
+    Colony* c=&s->colonies[p];c->priority=type;c->ratio_enabled=false;
+    c->fighter_percent=s->world.content.units[type].group==0 ? 100 : 0;c->production_error=50;
     snprintf(s->message,sizeof(s->message),"NEXT UNIT: %s",s->world.content.groups[s->world.content.units[type].group].singular);
 }
 void simulation_priority(Simulation* s,int group)
 {
     int type=content_product(&s->world.content,s->world.player_faction,group);
     if (type>=0) simulation_priority_type(s,(uint32_t)type);
+}
+
+bool simulation_ratio_available(const Simulation* s,uint32_t p)
+{
+    if (!simulation_body_known(s,p)) return false;
+    const Colony* c=&s->colonies[p];
+    return c->active && c->faction==s->world.player_faction
+        && !s->world.content.factions[c->faction].automatic
+        && content_product(&s->world.content,c->faction,0)>=0 && content_product(&s->world.content,c->faction,1)>=0;
+}
+
+void simulation_production_ratio(Simulation* s,uint32_t percent)
+{
+    int p=s->selected_body;
+    if (percent>100 || p<0 || !simulation_ratio_available(s,(uint32_t)p)) return;
+    Colony* c=&s->colonies[p];
+    if (!c->ratio_enabled || c->fighter_percent!=percent) c->production_error=50;
+    c->fighter_percent=percent;c->ratio_enabled=true;
+    snprintf(s->message,sizeof(s->message),"PRODUCTION: %u%% %.16s / %u%% %.16s",percent,s->world.content.groups[0].plural,100-percent,s->world.content.groups[1].plural);
 }
 
 static Vec3 colony_tip(const Simulation* s, uint32_t p)
@@ -1101,11 +1122,16 @@ static void grow_colonies(Simulation* s, float dt)
         if (!count) continue;
         if (!c->building)
         {
-            float cost=s->world.content.units[c->priority].cost;
+            uint32_t type=c->priority;
+            uint32_t error=c->production_error+c->fighter_percent;
+            if (c->ratio_enabled) type=(uint32_t)content_product(&s->world.content,c->faction,error>=100 ? 0 : 1);
+            float cost=s->world.content.units[type].cost;
             bool automatic=s->world.content.factions[c->faction].automatic;
             if (!automatic && c->energy<cost) continue;
             if (!automatic) c->energy-=cost;
-            c->building=true;c->building_kind=c->priority;c->manufacturing=0;
+            c->building=true;c->building_kind=type;c->manufacturing=0;
+            // Commit one ratio step only when a unit starts. Waiting and pointer events consume no steps.
+            if (c->ratio_enabled) c->production_error=error%100;
             c->production_tip=tips[s->next_generation%count];
         }
         if (structure_health(c,c->production_tip)<=0 || (c->production_tip ? c->branches[c->production_tip-1].growth : c->growth)<1)
@@ -1127,7 +1153,7 @@ static void grow_colonies(Simulation* s, float dt)
             position=add(tip,scale(normal,definition->scale*NEW_UNIT_TIP_CLEARANCE_SCALE));
         }
         if (spawn(s,type,position,(int)p,&normal))
-        { c->building=false;c->manufacturing=0;c->capacity_blocked=false; }
+        { if (definition->group<2) ++c->produced[definition->group];c->building=false;c->manufacturing=0;c->capacity_blocked=false; }
         else c->capacity_blocked=true;
     }
 }
@@ -1222,6 +1248,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
         const Colony* c=&s->colonies[p];
         fprintf(file,"%s{\"%s\":%u,\"faction\":%d,\"health\":%.6f,\"growth\":%.6f,\"%s\":%.6f,\"energy\":%.6f,\"building\":%s,\"priority\":%d,\"manufacturing\":%.6f,\"capacity_blocked\":%s,\"wounds\":%u",
             p ? "," : "","cell",p,(int)c->faction,c->health,c->growth,"nutrients",c->uptake,c->energy,c->building ? "true" : "false",(int)(c->faction ? s->world.content.units[c->priority].group : 0),c->manufacturing,c->capacity_blocked ? "true" : "false",c->wounds);
+        fprintf(file,",\"fighter_percent\":%u,\"ratio_enabled\":%s,\"produced\":[%u,%u],\"building_type\":\"%s\"",c->fighter_percent,c->ratio_enabled ? "true" : "false",c->produced[0],c->produced[1],c->building ? s->world.content.units[c->building_kind].name : "");
         const Body& body=s->world.bodies[p];
         fprintf(file,",\"active\":%s,\"establishment_age\":%.6f,\"root_count\":%u,\"production\":%.6f,\"attachments\":[",c->active ? "true" : "false",c->establishment_age,c->root_count,c->active ? simulation_production(s,p) : 0);
         for (uint32_t k=0;k<body.factory_root_count;++k) { Vec3 v=body.factory_roots[k];fprintf(file,"%s[%.6f,%.6f,%.6f]",k ? "," : "",v.x,v.y,v.z); }

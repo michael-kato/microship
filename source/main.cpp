@@ -55,6 +55,7 @@ static void print_usage(FILE* output)
         "              [--frames N] [--capture PATH.ppm|PATH.pfm] [--samples N] [--seed N]\n"
         "              [--vsync] [--time SECONDS] [--step-seconds N] [--camera-drag X Y] [--camera-zoom N]\n"
         "              [--camera-pointer X Y] [--click X Y] [--command X Y] [--select-group 1..3] [--focus] [--additive] [--restart]\n"
+        "              [--pointer-drag X1 Y1 X2 Y2] (client pixels)\n"
         "              [--smoke] [--stats|--no-stats] [--debug-views] [--no-activate]\n"
         "              [--replay PATH.orders] [--ticks N] [--state PATH.json] [--scene-state PATH.json]\n"
         "              [--audio-capture PATH.wav] (with --smoke and --ticks, at most 3600 ticks)\n"
@@ -135,6 +136,21 @@ int main(int argc, char** argv)
             if (++i==argc || strlen(argv[i])!=1 || argv[i][0]<'1' || argv[i][0]>'3')
             { fprintf(stderr,"--select-group requires 1, 2 or 3.\n");return 2; }
             options.camera_input.group=(uint32_t)(argv[i][0]-'0');
+        }
+        else if (strcmp(argv[i],"--pointer-drag")==0)
+        {
+            int32_t pixels[4];
+            for (int j=0;j<4;++j)
+            {
+                double value;
+                if (++i==argc || !parse_real(argv[i],&value) || value<0 || value>MAX_CLIENT_PIXEL_COORDINATE || value!=std::floor(value))
+                { fprintf(stderr,"--pointer-drag requires four integer client coordinates in [0,65535].\n");return 2; }
+                pixels[j]=(int32_t)value;
+            }
+            PointerInput* input=&options.camera_input;
+            input->pointer_pressed=true;input->pointer_released=true;input->pointer_valid=true;
+            input->press_x=pixels[0];input->press_y=pixels[1];input->pointer_x=pixels[2];input->pointer_y=pixels[3];
+            input->drag_x=(float)(pixels[2]-pixels[0]);input->drag_y=(float)(pixels[3]-pixels[1]);
         }
         else if (strcmp(argv[i], "--time") == 0 || strcmp(argv[i], "--step-seconds") == 0
             || strcmp(argv[i], "--camera-zoom") == 0 || strcmp(argv[i], "--camera-drag") == 0 || strcmp(argv[i], "--camera-pointer") == 0

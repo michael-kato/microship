@@ -42,9 +42,9 @@ const float CARD_ALPHA = .90;
 const float CARD_BORDER_ALPHA = .28;
 const float CARD_ACCENT_STRIP_BRIGHTNESS = .8;
 const int CARD_TEXT_MARGIN = 14;
-const int PROGRESS_TOP = 114;
-const int PROGRESS_BOTTOM = 128;
-const int PROGRESS_DIVIDER = 120;
+const int PROGRESS_TOP = 132;
+const int PROGRESS_BOTTOM = 140;
+const int PROGRESS_DIVIDER = 136;
 const int PROGRESS_RIGHT = 426;
 const float PROGRESS_WIDTH = 412.0;
 const float PROGRESS_ACCENT_BRIGHTNESS = .7;
@@ -253,6 +253,14 @@ void main()
                     value=PROGRESS_TRACK_COLOR;
                     if (local.x>=CARD_TEXT_MARGIN && local.x<PROGRESS_RIGHT && float(local.x-CARD_TEXT_MARGIN)/PROGRESS_WIDTH<progress)
                         value=bar==0 ? accent*PROGRESS_ACCENT_BRIGHTNESS : MANUFACTURE_PROGRESS_COLOR;
+                }
+                if (!left && debug.feedback.w>=0.0 && pixel.x>=extent.x-HUD_RATIO_LEFT_INSET && pixel.x<=extent.x-HUD_RATIO_RIGHT_INSET
+                    && pixel.y>=extent.y-HUD_RATIO_TOP && pixel.y<extent.y-HUD_RATIO_BOTTOM)
+                {
+                    int knob=extent.x-HUD_RATIO_LEFT_INSET+int(round(debug.feedback.w*float(HUD_RATIO_WIDTH)));
+                    int center=extent.y-(HUD_RATIO_TOP+HUD_RATIO_BOTTOM)/2;
+                    if (abs(pixel.y-center)<=2) value=PROGRESS_TRACK_COLOR+accent*.25;
+                    if (abs(pixel.x-knob)<=4 && abs(pixel.y-center)<=8) value=accent;
                 }
                 if (!left && debug.status.x>=0.0 && local.y>=GROWTH_LINE_TOP && local.y<GROWTH_LINE_BOTTOM && local.x>=CARD_TEXT_MARGIN && local.x<PROGRESS_RIGHT)
                 { value=selected*GROWTH_LINE_BACKGROUND;if (float(local.x-CARD_TEXT_MARGIN)/PROGRESS_WIDTH<debug.status.x) value=selected*SELECTION_ALPHA; }

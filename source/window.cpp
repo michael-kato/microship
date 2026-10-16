@@ -36,7 +36,7 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
     if (window && message == WM_ERASEBKGND) return 1;
     if (window && message == WM_LBUTTONDOWN)
     {
-        window->dragging = true;
+        window->dragging = true;window->input.pointer_pressed=true;
         window->pointer_x = (short)LOWORD(lparam);
         window->pointer_y = (short)HIWORD(lparam);
         window->press_x=window->pointer_x;window->press_y=window->pointer_y;window->moved=false;
@@ -47,6 +47,12 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
     {
         if (message==WM_LBUTTONUP && window->dragging && !window->moved)
         { window->input.click=true;window->input.click_x=(short)LOWORD(lparam);window->input.click_y=(short)HIWORD(lparam); }
+        if (message==WM_LBUTTONUP)
+        {
+            window->input.pointer_released=true;
+            window->input.pointer_x=(short)LOWORD(lparam);window->input.pointer_y=(short)HIWORD(lparam);window->input.pointer_valid=true;
+        }
+        else if (window->dragging) window->input.pointer_cancelled=true;
         window->dragging = false;
         if (message == WM_LBUTTONUP) ReleaseCapture();
         return 0;
@@ -140,6 +146,7 @@ bool window_poll(Window* window, PointerInput* input)
         DispatchMessageA(&message);
     }
     *input = window->input;
+    input->pointer_held=window->dragging;input->press_x=window->press_x;input->press_y=window->press_y;
     input->additive=(GetKeyState(VK_SHIFT)&KEY_PRESSED_MASK)!=0;
     POINT point;
     if (GetCursorPos(&point) && ScreenToClient(window->handle,&point))

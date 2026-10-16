@@ -79,8 +79,8 @@ with tempfile.TemporaryDirectory(prefix='microship-polish-') as directory:
     assert directed['order']['cell']==1 and directed['order']['count']==6,'Pointer order failed'
     focused,log=run('cell-focus',900,plant,extra=('--focus',))
     _,focus=camera(log);assert focus==(-6,0,0),'Home focus failed'
-    priority,_=run('hud-production',900,plant,extra=('--click','1750','1010'))
-    assert priority['colonies'][0]['priority']==1,'Production button failed'
+    priority,_=run('hud-production',900,plant,extra=('--click','1778','1030'))
+    assert priority['colonies'][0]['fighter_percent']==25,'Production slider failed'
     # Project an actual application-exported unit for the same screen-space pick path.
     baseline,_=run('pick-baseline');fighter=next(u for u in baseline['units'] if u['faction']==1 and u['kind']==0)
     ray=sub(fighter['position'],eye);depth=dot(ray,forward)

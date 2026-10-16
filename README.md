@@ -37,7 +37,7 @@ Controls:
 | Shift-click | Add or remove a unit from the selection |
 | Right-click open space | Move selected units and scout |
 | Right-click a known cell | Attack, orbit, or colonize |
-| Click a cell, then F / S | Produce fighters / bombers |
+| Click your cell, then drag its production slider | Set the fighter / bomber production ratio |
 | Home | Focus the selected cell or your home |
 | Space / R | Pause / restart |
 | F1 / F2 | Timing data / current render buffers |
@@ -61,6 +61,8 @@ Select the immune side:
 ```sh
 python3 scripts/proton_run.py build/windows-cross/microship.exe --world assets/levels/biology-immune.json
 ```
+
+The production slider sets the unit mix for the selected friendly cell in one-percent steps. The left end makes fighters only; the right end makes bombers only. Each cell keeps its own setting. A unit already in production finishes before the new mix applies. The ratio controls future production, not the number of surviving units. F and S still select the two endpoints. Replay `ratio 75` requests 75 percent fighters and 25 percent bombers. Restart restores the startup setting. Automatic spore emitters have no ratio control.
 
 Select the fungal trial with `--world assets/levels/biology-fungus.json`. The separate `biology-swarm.json` level tests a faster two-hit virus swarm against immune units. It does not replace the default three-hit virus balance.
 

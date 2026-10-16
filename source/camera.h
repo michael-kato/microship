@@ -12,6 +12,8 @@ struct PointerInput
     int32_t click_x, click_y, command_x, command_y;
     int32_t pointer_x, pointer_y;
     bool pointer_valid;
+    bool pointer_pressed,pointer_held,pointer_released,pointer_cancelled;
+    int32_t press_x,press_y;
     uint32_t group; // 1 fighters, 2 bombers, 3 all; zero keeps the selection.
     uint32_t priority; // 1 fighter, 2 bomber.
 };

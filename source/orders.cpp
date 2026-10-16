@@ -14,7 +14,7 @@ static const int REPLAY_TOKEN_CAPACITY = 32;
 static const int MOVE_COMMAND_FIELD_COUNT = 5;
 static const int MAX_MOVE_COORDINATE = 1000000;
 
-enum OrderKind { SELECT, TARGET, INSPECT, PRIORITY, MOVE };
+enum OrderKind { SELECT, TARGET, INSPECT, PRIORITY, RATIO, MOVE };
 struct Order { uint32_t tick; OrderKind kind; uint32_t argument; Vec3 destination; };
 
 static bool integer(const char* text, uint32_t maximum, uint32_t* value)
@@ -63,6 +63,11 @@ bool orders_run(Simulation* s, const char* path, uint32_t ticks,Audio* audio)
                 order.kind=!strcmp(command,"order") ? TARGET : INSPECT;
                 if (!s->world.body_count || !integer(argument,s->world.body_count-1,&order.argument)) { valid=false;break; }
             }
+            else if (!strcmp(command,"ratio"))
+            {
+                order.kind=RATIO;
+                if (!integer(argument,100,&order.argument)) { valid=false;break; }
+            }
             else if (!strcmp(command,"priority"))
             {
                 order.kind=PRIORITY;
@@ -92,6 +97,7 @@ bool orders_run(Simulation* s, const char* path, uint32_t ticks,Audio* audio)
             else if (order->kind==INSPECT)
             { if (simulation_body_known(s,order->argument)) s->selected_body=(int)order->argument; }
             else if (order->kind==MOVE) simulation_move_to(s,order->destination);
+            else if (order->kind==RATIO) simulation_production_ratio(s,order->argument);
             else simulation_priority_type(s,order->argument);
         }
         simulation_step(s);

@@ -37,6 +37,8 @@ struct Game
     Renderer renderer;
     Camera camera;
     PointerInput pointer;
+    bool ratio_dragging;
+    int ratio_body;
 };
 
 static double monotonic_seconds()
@@ -98,10 +100,37 @@ static void startup_camera(Game* game,const RenderConfig* config)
     }
 }
 
-static void gameplay_input(Game* game, const PointerInput* input, const RenderConfig* config)
+static bool ratio_hit(const RenderConfig* config,int x,int y)
+{
+    return x>=(int)config->width-HUD_RATIO_LEFT_INSET && x<=(int)config->width-HUD_RATIO_RIGHT_INSET
+        && y>=(int)config->height-HUD_RATIO_TOP && y<(int)config->height-HUD_RATIO_BOTTOM;
+}
+
+static void ratio_pointer(Game* game,PointerInput* input,const RenderConfig* config)
+{
+    Simulation* s=&game->simulation;
+    if (input->restart) game->ratio_dragging=false;
+    if (!input->pointer_cancelled && input->pointer_pressed && ratio_hit(config,input->press_x,input->press_y))
+    { game->ratio_dragging=true;game->ratio_body=s->selected_body; }
+    bool clicked=input->click && ratio_hit(config,input->click_x,input->click_y);
+    if (!game->ratio_dragging && !clicked) return;
+    input->drag_x=0;input->drag_y=0;
+    int x=clicked ? input->click_x : input->pointer_x;
+    if ((clicked || game->ratio_body==s->selected_body) && !input->pointer_cancelled)
+    {
+        int offset=x-((int)config->width-HUD_RATIO_LEFT_INSET);
+        offset=offset<0 ? 0 : offset>HUD_RATIO_WIDTH ? HUD_RATIO_WIDTH : offset;
+        uint32_t bombers=(uint32_t)((offset*PERCENT_SCALE+HUD_RATIO_WIDTH/2)/HUD_RATIO_WIDTH);
+        simulation_production_ratio(s,PERCENT_SCALE-bombers);
+    }
+    input->click=false;
+    if (input->pointer_released || input->pointer_cancelled || !input->pointer_held) game->ratio_dragging=false;
+}
+
+static void gameplay_input(Game* game, PointerInput* input, const RenderConfig* config)
 {
     Simulation* s=&game->simulation;if (!s->world.gameplay.enabled) return;
-    if (input->restart) { *s=game->initial_simulation;startup_camera(game,config); }
+    if (input->restart) { *s=game->initial_simulation;game->ratio_dragging=false;startup_camera(game,config); }
     if (input->pause) s->paused=!s->paused;
     if (input->group) simulation_select(s,input->group==3 ? -1 : (int)input->group-1);
     if (input->priority) simulation_priority(s,(int)input->priority-1);
@@ -125,8 +154,6 @@ static void gameplay_input(Game* game, const PointerInput* input, const RenderCo
         }
         if (x>=(int)config->width-HUD_SITE_PANEL_LEFT_INSET && x<(int)config->width-HUD_PANEL_MARGIN)
         {
-            if (input->click && input->click_y>=(int)config->height-HUD_PRIORITY_BUTTON_TOP && input->click_y<(int)config->height-HUD_PRIORITY_BUTTON_BOTTOM)
-                simulation_priority(s,input->click_x<(int)config->width-HUD_PRIORITY_BUTTON_DIVIDER_INSET ? 0 : 1);
             return;
         }
     }
@@ -195,7 +222,7 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     snprintf(r->hud[HUD_LINE_SITE],HUD_LINE_CAPACITY,"SELECT A BODY");
     snprintf(r->hud[HUD_LINE_STRUCTURES],HUD_LINE_CAPACITY,"SCOUT TO FIND ENEMY PRODUCTION SITES");
     snprintf(r->hud[HUD_LINE_RESOURCE],HUD_LINE_CAPACITY,"CLEAR DEFENDERS / COLONIZE TO EXPAND");
-    snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,"F: %-15s S: %s",s->world.content.groups[0].plural,s->world.content.groups[1].plural);
+    snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,"SELECT YOUR SITE TO SET THE UNIT MIX");
     if (s->world.content.factions[s->world.player_faction].automatic)
     {
         snprintf(r->hud[HUD_LINE_TITLE],HUD_LINE_CAPACITY,"MICROSHIP / %s     SPORES %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet);
@@ -207,7 +234,7 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     Color accent=content_color(&s->world.content,s->world.player_faction);
     r->hud_accent[0]=accent.r;r->hud_accent[1]=accent.g;r->hud_accent[2]=accent.b;
     r->hud_feedback[0]=-1;r->hud_feedback[1]=s->paused ? 2.0f : (float)s->outcome;
-    r->hud_feedback[2]=(float)s->time_seconds;
+    r->hud_feedback[2]=(float)s->time_seconds;r->hud_feedback[3]=-1;
     int p=s->selected_body;selection_marker(game,config,p,r->selection_marker);
     if (p>=0 && simulation_body_known(s,(uint32_t)p) && s->visible_bodies[p])
     {
@@ -225,7 +252,11 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
             snprintf(r->hud[HUD_LINE_STRUCTURES],HUD_LINE_CAPACITY,"STRUCTURES %u / %u   RATE %.2fX",c->active ? structures : 0,simulation_producer_definition(s,p)->branches.count,production);
         }
         snprintf(r->hud[HUD_LINE_RESOURCE],HUD_LINE_CAPACITY,"%s %05.1f / %.0f",s->world.content.resource_label,c->energy,s->world.gameplay.storage);
-        snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,"F: %.16s %s  S: %.16s %s",s->world.content.groups[0].plural,s->world.content.units[c->priority].group==0 ? "*" : " ",s->world.content.groups[1].plural,s->world.content.units[c->priority].group==1 ? "*" : " ");
+        if (simulation_ratio_available(s,(uint32_t)p))
+        {
+            snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,"%.10s %3u%%   %.10s %3u%%",s->world.content.groups[0].plural,c->fighter_percent,s->world.content.groups[1].plural,100-c->fighter_percent);
+            r->hud_feedback[3]=(100-c->fighter_percent)/(float)PERCENT_SCALE;
+        }
         if (s->world.content.factions[c->faction].automatic)
         {
             snprintf(r->hud[HUD_LINE_STRUCTURES],HUD_LINE_CAPACITY,"AUTOMATIC SEEKING SPORES");
@@ -277,10 +308,11 @@ int game_run(const GameOptions* options)
     printf("Render configuration: direct ray tracing; %u film samples; %u transmission layers; %u volume rays; %u integration steps.\n",
         config.samples_per_pixel,config.max_transmission_layers,config.volume_rays_per_pixel,config.volume_steps);
     startup_camera(&game,&config);
-    camera_apply_input(&game.camera, &options->camera_input, &config);
     if (!orders_run(&game.simulation,options->replay_path,options->ticks,&audio)) return 1;
     game.pointer=options->camera_input;
-    gameplay_input(&game,&options->camera_input,&config);
+    PointerInput initial_input=options->camera_input;
+    ratio_pointer(&game,&initial_input,&config);camera_apply_input(&game.camera,&initial_input,&config);
+    gameplay_input(&game,&initial_input,&config);
     printf("Initial camera: %g %g %g; target: %g %g %g.\n",game.camera.position.x,game.camera.position.y,game.camera.position.z,game.camera.target.x,game.camera.target.y,game.camera.target.z);
     if (!presentation_initialize(presentation.get(),&game.simulation,&config)) return 1;
     if (options->smoke)
@@ -300,7 +332,7 @@ int game_run(const GameOptions* options)
     game.renderer.debug_stats = options->stats_set ? options->show_stats : !options->headless || options->debug_views;
     if (!options->headless && !audio_open(&audio)) { renderer_shutdown(&game.renderer);return 1; }
     game.renderer.debug_views = options->debug_views;
-    printf("Left-drag to pan; wheel to zoom. F1/F2 debug. Gameplay: 1 fighters, 2 bombers, 3 all; right-click to move or order; F/S factory production; Space pause; R restart.\n");
+    printf("Left-drag to pan; wheel to zoom. F1/F2 debug. Gameplay: 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
     const double tick_seconds = 1.0 / SIMULATION_TICKS_PER_SECOND_DOUBLE;
     double previous = monotonic_seconds();
     double accumulator = 0.0;
@@ -316,9 +348,9 @@ int game_run(const GameOptions* options)
         game.renderer.previous_frame_ms = frames ? elapsed*MILLISECONDS_PER_SECOND : 0.0;
         if (input.toggle_stats) game.renderer.debug_stats = !game.renderer.debug_stats;
         if (input.toggle_buffers) game.renderer.debug_views = !game.renderer.debug_views;
-        camera_apply_input(&game.camera,&input,&config);
         if (input.restart && game.simulation.world.gameplay.enabled) { accumulator=0;elapsed=0; }
-        game.pointer=input;gameplay_input(&game,&input,&config);
+        game.pointer=input;ratio_pointer(&game,&input,&config);
+        camera_apply_input(&game.camera,&input,&config);gameplay_input(&game,&input,&config);
         accumulator += elapsed < MAX_FRAME_CATCHUP_SECONDS ? elapsed : MAX_FRAME_CATCHUP_SECONDS;
         if (options->headless) accumulator=0;
         while (accumulator >= tick_seconds)

@@ -178,6 +178,10 @@ add_test(NAME navigation COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/navigation.py $<TARGET_FILE:microship>)
 set_tests_properties(navigation PROPERTIES TIMEOUT 60)
 
+add_test(NAME production_ratio COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/production_ratio.py $<TARGET_FILE:microship>)
+set_tests_properties(production_ratio PROPERTIES TIMEOUT 45)
+
 option(MICROSHIP_GPU_TESTS "Run real hardware Vulkan E2E scenarios (explicit opt-in)" OFF)
 if(MICROSHIP_GPU_TESTS)
     add_test(NAME biology_scale_render COMMAND ${Python3_EXECUTABLE}

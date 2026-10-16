@@ -71,6 +71,8 @@ struct Colony
     Faction faction;
     float health, growth, uptake, energy, manufacturing;
     uint32_t type,priority,building_kind;
+    uint32_t fighter_percent,production_error,produced[2];
+    bool ratio_enabled;
     bool building, capacity_blocked;
     bool active;
     float root_regrow_timer;
@@ -131,6 +133,8 @@ void simulation_select(Simulation* simulation, int group); // Asset group ID; a 
 void simulation_order(Simulation* simulation, uint32_t cell);
 void simulation_move_to(Simulation* simulation, Vec3 destination);
 void simulation_priority(Simulation* simulation,int group);
+bool simulation_ratio_available(const Simulation*,uint32_t cell);
+void simulation_production_ratio(Simulation*,uint32_t fighter_percent);
 void simulation_priority_type(Simulation*,uint32_t type);
 bool simulation_write_state(const Simulation* simulation, const char* path);
 Vec3 simulation_spike_direction(uint32_t index,uint32_t count);
