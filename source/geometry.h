@@ -31,7 +31,7 @@ struct Geometry
 bool geometry_build(Geometry*,const MeshSource*,uint32_t count,const RenderConfig*);
 bool geometry_surface_point(const char* path,Vec3 position,float scale,Vec3 direction,Vec3* point);
 // The same startup transform is used for mesh parts and their attachment points.
-bool geometry_attachment(const MeshSource&,Vec3 direction,Vec3* point);
-bool geometry_vary(GpuVertex*,uint32_t,const GpuTriangle*,uint32_t,const MeshSource&);
+bool geometry_attachments(const MeshSource&,Vec3 direction,Vec3* points,uint32_t capacity,uint32_t* count);
+bool geometry_vary(GpuVertex*,uint32_t,GpuTriangle*,uint32_t*,const MeshSource&);
 
 #endif

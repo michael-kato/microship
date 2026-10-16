@@ -20,10 +20,10 @@ bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=Fals
 parts=[];models=[]
 component=0;components=[]
 
-def cell_part(pivot,movable=True,attachment=None):
+def cell_part(pivot,movable=True,attachment=None,minimum_scale=0):
     global component
     component=len(components)
-    components.append(dict(pivot=list(pivot),movable=movable,attachment=attachment))
+    components.append(dict(pivot=list(pivot),movable=movable,attachment=attachment,minimum_scale=minimum_scale))
 
 def finish(obj,color,roughness=.82,ior=1.35,smooth=True,material=0):
     obj.data.transform(Matrix.LocRotScale(obj.location,obj.rotation_euler.to_quaternion(),obj.scale))
@@ -97,6 +97,7 @@ def export(name,anatomy=False):
             if not count:raise RuntimeError('empty mesh part')
             d=dict(first=first,count=count,pivot=part['pivot'],movable=part['movable'])
             if part['attachment'] is not None:d['attachment']=list(part['attachment'])
+            if part['minimum_scale']:d['minimum_scale']=part['minimum_scale']
             definitions.append(d);first+=count
         (out/(name+'.parts.json')).write_text(json.dumps({'$schema':'../schemas/mesh-parts.schema.json','vertices':len(records),'parts':definitions},indent=2)+'\n')
     if any(abs(x)>1.49 for row in records for x in row[:3]):raise RuntimeError(name+' exceeds local mesh bounds')
@@ -122,19 +123,21 @@ def cell(name,key):
         return tuple(p['membrane'][i]*(1-.23*wave)+p['rim'][i]*(.23*wave) for i in range(3))
     finish(obj,pigment,.38,ior=1.38,material=3)
     inner=profiles['interior']
-    cell_part(inner['nucleus_center'])
+    center=Vector(inner['nucleus_center'])
+    cell_part(center,attachment=center+center.normalized()*inner['nucleus_size'][0])
     sphere(inner['nucleus_center'],inner['nucleus_size'],p['nucleus'],3,.42)
     sphere(inner['nucleolus_center'],inner['nucleolus_size'],p['vesicle'],2,.4)
     for index,center in enumerate(inner['mitochondria']):
         anchor=Vector(center)+Vector(center).normalized()*inner['mitochondrion_size'][1]
-        cell_part(center,attachment=anchor)
+        cell_part(center,attachment=anchor,minimum_scale=inner['mitochondrion_minimum_radius'][index])
         sphere(center,inner['mitochondrion_size'],inner['mitochondrion_color'],2,.52)
         # Mitochondrial cristae are geometry rather than painted lines.
         for j in range(3):
             c=Vector(center)+Vector(((j-1)*.07,0,.085))
             sphere(c,(.018,.063,.018),p['nucleus'],1,.6)
     for index,center in enumerate(inner['vesicle_centers']):
-        cell_part(center)
+        center=Vector(center)
+        cell_part(center,attachment=center+center.normalized()*.065,minimum_scale=inner['vesicle_minimum_radius'][index])
         sphere(center,(.065,.055,.06),p['vesicle'],2,.44)
     # Curved endoplasmic reticulum surrounding the nucleus, inside the shell.
     cell_part((0,0,0))
@@ -208,14 +211,55 @@ def spore():
     export('fungal_spore')
 
 def factory(side):
-    p=profiles[side];f=profiles['factory']
-    color=p['spikes'] if side=='virus' else p['body'];bud=p['core'] if side=='virus' else p['granules']
-    sphere((0,.18,0),(.19,.2,.17),p['body'],2,.7)
-    branches((0,0,0),(0,1,0),f['length'],f['radius'],f['depth'],color,True,bud)
-    # Repeated small capsids or rounded immune lobes replace flower petals.
-    for sign in (-1,1):
-        sphere((sign*.26,.55,.04),(.14,.18,.12),bud,1 if side=='virus' else 2,.6)
-    export(side+'_factory')
+    global parts
+    saved=rng.getstate()
+    p=profiles[side];f=profiles['factories'][side]
+    if side=='virus':
+        # Repeated sheath rings, an angular capsid, and six bent tail fibres.
+        for i in range(f['rings']):
+            y=(i+.5)/f['rings']
+            sphere((0,y,0),(f['sheath_radius'],.065,f['sheath_radius']),p['spikes'],1,.5)
+        rod((0,0,0),(0,1,0),f['shaft_radius'],p['body'])
+        export('virus_stem')
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1,radius=1)
+        obj=bpy.context.object;obj.scale=(f['head_radius'],f['head_radius']*1.25,f['head_radius'])
+        finish(obj,p['body'],.48,smooth=False)
+        for i in range(6):
+            a=i*math.tau/6;d=Vector((math.cos(a),0,math.sin(a)))
+            bend=d*f['fibre_spread']+Vector((0,-.32,0));end=d*f['fibre_spread']*1.35+Vector((0,-.65,0))
+            rod((0,-.12,0),bend,.025,p['spikes']);rod(bend,end,.018,p['core'])
+        export('virus_head')
+    elif side=='immune':
+        rod((0,0,0),(0,1,0),f['shaft_radius'],p['body'])
+        for i in range(f['lobes']):
+            y=(i+.5)/f['lobes'];sign=-1 if i%2 else 1
+            sphere((sign*.09,y,0),(.18,.23,.14),p['body'],2,.8)
+            branches((0,y,0),(sign,.35,.15),f['spread'],.025,2,p['body'],buds=p['granules'])
+        export('immune_stem')
+        for i in range(f['crown_lobes']):
+            a=i*math.tau/f['crown_lobes']
+            sphere((.18*math.cos(a),.08,.18*math.sin(a)),(.22,.25,.20),p['body'],2,.75)
+        sphere((0,.10,.12),(.14,.17,.12),p['granules'],2,.55)
+        export('immune_head')
+    else:
+        rod((0,0,0),(0,1,0),f['shaft_radius'],p['rays'])
+        for i in range(f['forks']):
+            a=i*2.39996323;y=(i+.5)/f['forks']
+            branches((0,y,0),(math.cos(a),.7,math.sin(a)),f['spread'],.025,2,p['body'],buds=p['core'])
+        export('fungal_stem')
+        sphere((0,-.10,0),(.14,.28,.14),p['rays'],2)
+        sphere((0,.14,0),(f['cap_radius'],.16,f['cap_radius']),p['body'],2,.6)
+        for i in range(f['spores']):
+            a=i*2.39996323
+            sphere((.28*math.cos(a),.25,.28*math.sin(a)),(.065,)*3,p['core'],1,.5)
+        export('fungal_head')
+    # The complete model is used by the non-staged presentation path.
+    for i,source in enumerate(models[-2:]):
+        obj=bpy.data.objects.new('complete',source.data.copy());bpy.context.collection.objects.link(obj)
+        if i:obj.data.transform(Matrix.Translation((0,1,0)))
+        parts.append(obj)
+    export(('fungal' if side=='fungal_spore' else side)+'_factory')
+    rng.setstate(saved)
 
 def background(name,key):
     p=profiles[key];vertices=[];faces=[];nx,ny=64,40
@@ -254,7 +298,7 @@ def background(name,key):
     export(name)
 
 cell('cell_infected','infected_cell');cell('cell_healthy','healthy_cell');cell('cell_neutral','neutral_cell')
-virus(False);virus(True);immune(False);immune(True);node();factory('virus');factory('immune')
+virus(False);virus(True);immune(False);immune(True);node();factory('virus');factory('immune');factory('fungal_spore')
 spore()
 # A single tapered local +Y segment. Runtime poses extend segments in sequence.
 rod((0,0,0),(0,1,0),.065,(1,1,1));export('growth_segment')

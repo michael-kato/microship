@@ -62,6 +62,8 @@ with tempfile.TemporaryDirectory(prefix='microship-polish-') as directory:
         previous={u['generation']:u for u in before['units']}
         for u in after['units']:
             if u['generation'] in previous:
+                # Attached units follow their target. These are flight bounds.
+                if u['latch']>=0 or previous[u['generation']]['latch']>=0:continue
                 distance=sub(u['position'],previous[u['generation']]['position'])
                 speed=3.5 if u['kind']==0 else 2.5
                 assert math.sqrt(dot(distance,distance))<=speed/60+.002,'Visible flight jumped'

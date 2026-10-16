@@ -247,6 +247,19 @@
         -0.3,
         -0.32
       ]
+    ],
+    "mitochondrion_minimum_radius": [
+      0,
+      2.5,
+      3.4,
+      3.4
+    ],
+    "vesicle_minimum_radius": [
+      0,
+      0,
+      2.5,
+      3.4,
+      3.4
     ]
   },
   "fractal": {
@@ -266,11 +279,6 @@
       0.35
     ]
   },
-  "factory": {
-    "length": 0.4,
-    "radius": 0.064,
-    "depth": 4
-  },
   "fungal_spore": {
     "body": [
       0.62,
@@ -287,5 +295,27 @@
       0.82,
       0.4
     ]
+  },
+  "factories": {
+    "virus": {
+      "rings": 6,
+      "sheath_radius": 0.13,
+      "shaft_radius": 0.07,
+      "head_radius": 0.36,
+      "fibre_spread": 0.39
+    },
+    "immune": {
+      "shaft_radius": 0.12,
+      "lobes": 3,
+      "spread": 0.22,
+      "crown_lobes": 5
+    },
+    "fungal_spore": {
+      "shaft_radius": 0.07,
+      "forks": 3,
+      "spread": 0.23,
+      "cap_radius": 0.43,
+      "spores": 9
+    }
   }
 }

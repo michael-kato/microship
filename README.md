@@ -10,7 +10,9 @@ The map has two home cells and three neutral cells. The homes are about 102 worl
 
 Fighters attack units first. Bombers attack factories first. Both have a secondary attack at one eighth of their normal rate. After defenders are gone, either type can colonize a cell. One unit is consumed to make the new factory. Destroy all enemy factories to win. Fungal spores act without orders and cannot colonize.
 
-Each cell has a seeded membrane shape and internal layout. A factory starts at a mitochondrial attachment point. Its stems extend in sequence, away from the cell center. Child limbs start after their parent matures. Units form as buds at mature tips and leave at full size. Each limb has its own health. A destroyed limb and its children break into drifting stem pieces. Surviving limbs keep producing. The root has 80 health and three hits; other limbs have 45 health and two hits. Lost limbs wait 24 seconds before they can regrow.
+Each cell has a seeded membrane shape and internal layout. Each discrete organelle has a factory attachment. Small cells retain fewer organelles: the default radii 2.1, 2.7, and 4.2 have four, six, and ten attachments. Each attachment has an independent root. Stems extend away from the cell center. Virus factories have faceted heads, ribbed tails, and six fibres. Immune factories have rounded lobes and paired fans. Fungal factories have branching stalks and spore caps. These forms use separate meshes and authored growth rules.
+
+Base unit manufacture takes 6 seconds, up from 2.5 seconds. Roots share the base collection and manufacture rate. Child limbs add to that rate. Units form at mature tips. Roots have 240 health and take 12 hits; child limbs have 150 health and take 8 hits. Damage removes one of four stem sections after each three root hits or two child hits. Heads and detached sections drift away. Loss of a supporting section removes its child limbs. Other organelle factories keep working. Lost roots and limbs wait 24 seconds before regrowth. The cell is lost only when all its factories are destroyed. Attacks can reach structures through their own cell membrane; other cells still block the shot.
 
 Normal window starts choose a new variation seed. `--world-seed N` selects a repeatable layout. CPU and headless runs use authored seeds unless this option is supplied. R restores the same layout. Virus and fungal cell tints change over 180 seconds; immune control returns cells toward their neutral appearance.
 
@@ -64,3 +66,5 @@ The October 16 direct-ray GPU check passed through Proton with host validation a
 
 
 The October 16 gameplay pass passed 266 application scenarios across eight CPU groups through Proton. New native 1080p captures show [organelle growth](screenshots/000243-organelle-growth.png), [immune limb damage](screenshots/000247-immune-breaks-factory-limbs.png), and [a fungal blast](screenshots/000248-fungal-blast.png). Khronos host validation passed. See [PROFILING.md](PROFILING.md) for frame observations, reproduction commands, and limits. The PCM mix was checked as an application export; live audio and native Windows remain unverified.
+
+The organelle factory check saved native 1080p captures 000249–000253. It checked virus, immune, fungal, root damage, and small-cell views with Khronos host validation active. See [PROFILING.md](PROFILING.md) for timings and limits.

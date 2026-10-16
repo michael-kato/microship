@@ -45,19 +45,22 @@ with tempfile.TemporaryDirectory(prefix='microship-growth-') as directory:
             if c['health']<=0:continue
             center=base['bodies'][index]['position'];radius=base['bodies'][index]['radius']
             assert 0<math.dist(c['root'],center)<radius,'Root did not start inside its cell'
-            for branch in c['structures']:
+            assert c['root_count']==len(c['attachments'])
+            for k,branch in enumerate(c['structures']):
+                if branch['parent']<0:assert branch['stem'][0]==c['attachments'][k], 'A root missed its organelle'
+
                 for x,y in zip(branch['stem'],branch['stem'][1:]):
                     delta=[v-u for u,v in zip(x,y)];radial=[u-v for u,v in zip(x,center)]
                     assert sum(u*v for u,v in zip(delta,radial))>0,'A stem grew toward the cell center'
                     assert math.dist(y,center)>math.dist(x,center)
     early,er=run('early',base,1000)
     late,lr=run('mature',base,1400)
-    assert 0<early['colonies'][0]['structures'][1]['growth']<1
-    assert late['colonies'][0]['structures'][1]['growth']==1
+    assert 0<early['colonies'][0]['structures'][10]['growth']<1
+    assert late['colonies'][0]['structures'][10]['growth']==1
     assert len(lr['instances'])>len(er['instances']),'Growth did not add stem segments'
     reset,_=run('restart',base,1800,extra=('--world-seed','1234','--restart'))
     assert reset['colonies'][0]['root']==a['colonies'][0]['root'] and reset['tick']==0
-    assert all(c['structures'][1]['health']==0 for c in reset['colonies'] if c['health']>0)
+    assert all(c['structures'][c['root_count']]['health']==0 for c in reset['colonies'] if c['health']>0)
     audio=out/'growth.wav'
     audible,_=run('sound',base,1800,extra=('--audio-capture',str(audio)))
     with wave.open(str(audio)) as f:
@@ -98,23 +101,58 @@ with tempfile.TemporaryDirectory(prefix='microship-growth-') as directory:
         if u['name']=='fungal_spore':u['attack']['lifetime']=.01
     immediate,_=run('spore-lifetime-before-launch-cooldown',expired,1)
     assert not any(u['faction']==3 for u in immediate['units'])
+    # Authored size thresholds remove organs and their attachment points together.
+    assert [len(c['attachments']) for c in a['colonies']]==[10,10,4,6,4]
+    small=deepcopy(base);small['bodies'][0]['radius']=2.1
+    reduced,rr=run('small-anatomy',small)
+    assert reduced['colonies'][0]['root_count']==4
+    assert rr['meshes'][0]['triangles']<ar['meshes'][0]['triangles'], 'Small cells retained all organ geometry'
+    # Compare the former and new manufacture times with the same scene and roots.
+    slower,_=run('slower-production',base,1800)
+    faster=deepcopy(base);faster['rules']['economy']['manufacture_seconds']=2.5
+    faster,_=run('former-production-time',faster,1800)
+    assert 11<slower['births']<faster['births'], 'Manufacture time did not reduce unit births'
     limbs=deepcopy(base);limbs['rules'].pop('exploration',None);limbs['spawns']=[]
     limbs['rules']['economy']['manufacture_seconds']=1000;limbs['rules']['ai']['expansion_delay']=300
     for producer in limbs['content']['buildings']:
-        if producer['faction']=='fungus':continue
         producer['growth_seconds']=.1;producer['branches'].update(seconds=.1,regrow_seconds=10)
     mature,_=run('limbs-grown',limbs,120)
-    tip=mature['colonies'][0]['structures'][2]['position'];position=[tip[0],tip[1],tip[2]+.4]
+    tip=mature['colonies'][0]['structures'][0]['position'];position=[tip[0],tip[1],tip[2]+.4]
     limbs['spawns']=[dict(type='immune_bomber',position=position)]
     for unit in limbs['content']['units']:
-        if unit['name']=='immune_bomber':unit.update(speed=.01,shot_interval=1.4)
-    broken,_=run('limb-break',limbs,150)
+        if unit['name']=='immune_bomber':unit.update(speed=.01,shot_interval=.12)
+    damaged,_=run('root-loses-section',limbs,22)
+    c=damaged['colonies'][0];root=c['structures'][0]
+    assert 0<root['health']<240 and 0<root['visible_growth']<1, root
+    assert damaged['fractures']['fragments']>0, 'A damaged section did not detach'
+    assert c['structures'][10]['health']==0, 'A child survived loss of its attachment section'
+    assert all(v['health']==240 for v in c['structures'][1:10]), 'Damage crossed to another organelle root'
+    broken,_=run('root-break',limbs,105)
     c=broken['colonies'][0]
-    assert c['health']==80 and c['structures'][1]['health']==45,'Damage crossed into an unrelated limb'
-    assert c['structures'][2]['health']==c['structures'][5]['health']==c['structures'][6]['health']==0,'Detached children stayed alive'
-    assert broken['fractures']['limbs']>=3 and broken['fractures']['fragments']>0 and broken['sound_events']['break']>=3
-    reset,_=run('limb-restart',limbs,150,extra=('--restart',))
+    assert c['health']==0 and c['active'] and broken['outcome']==0, c
+    assert all(v['health']>0 for v in c['structures'][1:10]), 'One root destroyed unrelated factories'
+    assert c['production']>0 and c['energy']>0, 'Surviving factories stopped collection'
+    reset,_=run('limb-restart',limbs,105,extra=('--restart',))
     assert reset['fractures']['limbs']==reset['fractures']['fragments']==0
+    assert reset['colonies'][0]['health']==240 and reset['colonies'][0]['active']
+    # A one-hit fixture lets one expendable spore remove a root, then leave the cell alone.
+    regrow=deepcopy(limbs);regrow['match']['opponent']='fungus';regrow['bodies'][1]['owner']='fungus'
+    regrow['spawns']=[dict(type='fungal_spore',position=position)]
+    for producer in regrow['content']['buildings']:
+        producer['hits']=1;producer['branches']['regrow_seconds']=.5
+    lost,_=run('root-awaits-regrowth',regrow,10)
+    assert lost['colonies'][0]['health']==0 and lost['colonies'][0]['active']
+    rebuilt,_=run('independent-root-regrowth',regrow,120)
+    root=rebuilt['colonies'][0]['structures'][0]
+    assert root['health']==240 and root['generation']==2 and root['wounds']==0, root
+    assert rebuilt['colonies'][0]['structures'][1]['generation']==1, 'Regrowth replaced an unrelated root'
+    parts_path=(out/base['content']['bodies'][2]['variation']['parts']).resolve()
+    metadata=json.loads(parts_path.read_text());metadata['parts'][0]['minimum_scale']=-1
+    bad_parts=out/'invalid-size-parts.json';bad_parts.write_text(json.dumps(metadata))
+    run('negative-organ-threshold',change(base,'content.bodies.2.variation.parts',bad_parts.name),expected=1)
+    run('invalid-grammar',change(base,'content.buildings.0.branches.grammar','unknown'),expected=1)
+    run('invalid-root-mode',change(base,'content.buildings.0.branches.roots','unknown'),expected=1)
+    run('insufficient-roots',change(base,'content.buildings.0.branches.count',9),expected=1)
     run('unknown-attack',change(trials['immune-trial'],'content.units.2.attack.mode','missing'),expected=1)
     run('invalid-variation',change(base,'content.bodies.0.variation.shape',.5),expected=1)
     run('missing-parts',change(base,'content.bodies.2.variation.parts','absent.json'),expected=1)

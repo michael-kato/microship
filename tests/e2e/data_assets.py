@@ -99,6 +99,7 @@ with tempfile.TemporaryDirectory(prefix='microship-content-') as directory:
     for spawn in changed['spawns']:
         if spawn['type'].startswith('immune_'):spawn['position'][0]=1000
     changed['rules']['economy']=dict(storage=180,manufacture_seconds=1000,landing_seconds=1.5,enemy_attack_seconds=300)
+    changed=branches(changed,count=1)
     destroyed,_,_=run('target-capability',changed,2400,'0 select fighters\n0 order 1\n')
     assert destroyed['colonies'][1]['health']==0 and destroyed['outcome']==1,'Targeting still depends on group names'
 

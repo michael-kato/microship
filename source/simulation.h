@@ -61,6 +61,10 @@ struct Colony
     float health, growth, uptake, energy, manufacturing;
     uint32_t type,priority,building_kind;
     bool building, capacity_blocked;
+    bool active;
+    float root_regrow_timer;
+    uint32_t root_generation,root_count;
+    int32_t parents[MAX_FACTORY_STRUCTURES];
     uint32_t wounds;
     EmbeddedSpike embedded[MAX_EMBEDDED];
     float branch_timer;
@@ -75,6 +79,7 @@ struct LimbDebris
     float radius,age,seconds,spin;
     uint32_t producer;
     Faction faction;
+    bool tip;
 };
 struct Simulation
 {
@@ -120,6 +125,8 @@ void simulation_unit_axes(const Unit*,Vec3* right,Vec3* up,Vec3* forward);
 void simulation_producer_axes(const ProducerDefinition*,Vec3* right,Vec3* up,Vec3* normal);
 Vec3 simulation_structure_position(const Simulation*,uint32_t cell,uint32_t structure);
 Vec3 simulation_growth_point(const Simulation*,uint32_t cell,uint32_t structure,float growth);
+float simulation_structure_growth(const Simulation*,uint32_t cell,uint32_t structure);
+float simulation_production(const Simulation*,uint32_t cell);
 bool simulation_in_sight(const Simulation*,Vec3 position,float radius);
 bool simulation_body_known(const Simulation*,uint32_t cell);
 void simulation_update_sight(Simulation*);

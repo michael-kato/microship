@@ -41,5 +41,7 @@ def branches(data,**settings):
     result=deepcopy(data)
     emitters={f['name'] for f in result['content']['factions'] if f.get('production',{}).get('mode')=='spores'}
     for building in result['content']['buildings']:
-        if building['faction'] not in emitters:building['branches'].update(settings)
+        if building['faction'] not in emitters:
+            building['branches'].update(settings)
+            if 'count' in settings:building['branches']['roots']='single'
     return result

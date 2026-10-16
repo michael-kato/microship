@@ -16,7 +16,7 @@ from save_progress import archive_capture
 
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('binary',type=Path);parser.add_argument('--output',type=Path,required=True);parser.add_argument('--run',action='store_true')
-parser.add_argument('--case',action='append',choices=['organelle-growth','fungal-seeking-spores','immune-breaks-factory-limbs','fungal-blast'])
+parser.add_argument('--case',action='append',choices=['organelle-growth','immune-factories','small-cell-factories','fungal-seeking-spores','immune-breaks-factory-limbs','fungal-blast'])
 args=parser.parse_args();root=Path(__file__).resolve().parents[1];binary=args.binary.resolve();out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
 check_gpu_environment()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
@@ -30,18 +30,22 @@ for p in limbs['content']['buildings']:
 probe=out/'limb-probe-world.json';write_world(probe,limbs);state=out/'limb-probe.json'
 p=subprocess.run([*command,'--smoke','--world',str(probe),'--ticks','120','--state',str(state)],capture_output=True,text=True,timeout=10)
 (out/'limb-probe.log').write_text(p.stdout+p.stderr);assert p.returncode==0,p.stdout+p.stderr
-tip=json.loads(state.read_text())['colonies'][0]['structures'][2]['position'];position=[tip[0],tip[1],tip[2]+.4]
+tip=json.loads(state.read_text())['colonies'][0]['structures'][0]['position'];position=[tip[0],tip[1],tip[2]+.4]
 limbs['spawns']=[dict(type='immune_bomber',position=position)]
 for u in limbs['content']['units']:
-    if u['name']=='immune_bomber':u.update(speed=.01,shot_interval=1.4)
+    if u['name']=='immune_bomber':u.update(speed=.01,shot_interval=.12)
 level=out/'limb-damage-world.json';write_world(level,limbs)
 damage_config=deepcopy(config);center=limbs['bodies'][0]['position'];damage_config['camera']['target']=center
 damage_config['camera']['position']=[center[0],center[1]+9,center[2]+30]
 camera=out/'limb-camera.json';camera.write_text(json.dumps(damage_config,indent=2)+'\n')
 regular=out/'render.json';regular.write_text(json.dumps(config,indent=2)+'\n')
-cases=[('organelle-growth',binary.parent/'assets/levels/biology-virus.json',regular,1000,1),
+small=stage_world(root/'assets/levels/biology-virus.json',out);small['bodies'][0]['radius']=2.1
+small_level=out/'small-cell-world.json';write_world(small_level,small)
+cases=[('organelle-growth',binary.parent/'assets/levels/biology-virus.json',regular,1800,1),
+       ('immune-factories',binary.parent/'assets/levels/biology-immune.json',regular,1800,1),
+       ('small-cell-factories',small_level,regular,1800,1),
        ('fungal-seeking-spores',binary.parent/'assets/levels/biology-fungus.json',regular,1812,1),
-       ('immune-breaks-factory-limbs',level,camera,150,2)]
+       ('immune-breaks-factory-limbs',level,camera,105,2)]
 if args.case and 'fungal-blast' in args.case:
     blast=stage_world(root/'assets/levels/biology-fungus.json',out);blast['rules'].pop('exploration',None)
     body=blast['bodies'][0];point=[c+n*body['radius']*1.5 for c,n in zip(body['position'],body['site']['normal'])]
@@ -66,7 +70,9 @@ for name,world,render,ticks,frames in cases:
     if os.environ.get('MICROSHIP_VULKAN_VALIDATION')=='1':assert 'Vulkan validation: enabled.' in stdout
     archive_capture(capture,name)
     d=json.loads(state.read_text())
-    if name=='immune-breaks-factory-limbs':assert d['fractures']['limbs']>=3 and d['fractures']['fragments']>0
+    if name=='immune-breaks-factory-limbs':
+        assert d['fractures']['limbs']>=3 and d['fractures']['fragments']>0
+        assert d['colonies'][0]['health']==0 and d['colonies'][0]['active']
     if name=='fungal-blast':assert d['faction_events']['spore_bursts']>0 and d['effects']['pops']>0
     results.append(dict(name=name,application_ms=[float(x) for x in re.findall(r'Application frame: ([\d.]+) ms',stdout)],
                         gpu_trace_ms=[float(x) for x in re.findall(r'GPU trace: ([\d.]+) ms',stdout)],fractures=d['fractures']))

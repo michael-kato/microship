@@ -150,12 +150,12 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
     }
     for (uint32_t i=0;i<s->world.body_count;++i)
     {
-        const Colony* c=&s->colonies[i];if (c->health<=0 || !s->visible_bodies[i]) continue;
+        const Colony* c=&s->colonies[i];if (!c->active || !s->visible_bodies[i]) continue;
         uint32_t count=simulation_producer_definition(s,i)->branches.count;
         for (uint32_t k=0;k<count;++k)
         {
             const FactoryStructure* b=k ? &c->branches[k-1] : 0;
-            if (k && b->health<=0) continue;
+            if ((k ? b->health : c->health)<=0) continue;
             uint32_t wounds=k ? b->wounds : c->wounds;
             const EmbeddedSpike* spikes=k ? b->embedded : c->embedded;
             Vec3 tip=simulation_structure_position(s,i,k);
@@ -211,8 +211,8 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
     }
     for (uint32_t p=0;p<s->world.body_count;++p)
     {
-        const Colony* colony=&s->colonies[p];if (colony->health<=0 || !s->visible_bodies[p]) continue;
-        if (s->world.content.factions[colony->faction].automatic) continue;
+        const Colony* colony=&s->colonies[p];if (!colony->active || !s->visible_bodies[p]) continue;
+
         if (s->world.gameplay.enabled)
         {
             const ProducerDefinition* definition=simulation_producer_definition(s,p);
@@ -221,25 +221,28 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                 Color color=content_color(&s->world.content,colony->faction);
                 for (uint32_t k=0;k<definition->branches.count;++k)
                 {
-                    if (k && colony->branches[k-1].health<=0) continue;
-                    float growth=k ? colony->branches[k-1].growth : colony->growth;
+                    if ((k ? colony->branches[k-1].health : colony->health)<=0) continue;
+                    float growth=simulation_structure_growth(s,p,k);
                     for (uint32_t j=0;j<GROWTH_SEGMENTS;++j)
                     {
                         float extension=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_SEGMENTS-j));
                         if (extension<=.0001f) continue;
                         Vec3 start=colony->stems[k][j],delta=scale(subtract(colony->stems[k][j+1],start),extension);
                         Vec3 y=normalize(delta),x=normalize(cross(std::fabs(y.z)<.9f ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
-                        float width=definition->width*(1-.12f*j)*(k ? .65f : 1)*(.55f+.45f*growth);
+                        float width=definition->width*(1-.12f*j)*(colony->parents[k]>=0 ? .65f : 1)*(.55f+.45f*growth);
                         uint32_t slot=state->stem_base+(p*MAX_FACTORY_STRUCTURES+k)*GROWTH_SEGMENTS+j;
                         set_instance(state,slot,state->segment_meshes[colony->type],start,scale(x,width),delta,scale(z,width));
                         uint32_t wounds=k ? colony->branches[k-1].wounds : colony->wounds;
                         Color tint=wounds ? s->world.spikes.injury[std::min(1u,wounds-1)] : color;
-                        float* style=state->scene.instances[slot].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=1;
+                        float* style=state->scene.instances[slot].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=wounds ? .95f : .25f;
                     }
-                    float size=definition->width*(k ? .55f : .8f)*(.4f+.6f*growth);
+                    float size=definition->width*(colony->parents[k]>=0 ? .7f : 1)*(.4f+.6f*growth);
                     uint32_t slot=factory_instance_slot(state,p,k);
-                    set_instance(state,slot,state->tip_meshes[colony->type],simulation_structure_position(s,p,k),Vec3{size,0,0},Vec3{0,size,0},Vec3{0,0,size});
-                    float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=1;
+                    Vec3 tip=simulation_structure_position(s,p,k),y=normalize(subtract(tip,colony->stems[k][0]));
+                    Vec3 x=normalize(cross(std::fabs(y.z)<.9f ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
+                    if (growth>=(k ? colony->branches[k-1].growth : colony->growth))
+                        set_instance(state,slot,state->tip_meshes[colony->type],tip,scale(x,size),scale(y,size),scale(z,size));
+                    float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=.25f;
                 }
                 if (colony->building)
                 {
@@ -254,7 +257,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
             Vec3 right,up,normal;simulation_producer_axes(simulation_producer_definition(s,p),&right,&up,&normal);
             for (uint32_t k=0;k<simulation_producer_definition(s,p)->branches.count;++k)
             {
-                const FactoryStructure* b=k ? &colony->branches[k-1] : 0;if (k && b->health<=0) continue;
+                const FactoryStructure* b=k ? &colony->branches[k-1] : 0;if ((k ? b->health : colony->health)<=0) continue;
                 float growth=std::fmax(.02f,k ? b->growth : colony->growth);
                 Vec3 position=k ? add(colony->surface,b->offset) : colony->surface;
                 float width=simulation_producer_definition(s,p)->width*growth;
@@ -270,9 +273,10 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
         float shrink=std::fmin(1.0f,(d.seconds-d.age)/s->world.combat.break_shrink);
         Vec3 delta=subtract(d.end,d.start),y=normalize(delta),x=normalize(cross(std::fabs(y.z)<.9f ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
         uint32_t slot=state->debris_base+i;
-        set_instance(state,slot,state->segment_meshes[d.producer],d.start,scale(x,d.radius*shrink),delta,scale(z,d.radius*shrink));
+        set_instance(state,slot,d.tip ? state->tip_meshes[d.producer] : state->segment_meshes[d.producer],d.start,
+            scale(x,d.radius*shrink),d.tip ? scale(y,d.radius*shrink) : scale(delta,shrink),scale(z,d.radius*shrink));
         Color color=content_color(&s->world.content,d.faction);float* style=state->scene.instances[slot].style;
-        style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=1;
+        style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=.25f;
     }
     update_spike_instances(state,simulation);
 }

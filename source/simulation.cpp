@@ -46,7 +46,7 @@ bool simulation_in_sight(const Simulation* s,Vec3 position,float radius)
     if (s->world.sight_radius<=0) return true;
     float reach=s->world.sight_radius+radius;
     for (uint32_t p=0;p<s->world.body_count;++p)
-        if (s->colonies[p].health>0 && s->colonies[p].faction==s->world.player_faction
+        if (s->colonies[p].active && s->colonies[p].faction==s->world.player_faction
             && length(subtract(position,s->world.bodies[p].position))<reach+s->world.bodies[p].radius) return true;
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (s->units[i].health>0 && s->units[i].faction==s->world.player_faction
@@ -78,10 +78,8 @@ void simulation_producer_axes(const ProducerDefinition* definition,Vec3* right,V
 }
 Vec3 simulation_structure_position(const Simulation* s,uint32_t p,uint32_t structure)
 {
-    if (s->world.content.factions[s->colonies[p].faction].automatic)
-        return add(s->colonies[p].surface,scale(s->world.bodies[p].colony_normal,simulation_producer_definition(s,p)->height));
     if (simulation_producer_definition(s,p)->segment_path[0])
-        return simulation_growth_point(s,p,structure,structure ? s->colonies[p].branches[structure-1].growth : s->colonies[p].growth);
+        return simulation_growth_point(s,p,structure,simulation_structure_growth(s,p,structure));
     const Colony* c=&s->colonies[p];Vec3 up=s->world.bodies[p].colony_normal;
     Vec3 base=c->surface;float growth=c->growth;
     if (s->world.gameplay.enabled)
@@ -102,27 +100,59 @@ Vec3 simulation_growth_point(const Simulation* s,uint32_t p,uint32_t k,float gro
     return add(points[j],scale(subtract(points[j+1],points[j]),t-j));
 }
 static float signed_random(uint32_t* seed) { return (branch_random(seed)>>8)*(1.0f/8388608)-1; }
+float simulation_structure_growth(const Simulation* s,uint32_t p,uint32_t k)
+{
+    const Colony& c=s->colonies[p];const ProducerDefinition& d=*simulation_producer_definition(s,p);
+    float growth=k ? c.branches[k-1].growth : c.growth;
+    uint32_t wounds=k ? c.branches[k-1].wounds : c.wounds;
+    uint32_t hits=c.parents[k]<0 ? d.hits : d.branches.hits;
+    uint32_t lost=std::min((uint32_t)GROWTH_SEGMENTS,wounds*GROWTH_SEGMENTS/hits);
+    return std::fmin(growth,(GROWTH_SEGMENTS-lost)/(float)GROWTH_SEGMENTS);
+}
+float simulation_production(const Simulation* s,uint32_t p)
+{
+    const Colony& c=s->colonies[p];const ProducerDefinition& d=*simulation_producer_definition(s,p);
+    float production=0;
+    for (uint32_t k=0;k<d.branches.count;++k)
+    {
+        if ((k ? c.branches[k-1].health : c.health)<=0) continue;
+        float growth=simulation_structure_growth(s,p,k);
+        production+=growth*growth*(c.parents[k]<0 ? 1.0f/c.root_count : d.branches.production);
+    }
+    return production;
+}
 static void prepare_factory(Simulation* s,uint32_t p)
 {
     Colony* c=&s->colonies[p];const BranchRules* f=&simulation_producer_definition(s,p)->branches;
     Vec3 right,up,normal;simulation_producer_axes(simulation_producer_definition(s,p),&right,&up,&normal);
     uint32_t seed=f->seed+p*747796405u;
+    const Body& body=s->world.bodies[p];
+    c->root_count=f->organelle_roots ? body.factory_root_count : 1;
+    for (uint32_t k=0;k<f->count;++k)
+    {
+        if (k<c->root_count) c->parents[k]=-1;
+        else if (!f->organelle_roots) c->parents[k]=(k-1)/2;
+        else if (f->grammar==GROWTH_FAN) c->parents[k]=((k-c->root_count)/2)%c->root_count;
+        else if (f->grammar==GROWTH_HYPHA && (k-c->root_count)%3) c->parents[k]=k-1;
+        else c->parents[k]=(k-c->root_count)%c->root_count;
+    }
     if (simulation_producer_definition(s,p)->segment_path[0])
     {
-        const Body& body=s->world.bodies[p];Vec3 root=body.factory_root;
         seed^=body.seed;
         for (uint32_t k=0;k<f->count;++k)
         {
-            uint32_t parent=(k-1)/2;
-            Vec3 start=k ? c->stems[parent][GROWTH_SEGMENTS-1] : root;
+            int32_t parent=c->parents[k];
+            Vec3 start=parent>=0 ? c->stems[parent][GROWTH_SEGMENTS-1] : body.factory_roots[k];
             c->stems[k][0]=start;
             Vec3 radial=normalize(subtract(start,body.position));
             Vec3 side=normalize(cross(std::fabs(radial.y)<.9f ? Vec3{0,1,0} : Vec3{1,0,0},radial));
             Vec3 other=cross(radial,side);float sign=k%2 ? -1.0f : 1.0f;
-            float extent=k ? f->spacing*1.8f : simulation_producer_definition(s,p)->height;
+            float extent=parent>=0 ? f->spacing*1.8f : simulation_producer_definition(s,p)->height;
+            float spread=f->grammar==GROWTH_AXIAL ? .12f : f->grammar==GROWTH_FAN ? .8f : .5f;
+            float bend=f->grammar==GROWTH_AXIAL ? .04f : f->grammar==GROWTH_FAN ? .14f : .3f;
             for (uint32_t j=1;j<=GROWTH_SEGMENTS;++j)
             {
-                Vec3 direction=normalize(add(scale(radial,1.5f),add(scale(side,(k ? sign*.8f : .0f)+signed_random(&seed)*.3f),scale(other,signed_random(&seed)*.35f))));
+                Vec3 direction=normalize(add(scale(radial,1.5f),add(scale(side,(parent>=0 ? sign*spread : 0)+signed_random(&seed)*bend),scale(other,signed_random(&seed)*bend))));
                 c->stems[k][j]=add(c->stems[k][j-1],scale(direction,extent/GROWTH_SEGMENTS));
                 radial=normalize(subtract(c->stems[k][j],body.position));
             }
@@ -148,8 +178,10 @@ static void establish_colony(Simulation* s,uint32_t p,Faction faction)
     *c=Colony();c->surface=surface;c->generation=generation;c->faction=faction;
     c->type=s->world.content.factions[faction].producer;
     c->health=simulation_producer_definition(s,p)->health;c->growth=.02f;c->priority=s->world.content.factions[faction].default_unit;
+    c->active=true;c->root_generation=1;
     s->world.bodies[p].owner=faction;
     if (s->world.gameplay.enabled) prepare_factory(s,p);
+    for (uint32_t k=1;k<c->root_count;++k) { c->branches[k-1].health=simulation_producer_definition(s,p)->health;c->branches[k-1].growth=.02f;c->branches[k-1].generation=1; }
     sound(s,SOUND_COLONIZE,c->surface);
 }
 
@@ -195,13 +227,20 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
     {
         Body& b=s->world.bodies[i];const BodyDefinition& d=s->world.content.bodies[b.type];
         MeshSource source={b.model_path,b.position,b.radius,0,b.color,d.parts_path,b.seed,d.shape_variation,d.part_variation};
-        if (d.hosts_site && !geometry_attachment(source,b.colony_normal,&b.factory_root)) return false;
+        if (d.hosts_site && !geometry_attachments(source,b.colony_normal,b.factory_roots,MAX_FACTORY_STRUCTURES,&b.factory_root_count)) return false;
+        b.factory_root=b.factory_roots[0];
+        for (uint32_t t=0;d.hosts_site && t<s->world.content.producer_count;++t)
+            if (s->world.content.producers[t].branches.organelle_roots && s->world.content.producers[t].branches.count<b.factory_root_count)
+            { fprintf(stderr,"Factory structure count is smaller than the cell attachment count.\n");return false; }
         if (d.hosts_site && !geometry_surface_point(b.model_path,b.position,b.radius,b.colony_normal,&s->colonies[i].surface)) return false;
     }
     if (s->world.gameplay.enabled)
         for (uint32_t p=0;p<s->world.body_count;++p)
             if (s->home_owner[p]!=FACTION_NEUTRAL && s->world.content.bodies[s->world.bodies[p].type].hosts_site)
-            { establish_colony(s,p,s->home_owner[p]);s->colonies[p].growth=1; }
+            {
+                establish_colony(s,p,s->home_owner[p]);s->colonies[p].growth=1;
+                for (uint32_t k=1;k<s->colonies[p].root_count;++k) s->colonies[p].branches[k-1].growth=1;
+            }
     simulation_update_sight(s);
     snprintf(s->message,sizeof(s->message),"RIGHT-CLICK OPEN SPACE TO SCOUT. ORDER A KNOWN BODY TO INTERACT.");
     if (s->world.content.factions[s->world.player_faction].automatic)
@@ -263,7 +302,7 @@ void simulation_priority_type(Simulation* s,uint32_t type)
 {
     if (s->world.content.factions[s->world.player_faction].automatic) return;
     int p=s->selected_body;
-    if (p<0 || !simulation_body_known(s,(uint32_t)p) || s->colonies[p].health<=0 || s->colonies[p].faction!=s->world.player_faction)
+    if (p<0 || !simulation_body_known(s,(uint32_t)p) || !s->colonies[p].active || s->colonies[p].faction!=s->world.player_faction)
     { snprintf(s->message,sizeof(s->message),"SELECT YOUR PRODUCTION SITE FIRST");return; }
     if (type>=s->world.content.unit_count || s->world.content.units[type].faction!=s->colonies[p].faction) return;
     s->colonies[p].priority=type;
@@ -277,7 +316,10 @@ void simulation_priority(Simulation* s,int group)
 
 static Vec3 colony_tip(const Simulation* s, uint32_t p)
 {
-    return simulation_structure_position(s,p,0);
+    const Colony& c=s->colonies[p];
+    for (uint32_t k=0;k<simulation_producer_definition(s,p)->branches.count;++k)
+        if ((k ? c.branches[k-1].health : c.health)>0) return simulation_structure_position(s,p,k);
+    return c.surface;
 }
 
 
@@ -285,20 +327,21 @@ static Vec3 colony_tip(const Simulation* s, uint32_t p)
 static bool defended(const Simulation* s, uint32_t p, Faction faction)
 {
     const Body* cell=&s->world.bodies[p];
-    if (s->colonies[p].health>0 && s->colonies[p].faction!=faction) return true;
+    if (s->colonies[p].active && s->colonies[p].faction!=faction) return true;
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (s->units[i].health>0 && s->units[i].faction!=faction
             && length(subtract(s->units[i].position,cell->position))<cell->radius+simulation_unit_definition(s,&s->units[i])->range) return true;
     return false;
 }
 
-static bool clear_shot(const Simulation* s, Vec3 from, Vec3 to)
+static bool clear_shot(const Simulation* s, Vec3 from, Vec3 to,int32_t structure_cell=NO_BODY)
 {
     Vec3 delta=subtract(to,from);float distance=length(delta);
     if (distance<.0001f) return true;
     Vec3 direction=scale(delta,1.0f/distance);
     for (uint32_t p=0;p<s->world.body_count;++p)
     {
+        if ((int32_t)p==structure_cell) continue;
         Vec3 offset=subtract(from,s->world.bodies[p].position);float along=dot(offset,direction);
         float radius=s->world.bodies[p].radius,disc=along*along-dot(offset,offset)+radius*radius;
         if (disc>0 && -along+std::sqrt(disc)>.001f && -along-std::sqrt(disc)<distance-.001f) return false;
@@ -322,8 +365,9 @@ static void move_units(Simulation* s, float dt)
             if (u->latch_colony && (uint32_t)u->latch<s->world.body_count)
             {
                 const Colony& c=s->colonies[u->latch];
-                valid=c.health>0 && c.generation==u->latch_root_generation && c.faction!=u->faction;
+                valid=c.active && c.generation==u->latch_root_generation && c.faction!=u->faction;
                 if (u->latch_structure) valid=valid && c.branches[u->latch_structure-1].health>0 && c.branches[u->latch_structure-1].generation==u->latch_generation;
+                else valid=valid && c.health>0 && c.root_generation==u->latch_generation;
                 if (valid) point=simulation_structure_position(s,u->latch,u->latch_structure);
             }
             else if (!u->latch_colony && u->latch<MAX_UNITS)
@@ -335,7 +379,7 @@ static void move_units(Simulation* s, float dt)
         Vec3 combat_target={};bool strafe=false;
         uint32_t p=(uint32_t)u->target;
         bool colonizing=simulation_unit_definition(s,u)->colonizes && u->target>=0 && s->world.content.bodies[s->world.bodies[p].type].hosts_site
-            && s->colonies[p].health<=0 && !defended(s,p,u->faction);
+            && !s->colonies[p].active && !defended(s,p,u->faction);
         Vec3 goal=u->moving ? u->destination : add(s->colonies[p].surface,scale(s->world.bodies[p].colony_normal,colonizing ? .25f : 1.3f));
         if (!u->moving && !colonizing)
         {
@@ -367,7 +411,7 @@ static void move_units(Simulation* s, float dt)
             if (definition->attack==ATTACK_PROJECTILE && flight->flight_enabled && nearest<simulation_unit_definition(s,u)->range*1.1f)
             { combat_target=goal;strafe=true; }
             else if (nearest<simulation_unit_definition(s,u)->range*.85f) goal=u->position;
-            else if (nearest==1e10f && ((definition->targets|definition->secondary_targets)&TARGET_STRUCTURES) && s->colonies[p].health>0 && s->colonies[p].faction!=u->faction)
+            else if (nearest==1e10f && ((definition->targets|definition->secondary_targets)&TARGET_STRUCTURES) && s->colonies[p].active && s->colonies[p].faction!=u->faction)
             {
                 goal=colony_tip(s,p);
                 if (definition->attack==ATTACK_PROJECTILE && flight->flight_enabled && length(subtract(goal,u->position))<simulation_unit_definition(s,u)->range*1.1f)
@@ -384,8 +428,8 @@ static void move_units(Simulation* s, float dt)
                 float score=d*(1+.3f*signed_random(&seed));
                 if (d<definition->seek_radius && score<nearest) { nearest=score;goal=positions[j];found=true; }
             }
-            if (!found) for (uint32_t j=0;j<s->world.body_count;++j) if (s->colonies[j].health>0 && s->colonies[j].faction!=u->faction)
-            { Vec3 point=simulation_structure_position(s,j,0);float d=length(subtract(point,u->position));if (d<nearest) { nearest=d;goal=point; } }
+            if (!found) for (uint32_t j=0;j<s->world.body_count;++j) if (s->colonies[j].active && s->colonies[j].faction!=u->faction)
+            { Vec3 point=colony_tip(s,j);float d=length(subtract(point,u->position));if (d<nearest) { nearest=d;goal=point; } }
             strafe=false;
         }
         Vec3 delta=subtract(goal,u->position);float distance=length(delta);
@@ -519,35 +563,46 @@ static void recover_units(Simulation* s,float dt)
 static float structure_health(const Colony* c,uint32_t k)
 { return k ? c->branches[k-1].health : c->health; }
 static uint32_t structure_generation(const Colony* c,uint32_t k)
-{ return k ? c->branches[k-1].generation : c->generation; }
+{ return k ? c->branches[k-1].generation : c->root_generation; }
 static uint32_t structure_wounds(const Colony* c,uint32_t k)
 { return k ? c->branches[k-1].wounds : c->wounds; }
 static uint32_t structure_slot(uint32_t cell,uint32_t structure)
 { return MAX_UNITS+cell*MAX_FACTORY_STRUCTURES+structure; }
-static void fracture_limb(Simulation* s,uint32_t p,uint32_t k)
+static void fracture_limb(Simulation* s,uint32_t p,uint32_t k,float old_growth,float retained)
 {
     const Colony& c=s->colonies[p];const ProducerDefinition& definition=*simulation_producer_definition(s,p);
     if (!definition.segment_path[0]) return;
     ++s->limbs_broken;sound(s,SOUND_BREAK,simulation_structure_position(s,p,k));
     const CombatVisuals& fx=s->world.combat;if (fx.break_seconds<=0) return;
-    float growth=k ? c.branches[k-1].growth : c.growth;
+    float growth=old_growth;
     uint32_t seed=s->world.bodies[p].seed^s->tick_count^(k*747796405u);
-    for (uint32_t j=0;j<GROWTH_SEGMENTS;++j)
+    for (uint32_t j=0;j<=GROWTH_SEGMENTS;++j)
     {
-        float amount=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_SEGMENTS-j));if (amount<=.001f) continue;
+        bool tip=j==GROWTH_SEGMENTS;
+        float amount=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_SEGMENTS-j));
+        if (tip)
+        { if (growth<(k ? c.branches[k-1].growth : c.growth)) continue; }
+        else if (j<retained*GROWTH_SEGMENTS || amount<=.001f) continue;
         uint32_t slot=0;while (slot<MAX_LIMB_DEBRIS && s->debris[slot].seconds>0) ++slot;
         if (slot==MAX_LIMB_DEBRIS)
         {
             slot=0;for (uint32_t i=1;i<MAX_LIMB_DEBRIS;++i) if (s->debris[i].age>s->debris[slot].age) slot=i;
             ++s->debris_replaced;
         }
-        LimbDebris d={};d.start=c.stems[k][j];d.end=add(d.start,scale(subtract(c.stems[k][j+1],d.start),amount));
+        LimbDebris d={};d.tip=tip;
+        if (tip)
+        {
+            d.start=simulation_growth_point(s,p,k,growth);
+            d.end=add(d.start,normalize(subtract(d.start,c.stems[k][0])));
+        }
+        else { d.start=c.stems[k][j];d.end=add(d.start,scale(subtract(c.stems[k][j+1],d.start),amount)); }
         Vec3 radial=normalize(subtract(d.start,s->world.bodies[p].position));
         Vec3 jitter={signed_random(&seed),signed_random(&seed),signed_random(&seed)};
         d.velocity=scale(add(radial,scale(jitter,.6f)),fx.break_speed);
         // This axis always has a nonzero radial component.
         d.axis=normalize(add(radial,scale(jitter,.35f)));d.spin=signed_random(&seed)*fx.break_spin;
-        d.radius=definition.width*(1-.12f*j)*(k ? .65f : 1)*(.55f+.45f*growth);
+        d.radius=tip ? definition.width*(c.parents[k]>=0 ? .7f : 1)*(.4f+.6f*growth)
+            : definition.width*(1-.12f*j)*(c.parents[k]>=0 ? .65f : 1)*(.55f+.45f*growth);
         d.seconds=fx.break_seconds;d.producer=c.type;d.faction=c.faction;s->debris[slot]=d;
     }
 }
@@ -586,13 +641,13 @@ static void projectile_combat(Simulation* s,float dt)
                 if (d<nearest && clear_shot(s,u->position,s->units[j].position)) { nearest=d;target=(int)j; }
             }
         if (target<0 && (targets&TARGET_STRUCTURES)) for (uint32_t j=0;j<s->world.body_count;++j)
-            if (s->colonies[j].health>0 && s->colonies[j].faction!=u->faction)
+            if (s->colonies[j].active && s->colonies[j].faction!=u->faction)
             {
                 uint32_t count=simulation_producer_definition(s,j)->branches.count;
                 for (uint32_t k=0;k<count;++k) if (structure_health(&s->colonies[j],k)>0)
                 {
                     Vec3 point=simulation_structure_position(s,j,k);float d=length(subtract(u->position,point));
-                    if (d<nearest && clear_shot(s,u->position,point)) { nearest=d;target=(int)j;colony=true;structure=k; }
+                    if (d<nearest && clear_shot(s,u->position,point,(int32_t)j)) { nearest=d;target=(int)j;colony=true;structure=k; }
                 }
             }
         }
@@ -615,11 +670,11 @@ static void projectile_combat(Simulation* s,float dt)
                     && length(subtract(s->units[j].position,u->position))<definition->blast_radius && clear_shot(s,u->position,s->units[j].position))
                 { ++hit_count[j];++s->hits; }
             for (uint32_t p=0;p<s->world.body_count;++p)
-                if (s->colonies[p].health>0 && (definition->friendly_fire || s->colonies[p].faction!=u->faction))
+                if (s->colonies[p].active && (definition->friendly_fire || s->colonies[p].faction!=u->faction))
                     for (uint32_t k=0;k<simulation_producer_definition(s,p)->branches.count;++k)
                     {
                         Vec3 point=simulation_structure_position(s,p,k);
-                        if (structure_health(&s->colonies[p],k)>0 && length(subtract(point,u->position))<definition->blast_radius && clear_shot(s,u->position,point))
+                        if (structure_health(&s->colonies[p],k)>0 && length(subtract(point,u->position))<definition->blast_radius && clear_shot(s,u->position,point,(int32_t)p))
                         { ++hit_count[structure_slot(p,k)];++s->hits; }
                     }
             continue;
@@ -669,7 +724,7 @@ static void projectile_combat(Simulation* s,float dt)
     for (uint32_t i=0;i<MAX_PROJECTILES;++i)
     {
         Projectile* p=&s->projectiles[i];if (!p->active) continue;
-        bool valid=p->colony ? s->colonies[p->target].health>0 && s->colonies[p->target].faction!=p->faction && s->colonies[p->target].generation==p->generation
+        bool valid=p->colony ? s->colonies[p->target].active && s->colonies[p->target].faction!=p->faction && s->colonies[p->target].generation==p->generation
             && structure_health(&s->colonies[p->target],p->structure)>0 && structure_generation(&s->colonies[p->target],p->structure)==p->structure_generation
             : s->units[p->target].health>0 && s->units[p->target].generation==p->generation;
         p->age+=dt;if (!valid || p->age>4) { p->active=false;continue; }
@@ -678,7 +733,7 @@ static void projectile_combat(Simulation* s,float dt)
             scale(world_direction(&s->units[p->target],p->anchor),simulation_unit_definition(s,&s->units[p->target])->scale));
         Vec3 delta=subtract(target,p->position);float d=length(delta),step=v->projectile_speed*dt;
         Vec3 next=d<=step ? target : add(p->position,scale(delta,step/d));
-        if (!clear_shot(s,p->position,next)) { p->active=false;continue; }
+        if (!clear_shot(s,p->position,next,p->colony ? p->target : NO_BODY)) { p->active=false;continue; }
         p->previous=p->position;p->position=next;
         if (d>.0001f) p->direction=scale(delta,1/d);
         if (d<=step)
@@ -732,46 +787,45 @@ static void projectile_combat(Simulation* s,float dt)
         }
     for (uint32_t i=0;i<s->world.body_count;++i)
         for (uint32_t k=0;k<simulation_producer_definition(s,i)->branches.count;++k)
-        if (s->colonies[i].health>0 && structure_health(&s->colonies[i],k)>0 && hit_count[structure_slot(i,k)]>0)
+        if (s->colonies[i].active && structure_health(&s->colonies[i],k)>0 && hit_count[structure_slot(i,k)]>0)
         {
             Colony* c=&s->colonies[i];FactoryStructure* branch=k ? &c->branches[k-1] : 0;
+            float before=simulation_structure_growth(s,i,k);
             float* health=k ? &branch->health : &c->health;uint32_t* wounds=k ? &branch->wounds : &c->wounds;
             EmbeddedSpike* embedded=k ? branch->embedded : c->embedded;
             uint32_t index=structure_slot(i,k);
-            if (s->world.spikes.enabled)
-            {
-                const ProducerDefinition& definition=*simulation_producer_definition(s,i);
-                uint32_t maximum=k ? definition.branches.hits : definition.hits;
-                float maximum_health=k ? definition.branches.health : definition.health;
-                uint32_t old=*wounds;*wounds=std::min(maximum,old+hit_count[index]);
-                for (uint32_t j=old;j<*wounds && j<2;++j) embedded[j]=landed[index][j-old];
-                *health=maximum_health*(maximum-*wounds)/maximum;
-            }
+            const ProducerDefinition& definition=*simulation_producer_definition(s,i);
+            bool root=c->parents[k]<0;
+            uint32_t maximum=root ? definition.hits : definition.branches.hits;
+            float maximum_health=root ? definition.health : definition.branches.health;
+            uint32_t old=*wounds;*wounds=std::min(maximum,old+hit_count[index]);
+            for (uint32_t j=old;j<*wounds && j<2;++j) embedded[j]=landed[index][j-old];
+            *health=maximum_health*(maximum-*wounds)/maximum;
+            float retained=simulation_structure_growth(s,i,k);
+            if (retained<before) fracture_limb(s,i,k,before,retained);
             if (*health==0)
             {
-                fracture_limb(s,i,k);
                 if (s->world.spikes.enabled) pop_body(s,simulation_structure_position(s,i,k),c->faction,false);
-                if (k)
-                {
-                    branch->growth=0;branch->regrow_timer=simulation_producer_definition(s,i)->branches.regrow_seconds;c->branch_timer=0;
-                    for (uint32_t j=k+1;j<simulation_producer_definition(s,i)->branches.count;++j)
-                    {
-                        uint32_t ancestor=(j-1)/2;
-                        while (ancestor>k) ancestor=(ancestor-1)/2;
-                        if (ancestor==k)
-                        {
-                            if (c->branches[j-1].health>0) fracture_limb(s,i,j);
-                            c->branches[j-1].health=0;c->branches[j-1].growth=0;c->branches[j-1].regrow_timer=simulation_producer_definition(s,i)->branches.regrow_seconds;
-                        }
-                    }
-                }
-                else
-                {
-                    c->energy=0;c->building=false;c->growth=0;s->world.bodies[i].owner=FACTION_NEUTRAL;
-                    for (uint32_t j=0;j<MAX_FACTORY_STRUCTURES-1;++j)
-                    { if (c->branches[j].health>0) fracture_limb(s,i,j+1);c->branches[j].health=0;c->branches[j].growth=0; }
-                }
+                if (k) { branch->growth=0;branch->regrow_timer=definition.branches.regrow_seconds; }
+                else { c->growth=0;c->root_regrow_timer=definition.branches.regrow_seconds; }
+                c->branch_timer=0;
             }
+            // Children attach at the start of the last segment. Loss of that support detaches them.
+            if (retained<=.75f)
+                for (uint32_t j=k+1;j<definition.branches.count;++j)
+                {
+                    int32_t ancestor=c->parents[j];
+                    while (ancestor>(int32_t)k) ancestor=c->parents[ancestor];
+                    if (ancestor!=(int32_t)k) continue;
+                    FactoryStructure& child=c->branches[j-1];
+                    if (child.health>0) fracture_limb(s,i,j,simulation_structure_growth(s,i,j),0);
+                    child.health=0;child.growth=0;child.regrow_timer=definition.branches.regrow_seconds;
+                }
+            c->active=c->health>0;
+            for (uint32_t j=1;j<definition.branches.count;++j) c->active=c->active || c->branches[j-1].health>0;
+            if (!c->active)
+            { c->energy=0;c->building=false;c->capacity_blocked=false;s->world.bodies[i].owner=FACTION_NEUTRAL; }
+
         }
 }
 
@@ -791,7 +845,7 @@ static void colonize_cells(Simulation* s, float dt)
             continue;
         }
         if (u->landing<0) u->landing=0;
-        if (c->health>0) continue;
+        if (c->active) continue;
         Vec3 goal=add(c->surface,scale(s->world.bodies[p].colony_normal,.25f));
         if (length(subtract(u->position,goal))>.35f) continue;
         u->landing+=dt;
@@ -806,37 +860,47 @@ static void grow_colonies(Simulation* s, float dt)
     const GameplayRules* rules=&s->world.gameplay;
     for (uint32_t p=0;p<s->world.body_count;++p)
     {
-        Colony* c=&s->colonies[p];
-        if (c->health<=0) continue;
-        // The sacrificed unit supplies initial growth. Nutrients fund production.
-        float old_growth=c->growth;
-        c->growth=std::fmin(1.0f,c->growth+dt/simulation_producer_definition(s,p)->growth_seconds);
-        if (old_growth<1 && c->growth>=1) sound(s,SOUND_MATURE,simulation_structure_position(s,p,0));
-        float production=1;
-        if (s->world.gameplay.enabled)
+        Colony* c=&s->colonies[p];if (!c->active) continue;
+        const ProducerDefinition& d=*simulation_producer_definition(s,p);
+        const BranchRules& f=d.branches;
+        c->branch_timer+=dt;
+        bool mature=false;
+        for (uint32_t k=0;k<f.count;++k)
         {
-            const BranchRules* f=&simulation_producer_definition(s,p)->branches;
-            if (c->growth>=1) c->branch_timer+=dt;
-            for (uint32_t j=1;j<f->count;++j)
+            FactoryStructure* b=k ? &c->branches[k-1] : 0;
+            float* health=k ? &b->health : &c->health;
+            float* growth=k ? &b->growth : &c->growth;
+            float* timer=k ? &b->regrow_timer : &c->root_regrow_timer;
+            uint32_t* wounds=k ? &b->wounds : &c->wounds;
+            uint32_t* generation=k ? &b->generation : &c->root_generation;
+            EmbeddedSpike* embedded=k ? b->embedded : c->embedded;
+            int32_t parent=c->parents[k];
+            *timer=std::fmax(0.0f,*timer-dt);
+            bool ready=parent<0 || ((parent ? c->branches[parent-1].health : c->health)>0 && simulation_structure_growth(s,p,parent)>=1);
+            if (*health<=0 && *timer<=0 && ready && c->branch_timer>=f.seconds)
             {
-                FactoryStructure* b=&c->branches[j-1];uint32_t parent=(j-1)/2;
-                b->regrow_timer=std::fmax(0.0f,b->regrow_timer-dt);
-                bool parent_ready=parent ? c->branches[parent-1].health>0 && c->branches[parent-1].growth>=1 : c->growth>=1;
-                if (b->health<=0 && b->regrow_timer<=0 && parent_ready && c->branch_timer>=f->seconds)
-                {
-                    c->branch_timer=0;b->health=f->health;b->growth=.02f;b->wounds=0;++b->generation;
-                    memset(b->embedded,0,sizeof(b->embedded));
-                    sound(s,SOUND_GROW,simulation_structure_position(s,p,j));
-                }
-                if (b->health<=0) continue;
-                float old=b->growth;b->growth=std::fmin(1.0f,b->growth+dt/simulation_producer_definition(s,p)->growth_seconds);
-                if (old<1 && b->growth>=1) sound(s,SOUND_MATURE,simulation_structure_position(s,p,j));
-                production+=f->production*b->growth*b->growth;
+                c->branch_timer=0;*health=parent<0 ? d.health : f.health;*growth=.02f;*wounds=0;++*generation;
+                memset(embedded,0,sizeof(EmbeddedSpike)*MAX_EMBEDDED);sound(s,SOUND_GROW,simulation_structure_position(s,p,k));
             }
+            if (*health<=0) continue;
+            float old=*growth;*growth=std::fmin(1.0f,*growth+dt/d.growth_seconds);
+            if (old<1 && *growth>=1) sound(s,SOUND_MATURE,simulation_structure_position(s,p,k));
+            mature=mature || *growth>=1;
         }
+        float production=simulation_production(s,p);
         c->uptake=s->world.bodies[p].availability;
-        c->energy=std::fmin(rules->storage,c->energy+dt*simulation_producer_definition(s,p)->collection*c->uptake*c->growth*c->growth*production);
-        if (c->growth<1) continue;
+        c->energy=std::fmin(rules->storage,c->energy+dt*d.collection*c->uptake*production);
+        if (!mature) continue;
+        uint32_t tips[MAX_FACTORY_STRUCTURES],count=0;
+        for (uint32_t k=0;k<f.count;++k)
+        {
+            if ((k ? c->branches[k-1].health : c->health)<=0 || (k ? c->branches[k-1].growth : c->growth)<1) continue;
+            bool child=false;
+            for (uint32_t j=k+1;j<f.count;++j)
+                child=child || (c->parents[j]==(int32_t)k && c->branches[j-1].health>0);
+            if (!child) tips[count++]=k;
+        }
+        if (!count) continue;
         if (!c->building)
         {
             float cost=s->world.content.units[c->priority].cost;
@@ -844,18 +908,10 @@ static void grow_colonies(Simulation* s, float dt)
             if (!automatic && c->energy<cost) continue;
             if (!automatic) c->energy-=cost;
             c->building=true;c->building_kind=c->priority;c->manufacturing=0;
-            uint32_t tips[MAX_FACTORY_STRUCTURES],count=0;
-            for (uint32_t k=0;k<simulation_producer_definition(s,p)->branches.count;++k)
-            {
-                if (k && (c->branches[k-1].health<=0 || c->branches[k-1].growth<1)) continue;
-                bool child=false;
-                for (uint32_t j=k*2+1;j<=k*2+2 && j<simulation_producer_definition(s,p)->branches.count;++j)
-                    child=child || (c->branches[j-1].health>0 && c->branches[j-1].growth>=1);
-                if (!child) tips[count++]=k;
-            }
-            c->production_tip=count ? tips[s->next_generation%count] : 0;
+            c->production_tip=tips[s->next_generation%count];
         }
-        if (c->production_tip && c->branches[c->production_tip-1].health<=0) c->production_tip=0;
+        if (structure_health(c,c->production_tip)<=0 || (c->production_tip ? c->branches[c->production_tip-1].growth : c->growth)<1)
+            c->production_tip=tips[0];
         float rate=s->world.ai_production_set && c->faction!=s->world.player_faction ? s->world.ai_production : 1;
         c->manufacturing=std::fmin(1.0f,c->manufacturing+dt*rate*production/rules->manufacture_seconds);
         if (c->manufacturing<1) continue;
@@ -866,7 +922,7 @@ static void grow_colonies(Simulation* s, float dt)
         float angle=(s->next_generation+1)*2.39996323f,spread=definition->scale*2;
         Vec3 position=add(add(colony_tip(s,p),scale(normal,1.0f)),
             add(scale(tangent,std::cos(angle)*spread),scale(cross(tangent,normal),std::sin(angle)*spread)));
-        if (simulation_producer_definition(s,p)->segment_path[0])
+        if (d.segment_path[0])
         {
             Vec3 tip=simulation_structure_position(s,p,c->production_tip);
             normal=normalize(subtract(tip,s->world.bodies[p].position));
@@ -890,7 +946,7 @@ static void enemy_orders(Simulation* s)
         if (d<nearest) { nearest=d;target=(int)p; }
     }
     for (uint32_t i=0;i<MAX_UNITS;++i) assault_ready=assault_ready || (s->units[i].health>0 && s->units[i].faction==enemy && (simulation_unit_definition(s,&s->units[i])->targets&TARGET_STRUCTURES));
-    for (uint32_t p=0;p<s->world.body_count;++p) if (s->colonies[p].health>0 && s->colonies[p].faction==enemy)
+    for (uint32_t p=0;p<s->world.body_count;++p) if (s->colonies[p].active && s->colonies[p].faction==enemy)
         s->colonies[p].priority=!assault_ready && target>=0 ? s->world.content.factions[enemy].assault_unit : s->world.content.factions[enemy].default_unit;
     bool expand=s->time_seconds>=(s->world.ai_production_set ? s->world.ai_expansion : s->world.gameplay.enemy_attack_seconds);
     for (uint32_t i=0;i<MAX_UNITS;++i)
@@ -903,7 +959,7 @@ static void enemy_orders(Simulation* s)
 static void outcome(Simulation* s)
 {
     bool friendly=false,hostile=false,units=false;
-    for (uint32_t p=0;p<s->world.body_count;++p) if (s->colonies[p].health>0)
+    for (uint32_t p=0;p<s->world.body_count;++p) if (s->colonies[p].active)
     {
         friendly=friendly || s->colonies[p].faction==s->world.player_faction;
         hostile=hostile || s->colonies[p].faction!=s->world.player_faction;
@@ -967,6 +1023,9 @@ bool simulation_write_state(const Simulation* s, const char* path)
         fprintf(file,"%s{\"%s\":%u,\"faction\":%d,\"health\":%.6f,\"growth\":%.6f,\"%s\":%.6f,\"energy\":%.6f,\"building\":%s,\"priority\":%d,\"manufacturing\":%.6f,\"capacity_blocked\":%s,\"wounds\":%u",
             p ? "," : "","cell",p,(int)c->faction,c->health,c->growth,"nutrients",c->uptake,c->energy,c->building ? "true" : "false",(int)(c->faction ? s->world.content.units[c->priority].group : 0),c->manufacturing,c->capacity_blocked ? "true" : "false",c->wounds);
         const Body& body=s->world.bodies[p];
+        fprintf(file,",\"active\":%s,\"root_count\":%u,\"production\":%.6f,\"attachments\":[",c->active ? "true" : "false",c->root_count,c->active ? simulation_production(s,p) : 0);
+        for (uint32_t k=0;k<body.factory_root_count;++k) { Vec3 v=body.factory_roots[k];fprintf(file,"%s[%.6f,%.6f,%.6f]",k ? "," : "",v.x,v.y,v.z); }
+        fprintf(file,"]");
         fprintf(file,",\"appearance\":{\"tint\":[%.6f,%.6f,%.6f],\"strength\":%.6f}",s->cell_appearance[p].tint.r,s->cell_appearance[p].tint.g,s->cell_appearance[p].tint.b,s->cell_appearance[p].strength);
         fprintf(file,",\"seed\":%u,\"root\":[%.6f,%.6f,%.6f],\"production_tip\":%u,\"discovered\":%s,\"visible\":%s,\"structures\":[",body.seed,body.factory_root.x,body.factory_root.y,body.factory_root.z,c->production_tip,s->discovered[p] ? "true" : "false",s->visible_bodies[p] ? "true" : "false");
         uint32_t count=s->world.gameplay.enabled && c->faction!=FACTION_NEUTRAL && s->world.content.bodies[s->world.bodies[p].type].hosts_site ? simulation_producer_definition(s,p)->branches.count : 0;
@@ -974,7 +1033,8 @@ bool simulation_write_state(const Simulation* s, const char* path)
         {
             const FactoryStructure* b=k ? &c->branches[k-1] : 0;Vec3 position=simulation_structure_position(s,p,k);
             fprintf(file,"%s{\"health\":%.6f,\"growth\":%.6f,\"wounds\":%u,\"generation\":%u,\"position\":[%.6f,%.6f,%.6f]",k ? "," : "",
-                k ? b->health : c->health,k ? b->growth : c->growth,k ? b->wounds : c->wounds,k ? b->generation : c->generation,position.x,position.y,position.z);
+                k ? b->health : c->health,k ? b->growth : c->growth,k ? b->wounds : c->wounds,k ? b->generation : c->root_generation,position.x,position.y,position.z);
+            fprintf(file,",\"parent\":%d,\"visible_growth\":%.6f",c->parents[k],simulation_structure_growth(s,p,k));
             fprintf(file,",\"stem\":[");
             for (uint32_t j=0;j<=GROWTH_SEGMENTS;++j) { Vec3 v=c->stems[k][j];fprintf(file,"%s[%.6f,%.6f,%.6f]",j ? "," : "",v.x,v.y,v.z); }
             fprintf(file,"]}");

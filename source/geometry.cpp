@@ -155,7 +155,10 @@ static bool add_model(Geometry* geometry, const char* path, Vec3 position, float
     }
     if (file && fclose(file) != 0) valid = false;
     if (valid && source && source->parts_path && source->parts_path[0])
-        valid=geometry_vary(&geometry->vertices[first_vertex],vertex_count,&geometry->triangles[first_triangle],triangle_count,*source);
+    {
+        valid=geometry_vary(&geometry->vertices[first_vertex],vertex_count,&geometry->triangles[first_triangle],&triangle_count,*source);
+        geometry->triangles.resize(first_triangle+triangle_count);
+    }
     for (uint32_t i = first_vertex; valid && i < geometry->vertices.size(); ++i)
     {
         GpuVertex* v = &geometry->vertices[i];

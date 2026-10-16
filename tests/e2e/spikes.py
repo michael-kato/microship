@@ -55,7 +55,7 @@ with tempfile.TemporaryDirectory(prefix='microship-spikes-') as directory:
             assert abs(u['health']-maximum*(3-u['wounds'])/3)<.00001,'Health does not match the hit count'
         for c in state['colonies']:
             for s in c['structures']:
-                if s['health']>0:assert abs(s['health']-80*(3-s['wounds'])/3)<.00001
+                if s['health']>0:assert abs(s['health']-240*(12-s['wounds'])/12)<.00001
     for side,home,player in [('virus',0,1),('immune',1,2)]:
         text=stage(side);combat=duel(text)
         one=run(side+'-one-hit',combat,20);check_hits(one)
@@ -68,7 +68,7 @@ with tempfile.TemporaryDirectory(prefix='microship-spikes-') as directory:
         dead=run(side+'-third-hit',combat,120);check_hits(dead)
         assert not any(u['kind']==0 for u in dead['units']),'Third impact did not remove fighters'
         assert dead['effects']['hits']==6 and dead['effects']['deaths']==2,'Three-hit duel produced the wrong damage'
-        assert dead['outcome']==0 and all(c['health']==80 for c in dead['colonies']),'Fighters damaged factories'
+        assert dead['outcome']==0 and all(c['health']==240 for c in dead['colonies']),'Fighters damaged factories'
         assert dead==run(side+'-repeat',combat,120),'Replay was not deterministic'
         slow=change(combat,'effects.projectile.shot_interval',10)
         regrown=run(side+'-regrown',slow,480);check_hits(regrown)
@@ -84,7 +84,7 @@ with tempfile.TemporaryDirectory(prefix='microship-spikes-') as directory:
         assert all(u['wounds']==0 for u in healed['units'] if u['faction']==player),'Friendly orbit did not remove wounds'
         reset=run(side+'-restart',combat,60,extra=('--restart',))
         assert reset['tick']==0 and reset['births']==4 and reset['recovery']=={'healed':0,'regrown':0,'detached':0}
-        assert all(c['health']==80 for c in reset['colonies']) and all(u['wounds']==0 and u['ready_spikes']==22 for u in reset['units'])
+        assert all(c['health']==240 for c in reset['colonies']) and all(u['wounds']==0 and u['ready_spikes']==22 for u in reset['units'])
         # Supply enough nutrients to measure the manufacturing rate.
         supplied=producers(text,collection=100)
         for body in supplied['bodies']:body['position'][0]*=10

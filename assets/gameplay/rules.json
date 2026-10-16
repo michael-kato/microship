@@ -3,7 +3,7 @@
   "resource_label": "NUTRIENTS",
   "economy": {
     "storage": 180.0,
-    "manufacture_seconds": 2.5,
+    "manufacture_seconds": 6,
     "landing_seconds": 1.5,
     "enemy_attack_seconds": 140.0
   },

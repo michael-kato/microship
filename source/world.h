@@ -16,6 +16,8 @@ struct Body
     char model_path[256];
     Vec3 colony_normal;
     Vec3 factory_root;
+    Vec3 factory_roots[MAX_FACTORY_STRUCTURES];
+    uint32_t factory_root_count;
     float availability;
     float interior_radius, interior_fade;
     Color interior_scattering;

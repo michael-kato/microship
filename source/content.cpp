@@ -205,7 +205,22 @@ static bool load_buildings(Content* c,Json root,const char* path)
         p.height=json_positive(json_get(j,"height"),10000);
         p.width=json_positive(json_get(j,"width"),10000);
         p.hits=json_uint(json_get(j,"hits"),1,32);Json b=json_get(j,"branches");
-        json_object(b,"seconds|count|spacing|production|seed|normal|health|hits|regrow_seconds");
+        json_object(b,"seconds|count|spacing|production|seed|normal|health|hits|regrow_seconds|roots|grammar");
+        char roots[32]={},grammar[32]={};
+        Json roots_json=json_find(b,"roots"),grammar_json=json_find(b,"grammar");
+        if (json_present(roots_json))
+        {
+            json_string(roots_json,roots,32);
+            p.branches.organelle_roots=!strcmp(roots,"organelles");
+            if (!p.branches.organelle_roots && strcmp(roots,"single")) json_error(roots_json,"roots must be organelles or single");
+        }
+        if (json_present(grammar_json))
+        {
+            json_string(grammar_json,grammar,32);
+            if (!strcmp(grammar,"fan")) p.branches.grammar=GROWTH_FAN;
+            else if (!strcmp(grammar,"hypha")) p.branches.grammar=GROWTH_HYPHA;
+            else if (strcmp(grammar,"axial")) json_error(grammar_json,"grammar must be axial, fan or hypha");
+        }
         Json branch_health=json_find(b,"health"),branch_hits=json_find(b,"hits");
         p.branches.health=json_present(branch_health) ? json_positive(branch_health,10000) : p.health;
         p.branches.hits=json_present(branch_hits) ? json_uint(branch_hits,1,32) : p.hits;
@@ -250,6 +265,7 @@ bool content_finish(Content* c,const char* path)
     {
         ProducerDefinition* p=&c->producers[i];int faction=content_faction(c,p->faction_name);
         if (faction<=0 || p->branches.fields!=3) { valid=false;break; }
+        if (p->branches.organelle_roots && !p->segment_path[0]) { valid=false;break; }
         p->faction=(Faction)faction;
     }
     for (uint32_t i=1;valid && i<MAX_FACTIONS;++i)
@@ -258,7 +274,7 @@ bool content_finish(Content* c,const char* path)
         int p=content_producer(c,f->producer_name),u=content_unit(c,f->default_name),a=content_unit(c,f->assault_name);
         if (p<0 || u<0 || a<0 || c->producers[p].faction!=i || c->units[u].faction!=i || c->units[a].faction!=i) { valid=false;break; }
         f->producer=(uint32_t)p;f->default_unit=(uint32_t)u;f->assault_unit=(uint32_t)a;
-        if (f->automatic && (u!=a || c->units[u].attack!=ATTACK_SPORE || c->units[u].colonizes || c->producers[p].branches.count!=1 || c->producers[p].segment_path[0])) valid=false;
+        if (f->automatic && (u!=a || c->units[u].attack!=ATTACK_SPORE || c->units[u].colonizes)) valid=false;
     }
     if (!valid) fprintf(stderr,"%s: content has incomplete or invalid references\n",path);
     return valid;

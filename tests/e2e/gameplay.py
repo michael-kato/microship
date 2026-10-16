@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
         text=stage(side)
         initial,log=run(side+'-initial',text)
         assert initial['player_faction']==player and initial['outcome']==0
-        assert active(initial['colonies'][home])==1 and active(initial['colonies'][enemy])==1
+        assert active(initial['colonies'][home])==10 and active(initial['colonies'][enemy])==10
         assert not initial['colonies'][enemy]['discovered']
         assert not any(u['visible'] for u in initial['units'] if u['faction']!=player)
         target='-52 -4 0' if side=='virus' else '48 14 0'
@@ -69,9 +69,9 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
         grown,_=run(side+'-branch-growth',text,1800)
         single=branches(text,count=1)
         baseline,_=run(side+'-single-production',single,1800)
-        assert active(early['colonies'][home])==1 and active(grown['colonies'][home])==2
+        assert active(early['colonies'][home])==10 and active(grown['colonies'][home])==11
         own=lambda s:sum(u['faction']==player for u in s['units'])
-        assert own(grown)>own(baseline),'New structures did not increase production'
+        assert grown['colonies'][home]['production']>baseline['colonies'][home]['production'],'New structures did not increase production rate'
         priority,_=run(side+'-produce-bombers',text,1200,f'0 cell {home}\n0 priority bomber\n')
         assert sum(u['faction']==player and u['kind']==1 for u in priority['units'])>1
         enemy_pos='48 14 7' if side=='virus' else '-52 -4 7'
@@ -82,7 +82,7 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
         assert found==run(side+'-repeat',text,scouting_ticks,scout)[0],'Replay was not deterministic'
         reset,_=run(side+'-restart',text,1800,scout,extra=('--restart',))
         assert reset['tick']==0 and not reset['colonies'][enemy]['discovered']
-        assert all(active(c)<=1 for c in reset['colonies']),'Restart retained branches'
+        assert all(active(c)==c['root_count'] for c in reset['colonies']),'Restart retained branches'
         dark=change(text,'appearance.ambient',[0,0,0])
         unlit,_=run(side+'-lighting-independent',dark,scouting_ticks,scout,extra=('--samples','1'))
         assert all(unlit[k]==found[k] for k in ('colonies','units','effects','recovery','outcome')),'Light changed the game'
@@ -103,7 +103,7 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
     for unit in compact['content']['units']:unit.pop('secondary_attack',None)
     fighters,_=run('fighters-cannot-bomb',compact,2400,'0 select fighters\n0 order 1\n')
     assert fighters['effects']['hits']>0 and fighters['effects']['deaths']>0,'No unit combat'
-    assert fighters['colonies'][1]['health']==80 and fighters['colonies'][1]['wounds']==0,'Fighters damaged a factory'
+    assert fighters['colonies'][1]['health']==240 and fighters['colonies'][1]['wounds']==0,'Fighters damaged a factory'
     # Move defenders away while keeping both reusable templates in the scene.
     no_defenders=change(compact,'spawns',compact['spawns'])
     for spawn in no_defenders['spawns']:
@@ -111,6 +111,8 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
     bombers,_=run('bombers-destroy-factory',no_defenders,2400,'0 select bombers\n0 order 1\n')
     assert bombers['colonies'][1]['health']==0 and bombers['outcome']==1,'Bomber did not destroy the enemy factory'
     expanded_target=branches(no_defenders,seconds=1,count=9)
+    for building in expanded_target['content']['buildings']:
+        building['health']=80;building['hits']=3;building['branches'].update(health=45,hits=2)
     destroyed,_=run('destroy-grown-factory',expanded_target,2400,'0 select bombers\n0 order 1\n')
     assert destroyed['colonies'][1]['health']==0
     assert all(s['health']==0 for s in destroyed['colonies'][1]['structures']),'Root death left live branches'
@@ -124,7 +126,7 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
     for name,bad in [
         ('unsupported-bio-owner',change(text,'bodies.1.owner','robotic')),
         ('missing-factory-side',remove(text,'content.buildings.1')),
-        ('invalid-branch-count',branches(text,count=10)),
+        ('invalid-branch-count',branches(text,count=17)),
         ('zero-plane',branches(text,normal=[0,0,0])),
         ('invalid-sight',change(text,'rules.exploration.sight_radius',float('nan'))),
         ('missing-factory-mesh',change(text,'content.buildings.0.model','missing.fmesh')),

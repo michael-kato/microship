@@ -4,7 +4,8 @@
 #include <stdint.h>
 
 typedef uint32_t Faction;
-enum { FACTION_NEUTRAL=0, MAX_FACTIONS=9, MAX_GROUPS=8, MAX_UNIT_TYPES=32, MAX_PRODUCER_TYPES=8, MAX_BODY_TYPES=32, MAX_FACTORY_STRUCTURES=9 };
+enum { FACTION_NEUTRAL=0, MAX_FACTIONS=9, MAX_GROUPS=8, MAX_UNIT_TYPES=32, MAX_PRODUCER_TYPES=8, MAX_BODY_TYPES=32, MAX_FACTORY_STRUCTURES=16 };
+enum GrowthGrammar { GROWTH_AXIAL,GROWTH_FAN,GROWTH_HYPHA };
 enum { TARGET_UNITS=1, TARGET_STRUCTURES=2 };
 enum AttackMode { ATTACK_PROJECTILE,ATTACK_DIGEST,ATTACK_SPORE };
 struct GroupDefinition { bool declared;char key[32],selection[32],singular[32],plural[32]; };
@@ -34,6 +35,8 @@ struct UnitDefinition
 };
 struct BranchRules
 {
+    GrowthGrammar grammar;
+    bool organelle_roots;
     uint32_t fields,count,seed;
     uint32_t hits;
     float health;

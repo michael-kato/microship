@@ -201,17 +201,17 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     if (p>=0 && simulation_body_known(s,(uint32_t)p) && s->visible_bodies[p])
     {
         const Colony* c=&s->colonies[p];
-        bool ours=c->health>0 && c->faction==s->world.player_faction;
-        r->hud_accent[3]=ours ? 1.0f : c->health>0 ? -1.0f : 0.0f;
-        snprintf(r->hud[4],96,"%s %02d / %s",s->world.content.bodies[s->world.bodies[p].type].label,p+1,c->health>0 ? (ours ? "YOUR NODE" : "HOSTILE NODE") : "UNCLAIMED");
+        bool ours=c->active && c->faction==s->world.player_faction;
+        r->hud_accent[3]=ours ? 1.0f : c->active ? -1.0f : 0.0f;
+        snprintf(r->hud[4],96,"%s %02d / %s",s->world.content.bodies[s->world.bodies[p].type].label,p+1,c->active ? (ours ? "YOUR NODE" : "HOSTILE NODE") : "UNCLAIMED");
         if (c->building) snprintf(r->hud[4]+strlen(r->hud[4]),96-strlen(r->hud[4]),"  %s %03.0f%%",s->world.content.factions[c->faction].automatic ? "SPORE" : "BUILD",c->manufacturing*100);
         if (c->capacity_blocked) snprintf(r->hud[4],96,"UNIT STORAGE FULL / BUILD HELD");
         if (s->world.gameplay.enabled)
         {
-            uint32_t structures=1;float production=1;
+            uint32_t structures=c->health>0 ? 1 : 0;float production=simulation_production(s,p);
             for (uint32_t j=0;j<simulation_producer_definition(s,p)->branches.count-1;++j) if (c->branches[j].health>0)
-            { ++structures;production+=simulation_producer_definition(s,p)->branches.production*c->branches[j].growth*c->branches[j].growth; }
-            snprintf(r->hud[5],96,"STRUCTURES %u / %u   RATE %.2fX",c->health>0 ? structures : 0,simulation_producer_definition(s,p)->branches.count,production);
+            { ++structures; }
+            snprintf(r->hud[5],96,"STRUCTURES %u / %u   RATE %.2fX",c->active ? structures : 0,simulation_producer_definition(s,p)->branches.count,production);
         }
         snprintf(r->hud[6],96,"%s %05.1f / %.0f",s->world.content.resource_label,c->energy,s->world.gameplay.storage);
         snprintf(r->hud[7],96,"F: %.16s %s  S: %.16s %s",s->world.content.groups[0].plural,s->world.content.units[c->priority].group==0 ? "*" : " ",s->world.content.groups[1].plural,s->world.content.units[c->priority].group==1 ? "*" : " ");

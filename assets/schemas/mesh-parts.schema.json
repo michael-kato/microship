@@ -34,6 +34,11 @@
           },
           "attachment": {
             "$ref": "shared.schema.json#/$defs/position"
+          },
+          "minimum_scale": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000
           }
         },
         "required": [

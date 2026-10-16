@@ -78,10 +78,10 @@ def main():
     if args.samples+args.volume_samples+background>8:
         parser.error('Background queries count toward the eight-sample cap')
     single=deepcopy(world)
-    for building in single['content']['buildings']:building['branches']['count']=1
+    for building in single['content']['buildings']:building['branches'].update(count=1,roots='single')
     spheres=deepcopy(world)
     for body in spheres['content']['bodies']:
-        body['geometry']='sphere';body.pop('model',None)
+        body['geometry']='sphere';body.pop('model',None);body.pop('variation',None)
     cases=[('full',world,config),('single-structure',single,config),('sphere-bodies',spheres,config),
            ('one-transmission-layer',world,setting(config,'max_transmission_layers',1)),
            ('half-samples',world,setting(config,'samples_per_pixel',max(1,args.samples//2)))]
