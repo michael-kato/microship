@@ -119,6 +119,7 @@ add_executable(microship
     source/geometry.cpp source/geometry_variation.cpp
     source/window.cpp
     source/simulation.cpp
+    source/flight.cpp
     source/orders.cpp
     source/renderer.cpp
     source/game.cpp
@@ -173,6 +174,9 @@ set_tests_properties(data_assets PROPERTIES TIMEOUT 45)
 add_test(NAME growth_factions COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/growth_factions.py $<TARGET_FILE:microship>)
 set_tests_properties(growth_factions PROPERTIES TIMEOUT 45)
+add_test(NAME navigation COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/navigation.py $<TARGET_FILE:microship>)
+set_tests_properties(navigation PROPERTIES TIMEOUT 60)
 
 option(MICROSHIP_GPU_TESTS "Run real hardware Vulkan E2E scenarios (explicit opt-in)" OFF)
 if(MICROSHIP_GPU_TESTS)

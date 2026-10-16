@@ -12,14 +12,18 @@
     "expansion_delay": 22.0
   },
   "orbit": {
-    "clearance": 0.6,
-    "speed": 0.48
+    "clearance": 1,
+    "speed": 0.24,
+    "weave_radius": 0.9,
+    "weave_height": 0.8
   },
   "flight": {
-    "acceleration": 9.0,
-    "turn_rate": 7.0,
+    "acceleration": 3.2,
+    "turn_rate": 2.5,
     "separation": 0.55,
-    "bank": 0.55
+    "bank": 0.55,
+    "lookahead_seconds": 1,
+    "obstacle_clearance": 0.35
   },
   "spikes": {
     "count": 22,

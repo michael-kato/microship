@@ -137,6 +137,26 @@
               "tip"
             ],
             "additionalProperties": false
+          },
+          "navigation": {
+            "type": "object",
+            "properties": {
+              "stem_radius": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 10
+              },
+              "head_radius": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 10
+              }
+            },
+            "required": [
+              "stem_radius",
+              "head_radius"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

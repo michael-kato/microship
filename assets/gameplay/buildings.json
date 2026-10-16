@@ -31,6 +31,10 @@
       "growth_meshes": {
         "segment": "../models/virus_stem.fmesh",
         "tip": "../models/virus_head.fmesh"
+      },
+      "navigation": {
+        "stem_radius": 0.15,
+        "head_radius": 0.85
       }
     },
     {
@@ -63,6 +67,10 @@
       "growth_meshes": {
         "segment": "../models/immune_stem.fmesh",
         "tip": "../models/immune_head.fmesh"
+      },
+      "navigation": {
+        "stem_radius": 0.55,
+        "head_radius": 0.55
       }
     },
     {
@@ -95,6 +103,10 @@
       "growth_meshes": {
         "segment": "../models/fungal_stem.fmesh",
         "tip": "../models/fungal_head.fmesh"
+      },
+      "navigation": {
+        "stem_radius": 0.55,
+        "head_radius": 0.55
       }
     }
   ]

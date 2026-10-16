@@ -50,19 +50,25 @@ static bool load_rules(World* w,const char* path)
     Json flight=json_find(root,"flight");
     if (json_present(flight))
     {
-        Json j=flight;json_object(j,"acceleration|turn_rate|separation|bank");
+        Json j=flight;json_object(j,"acceleration|turn_rate|separation|bank|lookahead_seconds|obstacle_clearance");
         w->combat.acceleration=json_positive(json_get(j,"acceleration"),100);
         w->combat.turn_rate=json_positive(json_get(j,"turn_rate"),30);
         w->combat.separation=json_positive(json_get(j,"separation"),3);
         w->combat.bank=json_float(json_get(j,"bank"),0,1);
+        Json lookahead=json_find(j,"lookahead_seconds"),clearance=json_find(j,"obstacle_clearance");
+        w->combat.lookahead=json_present(lookahead) ? json_positive(lookahead,5) : 0;
+        w->combat.obstacle_clearance=json_present(clearance) ? json_positive(clearance,5) : 0;
         w->combat.flight_enabled=true;
     }
     Json orbit=json_find(root,"orbit");
     if (json_present(orbit))
     {
-        Json j=orbit;json_object(j,"clearance|speed");
+        Json j=orbit;json_object(j,"clearance|speed|weave_radius|weave_height");
         w->combat.orbit_clearance=json_positive(json_get(j,"clearance"),5);
         w->combat.orbit_speed=json_positive(json_get(j,"speed"),2);
+        Json radius=json_find(j,"weave_radius"),height=json_find(j,"weave_height");
+        w->combat.weave_radius=json_present(radius) ? json_float(radius,0,5) : 0;
+        w->combat.weave_height=json_present(height) ? json_float(height,0,5) : 0;
         w->combat_fields|=2;
     }
     Json recovery=json_find(root,"recovery");

@@ -205,6 +205,50 @@
               "interval_factor"
             ],
             "additionalProperties": false
+          },
+          "autonomy": {
+            "type": "object",
+            "properties": {
+              "unit_radius": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "structure_radius": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "colonize_radius": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "leash_radius": {
+                "type": "number",
+                "maximum": 100,
+                "exclusiveMinimum": 0
+              },
+              "response_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "cruise_fraction": {
+                "type": "number",
+                "maximum": 1,
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "unit_radius",
+              "structure_radius",
+              "colonize_radius",
+              "leash_radius",
+              "response_seconds",
+              "cruise_fraction"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

@@ -1,6 +1,7 @@
 #include "simulation.h"
 #include "vector_math.h"
 #include "geometry.h"
+#include "flight.h"
 #include <stdio.h>
 #include <string.h>
 #include <algorithm>
@@ -193,6 +194,7 @@ static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,const 
             const UnitDefinition* definition=&s->world.content.units[type];
             Unit unit={};
             unit.latch=-1;
+            unit.attention=-1;unit.response_timer=definition->response_seconds*((s->next_generation+1)%13)/13;
             unit.position=position;unit.forward=Vec3{0,0,1};unit.type=type;unit.faction=definition->faction;
             if (heading) { unit.forward=*heading;unit.hatched=true; }
             unit.health=definition->health;
@@ -276,7 +278,10 @@ void simulation_order(Simulation* s, uint32_t cell)
     uint32_t count=0;
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (s->units[i].selected && s->units[i].health>0)
-        { s->units[i].target=(int)cell;s->units[i].moving=false;s->units[i].landing=0;s->units[i].latch=-1;++count; }
+        {
+            Unit& u=s->units[i];u.target=(int)cell;u.moving=false;u.landing=0;u.latch=-1;u.attention=-1;
+            u.commanded=!s->colonies[cell].active || s->colonies[cell].faction!=u.faction;u.response_timer=0;++count;
+        }
     s->selected_body=(int)cell;
     if (count) { s->order_body=(int)cell;s->order_tick=s->tick_count;s->order_count=count; }
     if (count) snprintf(s->message,sizeof(s->message),"%u UNITS ORDERED TO %s %u",count,s->world.content.bodies[s->world.bodies[cell].type].label,cell+1);
@@ -293,6 +298,7 @@ void simulation_move_to(Simulation* s,Vec3 destination)
         if (s->units[i].health>0 && s->units[i].selected)
         {
             Unit* u=&s->units[i];u->target=NO_BODY;u->destination=destination;u->moving=true;u->landing=0;u->latch=-1;++count;
+            u->commanded=true;u->attention=-1;
         }
     s->order_body=NO_BODY;s->order_count=count;s->order_tick=s->tick_count;
     snprintf(s->message,sizeof(s->message),"%u UNITS MOVING. SCOUT TO FIND CELLS.",count);
@@ -349,9 +355,86 @@ static bool clear_shot(const Simulation* s, Vec3 from, Vec3 to,int32_t structure
     return true;
 }
 
+static float structure_health(const Colony*,uint32_t);
+static uint32_t structure_generation(const Colony*,uint32_t);
+
+static bool within_leash(const Simulation* s,const Unit& u,Vec3 point)
+{
+    const UnitDefinition& d=*simulation_unit_definition(s,&u);
+    return u.commanded || d.leash_radius<=0 || length(subtract(point,s->world.bodies[u.target].position))<=s->world.bodies[u.target].radius+d.leash_radius;
+}
+static bool attention_valid(const Simulation* s,const Unit& u,const Vec3* positions)
+{
+    if (u.attention<0) return false;
+    const UnitDefinition& d=*simulation_unit_definition(s,&u);
+    Vec3 point={};float radius=0;
+    if (u.task==TASK_ATTACK_UNIT && u.attention<MAX_UNITS)
+    {
+        const Unit& other=s->units[u.attention];
+        if (other.health<=0 || other.generation!=u.attention_generation || other.faction==u.faction) return false;
+        point=positions[u.attention];radius=d.unit_radius;
+    }
+    else if (u.task==TASK_ATTACK_STRUCTURE && (uint32_t)u.attention<s->world.body_count)
+    {
+        const Colony& c=s->colonies[u.attention];
+        if (!c.active || c.faction==u.faction || c.generation!=u.attention_colony_generation
+            || structure_health(&c,u.attention_structure)<=0 || structure_generation(&c,u.attention_structure)!=u.attention_generation) return false;
+        point=simulation_structure_position(s,u.attention,u.attention_structure);radius=d.structure_radius;
+    }
+    else return false;
+    return within_leash(s,u,point) && length(subtract(point,u.position))<=radius*1.35f;
+}
+static void local_task(Simulation* s,Unit* u,const Vec3* positions,float dt)
+{
+    const UnitDefinition& d=*simulation_unit_definition(s,u);
+    bool valid=attention_valid(s,*u,positions);
+    if (!valid) { u->attention=-1;u->task=TASK_PATROL; }
+    u->response_timer-=dt;
+    if (u->response_timer>0) return;
+    u->response_timer=d.response_seconds*(.8f+.4f*(u->generation%7)/6);
+    if (valid) return;
+    for (uint32_t pass=0;pass<2;++pass)
+    {
+        uint32_t mask=pass ? d.secondary_targets : d.targets;float nearest=d.unit_radius;
+        if (mask&TARGET_UNITS) for (uint32_t j=0;j<MAX_UNITS;++j)
+        {
+            const Unit& other=s->units[j];if (other.health<=0 || other.faction==u->faction) continue;
+            float distance=length(subtract(positions[j],u->position));
+            if (distance>=nearest || !within_leash(s,*u,positions[j]) || !clear_shot(s,u->position,positions[j])) continue;
+            nearest=distance;u->task=TASK_ATTACK_UNIT;u->attention=j;u->attention_generation=other.generation;
+        }
+        if (u->attention>=0) return;
+        nearest=d.structure_radius;
+        if (mask&TARGET_STRUCTURES) for (uint32_t p=0;p<s->world.body_count;++p)
+        {
+            const Colony& c=s->colonies[p];if (!c.active || c.faction==u->faction) continue;
+            for (uint32_t k=0;k<simulation_producer_definition(s,p)->branches.count;++k)
+            {
+                if (structure_health(&c,k)<=0) continue;
+                Vec3 point=simulation_structure_position(s,p,k);float distance=length(subtract(point,u->position));
+                if (distance>=nearest || !within_leash(s,*u,point) || !clear_shot(s,u->position,point,p)) continue;
+                nearest=distance;u->task=TASK_ATTACK_STRUCTURE;u->attention=p;u->attention_structure=k;
+                u->attention_generation=structure_generation(&c,k);u->attention_colony_generation=c.generation;
+            }
+        }
+        if (u->attention>=0) return;
+    }
+    if (u->commanded || !d.colonizes || d.colonize_radius<=0) return;
+    float nearest=d.colonize_radius;int32_t chosen=-1;
+    for (uint32_t p=0;p<s->world.body_count;++p)
+    {
+        if (!s->world.content.bodies[s->world.bodies[p].type].hosts_site || s->colonies[p].active
+            || (u->faction==s->world.player_faction && !simulation_body_known(s,p))) continue;
+        float distance=length(subtract(u->position,s->world.bodies[p].position))-s->world.bodies[p].radius;
+        if (distance<nearest && !defended(s,p,u->faction)) { nearest=distance;chosen=p; }
+    }
+    if (chosen>=0) { u->target=chosen;u->task=TASK_COLONIZE; }
+}
+
 static void move_units(Simulation* s, float dt)
 {
     const CombatVisuals* flight=&s->world.combat;
+    FlightObstacles obstacles;flight_obstacles(s,&obstacles);
     Vec3 positions[MAX_UNITS],velocities[MAX_UNITS];
     for (uint32_t i=0;i<MAX_UNITS;++i) { positions[i]=s->units[i].position;velocities[i]=s->units[i].velocity; }
     for (uint32_t i=0;i<MAX_UNITS;++i)
@@ -378,6 +461,7 @@ static void move_units(Simulation* s, float dt)
         }
         Vec3 combat_target={};bool strafe=false;
         uint32_t p=(uint32_t)u->target;
+        if (!u->moving && s->colonies[p].active && s->colonies[p].faction==u->faction) u->commanded=false;
         bool colonizing=simulation_unit_definition(s,u)->colonizes && u->target>=0 && s->world.content.bodies[s->world.bodies[p].type].hosts_site
             && !s->colonies[p].active && !defended(s,p,u->faction);
         Vec3 goal=u->moving ? u->destination : add(s->colonies[p].surface,scale(s->world.bodies[p].colony_normal,colonizing ? .25f : 1.3f));
@@ -389,35 +473,50 @@ static void move_units(Simulation* s, float dt)
             float angle=u->generation*2.39996323f;
             if (s->world.combat.enabled)
             {
-                u->orbit_phase=std::fmod(u->orbit_phase+s->world.combat.orbit_speed*dt,6.28318530718f);angle=u->orbit_phase;
+                float rate=(.8f+.4f*(u->generation%7)/6)*(u->generation%3 ? 1 : -1);
+                u->orbit_phase=std::fmod(u->orbit_phase+s->world.combat.orbit_speed*rate*dt,6.28318530718f);angle=u->orbit_phase;
             }
             float spread=s->world.bodies[p].radius*(.25f+.06f*std::sqrt((float)i+1));
             if (s->world.combat.enabled)
             {
-                spread=s->world.bodies[p].radius+s->world.combat.orbit_clearance;
-                goal=add(s->world.bodies[p].position,scale(normal,.4f*s->world.bodies[p].radius));
+                spread=s->world.bodies[p].radius+flight->orbit_clearance+flight->weave_radius*std::sin(2*angle+u->generation);
+                float height=.4f*s->world.bodies[p].radius+flight->weave_height*std::sin(3*angle+u->generation*.7f);
+                goal=add(s->world.bodies[p].position,scale(normal,height));
             }
             goal=add(goal,add(scale(tangent,std::cos(angle)*spread),scale(bitangent,std::sin(angle)*spread)));
-            float nearest=1e10f;
-            for (uint32_t j=0;((definition->targets|definition->secondary_targets)&TARGET_UNITS) && j<MAX_UNITS;++j)
-                if (s->units[j].health>0 && s->units[j].faction!=u->faction)
-                {
-                    Vec3 enemy=flight->flight_enabled ? positions[j] : s->units[j].position;
-                    float target_distance=length(subtract(enemy,s->world.bodies[p].position));
-                    float distance=length(subtract(enemy,u->position));
-                    if (target_distance< s->world.bodies[p].radius+simulation_unit_definition(s,u)->range+2 && distance<nearest)
-                    { nearest=distance;goal=enemy; }
-                }
-            if (definition->attack==ATTACK_PROJECTILE && flight->flight_enabled && nearest<simulation_unit_definition(s,u)->range*1.1f)
-            { combat_target=goal;strafe=true; }
-            else if (nearest<simulation_unit_definition(s,u)->range*.85f) goal=u->position;
-            else if (nearest==1e10f && ((definition->targets|definition->secondary_targets)&TARGET_STRUCTURES) && s->colonies[p].active && s->colonies[p].faction!=u->faction)
+            local_task(s,u,positions,dt);
+            if (u->task==TASK_ATTACK_UNIT) goal=positions[u->attention];
+            else if (u->task==TASK_ATTACK_STRUCTURE) goal=simulation_structure_position(s,u->attention,u->attention_structure);
+            else if (u->task==TASK_COLONIZE) goal=add(s->colonies[u->target].surface,scale(s->world.bodies[u->target].colony_normal,.25f));
+            else if (u->commanded && s->colonies[p].active && s->colonies[p].faction!=u->faction)
             {
-                goal=colony_tip(s,p);
-                if (definition->attack==ATTACK_PROJECTILE && flight->flight_enabled && length(subtract(goal,u->position))<simulation_unit_definition(s,u)->range*1.1f)
-                { combat_target=goal;strafe=true; }
-                else if (length(subtract(goal,u->position))<simulation_unit_definition(s,u)->range*.85f) goal=u->position;
+                float nearest=1e20f;
+                for (uint32_t k=0;k<simulation_producer_definition(s,p)->branches.count;++k)
+                {
+                    if (structure_health(&s->colonies[p],k)<=0) continue;
+                    Vec3 point=simulation_structure_position(s,p,k);float distance=length(subtract(point,u->position));
+                    if (distance<nearest)
+                    {
+                        nearest=distance;goal=point;u->task=TASK_ATTACK_STRUCTURE;u->attention=p;u->attention_structure=k;
+                        u->attention_generation=structure_generation(&s->colonies[p],k);u->attention_colony_generation=s->colonies[p].generation;
+                    }
+                }
             }
+            if (u->task==TASK_ATTACK_UNIT || u->task==TASK_ATTACK_STRUCTURE)
+            {
+                float nearest=length(subtract(goal,u->position));
+                if (definition->attack==ATTACK_PROJECTILE && flight->flight_enabled && nearest<definition->range*1.1f)
+                { combat_target=goal;strafe=true; }
+                else if (nearest<definition->range*.85f) goal=u->position;
+            }
+        }
+        if (u->moving) u->task=TASK_MOVE;
+        else if (colonizing) u->task=TASK_COLONIZE;
+        if (u->hatched && u->age<2 && !u->moving && !u->commanded && definition->attack!=ATTACK_SPORE)
+        {
+            Vec3 radial=subtract(u->position,s->world.bodies[p].position);
+            if (dot(radial,radial)>.001f) goal=add(u->position,scale(normalize(radial),3));
+            u->task=TASK_LAUNCH;u->attention=-1;
         }
         if (definition->attack==ATTACK_SPORE)
         {
@@ -432,8 +531,9 @@ static void move_units(Simulation* s, float dt)
             { Vec3 point=colony_tip(s,j);float d=length(subtract(point,u->position));if (d<nearest) { nearest=d;goal=point; } }
             strafe=false;
         }
+        u->flight_goal=goal;
         Vec3 delta=subtract(goal,u->position);float distance=length(delta);
-        float speed=simulation_unit_definition(s,u)->speed;
+        float speed=definition->speed*((u->task==TASK_PATROL || u->task==TASK_LAUNCH) ? definition->cruise_fraction : 1);
         if (flight->flight_enabled)
         {
             Vec3 desired=distance>.0001f ? scale(delta,std::fmin(speed,distance*3)/distance) : Vec3{};
@@ -459,11 +559,13 @@ static void move_units(Simulation* s, float dt)
             for (uint32_t j=0;j<s->world.body_count;++j)
             {
                 if (colonizing && j==p && distance<1.5f) continue;
+                if (definition->attack==ATTACK_DIGEST && u->task==TASK_ATTACK_STRUCTURE && u->attention==(int32_t)j) continue;
                 Vec3 probe=add(u->position,scale(velocities[i],.35f));
                 Vec3 away=subtract(probe,s->world.bodies[j].position);float d=length(away);
                 float safe=s->world.bodies[j].radius*1.08f+.6f;
                 if (d<safe && d>.001f) desired=add(desired,scale(away,speed*3*(1-d/safe)/d));
             }
+            desired=flight_avoid(s,obstacles,*u,desired,speed);
             float desired_speed=length(desired);if (desired_speed>speed) desired=scale(desired,speed/desired_speed);
             Vec3 change=subtract(desired,velocities[i]);float change_length=length(change);
             if (change_length>flight->acceleration*dt) change=scale(change,flight->acceleration*dt/change_length);
@@ -485,10 +587,19 @@ static void move_units(Simulation* s, float dt)
             Vec3 offset=subtract(u->position,s->world.bodies[p2].position);float radial=length(offset);
             float clearance=s->world.bodies[p2].radius*1.08f+.12f;
             if (colonizing && p2==p && distance<1.5f) continue;
+            if (definition->attack==ATTACK_DIGEST && u->task==TASK_ATTACK_STRUCTURE && u->attention==(int32_t)p2) continue;
             if (radial<clearance && radial>.0001f)
                 u->position=add(s->world.bodies[p2].position,scale(offset,clearance/radial));
         }
-        if (u->moving && length(subtract(u->destination,u->position))<.15f) { u->moving=false;u->velocity=Vec3{}; }
+        if (flight->flight_enabled) flight_clip(s,obstacles,u,positions[i]);
+        if (u->moving && length(subtract(u->destination,u->position))<.15f)
+        {
+            u->moving=false;u->commanded=false;u->attention=-1;u->response_timer=0;
+            float nearest=1e20f;int32_t home=home_body(s,u->faction);
+            for (uint32_t b=0;b<s->world.body_count;++b) if (u->faction!=s->world.player_faction || simulation_body_known(s,b))
+            { float distance=length(subtract(u->position,s->world.bodies[b].position));if (distance<nearest) { nearest=distance;home=b; } }
+            u->target=home;
+        }
     }
 }
 
@@ -952,7 +1063,9 @@ static void enemy_orders(Simulation* s)
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         Unit* u=&s->units[i];if (u->health<=0 || u->faction!=enemy) continue;
-        u->target=expand && target>=0 ? target : home;
+        int32_t next=expand && target>=0 ? target : home;
+        if (u->target!=next) { u->attention=-1;u->response_timer=0; }
+        u->target=next;u->commanded=expand && target>=0;
     }
 }
 
@@ -1041,7 +1154,15 @@ bool simulation_write_state(const Simulation* s, const char* path)
         }
         fprintf(file,"]}");
     }
-    fprintf(file,"],\"units\":[");bool first=true;
+    fprintf(file,"],\"flight\":{\"avoidance_events\":%u,\"contacts\":%u,\"obstacles\":[",s->avoidance_events,s->factory_contacts);
+    FlightObstacles obstacles;flight_obstacles(s,&obstacles);
+    for (uint32_t i=0;i<obstacles.count;++i)
+    {
+        const FlightObstacle& o=obstacles.values[i];
+        fprintf(file,"%s{\"cell\":%u,\"structure\":%u,\"start\":[%.6f,%.6f,%.6f],\"end\":[%.6f,%.6f,%.6f],\"radius\":%.6f}",
+            i ? "," : "",o.cell,o.structure,o.start.x,o.start.y,o.start.z,o.end.x,o.end.y,o.end.z,o.radius);
+    }
+    fprintf(file,"]},\"units\":[");bool first=true;
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (s->units[i].health>0)
         {
@@ -1049,6 +1170,9 @@ bool simulation_write_state(const Simulation* s, const char* path)
             uint32_t ready=0;for (uint32_t j=0;j<s->world.spikes.count;++j) ready+=u->spikes[j]>=1;
             fprintf(file,"%s{\"slot\":%u,\"generation\":%u,\"faction\":%d,\"kind\":%d,\"health\":%.6f,\"target\":%d,\"position\":[%.6f,%.6f,%.6f],\"velocity\":[%.6f,%.6f,%.6f],\"bank\":%.6f,\"selected\":%s,\"wounds\":%u,\"ready_spikes\":%u,\"flash\":%.6f,\"visible\":%s,\"moving\":%s",
                 first ? "" : ",",i,u->generation,(int)u->faction,(int)simulation_unit_definition(s,u)->group,u->health,u->target,u->position.x,u->position.y,u->position.z,u->velocity.x,u->velocity.y,u->velocity.z,u->bank,u->selected ? "true" : "false",u->wounds,ready,u->flash,s->visible_units[i] ? "true" : "false",u->moving ? "true" : "false");
+            static const char* tasks[]={"patrol","move","attack-unit","attack-structure","colonize","launch"};
+            fprintf(file,",\"task\":\"%s\",\"attention\":%d,\"attention_generation\":%u,\"commanded\":%s,\"flight_goal\":[%.6f,%.6f,%.6f]",
+                tasks[u->task],u->attention,u->attention_generation,u->commanded ? "true" : "false",u->flight_goal.x,u->flight_goal.y,u->flight_goal.z);
             fprintf(file,",\"type\":\"%s\",\"latch\":%d,\"latch_generation\":%u,\"latch_colony\":%s}",simulation_unit_definition(s,u)->name,u->latch,u->latch_generation,u->latch_colony ? "true" : "false");first=false;
         }
     uint32_t projectiles=0,pops=0,trails=0,flashes=0,low=0,impacts=0;

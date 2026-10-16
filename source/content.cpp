@@ -129,7 +129,7 @@ static bool load_units(Content* c,Json root,const char* path)
     json_object(root,"$schema|units");JsonArray a=json_array(json_get(root,"units"),MAX_UNIT_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|pick_radius|cue_radius|hits|attack|secondary_attack");
+        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|pick_radius|cue_radius|hits|attack|secondary_attack|autonomy");
         UnitDefinition u={};definition_name(j,u.name);
         Json attack=json_find(j,"attack");
         if (json_present(attack))
@@ -153,6 +153,18 @@ static bool load_units(Content* c,Json root,const char* path)
         u.speed=json_positive(json_get(j,"speed"),10000);
         u.health=json_positive(json_get(j,"health"),10000);
         u.range=json_positive(json_get(j,"range"),10000);
+        u.unit_radius=u.structure_radius=u.range;u.cruise_fraction=1;
+        Json autonomy=json_find(j,"autonomy");
+        if (json_present(autonomy))
+        {
+            json_object(autonomy,"unit_radius|structure_radius|colonize_radius|leash_radius|response_seconds|cruise_fraction");
+            u.unit_radius=json_float(json_get(autonomy,"unit_radius"),0,100);
+            u.structure_radius=json_float(json_get(autonomy,"structure_radius"),0,100);
+            u.colonize_radius=json_float(json_get(autonomy,"colonize_radius"),0,100);
+            u.leash_radius=json_positive(json_get(autonomy,"leash_radius"),100);
+            u.response_seconds=json_float(json_get(autonomy,"response_seconds"),0,10);
+            u.cruise_fraction=json_positive(json_get(autonomy,"cruise_fraction"),1);
+        }
         u.cost=json_positive(json_get(j,"cost"),10000);
         u.shot_interval=json_positive(json_get(j,"shot_interval"),10000);
         u.separation=json_positive(json_get(j,"separation"),10000);
@@ -191,7 +203,14 @@ static bool load_buildings(Content* c,Json root,const char* path)
     json_object(root,"$schema|buildings");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|model|growth_seconds|health|collection|height|width|hits|branches|growth_meshes");ProducerDefinition p={};
+        json_object(j,"name|faction|model|growth_seconds|health|collection|height|width|hits|branches|growth_meshes|navigation");ProducerDefinition p={};
+        Json navigation=json_find(j,"navigation");
+        if (json_present(navigation))
+        {
+            json_object(navigation,"stem_radius|head_radius");
+            p.stem_radius=json_positive(json_get(navigation,"stem_radius"),10);
+            p.head_radius=json_positive(json_get(navigation,"head_radius"),10);
+        }
         Json growth=json_find(j,"growth_meshes");
         if (json_present(growth))
         {

@@ -7,8 +7,15 @@
 enum { MAX_UNITS = 256, NO_BODY = -1, MAX_PROJECTILES=512, MAX_POPS=256, TRAIL_POINTS=8 };
 enum { MAX_SPIKES=32, MAX_EMBEDDED=2, GROWTH_SEGMENTS=4,MAX_LIMB_DEBRIS=256 };
 struct EmbeddedSpike { Vec3 direction,anchor; Faction faction; };
+enum UnitTask { TASK_PATROL,TASK_MOVE,TASK_ATTACK_UNIT,TASK_ATTACK_STRUCTURE,TASK_COLONIZE,TASK_LAUNCH };
 struct Unit
 {
+    UnitTask task;
+    int32_t attention;
+    uint32_t attention_generation,attention_structure,attention_colony_generation;
+    float response_timer;
+    bool commanded;
+    Vec3 flight_goal;
     Vec3 position;
     float health, landing;
     uint32_t type, generation;
@@ -107,6 +114,7 @@ struct Simulation
     bool paused;
     char message[96];
     uint32_t shots, hits, deaths;
+    uint32_t avoidance_events,factory_contacts;
     uint32_t digestions,spore_bursts,digest_heals;
     uint32_t last_flash_tick,last_low_tick,last_death_tick;
 };

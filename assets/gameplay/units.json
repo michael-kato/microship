@@ -13,7 +13,7 @@
         1.0,
         1.0
       ],
-      "speed": 3.5,
+      "speed": 2.8,
       "health": 36.0,
       "range": 3.2,
       "cost": 12.0,
@@ -33,6 +33,14 @@
           "structures"
         ],
         "interval_factor": 8
+      },
+      "autonomy": {
+        "unit_radius": 5.5,
+        "structure_radius": 3,
+        "colonize_radius": 5,
+        "leash_radius": 11,
+        "response_seconds": 0.7,
+        "cruise_fraction": 0.65
       }
     },
     {
@@ -47,7 +55,7 @@
         1.0,
         1.0
       ],
-      "speed": 2.5,
+      "speed": 2.0,
       "health": 60.0,
       "range": 3.2,
       "cost": 30.0,
@@ -67,6 +75,14 @@
           "units"
         ],
         "interval_factor": 8
+      },
+      "autonomy": {
+        "unit_radius": 3.5,
+        "structure_radius": 5,
+        "colonize_radius": 5,
+        "leash_radius": 9,
+        "response_seconds": 1.1,
+        "cruise_fraction": 0.65
       }
     },
     {
@@ -81,7 +97,7 @@
         1.0,
         1.0
       ],
-      "speed": 2.5,
+      "speed": 2.0,
       "health": 72,
       "range": 0.65,
       "cost": 28,
@@ -104,6 +120,14 @@
           "structures"
         ],
         "interval_factor": 8
+      },
+      "autonomy": {
+        "unit_radius": 5.5,
+        "structure_radius": 3,
+        "colonize_radius": 5,
+        "leash_radius": 11,
+        "response_seconds": 0.7,
+        "cruise_fraction": 0.65
       }
     },
     {
@@ -118,7 +142,7 @@
         1.0,
         1.0
       ],
-      "speed": 1.9,
+      "speed": 1.52,
       "health": 120,
       "range": 0.85,
       "cost": 52,
@@ -141,6 +165,14 @@
           "units"
         ],
         "interval_factor": 8
+      },
+      "autonomy": {
+        "unit_radius": 3.5,
+        "structure_radius": 5,
+        "colonize_radius": 5,
+        "leash_radius": 9,
+        "response_seconds": 1.1,
+        "cruise_fraction": 0.65
       }
     },
     {
@@ -155,7 +187,7 @@
         1.0,
         1.0
       ],
-      "speed": 8,
+      "speed": 6.4,
       "health": 24,
       "range": 0.65,
       "cost": 1,
@@ -191,7 +223,7 @@
         1.0,
         1.0
       ],
-      "speed": 4.8,
+      "speed": 3.84,
       "health": 24,
       "range": 3.2,
       "cost": 7,
@@ -211,6 +243,14 @@
           "structures"
         ],
         "interval_factor": 8
+      },
+      "autonomy": {
+        "unit_radius": 5.5,
+        "structure_radius": 3,
+        "colonize_radius": 5,
+        "leash_radius": 11,
+        "response_seconds": 0.7,
+        "cruise_fraction": 0.65
       }
     },
     {
@@ -225,7 +265,7 @@
         1.0,
         1.0
       ],
-      "speed": 3.5,
+      "speed": 2.8,
       "health": 40,
       "range": 3.2,
       "cost": 18,
@@ -245,6 +285,14 @@
           "units"
         ],
         "interval_factor": 8
+      },
+      "autonomy": {
+        "unit_radius": 3.5,
+        "structure_radius": 5,
+        "colonize_radius": 5,
+        "leash_radius": 9,
+        "response_seconds": 1.1,
+        "cruise_fraction": 0.65
       }
     }
   ]

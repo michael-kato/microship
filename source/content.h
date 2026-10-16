@@ -29,6 +29,7 @@ struct UnitDefinition
     float scale,yaw_degrees;
     Color color;
     float speed,health,range,cost,shot_interval,separation,pick_radius,cue_radius;
+    float unit_radius,structure_radius,colonize_radius,leash_radius,response_seconds,cruise_fraction;
     AttackMode attack;
     float seek_radius,blast_radius,lifetime;
     bool friendly_fire;
@@ -49,6 +50,7 @@ struct ProducerDefinition
     char segment_path[256],tip_path[256];
     Faction faction;
     float growth_seconds,health,collection,height,width;
+    float stem_radius,head_radius;
     uint32_t hits;
     BranchRules branches;
 };

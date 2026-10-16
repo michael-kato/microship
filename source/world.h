@@ -52,6 +52,7 @@ struct CombatVisuals
     float orbit_clearance, orbit_speed;
     bool flight_enabled;
     float acceleration, turn_rate, separation, bank;
+    float lookahead,obstacle_clearance,weave_radius,weave_height;
     Color flash, injured;
     float break_seconds,break_speed,break_drag,break_spin,break_shrink;
 };

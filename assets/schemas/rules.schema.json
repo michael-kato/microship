@@ -97,6 +97,16 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "lookahead_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 5
+        },
+        "obstacle_clearance": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 5
         }
       },
       "required": [
@@ -119,6 +129,16 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 2
+        },
+        "weave_radius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "weave_height": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5
         }
       },
       "required": [
