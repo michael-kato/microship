@@ -297,7 +297,7 @@ vec3 evaluate_bsdf(vec3 normal, vec3 outgoing, vec3 incoming, vec3 albedo,
     return albedo * ((1.0-f) / PI) + vec3(specular);
 }
 
-struct InstanceStyle { vec4 tint,emission; };
+struct InstanceStyle { vec4 tint,material; }; // Emission, target roughness, roughness weight, reserved.
 layout(set=0,binding = RENDER_BINDING_INSTANCE_STYLES,std430) readonly buffer InstanceStyles { InstanceStyle instance_style[]; };
 
 struct Surface
@@ -349,7 +349,8 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
     surface.translucent=triangle.w==THIN_MEMBRANE_MATERIAL;
     vec4 tint=instance_style[hit_instance].tint;
     surface.color=mix(surface.color,tint.rgb,tint.a);
-    surface.emission+=instance_style[hit_instance].emission.x;
+    surface.emission+=instance_style[hit_instance].material.x;
+    if (surface.translucent) surface.roughness=mix(surface.roughness,instance_style[hit_instance].material.y,instance_style[hit_instance].material.z);
     return true;
 }
 

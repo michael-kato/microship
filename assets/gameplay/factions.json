@@ -17,12 +17,21 @@
       },
       "cell_appearance": {
         "tint": [
-          0.45,
-          0.9,
-          0.75
+          0.12,
+          0.68,
+          0.58
         ],
-        "strength": 0.32,
-        "seconds": 180
+        "strength": 0.42,
+        "seconds": 180,
+        "roughness": 0.18,
+        "surface": {
+          "model": "../models/cell_spine.fmesh",
+          "count": 28,
+          "width": 0.08,
+          "height": 0.16,
+          "offset": 0.96,
+          "seed": 7821
+        }
       }
     },
     {
@@ -38,6 +47,16 @@
         "building": "immune_factory",
         "default_unit": "immune_fighter",
         "assault_unit": "immune_bomber"
+      },
+      "cell_appearance": {
+        "tint": [
+          0.98,
+          0.83,
+          0.9
+        ],
+        "strength": 0.22,
+        "seconds": 180,
+        "roughness": 0.6
       }
     },
     {
@@ -57,12 +76,21 @@
       },
       "cell_appearance": {
         "tint": [
-          0.82,
-          0.65,
-          0.35
+          0.43,
+          0.23,
+          0.1
         ],
-        "strength": 0.32,
-        "seconds": 180
+        "strength": 0.46,
+        "seconds": 180,
+        "roughness": 0.94,
+        "surface": {
+          "model": "../models/cell_lobe.fmesh",
+          "count": 18,
+          "width": 0.13,
+          "height": 0.095,
+          "offset": 0.96,
+          "seed": 1769
+        }
       }
     }
   ]

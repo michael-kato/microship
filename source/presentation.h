@@ -7,9 +7,12 @@ struct Camera;
 struct RenderConfig;
 
 // Game code owns these mappings. The renderer receives RenderScene only.
+struct CellSurfaceFeature { uint32_t body,faction,slot;Vec3 position,normal; };
 struct Presentation
 {
     RenderScene scene;
+    std::vector<CellSurfaceFeature> surface_features;
+    uint32_t surface_meshes[MAX_FACTIONS];
     uint32_t body_meshes[MAX_BODIES],unit_meshes[MAX_UNIT_TYPES],factory_meshes[MAX_PRODUCER_TYPES],spike_mesh,background_mesh;
     uint32_t segment_meshes[MAX_PRODUCER_TYPES],tip_meshes[MAX_PRODUCER_TYPES],stem_base,bud_base,debris_base;
     uint32_t unit_base,body_base,factory_base,attached_base,flying_base,embedded_base,background_slot;

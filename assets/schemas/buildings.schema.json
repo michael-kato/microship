@@ -61,7 +61,7 @@
               "count": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 32
+                "maximum": 128
               },
               "spacing": {
                 "type": "number",
@@ -108,8 +108,59 @@
                 "enum": [
                   "axial",
                   "fan",
-                  "hypha"
+                  "hypha",
+                  "tree"
                 ]
+              },
+              "tree": {
+                "type": "object",
+                "properties": {
+                  "children": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 3
+                  },
+                  "levels": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 5
+                  },
+                  "length_scale": {
+                    "type": "number",
+                    "minimum": 0.2,
+                    "maximum": 0.9
+                  },
+                  "width_scale": {
+                    "type": "number",
+                    "minimum": 0.2,
+                    "maximum": 0.9
+                  },
+                  "angle_degrees": {
+                    "type": "number",
+                    "minimum": 10,
+                    "maximum": 65
+                  },
+                  "bend": {
+                    "type": "number",
+                    "minimum": 0.05,
+                    "maximum": 0.5
+                  },
+                  "root_share": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 0.9
+                  }
+                },
+                "required": [
+                  "children",
+                  "levels",
+                  "length_scale",
+                  "width_scale",
+                  "angle_degrees",
+                  "bend",
+                  "root_share"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [

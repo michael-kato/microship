@@ -5,9 +5,9 @@
 #include "asset_limits.h"
 
 typedef uint32_t Faction;
-enum { FACTION_NEUTRAL=0, MAX_FACTIONS=9, MAX_GROUPS=8, MAX_UNIT_TYPES=32, MAX_PRODUCER_TYPES=8, MAX_BODY_TYPES=32, MAX_FACTORY_STRUCTURES=32 };
+enum { FACTION_NEUTRAL=0, MAX_FACTIONS=9, MAX_GROUPS=8, MAX_UNIT_TYPES=32, MAX_PRODUCER_TYPES=8, MAX_BODY_TYPES=32, MAX_FACTORY_STRUCTURES=128 };
 enum { MAX_HIT_COUNT=32, BRANCH_FIELDS_COMPLETE=3 };
-enum GrowthGrammar { GROWTH_AXIAL,GROWTH_FAN,GROWTH_HYPHA };
+enum GrowthGrammar { GROWTH_AXIAL,GROWTH_FAN,GROWTH_HYPHA,GROWTH_TREE };
 enum { TARGET_UNITS=1, TARGET_STRUCTURES=2 };
 enum AttackMode { ATTACK_PROJECTILE,ATTACK_DIGEST,ATTACK_SPORE };
 struct GroupDefinition { bool declared;char key[ASSET_NAME_CAPACITY],selection[ASSET_NAME_CAPACITY],singular[ASSET_NAME_CAPACITY],plural[ASSET_NAME_CAPACITY]; };
@@ -19,7 +19,11 @@ struct FactionDefinition
     uint32_t producer,default_unit,assault_unit;
     bool automatic;
     Color cell_tint;
-    float cell_strength,transform_seconds;
+    float cell_strength,transform_seconds,cell_roughness;
+    bool cell_material;
+    char surface_path[ASSET_PATH_CAPACITY];
+    uint32_t surface_count,surface_seed;
+    float surface_width,surface_height,surface_offset;
 };
 struct UnitDefinition
 {
@@ -45,6 +49,8 @@ struct BranchRules
     float health;
     float seconds,spacing,production,regrow_seconds;
     Vec3 normal;
+    uint32_t children,levels;
+    float length_scale,width_scale,angle,bend,root_share;
 };
 struct ProducerDefinition
 {

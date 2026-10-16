@@ -10,6 +10,7 @@
 #include "vector_math.h"
 #include "math_constants.h"
 
+#include <algorithm>
 #include <stdio.h>
 #include <string.h>
 #ifndef WIN32_LEAN_AND_MEAN
@@ -39,6 +40,8 @@ struct Game
     PointerInput pointer;
     bool ratio_dragging;
     int ratio_body;
+    bool box_dragging,box_moved;
+    int box[4];
 };
 
 static double monotonic_seconds()
@@ -125,6 +128,51 @@ static void ratio_pointer(Game* game,PointerInput* input,const RenderConfig* con
     }
     input->click=false;
     if (input->pointer_released || input->pointer_cancelled || !input->pointer_held) game->ratio_dragging=false;
+}
+
+static void select_box(Game* game,const RenderConfig* config,bool additive)
+{
+    Simulation* s=&game->simulation;
+    if (s->world.content.factions[s->world.player_faction].automatic) return;
+    Vec3 forward=normalize(subtract(game->camera.target,game->camera.position));
+    Vec3 right=normalize(cross(forward,game->camera.up)),up=cross(right,forward);
+    float focal=config->height/(2*std::tan(config->vertical_fov_degrees*HALF_DEGREES_TO_RADIANS));
+    int left=std::min(game->box[0],game->box[2]),top=std::min(game->box[1],game->box[3]);
+    int right_edge=std::max(game->box[0],game->box[2]),bottom=std::max(game->box[1],game->box[3]);
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    {
+        Unit* u=&s->units[i];
+        if (!additive) u->selected=false;
+        if (u->health<=0 || u->faction!=s->world.player_faction) continue;
+        Vec3 offset=subtract(u->position,game->camera.position);float depth=dot(offset,forward);
+        if (depth<=0) continue;
+        float x=config->width*.5f+dot(offset,right)*focal/depth,y=config->height*.5f-dot(offset,up)*focal/depth;
+        if (x>=left && x<=right_edge && y>=top && y<=bottom) u->selected=true;
+    }
+}
+
+static void selection_input(Game* game,PointerInput* input,const RenderConfig* config)
+{
+    if (!game->simulation.world.gameplay.enabled) return;
+    if (input->restart || input->pointer_cancelled) { game->box_dragging=false;return; }
+    if (input->group)
+    { simulation_select(&game->simulation,input->group==3 ? -1 : (int)input->group-1);input->group=0; }
+    if (input->pointer_pressed && input->press_x>=0 && input->press_x<(int)config->width
+        && input->press_y>=0 && input->press_y<(int)config->height-HUD_BOTTOM_BAND_HEIGHT)
+    {
+        game->box_dragging=true;game->box_moved=false;
+        game->box[0]=input->press_x;game->box[1]=input->press_y;
+    }
+    if (!game->box_dragging) return;
+    input->drag_x=0;input->drag_y=0;
+    game->box[2]=std::max(0,std::min((int)config->width-1,input->pointer_x));
+    game->box[3]=std::max(0,std::min((int)config->height-HUD_BOTTOM_BAND_HEIGHT-1,input->pointer_y));
+    game->box_moved=game->box_moved || input->pointer_moved;
+    if (input->pointer_released)
+    {
+        if (game->box_moved) { select_box(game,config,input->additive);input->click=false; }
+        game->box_dragging=false;
+    }
 }
 
 static void gameplay_input(Game* game, PointerInput* input, const RenderConfig* config)
@@ -233,6 +281,12 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     r->hud_status[0]=-1;
     Color accent=content_color(&s->world.content,s->world.player_faction);
     r->hud_accent[0]=accent.r;r->hud_accent[1]=accent.g;r->hud_accent[2]=accent.b;
+    for (uint32_t j=0;j<4;++j) r->selection_box[j]=-1;
+    if (game->box_dragging && game->box_moved)
+    {
+        r->selection_box[0]=std::min(game->box[0],game->box[2]);r->selection_box[1]=std::min(game->box[1],game->box[3]);
+        r->selection_box[2]=std::max(game->box[0],game->box[2]);r->selection_box[3]=std::max(game->box[1],game->box[3]);
+    }
     r->hud_feedback[0]=-1;r->hud_feedback[1]=s->paused ? 2.0f : (float)s->outcome;
     r->hud_feedback[2]=(float)s->time_seconds;r->hud_feedback[3]=-1;
     int p=s->selected_body;selection_marker(game,config,p,r->selection_marker);
@@ -247,9 +301,9 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
         if (s->world.gameplay.enabled)
         {
             uint32_t structures=c->health>0 ? 1 : 0;float production=simulation_production(s,p);
-            for (uint32_t j=0;j<simulation_producer_definition(s,p)->branches.count-1;++j) if (c->branches[j].health>0)
+            for (uint32_t j=1;j<c->structure_count;++j) if (c->branches[j-1].health>0)
             { ++structures; }
-            snprintf(r->hud[HUD_LINE_STRUCTURES],HUD_LINE_CAPACITY,"STRUCTURES %u / %u   RATE %.2fX",c->active ? structures : 0,simulation_producer_definition(s,p)->branches.count,production);
+            snprintf(r->hud[HUD_LINE_STRUCTURES],HUD_LINE_CAPACITY,"STRUCTURES %u / %u   RATE %.2fX",c->active ? structures : 0,c->active ? c->structure_count : simulation_producer_definition(s,p)->branches.count,production);
         }
         snprintf(r->hud[HUD_LINE_RESOURCE],HUD_LINE_CAPACITY,"%s %05.1f / %.0f",s->world.content.resource_label,c->energy,s->world.gameplay.storage);
         if (simulation_ratio_available(s,(uint32_t)p))
@@ -263,7 +317,7 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
             snprintf(r->hud[HUD_LINE_RESOURCE],HUD_LINE_CAPACITY,"SPORES CAN BE SHOT DOWN");
             snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,"BLASTS ALSO DAMAGE NEARBY FRIENDLIES");
         }
-        if (!ours) snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,"CLEAR DEFENDERS TO ESTABLISH A SITE");
+        if (!ours) snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,c->active ? "CLEAR DEFENDERS TO ESTABLISH A SITE" : "ORDER CRAFT HERE TO ESTABLISH A SITE");
         r->hud_status[0]=-1;r->hud_status[1]=c->growth;
         r->hud_status[2]=c->energy/s->world.gameplay.storage;r->hud_status[3]=c->building ? c->manufacturing : 0;
         if (s->order_body==p && s->order_count) r->hud_feedback[0]=(s->tick_count-s->order_tick)/SIMULATION_TICKS_PER_SECOND_FLOAT;
@@ -286,7 +340,8 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
 
 int game_run(const GameOptions* options)
 {
-    Game game = {};
+    std::unique_ptr<Game> storage(new (std::nothrow) Game());if (!storage) return 1;
+    Game& game=*storage;
     Audio audio;if (!audio_load(&audio,options->audio_path,options->audio_capture_path)) return 1;
     std::unique_ptr<Presentation> presentation(new (std::nothrow) Presentation());
     if (!presentation) return 1;
@@ -311,7 +366,7 @@ int game_run(const GameOptions* options)
     if (!orders_run(&game.simulation,options->replay_path,options->ticks,&audio)) return 1;
     game.pointer=options->camera_input;
     PointerInput initial_input=options->camera_input;
-    ratio_pointer(&game,&initial_input,&config);camera_apply_input(&game.camera,&initial_input,&config);
+    ratio_pointer(&game,&initial_input,&config);selection_input(&game,&initial_input,&config);camera_apply_input(&game.camera,&initial_input,&config);
     gameplay_input(&game,&initial_input,&config);
     printf("Initial camera: %g %g %g; target: %g %g %g.\n",game.camera.position.x,game.camera.position.y,game.camera.position.z,game.camera.target.x,game.camera.target.y,game.camera.target.z);
     if (!presentation_initialize(presentation.get(),&game.simulation,&config)) return 1;
@@ -332,7 +387,7 @@ int game_run(const GameOptions* options)
     game.renderer.debug_stats = options->stats_set ? options->show_stats : !options->headless || options->debug_views;
     if (!options->headless && !audio_open(&audio)) { renderer_shutdown(&game.renderer);return 1; }
     game.renderer.debug_views = options->debug_views;
-    printf("Left-drag to pan; wheel to zoom. F1/F2 debug. Gameplay: 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
+    printf("Left-drag to select; middle-drag to pan; wheel to zoom. F1/F2 debug. Gameplay: 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
     const double tick_seconds = 1.0 / SIMULATION_TICKS_PER_SECOND_DOUBLE;
     double previous = monotonic_seconds();
     double accumulator = 0.0;
@@ -349,7 +404,7 @@ int game_run(const GameOptions* options)
         if (input.toggle_stats) game.renderer.debug_stats = !game.renderer.debug_stats;
         if (input.toggle_buffers) game.renderer.debug_views = !game.renderer.debug_views;
         if (input.restart && game.simulation.world.gameplay.enabled) { accumulator=0;elapsed=0; }
-        game.pointer=input;ratio_pointer(&game,&input,&config);
+        game.pointer=input;ratio_pointer(&game,&input,&config);selection_input(&game,&input,&config);
         camera_apply_input(&game.camera,&input,&config);gameplay_input(&game,&input,&config);
         accumulator += elapsed < MAX_FRAME_CATCHUP_SECONDS ? elapsed : MAX_FRAME_CATCHUP_SECONDS;
         if (options->headless) accumulator=0;

@@ -12,7 +12,7 @@ struct RenderInstance
     float transform[3][4];
     uint32_t mesh, mask;
     bool background;
-    float style[INSTANCE_STYLE_FLOATS];
+    float style[INSTANCE_STYLE_FLOATS]; // RGB tint, weight; emission, target roughness, roughness weight, reserved.
 };
 struct RenderMedium
 {

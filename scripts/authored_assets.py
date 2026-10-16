@@ -21,6 +21,7 @@ def stage_world(source, directory):
         for item in content[name]:
             model(item,'model',definition.parent)
             if 'variation' in item:model(item['variation'],'parts',definition.parent)
+            if 'surface' in item.get('cell_appearance',{}):model(item['cell_appearance']['surface'],'model',definition.parent)
             if 'growth_meshes' in item:
                 for key in ('segment','tip'):model(item['growth_meshes'],key,definition.parent)
     world['content']=content

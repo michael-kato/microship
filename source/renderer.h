@@ -22,6 +22,7 @@ struct Renderer
     double gpu_frame_ms, work_frame_ms, acquire_ms, present_ms;
     bool overlay_enabled;
     char hud[HUD_TEXT_LINES][HUD_LINE_CAPACITY];
+    int32_t selection_box[4];
     int32_t selection_marker[4];
     int32_t hover_marker[4];
     float hud_status[4],hud_accent[4],hud_feedback[4];

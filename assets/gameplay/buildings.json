@@ -14,9 +14,9 @@
       "hits": 12,
       "branches": {
         "seconds": 32,
-        "count": 24,
+        "count": 70,
         "spacing": 1.4,
-        "production": 0.05,
+        "production": 0.011,
         "seed": 4721,
         "normal": [
           0.0,
@@ -27,11 +27,20 @@
         "hits": 8,
         "regrow_seconds": 48,
         "roots": "organelles",
-        "grammar": "axial"
+        "grammar": "tree",
+        "tree": {
+          "children": 2,
+          "levels": 3,
+          "length_scale": 0.62,
+          "width_scale": 0.62,
+          "angle_degrees": 32,
+          "bend": 0.2,
+          "root_share": 0.6
+        }
       },
       "growth_meshes": {
         "segment": "../models/virus_stem.fmesh",
-        "tip": "../models/virus_head.fmesh"
+        "tip": "../models/virus_leaf.fmesh"
       },
       "navigation": {
         "stem_radius": 0.15,

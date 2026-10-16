@@ -51,6 +51,11 @@ class Desktop:
             self.api.XQueryTree.argtypes = [c.c_void_p, c.c_ulong, c.POINTER(c.c_ulong), c.POINTER(c.c_ulong), c.POINTER(c.POINTER(c.c_ulong)), c.POINTER(c.c_uint)]
             self.api.XFetchName.argtypes = [c.c_void_p, c.c_ulong, c.POINTER(c.c_void_p)]
             self.api.XFree.argtypes = [c.c_void_p]
+            self.api.XInternAtom.argtypes = [c.c_void_p, c.c_char_p, c.c_int]
+            self.api.XInternAtom.restype = c.c_ulong
+            self.api.XGetWindowProperty.argtypes = [c.c_void_p, c.c_ulong, c.c_ulong, c.c_long, c.c_long, c.c_int, c.c_ulong,
+                c.POINTER(c.c_ulong), c.POINTER(c.c_int), c.POINTER(c.c_ulong), c.POINTER(c.c_ulong), c.POINTER(c.POINTER(c.c_ubyte))]
+            self.client_list = self.api.XInternAtom(self.display, b'_NET_CLIENT_LIST', 1)
             self.api.XTranslateCoordinates.argtypes = [c.c_void_p, c.c_ulong, c.c_ulong, c.c_int, c.c_int, c.POINTER(c.c_int), c.POINTER(c.c_int), c.POINTER(c.c_ulong)]
             self.api.XSetInputFocus.argtypes = [c.c_void_p, c.c_ulong, c.c_int, c.c_ulong]
             self.api.XFlush.argtypes = [c.c_void_p]
@@ -85,7 +90,18 @@ class Desktop:
                 if self.api.XQueryTree(self.display, handle, c.byref(root), c.byref(parent), c.byref(children), c.byref(count)):
                     for i in range(count.value): visit(children[i], depth-1)
                     if children: self.api.XFree(children)
-            visit(self.root, 4)
+            # A full tree scan can take longer than a two-frame game window.
+            # The window manager lists its client handles in one property read.
+            actual, count, remaining = c.c_ulong(), c.c_ulong(), c.c_ulong()
+            format_bits = c.c_int(); values = c.POINTER(c.c_ubyte)()
+            if self.client_list and self.api.XGetWindowProperty(self.display, self.root, self.client_list, 0, 4096, 0, 0,
+                    c.byref(actual), c.byref(format_bits), c.byref(count), c.byref(remaining), c.byref(values)) == 0 and format_bits.value == 32:
+                handles = c.cast(values, c.POINTER(c.c_ulong))
+                for i in range(count.value): visit(handles[i], 0)
+                if values: self.api.XFree(values)
+            else:
+                if values: self.api.XFree(values)
+                visit(self.root, 4)
         return result
 
     def focus_point(self, handle):
@@ -107,10 +123,10 @@ class Desktop:
             self.xt.XTestFakeMotionEvent(self.display, -1, x, y, 0)
             self.api.XFlush(self.display)
 
-    def button(self, down):
-        if sys.platform == 'win32': self.api.mouse_event(2 if down else 4, 0, 0, 0, 0)
+    def button(self, down, button=2):
+        if sys.platform == 'win32': self.api.mouse_event(({1:(2,4),2:(32,64)}[button])[0 if down else 1], 0, 0, 0, 0)
         else:
-            self.xt.XTestFakeButtonEvent(self.display, 1, int(down), 0)
+            self.xt.XTestFakeButtonEvent(self.display, button, int(down), 0)
             self.api.XFlush(self.display)
 
     def wheel(self):

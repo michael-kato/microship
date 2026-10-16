@@ -46,6 +46,24 @@ static void set_instance(Presentation* p,uint32_t slot,uint32_t mesh,Vec3 positi
     }
 }
 
+static bool cell_surface_point(const Geometry& g,uint32_t mesh,Vec3 center,Vec3 direction,Vec3* point)
+{
+    const MeshRange& range=g.meshes[mesh];float farthest=0;
+    for (uint32_t i=range.first;i<range.first+range.count;++i)
+    {
+        const GpuTriangle& t=g.triangles[i];const float* av=g.vertices[t.index[0]].position;
+        const float* bv=g.vertices[t.index[1]].position;const float* cv=g.vertices[t.index[2]].position;
+        Vec3 a={av[0],av[1],av[2]},b={bv[0],bv[1],bv[2]},c={cv[0],cv[1],cv[2]};
+        Vec3 e1=subtract(b,a),e2=subtract(c,a),h=cross(direction,e2);float det=dot(e1,h);
+        if (std::fabs(det)<.000001f) continue;
+        Vec3 offset=subtract(center,a);float u=dot(offset,h)/det;if (u<0 || u>1) continue;
+        Vec3 q=cross(offset,e1);float v=dot(direction,q)/det;if (v<0 || u+v>1) continue;
+        farthest=std::fmax(farthest,dot(e2,q)/det);
+    }
+    if (farthest<=0) return false;
+    *point=add(center,scale(direction,farthest));return true;
+}
+
 bool presentation_initialize(Presentation* p,const Simulation* s,const RenderConfig* config)
 {
     const World* w=&s->world;RenderScene* scene=&p->scene;
@@ -91,6 +109,11 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
             p->background_mesh=(uint32_t)sources.size();const Background* b=&w->backdrop;
             sources.push_back(MeshSource{b->model_path,b->position,b->scale,0,b->color,0,0,0,0});
         }
+        for (uint32_t f=1;f<MAX_FACTIONS;++f) if (w->content.factions[f].surface_count)
+        {
+            const FactionDefinition& profile=w->content.factions[f];p->surface_meshes[f]=(uint32_t)sources.size();
+            sources.push_back(MeshSource{profile.surface_path,Vec3{},1,0,profile.cell_tint,0,0,0,0});
+        }
         if (!geometry_build(&scene->geometry,sources.data(),(uint32_t)sources.size(),config)) return false;
         p->unit_base=0;p->body_base=w->gameplay.enabled ? (uint32_t)MAX_UNITS : w->spawn_count;
         p->factory_base=p->body_base+w->body_count;
@@ -101,6 +124,22 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
         p->flying_base=p->attached_base+(w->spikes.enabled ? MAX_UNITS*w->spikes.count : 0);
         p->embedded_base=p->flying_base+(w->spikes.enabled ? MAX_PROJECTILES : 0);
         p->background_slot=p->embedded_base+(w->spikes.enabled ? MAX_EMBEDDED*(MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES) : 0);
+        for (uint32_t body=0;body<w->body_count;++body)
+            if (w->content.bodies[w->bodies[body].type].hosts_site)
+            for (uint32_t f=1;f<MAX_FACTIONS;++f)
+            {
+                const FactionDefinition& profile=w->content.factions[f];
+                for (uint32_t k=0;k<profile.surface_count;++k)
+                {
+                    float z=1-2*(k+.5f)/profile.surface_count,ring=std::sqrt(std::fmax(0.0f,1-z*z));
+                    float angle=k*2.39996323f+(w->bodies[body].seed^profile.surface_seed)*.001f;
+                    Vec3 normal={ring*std::cos(angle),ring*std::sin(angle),z},point;
+                    if (!cell_surface_point(scene->geometry,p->body_meshes[body],w->bodies[body].position,normal,&point))
+                    { fprintf(stderr,"Cannot attach authored cell surface form.\n");return false; }
+                    point=add(point,scale(normal,-w->bodies[body].radius*(1-profile.surface_offset)));
+                    p->surface_features.push_back(CellSurfaceFeature{body,f,p->background_slot++,point,normal});
+                }
+            }
         scene->instances.resize(p->background_slot+1);
         scene->effects.resize(MAX_EFFECT_SEGMENTS);
         scene->tile_count=((config->width+EFFECT_TILE-1)/EFFECT_TILE)*((config->height+EFFECT_TILE-1)/EFFECT_TILE);
@@ -178,7 +217,7 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
     for (uint32_t i=0;i<s->world.body_count;++i)
     {
         const Colony* c=&s->colonies[i];if (!c->active || !s->visible_bodies[i]) continue;
-        uint32_t count=simulation_producer_definition(s,i)->branches.count;
+        uint32_t count=s->colonies[i].structure_count;
         for (uint32_t k=0;k<count;++k)
         {
             const FactoryStructure* b=k ? &c->branches[k-1] : 0;
@@ -246,7 +285,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
             if (definition->segment_path[0])
             {
                 Color color=content_color(&s->world.content,colony->faction);
-                for (uint32_t k=0;k<definition->branches.count;++k)
+                for (uint32_t k=0;k<colony->structure_count;++k)
                 {
                     if ((k ? colony->branches[k-1].health : colony->health)<=0) continue;
                     float growth=simulation_structure_growth(s,p,k);
@@ -256,18 +295,18 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                         if (extension<=MIN_VISIBLE_STEM_EXTENSION) continue;
                         Vec3 start=colony->stems[k][j],delta=scale(subtract(colony->stems[k][j+1],start),extension);
                         Vec3 y=normalize(delta),x=normalize(cross(std::fabs(y.z)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
-                        float width=definition->width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j)*(colony->parents[k]>=0 ? FACTORY_CHILD_STEM_WIDTH_SCALE : 1)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
+                        float width=definition->width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j)*simulation_structure_scale(s,p,k)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
                         uint32_t slot=state->stem_base+(p*MAX_FACTORY_STRUCTURES+k)*GROWTH_SEGMENTS+j;
                         set_instance(state,slot,state->segment_meshes[colony->type],start,scale(x,width),delta,scale(z,width));
                         uint32_t wounds=k ? colony->branches[k-1].wounds : colony->wounds;
                         Color tint=wounds ? s->world.spikes.injury[std::min(1u,wounds-1)] : color;
                         float* style=state->scene.instances[slot].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=wounds ? INJURY_TINT_STRENGTH : FACTORY_FACTION_TINT_STRENGTH;
                     }
-                    float size=definition->width*(colony->parents[k]>=0 ? FACTORY_CHILD_HEAD_WIDTH_SCALE : 1)*(FACTORY_HEAD_START_WIDTH_SCALE+FACTORY_HEAD_GROWTH_WIDTH_SCALE*growth);
+                    float size=definition->width*(definition->branches.grammar==GROWTH_TREE ? simulation_structure_scale(s,p,k) : (colony->parents[k]>=0 ? FACTORY_CHILD_HEAD_WIDTH_SCALE : 1))*(FACTORY_HEAD_START_WIDTH_SCALE+FACTORY_HEAD_GROWTH_WIDTH_SCALE*growth);
                     uint32_t slot=factory_instance_slot(state,p,k);
                     Vec3 tip=simulation_structure_position(s,p,k),y=normalize(subtract(tip,colony->stems[k][0]));
                     Vec3 x=normalize(cross(std::fabs(y.z)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
-                    if (growth>=(k ? colony->branches[k-1].growth : colony->growth))
+                    if (growth>=(k ? colony->branches[k-1].growth : colony->growth) && (definition->branches.grammar!=GROWTH_TREE || simulation_structure_terminal(s,p,k)))
                         set_instance(state,slot,state->tip_meshes[colony->type],tip,scale(x,size),scale(y,size),scale(z,size));
                     float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=FACTORY_FACTION_TINT_STRENGTH;
                 }
@@ -282,7 +321,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                 continue;
             }
             Vec3 right,up,normal;simulation_producer_axes(simulation_producer_definition(s,p),&right,&up,&normal);
-            for (uint32_t k=0;k<simulation_producer_definition(s,p)->branches.count;++k)
+            for (uint32_t k=0;k<colony->structure_count;++k)
             {
                 const FactoryStructure* b=k ? &colony->branches[k-1] : 0;if ((k ? b->health : colony->health)<=0) continue;
                 float growth=std::fmax(MIN_LEGACY_FACTORY_GROWTH,k ? b->growth : colony->growth);
@@ -346,6 +385,12 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
             set_instance(p,p->body_base+i,p->body_meshes[i],Vec3{},Vec3{1,0,0},Vec3{0,1,0},Vec3{0,0,1});
             const CellAppearance& a=s->cell_appearance[i];float* style=scene->instances[p->body_base+i].style;
             style[0]=a.tint.r;style[1]=a.tint.g;style[2]=a.tint.b;style[3]=s->visible_bodies[i] ? a.strength : 0;
+            float weight=0,roughness=0;
+            if (s->visible_bodies[i]) for (uint32_t f=1;f<MAX_FACTIONS;++f)
+                if (w->content.factions[f].cell_material)
+                { weight+=a.factions[f];roughness+=a.factions[f]*w->content.factions[f].cell_roughness; }
+            if (weight>0) { style[5]=roughness/weight;style[6]=std::fmin(1.0f,weight); }
+
         }
     for (uint32_t i=0;i<scene->media.size();++i)
     {
@@ -364,6 +409,15 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
         medium->scattering[3]=c->interior_fade;
         medium->absorption_phase[0]=medium->absorption_phase[1]=medium->absorption_phase[2]=c->interior_absorption;
         medium->absorption_phase[3]=c->interior_anisotropy;
+    }
+    for (uint32_t i=0;i<p->surface_features.size();++i)
+    {
+        const CellSurfaceFeature& feature=p->surface_features[i];if (!s->visible_bodies[feature.body]) continue;
+        float blend=s->cell_appearance[feature.body].factions[feature.faction];if (blend<=.001f) continue;
+        blend=blend*blend*(3-2*blend);
+        const FactionDefinition& profile=w->content.factions[feature.faction];float radius=w->bodies[feature.body].radius;
+        Vec3 y=feature.normal,x=normalize(cross(std::fabs(y.z)<.9f ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
+        set_instance(p,feature.slot,p->surface_meshes[feature.faction],feature.position,scale(x,radius*profile.surface_width*blend),scale(y,radius*profile.surface_height*blend),scale(z,radius*profile.surface_width*blend));
     }
     if (w->gameplay.enabled) update_gameplay_instances(p,s);
     else

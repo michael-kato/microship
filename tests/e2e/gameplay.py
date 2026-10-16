@@ -126,7 +126,7 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
     for name,bad in [
         ('unsupported-bio-owner',change(text,'bodies.1.owner','robotic')),
         ('missing-factory-side',remove(text,'content.buildings.1')),
-        ('invalid-branch-count',branches(text,count=33)),
+        ('invalid-branch-count',branches(text,count=129)),
         ('zero-plane',branches(text,normal=[0,0,0])),
         ('invalid-sight',change(text,'rules.exploration.sight_radius',float('nan'))),
         ('missing-factory-mesh',change(text,'content.buildings.0.model','missing.fmesh')),

@@ -7,9 +7,13 @@ from authored_assets import stage_world, write_world
 
 
 def established_world(source,directory):
-    """Stage an existing-factory scenario. Startup checks use stage_world directly."""
+    """Stage the prior axial factory fixture. Current startup and tree checks use stage_world."""
     data=stage_world(source,directory)
     for start in data['match'].pop('starts',[]):data['bodies'][start['cell']]['owner']=start['faction']
+    for building in data['content']['buildings']:
+        if building['branches']['grammar']=='tree':
+            building['branches'].update(grammar='axial',count=24,production=.05)
+            building['branches'].pop('tree',None)
     return data
 
 
@@ -50,5 +54,6 @@ def branches(data,**settings):
     for building in result['content']['buildings']:
         if building['faction'] not in emitters:
             building['branches'].update(settings)
-            if 'count' in settings:building['branches']['roots']='single'
+            if 'count' in settings:
+                building['branches']['roots']='single';building['branches']['grammar']='axial';building['branches'].pop('tree',None)
     return result

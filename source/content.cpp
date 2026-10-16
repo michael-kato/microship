@@ -118,7 +118,7 @@ static bool load_bodies(Content* c,Json root,const char* path)
     }
     return root.document->valid;
 }
-static bool load_factions(Content* c,Json root)
+static bool load_factions(Content* c,Json root,const char* path)
 {
     json_object(root,"$schema|factions");JsonArray a=json_array(json_get(root,"factions"),MAX_FACTIONS-1);Json j={};
     while (json_next(&a,&j))
@@ -127,8 +127,19 @@ static bool load_factions(Content* c,Json root)
         Json appearance=json_find(j,"cell_appearance");
         if (json_present(appearance))
         {
-            json_object(appearance,"tint|strength|seconds");f.cell_tint=json_color(json_get(appearance,"tint"));
+            json_object(appearance,"tint|strength|seconds|roughness|surface");f.cell_tint=json_color(json_get(appearance,"tint"));
             f.cell_strength=json_float(json_get(appearance,"strength"),0,1);f.transform_seconds=json_positive(json_get(appearance,"seconds"),MAX_CELL_TINT_SECONDS);
+            Json roughness=json_find(appearance,"roughness");
+            if (json_present(roughness)) { f.cell_roughness=json_float(roughness,.02f,1);f.cell_material=true; }
+            Json surface=json_find(appearance,"surface");
+            if (json_present(surface))
+            {
+                json_object(surface,"model|count|width|height|offset|seed");json_path(json_get(surface,"model"),path,f.surface_path);
+                f.surface_count=json_uint(json_get(surface,"count"),1,32);f.surface_seed=json_uint(json_get(surface,"seed"),0,16777215);
+                f.surface_width=json_positive(json_get(surface,"width"),.5f);f.surface_height=json_positive(json_get(surface,"height"),.5f);
+                f.surface_offset=json_float(json_get(surface,"offset"),.5f,1.2f);
+            }
+
         }
         uint32_t id=json_uint(json_get(j,"id"),1,MAX_FACTIONS-1);
         definition_name(j,f.name);json_string(json_get(j,"label"),f.label,ASSET_NAME_CAPACITY);f.color=json_color(json_get(j,"color"));
@@ -274,7 +285,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
         p.height=json_positive(json_get(j,"height"),MAX_BUILDING_HEIGHT);
         p.width=json_positive(json_get(j,"width"),MAX_BUILDING_WIDTH);
         p.hits=json_uint(json_get(j,"hits"),1,MAX_HIT_COUNT);Json b=json_get(j,"branches");
-        json_object(b,"seconds|count|spacing|production|seed|normal|health|hits|regrow_seconds|roots|grammar");
+        json_object(b,"seconds|count|spacing|production|seed|normal|health|hits|regrow_seconds|roots|grammar|tree");
         char roots[ASSET_NAME_CAPACITY]={},grammar[ASSET_NAME_CAPACITY]={};
         Json roots_json=json_find(b,"roots"),grammar_json=json_find(b,"grammar");
         if (json_present(roots_json))
@@ -288,8 +299,19 @@ static bool load_buildings(Content* c,Json root,const char* path)
             json_string(grammar_json,grammar,ASSET_NAME_CAPACITY);
             if (!strcmp(grammar,"fan")) p.branches.grammar=GROWTH_FAN;
             else if (!strcmp(grammar,"hypha")) p.branches.grammar=GROWTH_HYPHA;
-            else if (strcmp(grammar,"axial")) json_error(grammar_json,"grammar must be axial, fan or hypha");
+            else if (!strcmp(grammar,"tree")) p.branches.grammar=GROWTH_TREE;
+            else if (strcmp(grammar,"axial")) json_error(grammar_json,"grammar must be axial, fan, hypha or tree");
         }
+        Json tree=json_find(b,"tree");
+        if (p.branches.grammar==GROWTH_TREE)
+        {
+            json_object(tree,"children|levels|length_scale|width_scale|angle_degrees|bend|root_share");
+            p.branches.children=json_uint(json_get(tree,"children"),2,3);p.branches.levels=json_uint(json_get(tree,"levels"),2,5);
+            p.branches.length_scale=json_float(json_get(tree,"length_scale"),.2f,.9f);p.branches.width_scale=json_float(json_get(tree,"width_scale"),.2f,.9f);
+            p.branches.angle=json_float(json_get(tree,"angle_degrees"),10,65)*.01745329252f;p.branches.bend=json_float(json_get(tree,"bend"),.05f,.5f);
+            p.branches.root_share=json_float(json_get(tree,"root_share"),.1f,.9f);
+        }
+        else if (json_present(tree)) json_error(tree,"tree settings require the tree grammar");
         Json branch_health=json_find(b,"health"),branch_hits=json_find(b,"hits");
         p.branches.health=json_present(branch_health) ? json_positive(branch_health,MAX_BRANCH_HEALTH) : p.health;
         p.branches.hits=json_present(branch_hits) ? json_uint(branch_hits,1,MAX_HIT_COUNT) : p.hits;
@@ -314,7 +336,7 @@ bool content_load(Content* content,const char* path)
     {
         char file[ASSET_PATH_CAPACITY]={};if (!json_path(json_get(root,keys[i]),path,file)) return false;
         JsonDocument document;if (!json_load(&document,file)) return false;Json data=json_root(&document);
-        bool valid=i==0 ? load_bodies(content,data,file) : i==1 ? load_factions(content,data) : i==2 ? load_groups(content,data)
+        bool valid=i==0 ? load_bodies(content,data,file) : i==1 ? load_factions(content,data,file) : i==2 ? load_groups(content,data)
             : i==3 ? load_units(content,data,file) : load_buildings(content,data,file);
         if (!valid) return false;
     }

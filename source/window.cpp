@@ -34,6 +34,13 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
         return 0;
     }
     if (window && message == WM_ERASEBKGND) return 1;
+    if (window && message==WM_MBUTTONDOWN)
+    {
+        window->panning=true;window->pointer_x=(short)LOWORD(lparam);window->pointer_y=(short)HIWORD(lparam);
+        SetCapture(handle);return 0;
+    }
+    if (window && message==WM_MBUTTONUP)
+    { window->panning=false;if (!window->dragging) ReleaseCapture();return 0; }
     if (window && message == WM_LBUTTONDOWN)
     {
         window->dragging = true;window->input.pointer_pressed=true;
@@ -53,17 +60,18 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
             window->input.pointer_x=(short)LOWORD(lparam);window->input.pointer_y=(short)HIWORD(lparam);window->input.pointer_valid=true;
         }
         else if (window->dragging) window->input.pointer_cancelled=true;
+        if (message==WM_CAPTURECHANGED) window->panning=false;
         window->dragging = false;
-        if (message == WM_LBUTTONUP) ReleaseCapture();
+        if (message == WM_LBUTTONUP && !window->panning) ReleaseCapture();
         return 0;
     }
     if (window && message == WM_MOUSEMOVE)
     {
         int32_t x = (short)LOWORD(lparam), y = (short)HIWORD(lparam);
         window->input.pointer_x=x;window->input.pointer_y=y;window->input.pointer_valid=true;
-        if (!window->dragging) return 0;
+        if (!window->dragging && !window->panning) return 0;
         if (abs(x-window->press_x)+abs(y-window->press_y)>DRAG_THRESHOLD_PIXELS) window->moved=true;
-        if (window->moved)
+        if (window->panning)
         { window->input.drag_x += x - window->pointer_x;window->input.drag_y += y - window->pointer_y; }
         window->pointer_x = x;
         window->pointer_y = y;
@@ -146,7 +154,7 @@ bool window_poll(Window* window, PointerInput* input)
         DispatchMessageA(&message);
     }
     *input = window->input;
-    input->pointer_held=window->dragging;input->press_x=window->press_x;input->press_y=window->press_y;
+    input->pointer_held=window->dragging;input->pointer_moved=window->moved;input->press_x=window->press_x;input->press_y=window->press_y;
     input->additive=(GetKeyState(VK_SHIFT)&KEY_PRESSED_MASK)!=0;
     POINT point;
     if (GetCursorPos(&point) && ScreenToClient(window->handle,&point))

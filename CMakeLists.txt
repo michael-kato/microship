@@ -191,6 +191,12 @@ add_test(NAME startup COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/startup.py $<TARGET_FILE:microship>)
 set_tests_properties(startup PROPERTIES TIMEOUT 60)
 
+foreach(group IN ITEMS selection colony_forms)
+    add_test(NAME ${group} COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/${group}.py $<TARGET_FILE:microship>)
+    set_tests_properties(${group} PROPERTIES TIMEOUT 60)
+endforeach()
+
 option(MICROSHIP_GPU_TESTS "Run real hardware Vulkan E2E scenarios (explicit opt-in)" OFF)
 if(MICROSHIP_GPU_TESTS)
     add_test(NAME biology_scale_render COMMAND ${Python3_EXECUTABLE}

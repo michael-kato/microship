@@ -35,7 +35,7 @@ void flight_obstacles(const Simulation* s,FlightObstacles* out)
         const Colony& c=s->colonies[p];if (!c.active) continue;
         const ProducerDefinition& d=*simulation_producer_definition(s,p);
         if (!d.segment_path[0] || d.stem_radius<=0 || d.head_radius<=0) continue;
-        for (uint32_t k=0;k<d.branches.count;++k)
+        for (uint32_t k=0;k<c.structure_count;++k)
         {
             if ((k ? c.branches[k-1].health : c.health)<=0) continue;
             float growth=simulation_structure_growth(s,p,k);
@@ -43,14 +43,14 @@ void flight_obstacles(const Simulation* s,FlightObstacles* out)
             {
                 float extension=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_SEGMENTS-j));
                 if (extension<=OBSTACLE_DIRECTION_EPSILON) continue;
-                float width=d.width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j)*(c.parents[k]>=0 ? FACTORY_CHILD_STEM_WIDTH_SCALE : 1)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
+                float width=d.width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j)*simulation_structure_scale(s,p,k)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
                 Vec3 a=c.stems[k][j],b=add(a,scale(subtract(c.stems[k][j+1],a),extension));
                 out->values[out->count++]=FlightObstacle{a,b,width*d.stem_radius,p,k};
             }
-            if (growth>=(k ? c.branches[k-1].growth : c.growth))
+            if (growth>=(k ? c.branches[k-1].growth : c.growth) && (d.branches.grammar!=GROWTH_TREE || simulation_structure_terminal(s,p,k)))
             {
                 Vec3 tip=simulation_structure_position(s,p,k);
-                float size=d.width*(c.parents[k]>=0 ? FACTORY_CHILD_HEAD_WIDTH_SCALE : 1)*(FACTORY_HEAD_START_WIDTH_SCALE+FACTORY_HEAD_GROWTH_WIDTH_SCALE*growth);
+                float size=d.width*(d.branches.grammar==GROWTH_TREE ? simulation_structure_scale(s,p,k) : (c.parents[k]>=0 ? FACTORY_CHILD_HEAD_WIDTH_SCALE : 1))*(FACTORY_HEAD_START_WIDTH_SCALE+FACTORY_HEAD_GROWTH_WIDTH_SCALE*growth);
                 out->values[out->count++]=FlightObstacle{tip,tip,size*d.head_radius,p,k};
             }
         }

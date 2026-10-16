@@ -60,7 +60,7 @@ layout(push_constant) uniform Debug {
     vec4 settings; // Exposure, surface spp, depth scale, unused.
     ivec4 marker;
     vec4 status,accent,feedback;
-    ivec4 hover;
+    ivec4 hover,box;
 } debug;
 
 const vec3 DEBUG_BACKGROUND_COLOR=vec3(0.012,0.016,0.022);
@@ -272,6 +272,11 @@ void main()
             vec2 uv=(vec2(pixel)+ORDER_RING_INNER_PIXELS)/vec2(extent);
             value*=1.0-VIGNETTE_STRENGTH*pow(clamp(length((uv-ORDER_RING_INNER_PIXELS)*VIGNETTE_RADIUS_SCALE),0.0,1.0),2.0);
         }
+    }
+    if (!views && debug.settings.w>0.0 && debug.box.x>=0 && all(greaterThanEqual(pixel,debug.box.xy)) && all(lessThanEqual(pixel,debug.box.zw)))
+    {
+        bool edge=pixel.x<=debug.box.x+1 || pixel.x>=debug.box.z-1 || pixel.y<=debug.box.y+1 || pixel.y>=debug.box.w-1;
+        value=edge ? accent : mix(value,accent,.05);
     }
     imageStore(display_image,pixel,vec4(value,1.0));
 }

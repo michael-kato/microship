@@ -27,7 +27,7 @@
 static const int GPU_VERTEX_BYTES = 48;
 static const int GPU_MEDIUM_BYTES = 48;
 static const int GPU_RENDER_UNIFORM_BYTES = 432;
-static const int GPU_DEBUG_PUSH_BYTES = 112;
+static const int GPU_DEBUG_PUSH_BYTES = 128;
 static const double MILLISECONDS_PER_SECOND = 1000.0;
 static const double BINARY_UNIT_SCALE = 1024.0;
 static const float LUMINANCE_RED_WEIGHT = .2126f;
@@ -108,7 +108,7 @@ struct DebugParameters
     float settings[4];
     int32_t marker[4];
     float status[4],accent[4],feedback[4];
-    int32_t hover[4];
+    int32_t hover[4],box[4];
 };
 static_assert(sizeof(DebugParameters) == GPU_DEBUG_PUSH_BYTES, "Debug push-constant layout");
 
@@ -1210,6 +1210,7 @@ static void draw_debug(RendererState* state, const Renderer* renderer)
     memcpy(parameters.accent,renderer->hud_accent,sizeof(parameters.accent));
     memcpy(parameters.feedback,renderer->hud_feedback,sizeof(parameters.feedback));
     memcpy(parameters.hover,renderer->hover_marker,sizeof(parameters.hover));
+    memcpy(parameters.box,renderer->selection_box,sizeof(parameters.box));
     char lines[STATS_TEXT_LINES][STATS_LINE_CAPACITY] = {};
     if (renderer->gpu_frame_ms>0)
         snprintf(lines[0],sizeof(lines[0]),"GPU %.2f MS WORK %.2f MS",renderer->gpu_frame_ms,renderer->work_frame_ms);

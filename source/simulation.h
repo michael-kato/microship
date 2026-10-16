@@ -76,7 +76,8 @@ struct Colony
     bool building, capacity_blocked;
     bool active;
     float root_regrow_timer;
-    uint32_t root_generation,root_count;
+    uint32_t root_generation,root_count,structure_count;
+    float limb_scale[MAX_FACTORY_STRUCTURES],deployment_start[MAX_FACTORY_STRUCTURES],deployment_seconds[MAX_FACTORY_STRUCTURES];
     int32_t parents[MAX_FACTORY_STRUCTURES];
     uint32_t wounds;
     EmbeddedSpike embedded[MAX_EMBEDDED];
@@ -86,7 +87,7 @@ struct Colony
     Vec3 stems[MAX_FACTORY_STRUCTURES][GROWTH_SEGMENTS+1];
     uint32_t production_tip;
 };
-struct CellAppearance { Color tint;float strength,seconds; };
+struct CellAppearance { Color tint;float strength,seconds;float factions[MAX_FACTIONS]; };
 struct LimbDebris
 {
     Vec3 start,end,velocity,axis;
@@ -143,6 +144,8 @@ void simulation_unit_axes(const Unit*,Vec3* right,Vec3* up,Vec3* forward);
 void simulation_producer_axes(const ProducerDefinition*,Vec3* right,Vec3* up,Vec3* normal);
 Vec3 simulation_structure_position(const Simulation*,uint32_t cell,uint32_t structure);
 Vec3 simulation_growth_point(const Simulation*,uint32_t cell,uint32_t structure,float growth);
+float simulation_structure_scale(const Simulation*,uint32_t cell,uint32_t structure);
+bool simulation_structure_terminal(const Simulation*,uint32_t cell,uint32_t structure);
 float simulation_structure_growth(const Simulation*,uint32_t cell,uint32_t structure);
 float simulation_production(const Simulation*,uint32_t cell);
 bool simulation_in_sight(const Simulation*,Vec3 position,float radius);

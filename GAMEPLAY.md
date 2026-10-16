@@ -6,9 +6,13 @@ Fighters prefer units. Bombers prefer structures. Their fallback attack uses one
 
 Immune fighters have 216 health and take fifteen hits. Immune bombers have 360 health and take fifteen hits. Virus fighters and bombers retain three hits. Immune roots have 480 health and take twenty-four hits; immune child limbs have 300 health and take sixteen hits. Virus and fungal roots have 240 health and take twelve hits; their child limbs have 150 health and take eight hits.
 
-Factory deployment takes 180 seconds. Structures emerge one at a time. Base manufacture takes twelve seconds before production modifiers. Base collection is 2.5 nutrients per second. Root growth takes fourteen seconds; child emergence intervals are thirty-two seconds, and damaged limbs wait forty-eight seconds before regrowth. Mature roots share the base rate. Child limbs add to that rate. A partly established cell can produce from mature tips.
+Factory deployment takes 180 seconds. Structures emerge one at a time. Base manufacture takes twelve seconds before production modifiers. Base collection is 2.5 nutrients per second. Damage regrowth uses fourteen seconds of growth and thirty-two-second child emergence intervals. Damaged limbs wait forty-eight seconds before regrowth. Mature roots share the base rate. Child limbs add to that rate. A partly established cell can produce from mature tips. Virus production uses terminal leaves.
 
-Virus factories can have twenty-four structures, including independent organelle roots and two child levels on a large cell. Child contribution is 0.05 per mature limb. Immune and fungal factories retain sixteen structures and a 0.12 child contribution. Small, medium, and large cells have four, six, and ten organelle roots. Storage supports thirty-two structures per cell. The growth plane is authored to match the startup view. Stems extend mainly across that plane; moving the camera does not change geometry or gameplay.
+Each virus organelle root grows a curved trunk, two forked sub-trunks, and four smaller branches with terminal leaves. A large cell has ten roots, seventy structures, and forty terminal leaves. Medium and small cells have forty-two and twenty-eight structures. Child lengths and widths use a 0.62 scale at each level. Child production contribution is 0.011 per mature limb. Immune and fungal factories retain sixteen structures and a 0.12 child contribution. Storage supports 128 structures per cell.
+
+Virus trees deploy one complete tree at a time. Trunks use sixty percent of the full deployment time; smaller branches share the rest. New units grow at terminal leaves. Support damage removes descendants. The growth plane is authored to match the startup view. Moving the camera does not change geometry or gameplay.
+
+Ownership changes cell form and material over 180 seconds. Virus cells grow small blue-green spines and acquire a shinier membrane. Fungal cells grow brown lobes and acquire a rougher membrane. Immune cells move toward pink and white and the base cell form. Previous faction features shrink when ownership changes. These features use fixed meshes and current instance transforms. They do not change cell collisions, attachment points, or simulation outcomes.
 
 Damage removes stem sections and can remove descendants of a damaged support. Other roots keep working. Geometry and BLAS stay fixed during growth; instance transforms expose the current sections. Unit manufacture occurs at mature tips.
 
@@ -26,7 +30,9 @@ Audio uses twelve generated PCM effects and a fixed sixteen-voice mixer. Off-scr
 
 | Input | Action |
 | --- | --- |
-| Left drag / wheel | Pan / zoom at the pointer |
+| Left click / drag | Select one craft / select craft in a rectangle |
+| Shift-drag | Add craft in the rectangle to the selection |
+| Middle drag / wheel | Pan / zoom at the pointer |
 | 1 / 2 / 3 | Select fighters / bombers / all units |
 | Shift-click | Add or remove a unit from the selection |
 | Right-click open space | Move selected craft and scout |

@@ -148,7 +148,7 @@ int main(int argc, char** argv)
                 pixels[j]=(int32_t)value;
             }
             PointerInput* input=&options.camera_input;
-            input->pointer_pressed=true;input->pointer_released=true;input->pointer_valid=true;
+            input->pointer_pressed=true;input->pointer_released=true;input->pointer_valid=true;input->pointer_moved=true;
             input->press_x=pixels[0];input->press_y=pixels[1];input->pointer_x=pixels[2];input->pointer_y=pixels[3];
             input->drag_x=(float)(pixels[2]-pixels[0]);input->drag_y=(float)(pixels[3]-pixels[1]);
         }
