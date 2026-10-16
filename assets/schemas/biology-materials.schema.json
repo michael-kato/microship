@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Biological surface authoring profiles",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "surfaces": {
+      "type": "object",
+      "properties": {
+        "membrane": {
+          "$ref": "#/$defs/surface"
+        },
+        "nucleus": {
+          "$ref": "#/$defs/surface"
+        },
+        "nucleolus": {
+          "$ref": "#/$defs/surface"
+        },
+        "mitochondrion": {
+          "$ref": "#/$defs/surface"
+        },
+        "cristae": {
+          "$ref": "#/$defs/surface"
+        },
+        "vesicle": {
+          "$ref": "#/$defs/surface"
+        },
+        "reticulum": {
+          "$ref": "#/$defs/surface"
+        },
+        "substrate": {
+          "$ref": "#/$defs/surface"
+        },
+        "virus_capsid": {
+          "$ref": "#/$defs/surface"
+        },
+        "virus_sheath": {
+          "$ref": "#/$defs/surface"
+        },
+        "virus_fibre": {
+          "$ref": "#/$defs/surface"
+        },
+        "immune_surface": {
+          "$ref": "#/$defs/surface"
+        },
+        "immune_granule": {
+          "$ref": "#/$defs/surface"
+        },
+        "fungal_stalk": {
+          "$ref": "#/$defs/surface"
+        },
+        "fungal_cap": {
+          "$ref": "#/$defs/surface"
+        },
+        "fungal_spore": {
+          "$ref": "#/$defs/surface"
+        },
+        "spike": {
+          "$ref": "#/$defs/surface"
+        }
+      },
+      "required": [
+        "membrane",
+        "nucleus",
+        "nucleolus",
+        "mitochondrion",
+        "cristae",
+        "vesicle",
+        "reticulum",
+        "substrate",
+        "virus_capsid",
+        "virus_sheath",
+        "virus_fibre",
+        "immune_surface",
+        "immune_granule",
+        "fungal_stalk",
+        "fungal_cap",
+        "fungal_spore",
+        "spike"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "surfaces"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "surface": {
+      "type": "object",
+      "properties": {
+        "roughness_min": {
+          "type": "number",
+          "minimum": 0.02,
+          "maximum": 1
+        },
+        "roughness_max": {
+          "type": "number",
+          "minimum": 0.02,
+          "maximum": 1
+        },
+        "ior": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "frequency": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 100
+        },
+        "pigment_low": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "pigment_high": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "minItems": 3,
+          "maxItems": 3
+        }
+      },
+      "required": [
+        "roughness_min",
+        "roughness_max",
+        "ior",
+        "frequency",
+        "pigment_low",
+        "pigment_high"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

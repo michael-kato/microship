@@ -18,7 +18,7 @@ Normal window starts choose a new variation seed. `--world-seed N` selects a rep
 
 Twelve short effects are synthesized locally as PCM WAV files. The game has hooks for orders, growth, maturity, birth, firing, hits, death, colonization, healing, outcomes, and limb breaks. Playback uses a fixed 16-voice mixer. Off-screen enemy events do not produce sounds. `--smoke --ticks 1800 --audio-capture build/growth.wav` exports a 30-second mix without starting the GPU or an audio device. Audio settings and synthesis parameters are in `assets/audio/`.
 
-Cells have branching internal geometry and a scattering medium within the membrane. Units and factories also have repeated branch forms. All color is in mesh vertices. The direct ray tracer evaluates the studio lights and their shadows, follows clear membrane transmission, and integrates cell scattering. Ambient fill approximates indirect light. Each frame uses current scene data and fixed spatial samples. There is no temporal processing or denoising.
+Cells have branching internal geometry and a scattering medium within the membrane. Units and factories also have repeated branch forms. All color is in mesh vertices. Mesh vertices also carry roughness and optical index. Material profiles give organelles, fibres, capsids, and faction structures separate gloss and pigment ranges. The authoring generator bakes this variation without image maps. The direct ray tracer evaluates the studio lights and their shadows, follows clear membrane transmission, and integrates cell scattering. Ambient fill approximates indirect light. Each frame uses current scene data and fixed spatial samples. There is no temporal processing or denoising.
 
 Controls:
 

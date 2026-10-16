@@ -1,0 +1,277 @@
+{
+  "$schema": "../../schemas/biology-materials.schema.json",
+  "surfaces": {
+    "membrane": {
+      "roughness_min": 0.24,
+      "roughness_max": 0.58,
+      "ior": 1.38,
+      "frequency": 7,
+      "pigment_low": [
+        0.72,
+        0.87,
+        0.76
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "nucleus": {
+      "roughness_min": 0.42,
+      "roughness_max": 0.72,
+      "ior": 1.4,
+      "frequency": 13,
+      "pigment_low": [
+        0.58,
+        0.66,
+        0.76
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "nucleolus": {
+      "roughness_min": 0.18,
+      "roughness_max": 0.3,
+      "ior": 1.44,
+      "frequency": 22,
+      "pigment_low": [
+        0.72,
+        0.56,
+        0.68
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "mitochondrion": {
+      "roughness_min": 0.43,
+      "roughness_max": 0.73,
+      "ior": 1.42,
+      "frequency": 17,
+      "pigment_low": [
+        0.66,
+        0.77,
+        0.58
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "cristae": {
+      "roughness_min": 0.24,
+      "roughness_max": 0.4,
+      "ior": 1.45,
+      "frequency": 24,
+      "pigment_low": [
+        0.54,
+        0.67,
+        0.8
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "vesicle": {
+      "roughness_min": 0.18,
+      "roughness_max": 0.32,
+      "ior": 1.4,
+      "frequency": 18,
+      "pigment_low": [
+        0.74,
+        0.63,
+        0.78
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "reticulum": {
+      "roughness_min": 0.5,
+      "roughness_max": 0.8,
+      "ior": 1.38,
+      "frequency": 12,
+      "pigment_low": [
+        0.62,
+        0.76,
+        0.66
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "substrate": {
+      "roughness_min": 0.74,
+      "roughness_max": 0.96,
+      "ior": 1.35,
+      "frequency": 11,
+      "pigment_low": [
+        0.54,
+        0.69,
+        0.61
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "virus_capsid": {
+      "roughness_min": 0.24,
+      "roughness_max": 0.48,
+      "ior": 1.48,
+      "frequency": 9,
+      "pigment_low": [
+        0.6,
+        0.74,
+        0.9
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "virus_sheath": {
+      "roughness_min": 0.4,
+      "roughness_max": 0.67,
+      "ior": 1.42,
+      "frequency": 17,
+      "pigment_low": [
+        0.52,
+        0.83,
+        0.7
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "virus_fibre": {
+      "roughness_min": 0.7,
+      "roughness_max": 0.93,
+      "ior": 1.36,
+      "frequency": 10,
+      "pigment_low": [
+        0.74,
+        0.64,
+        0.84
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "immune_surface": {
+      "roughness_min": 0.45,
+      "roughness_max": 0.78,
+      "ior": 1.4,
+      "frequency": 13,
+      "pigment_low": [
+        0.77,
+        0.67,
+        0.59
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "immune_granule": {
+      "roughness_min": 0.18,
+      "roughness_max": 0.36,
+      "ior": 1.46,
+      "frequency": 20,
+      "pigment_low": [
+        0.71,
+        0.53,
+        0.68
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "fungal_stalk": {
+      "roughness_min": 0.7,
+      "roughness_max": 0.96,
+      "ior": 1.38,
+      "frequency": 14,
+      "pigment_low": [
+        0.58,
+        0.69,
+        0.45
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "fungal_cap": {
+      "roughness_min": 0.33,
+      "roughness_max": 0.62,
+      "ior": 1.44,
+      "frequency": 10,
+      "pigment_low": [
+        0.76,
+        0.63,
+        0.43
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "fungal_spore": {
+      "roughness_min": 0.22,
+      "roughness_max": 0.42,
+      "ior": 1.46,
+      "frequency": 16,
+      "pigment_low": [
+        0.61,
+        0.78,
+        0.53
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    },
+    "spike": {
+      "roughness_min": 0.24,
+      "roughness_max": 0.43,
+      "ior": 1.48,
+      "frequency": 12,
+      "pigment_low": [
+        0.77,
+        0.92,
+        0.84
+      ],
+      "pigment_high": [
+        1,
+        1,
+        1
+      ]
+    }
+  }
+}

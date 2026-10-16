@@ -45,6 +45,9 @@ with tempfile.TemporaryDirectory(prefix='microship-content-') as directory:
     text=stage_world(root/'assets/levels/biology-virus.json',out)
     order='0 cell 0\n0 priority bomber\n'
     base,scene,log=run('baseline',text,1800,order)
+    roughness=scene['meshes'][0]['roughness']
+    assert .02<=roughness[0]<.35 and .85<roughness[1]<=1, 'Cell surfaces lost their gloss and matte range'
+    assert scene['meshes'][0]['ior'][0]<scene['meshes'][0]['ior'][1], 'Cell surfaces use one optical material'
     names=dict([('virus_fighter','type_a'),('virus_bomber','type_b'),('immune_fighter','type_c'),
                 ('immune_bomber','type_d'),('virus_factory','growth_a'),('immune_factory','growth_b'),
                 ('virus','team_a'),('immune','team_b'),('fighter','guard'),('fighters','guards'),

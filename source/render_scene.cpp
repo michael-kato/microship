@@ -71,8 +71,16 @@ bool render_scene_write(const RenderScene* scene,const char* path)
     for (uint32_t i=0;i<scene->geometry.meshes.size();++i)
     {
         const MeshRange* m=&scene->geometry.meshes[i];
-        fprintf(file,"%s{\"triangles\":%u,\"low\":[%.6f,%.6f,%.6f],\"high\":[%.6f,%.6f,%.6f]}",
-            i ? "," : "",m->count,m->low[0],m->low[1],m->low[2],m->high[0],m->high[1],m->high[2]);
+        float rough_low=1,rough_high=0,ior_low=3,ior_high=1;
+        for (uint32_t t=m->first;t<m->first+m->count;++t)
+            for (uint32_t j=0;j<3;++j)
+            {
+                const GpuVertex& v=scene->geometry.vertices[scene->geometry.triangles[t].index[j]];
+                rough_low=std::fmin(rough_low,v.color[3]);rough_high=std::fmax(rough_high,v.color[3]);
+                ior_low=std::fmin(ior_low,v.position[3]);ior_high=std::fmax(ior_high,v.position[3]);
+            }
+        fprintf(file,"%s{\"triangles\":%u,\"low\":[%.6f,%.6f,%.6f],\"high\":[%.6f,%.6f,%.6f],\"roughness\":[%.6f,%.6f],\"ior\":[%.6f,%.6f]}",
+            i ? "," : "",m->count,m->low[0],m->low[1],m->low[2],m->high[0],m->high[1],m->high[2],rough_low,rough_high,ior_low,ior_high);
     }
     fprintf(file,"],\"instances\":[");bool first=true;
     for (uint32_t i=0;i<scene->instances.size();++i)
