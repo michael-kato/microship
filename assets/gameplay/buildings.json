@@ -8,7 +8,7 @@
       "growth_seconds": 5.0,
       "health": 80.0,
       "collection": 5.0,
-      "height": 1.4,
+      "height": 3.5,
       "width": 1.6,
       "hits": 3,
       "branches": {
@@ -21,7 +21,14 @@
           0.0,
           0.29,
           0.957
-        ]
+        ],
+        "health": 45,
+        "hits": 2,
+        "regrow_seconds": 24
+      },
+      "growth_meshes": {
+        "segment": "../models/growth_segment.fmesh",
+        "tip": "../models/growth_tip.fmesh"
       }
     },
     {
@@ -31,7 +38,7 @@
       "growth_seconds": 5.0,
       "health": 80.0,
       "collection": 5.0,
-      "height": 1.4,
+      "height": 3.5,
       "width": 1.6,
       "hits": 3,
       "branches": {
@@ -44,7 +51,40 @@
           0.0,
           0.29,
           0.957
-        ]
+        ],
+        "health": 45,
+        "hits": 2,
+        "regrow_seconds": 24
+      },
+      "growth_meshes": {
+        "segment": "../models/growth_segment.fmesh",
+        "tip": "../models/growth_tip.fmesh"
+      }
+    },
+    {
+      "name": "fungal_emitter",
+      "faction": "fungus",
+      "model": "../models/immune_factory.fmesh",
+      "growth_seconds": 1,
+      "health": 80.0,
+      "collection": 5.0,
+      "height": 0.4,
+      "width": 1.6,
+      "hits": 3,
+      "branches": {
+        "seconds": 16.0,
+        "count": 1,
+        "spacing": 1.15,
+        "production": 0.35,
+        "seed": 4721,
+        "normal": [
+          0.0,
+          0.29,
+          0.957
+        ],
+        "health": 45,
+        "hits": 2,
+        "regrow_seconds": 24
       }
     }
   ]

@@ -87,7 +87,17 @@ static bool load_rules(World* w,const char* path)
 static bool load_effects(World* w,const char* path)
 {
     JsonDocument d;if (!json_load(&d,path)) return false;Json root=json_root(&d);
-    json_object(root,"$schema|projectile|damage|injury|spikes");
+    json_object(root,"$schema|projectile|damage|injury|spikes|limb_break");
+    Json fracture=json_find(root,"limb_break");
+    if (json_present(fracture))
+    {
+        json_object(fracture,"seconds|speed|drag|spin|shrink_seconds");
+        w->combat.break_seconds=json_positive(json_get(fracture,"seconds"),10);
+        w->combat.break_speed=json_positive(json_get(fracture,"speed"),10);
+        w->combat.break_drag=json_float(json_get(fracture,"drag"),0,10);
+        w->combat.break_spin=json_float(json_get(fracture,"spin"),0,20);
+        w->combat.break_shrink=json_positive(json_get(fracture,"shrink_seconds"),w->combat.break_seconds);
+    }
     Json p=json_find(root,"projectile");
     if (json_present(p))
     {
@@ -193,7 +203,8 @@ static bool load_placements(World* w,Json root)
     JsonArray bodies=json_array(json_get(root,"bodies"),MAX_BODIES);Json j={};
     while (json_next(&bodies,&j))
     {
-        json_object(j,"type|owner|position|radius|tint|site|medium");Body b={};b.availability=-1;
+        json_object(j,"type|owner|position|radius|tint|site|medium|seed");Body b={};b.availability=-1;
+        Json seed=json_find(j,"seed");b.seed=json_present(seed) ? json_uint(seed,0,16777215) : (w->body_count+1)*4721;
         char type[32]={};Json name=json_get(j,"type");json_string(name,type,32);int index=content_body(&w->content,type);
         if (index<0) return json_error(name,"unknown body type reference");
         b.type=(uint32_t)index;strcpy(b.model_path,w->content.bodies[index].model_path);b.owner=read_owner(w,json_get(j,"owner"));

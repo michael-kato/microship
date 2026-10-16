@@ -6,7 +6,7 @@ Edit the JSON files and restart the application. Asset edits need no C++ rebuild
 
 | File | Purpose |
 | --- | --- |
-| `startup.json` | Select the initial level, render settings, and compiled shader |
+| `startup.json` | Select the initial level, render settings, shader, and sound bank |
 | `gameplay/biology.json` | List the five content definition files |
 | `gameplay/bodies.json` | Define body geometry and production-site capability |
 | `gameplay/factions.json` | Define faction IDs, labels, colors, and production links |
@@ -16,6 +16,11 @@ Edit the JSON files and restart the application. Asset edits need no C++ rebuild
 | `gameplay/rules.json` | Define economy, AI, scouting, flight, orbit, ammunition, and recovery |
 | `levels/biology-virus.json` | Set the match sides and starting body and unit placements |
 | `levels/biology-immune.json` | Select immune control of the same starting map |
+| `levels/biology-fungus.json` | Select the automatic fungal spore trial |
+| `gameplay/faction-trials.json` | Select experimental faction production links with shared body, unit, group, and building definitions |
+| `models/*.parts.json` | Define mesh part ranges, pivots, and factory attachment points |
+| `audio/biology.json` | Map gameplay events to WAV files, gains, and cooldowns |
+| `audio/synthesis.json` | Set the parameters used by `scripts/make_sfx.py` |
 | `presentation/biology.json` | Set ambient light, studio lights, membranes, and backdrop |
 | `presentation/combat.json` | Set projectile appearance, damage colors, and spike geometry |
 | `rendering/biology.json` | Set the normal render budget, camera, geometry, and display settings |
@@ -66,15 +71,21 @@ Each body placement contains its own `site` and `medium` objects. They do not re
 
 Body types use `geometry: "mesh"` with a `model` path, or `geometry: "sphere"` without a model path. Only types with `hosts_site: true` can contain a production site. Gameplay hosts require a site normal and resource availability. Decorative bodies need neither. Spawns reference unit names and contain a position.
 
-Faction IDs are in `[1,8]`. ID 0 means neutral. Group IDs are in `[0,7]`. Names have no compiled faction or unit meaning. Production links must refer to a building and units of the same faction. A product needs no starting placement. Hit counts are integers in `[1,32]`. The current game uses three hits. At most two embedded spikes appear as geometry.
+Faction IDs are in `[1,8]`. ID 0 means neutral. Group IDs are in `[0,7]`. Names have no compiled faction or unit meaning. Production links must refer to a building and units of the same faction. A product needs no starting placement. Hit counts are integers in `[1,32]`. Default virus units use three hits, immune units use five, and fungal spores use two. At most two embedded spikes appear as geometry.
 
-Building `branches` contains `seconds`, `count`, `spacing`, `production`, `seed`, and `normal`. Branch count is in `[1,9]`. Each live branch adds `production × growth²` to collection and manufacture rates. Root destruction removes its branches.
+Building `branches` contains `seconds`, `count`, `spacing`, `production`, `seed`, `normal`, `health`, `hits`, and `regrow_seconds`. Branch count is in `[1,9]`. Each live branch adds `production × growth²` to collection and manufacture rates. A limb has separate health, wounds, and generation. Its loss removes child limbs. Root loss removes the whole tree. `growth_meshes.segment` and `growth_meshes.tip` reference the shared meshes used for staged growth. `presentation/combat.json` defines debris lifetime, speed, drag, spin, and shrink time.
+
+Body `variation` references a mesh-parts file and sets `shape` and `interior` variation. Part ranges must cover every vertex in order. Rigid part transforms keep each organelle and its detail together. The same seeded transform moves its attachment point. Each placement can set `seed`; `--world-seed` changes the whole layout. Variation is generated and validated at startup. Growth and debris only change preallocated instance poses during play.
+
+Unit `attack.mode` selects `projectile`, `digest`, or `spore`. Spore mode requires `seek_radius`, `blast_radius`, `lifetime`, and `friendly_fire`. `secondary_attack` names distinct fallback targets and an `interval_factor`. Faction production mode `spores` requires one emitter structure and the same non-colonizing spore product in both production links. These emitters do not consume nutrients or accept production orders. Faction `cell_appearance` sets a tint, maximum strength, and transformation time.
+
+Sound banks require all named events. Each clip is canonical mono 48 kHz 16-bit PCM, with a maximum duration of two seconds. Clips load before ticks; the mixer uses fixed voice and output buffers. `scripts/make_sfx.py` regenerates the WAV files from their synthesis settings. `--audio PATH.json` selects another sound bank. `--audio-capture PATH.wav` requires `--smoke` and between 1 and 3600 ticks.
 
 `rules.json` contains simulation parameters. `presentation/combat.json` contains visual parameters. Changing light or render settings must not change gameplay outcomes. The current level setup places bodies and units; it does not define a separate event scripting language. Replay `.orders` files feed the existing application controls.
 
 Render files contain `output`, `sampling`, `volume`, `geometry`, `camera`, `lighting`, and `bloom` objects. All render fields are required. The normal budget remains native 1920×1080, six fixed film samples, one volume film ray, and one background query. Each logical frame uses only current inputs and fixed spatial samples. Zero volume rays remove in-scattering but retain attenuation. Remove body media to remove attenuation too.
 
-JSON does not allow comments or trailing commas. Field descriptions are in this document and the local schemas. Each authored JSON document has a `$schema` link for editor validation. The application does not fetch schemas or use the network.
+JSON does not allow comments or trailing commas. Field descriptions are in this document and the local schemas. Each runtime JSON document has a `$schema` link for editor validation. The application does not fetch schemas or use the network.
 
 ## Validation
 

@@ -55,8 +55,8 @@ with tempfile.TemporaryDirectory(prefix='microship-content-') as directory:
         return names.get(value,value) if isinstance(value,str) else value
     renamed=rename(text)
     renamed_state,_,renamed_log=run('renamed-content',renamed,1800,'0 cell 0\n0 priority breacher\n')
-    assert renamed_state==base,'Definition names changed game results'
-    assert 'spawn type_a' in renamed_log and 'body infected team_a' in renamed_log
+    assert renamed_state==rename(base),'Definition names changed game results'
+    assert 'spawn type_a' in renamed_log and 'body unclaimed team_a' in renamed_log
 
     def reverse_keys(value):
         if isinstance(value,dict):return {k:reverse_keys(v) for k,v in reversed(list(value.items()))}
@@ -95,6 +95,7 @@ with tempfile.TemporaryDirectory(prefix='microship-content-') as directory:
 
     compact=stage_world(root/'tests/e2e/scenes/biology-two-virus.json',out)
     changed=units(compact,group='fighter',targets=['structures'])
+    for u in changed['content']['units']:u.pop('secondary_attack',None)
     for spawn in changed['spawns']:
         if spawn['type'].startswith('immune_'):spawn['position'][0]=1000
     changed['rules']['economy']=dict(storage=180,manufacture_seconds=1000,landing_seconds=1.5,enemy_attack_seconds=300)
@@ -103,6 +104,8 @@ with tempfile.TemporaryDirectory(prefix='microship-content-') as directory:
 
     # Five-hit types use the same combat loop and keep bounded embedded geometry.
     duel=units(compact,group='fighter',speed=.01,health=100,hits=5)
+    for u in duel['content']['units']:
+        if u['group']=='fighter' and u['faction']!='fungus':u.update(attack={'mode':'projectile'},range=3.2,shot_interval=1)
     seen=set();spawns=[]
     for spawn in duel['spawns']:
         name=spawn['type']

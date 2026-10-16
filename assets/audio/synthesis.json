@@ -1,0 +1,101 @@
+{
+  "$schema": "../schemas/synthesis.schema.json",
+  "sounds": {
+    "order": {
+      "seconds": 0.09,
+      "start_hz": 600,
+      "end_hz": 900,
+      "noise": 0.05,
+      "decay": 1.5,
+      "seed": 4721
+    },
+    "growth": {
+      "seconds": 0.26,
+      "start_hz": 90,
+      "end_hz": 210,
+      "noise": 0.45,
+      "decay": 1.2,
+      "seed": 4722
+    },
+    "mature": {
+      "seconds": 0.32,
+      "start_hz": 240,
+      "end_hz": 700,
+      "noise": 0.1,
+      "decay": 2,
+      "seed": 4723
+    },
+    "birth": {
+      "seconds": 0.18,
+      "start_hz": 330,
+      "end_hz": 900,
+      "noise": 0.15,
+      "decay": 1.7,
+      "seed": 4724
+    },
+    "shot": {
+      "seconds": 0.07,
+      "start_hz": 700,
+      "end_hz": 160,
+      "noise": 0.65,
+      "decay": 4,
+      "seed": 4725
+    },
+    "hit": {
+      "seconds": 0.1,
+      "start_hz": 180,
+      "end_hz": 55,
+      "noise": 0.8,
+      "decay": 3,
+      "seed": 4726
+    },
+    "death": {
+      "seconds": 0.3,
+      "start_hz": 120,
+      "end_hz": 25,
+      "noise": 0.8,
+      "decay": 3,
+      "seed": 4727
+    },
+    "colonize": {
+      "seconds": 0.45,
+      "start_hz": 100,
+      "end_hz": 500,
+      "noise": 0.18,
+      "decay": 1.5,
+      "seed": 4728
+    },
+    "heal": {
+      "seconds": 0.22,
+      "start_hz": 480,
+      "end_hz": 850,
+      "noise": 0.05,
+      "decay": 2,
+      "seed": 4729
+    },
+    "win": {
+      "seconds": 0.7,
+      "start_hz": 320,
+      "end_hz": 960,
+      "noise": 0.03,
+      "decay": 1,
+      "seed": 4730
+    },
+    "lose": {
+      "seconds": 0.7,
+      "start_hz": 330,
+      "end_hz": 65,
+      "noise": 0.1,
+      "decay": 1,
+      "seed": 4731
+    },
+    "break": {
+      "seconds": 0.24,
+      "start_hz": 210,
+      "end_hz": 48,
+      "noise": 0.72,
+      "decay": 3.5,
+      "seed": 4765
+    }
+  }
+}

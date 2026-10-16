@@ -29,7 +29,7 @@ def main():
     path_argument = False
     for argument in sys.argv[2:]:
         arguments.append(windows_path(argument) if path_argument else argument)
-        path_argument = argument in ("--world", "--config", "--capture", "--shader", "--state", "--scene-state", "--replay")
+        path_argument = argument in ("--world", "--config", "--capture", "--shader", "--state", "--scene-state", "--replay", "--audio-capture", "--audio")
     environment = os.environ.copy()
     environment["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam.resolve())
     environment["STEAM_COMPAT_DATA_PATH"] = str(prefix.resolve())

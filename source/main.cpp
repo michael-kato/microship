@@ -14,7 +14,7 @@
 #endif
 #include <windows.h>
 
-static bool asset_paths(char* world, char* config, char* shader, size_t capacity)
+static bool asset_paths(char* world, char* config, char* shader,char* audio,size_t capacity)
 {
     char executable[4096];
     DWORD count = GetModuleFileNameA(0, executable, sizeof(executable));
@@ -32,10 +32,11 @@ static bool asset_paths(char* world, char* config, char* shader, size_t capacity
     int length=snprintf(manifest,sizeof(manifest),"%s/assets/startup.json",executable);
     if (length<=0 || (size_t)length>=sizeof(manifest)) return false;
     JsonDocument document;if (!json_load(&document,manifest)) return false;
-    Json root=json_root(&document);json_object(root,"$schema|world|render|shader");
+    Json root=json_root(&document);json_object(root,"$schema|world|render|shader|audio");
     return json_path(json_get(root,"world"),manifest,world,capacity)
         && json_path(json_get(root,"render"),manifest,config,capacity)
         && json_path(json_get(root,"shader"),manifest,shader,capacity)
+        && json_path(json_get(root,"audio"),manifest,audio,capacity)
         && document.valid;
 }
 
@@ -47,6 +48,8 @@ static void print_usage(FILE* output)
         "              [--camera-pointer X Y] [--click X Y] [--command X Y] [--select-group 1..3] [--focus] [--additive] [--restart]\n"
         "              [--smoke] [--stats|--no-stats] [--debug-views] [--no-activate]\n"
         "              [--replay PATH.orders] [--ticks N] [--state PATH.json] [--scene-state PATH.json]\n"
+        "              [--audio-capture PATH.wav] (with --smoke and --ticks, at most 3600 ticks)\n"
+        "              [--world-seed N] [--audio PATH.json]\n"
         "Default: direct ray-traced Win32 window; Escape or close to exit.\n"
         "Headless/capture runs default to one frame. PFM saves linear HDR before bloom; PPM saves display RGB.\n"
         "--smoke runs asset loading and simulation lifecycle without a GPU.\n");
@@ -82,8 +85,8 @@ int main(int argc, char** argv)
 {
     setvbuf(stdout,0,_IONBF,0);
     GameOptions options = {};
-    char world_path[4096], config_path[4096], shader_path[4096];
-    if (!asset_paths(world_path, config_path, shader_path, sizeof(world_path)))
+    char world_path[4096], config_path[4096], shader_path[4096],audio_path[4096];
+    if (!asset_paths(world_path, config_path, shader_path,audio_path,sizeof(world_path)))
     {
         fprintf(stderr, "Cannot locate assets beside the microship executable.\n");
         return 1;
@@ -92,6 +95,7 @@ int main(int argc, char** argv)
     options.config_path = config_path;
     options.shader_path = shader_path;
     options.builtin_shader_path = shader_path;
+    options.audio_path=audio_path;
     for (int i = 1; i < argc; ++i)
     {
         if (strcmp(argv[i], "--help") == 0)
@@ -153,7 +157,7 @@ int main(int argc, char** argv)
         }
         else if (strcmp(argv[i], "--world") == 0 || strcmp(argv[i], "--config") == 0
                  || strcmp(argv[i], "--capture") == 0 || strcmp(argv[i], "--shader") == 0
-                 || strcmp(argv[i], "--replay") == 0 || strcmp(argv[i], "--state") == 0 || strcmp(argv[i], "--scene-state") == 0)
+                 || strcmp(argv[i], "--replay") == 0 || strcmp(argv[i], "--state") == 0 || strcmp(argv[i], "--scene-state") == 0 || strcmp(argv[i],"--audio-capture")==0 || strcmp(argv[i],"--audio")==0)
         {
             const char* flag = argv[i];
             if (++i == argc || !argv[i][0] || strncmp(argv[i], "--", 2) == 0)
@@ -173,22 +177,27 @@ int main(int argc, char** argv)
                 options.scene_state_path = argv[i];
             else if (strcmp(flag, "--state") == 0)
                 options.state_path = argv[i];
+            else if (strcmp(flag,"--audio-capture")==0)
+                options.audio_capture_path=argv[i];
+            else if (strcmp(flag,"--audio")==0)
+                options.audio_path=argv[i];
             else
                 options.capture_path = argv[i];
         }
         else if (strcmp(argv[i], "--frames") == 0 || strcmp(argv[i], "--samples") == 0
-                 || strcmp(argv[i], "--seed") == 0 || strcmp(argv[i], "--ticks") == 0)
+                 || strcmp(argv[i], "--seed") == 0 || strcmp(argv[i], "--world-seed") == 0 || strcmp(argv[i], "--ticks") == 0)
         {
             const char* flag = argv[i];
             uint32_t value = 0;
-            bool seed = strcmp(flag, "--seed") == 0;
+            bool seed = strcmp(flag, "--seed") == 0 || strcmp(flag,"--world-seed")==0;
             uint32_t maximum = strcmp(flag, "--samples") == 0 ? 4096 : strcmp(flag,"--ticks")==0 ? 1000000 : UINT32_MAX;
             if (++i == argc || !parse_integer(argv[i], seed ? 0 : 1, maximum, &value))
             {
                 fprintf(stderr, "%s requires an integer in [%u, %u].\n", flag, seed ? 0 : 1, maximum);
                 return 2;
             }
-            if (seed)
+            if (!strcmp(flag,"--world-seed")) { options.world_seed=value;options.world_seed_set=true; }
+            else if (seed)
             {
                 options.seed = value;
                 options.seed_set = true;
@@ -206,6 +215,8 @@ int main(int argc, char** argv)
             return 2;
         }
     }
+    if (options.audio_capture_path && (!options.smoke || !options.ticks || options.ticks>3600))
+    { fprintf(stderr,"--audio-capture requires --smoke and --ticks in [1,3600].\n");return 2; }
     if (options.smoke && (options.headless || options.capture_path || options.frames))
     {
         fprintf(stderr, "--smoke cannot be combined with GPU frame controls.\n");

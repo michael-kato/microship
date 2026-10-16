@@ -1,5 +1,6 @@
 #include "orders.h"
 #include "simulation.h"
+#include "audio.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -18,7 +19,7 @@ static bool integer(const char* text, uint32_t maximum, uint32_t* value)
     *value=(uint32_t)n;return true;
 }
 
-bool orders_run(Simulation* s, const char* path, uint32_t ticks)
+bool orders_run(Simulation* s, const char* path, uint32_t ticks,Audio* audio)
 {
     Order orders[512]={};uint32_t count=0;
     if (path)
@@ -87,6 +88,12 @@ bool orders_run(Simulation* s, const char* path, uint32_t ticks)
             else simulation_priority_type(s,order->argument);
         }
         simulation_step(s);
+        if (audio && audio->capture)
+        {
+            Vec3 listener={};for (uint32_t i=0;i<s->world.body_count;++i) if (s->home_owner[i]==s->world.player_faction) listener=s->world.bodies[i].position;
+            audio_events(audio,s,listener);if (!audio_tick(audio)) return false;
+        }
+        else s->sounds.count=0;
     }
     if (path || ticks) printf("Gameplay replay: %u commands, %u ticks; births %u, landings %u, losses %u.\n",count,ticks,s->births,s->landings,s->losses);
     return true;

@@ -18,7 +18,11 @@ def stage_world(source, directory):
     for name,path in read(manifest).items():
         definition=(manifest.parent/path).resolve()
         content[name]=read(definition)[name]
-        for item in content[name]:model(item,'model',definition.parent)
+        for item in content[name]:
+            model(item,'model',definition.parent)
+            if 'variation' in item:model(item['variation'],'parts',definition.parent)
+            if 'growth_meshes' in item:
+                for key in ('segment','tip'):model(item['growth_meshes'],key,definition.parent)
     world['content']=content
     for name in ('rules','appearance','effects'):
         if name not in world:continue

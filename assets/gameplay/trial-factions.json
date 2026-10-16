@@ -1,0 +1,69 @@
+{
+  "$schema": "../schemas/factions.schema.json",
+  "factions": [
+    {
+      "id": 1,
+      "name": "virus",
+      "label": "VIRUS",
+      "color": [
+        0.45,
+        0.9,
+        0.75
+      ],
+      "production": {
+        "building": "virus_factory",
+        "default_unit": "swarm_fighter",
+        "assault_unit": "swarm_bomber"
+      },
+      "cell_appearance": {
+        "tint": [
+          0.45,
+          0.9,
+          0.75
+        ],
+        "strength": 0.32,
+        "seconds": 180
+      }
+    },
+    {
+      "id": 2,
+      "name": "immune",
+      "label": "IMMUNE",
+      "color": [
+        1.0,
+        0.55,
+        0.65
+      ],
+      "production": {
+        "building": "immune_factory",
+        "default_unit": "immune_fighter",
+        "assault_unit": "immune_bomber"
+      }
+    },
+    {
+      "id": 3,
+      "name": "fungus",
+      "label": "FUNGUS TRIAL",
+      "color": [
+        0.82,
+        0.65,
+        0.35
+      ],
+      "production": {
+        "building": "fungal_emitter",
+        "default_unit": "fungal_spore",
+        "assault_unit": "fungal_spore",
+        "mode": "spores"
+      },
+      "cell_appearance": {
+        "tint": [
+          0.82,
+          0.65,
+          0.35
+        ],
+        "strength": 0.32,
+        "seconds": 180
+      }
+    }
+  ]
+}

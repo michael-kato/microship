@@ -116,6 +116,11 @@
               "anisotropy"
             ],
             "additionalProperties": false
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16777215
           }
         },
         "required": [

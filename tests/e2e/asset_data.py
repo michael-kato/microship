@@ -39,5 +39,7 @@ def producers(data,**settings):
 
 def branches(data,**settings):
     result=deepcopy(data)
-    for building in result['content']['buildings']:building['branches'].update(settings)
+    emitters={f['name'] for f in result['content']['factions'] if f.get('production',{}).get('mode')=='spores'}
+    for building in result['content']['buildings']:
+        if building['faction'] not in emitters:building['branches'].update(settings)
     return result

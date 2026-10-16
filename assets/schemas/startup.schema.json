@@ -14,12 +14,16 @@
     },
     "shader": {
       "$ref": "shared.schema.json#/$defs/path"
+    },
+    "audio": {
+      "$ref": "shared.schema.json#/$defs/path"
     }
   },
   "required": [
     "world",
     "render",
-    "shader"
+    "shader",
+    "audio"
   ],
   "additionalProperties": false
 }

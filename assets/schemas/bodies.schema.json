@@ -28,6 +28,30 @@
           },
           "hosts_site": {
             "type": "boolean"
+          },
+          "variation": {
+            "type": "object",
+            "properties": {
+              "parts": {
+                "$ref": "shared.schema.json#/$defs/path"
+              },
+              "shape": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 0.12
+              },
+              "interior": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 0.15
+              }
+            },
+            "required": [
+              "parts",
+              "shape",
+              "interior"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

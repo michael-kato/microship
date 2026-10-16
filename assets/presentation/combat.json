@@ -38,5 +38,12 @@
       0.018,
       0.009
     ]
+  },
+  "limb_break": {
+    "seconds": 2,
+    "speed": 0.9,
+    "drag": 1.5,
+    "spin": 2.8,
+    "shrink_seconds": 0.5
   }
 }

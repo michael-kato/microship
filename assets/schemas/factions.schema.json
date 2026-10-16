@@ -36,12 +36,42 @@
               },
               "assault_unit": {
                 "$ref": "shared.schema.json#/$defs/name"
+              },
+              "mode": {
+                "enum": [
+                  "manufacture",
+                  "spores"
+                ]
               }
             },
             "required": [
               "building",
               "default_unit",
               "assault_unit"
+            ],
+            "additionalProperties": false
+          },
+          "cell_appearance": {
+            "type": "object",
+            "properties": {
+              "tint": {
+                "$ref": "shared.schema.json#/$defs/color"
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 3600
+              }
+            },
+            "required": [
+              "tint",
+              "strength",
+              "seconds"
             ],
             "additionalProperties": false
           }

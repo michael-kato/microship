@@ -1,0 +1,66 @@
+{
+  "$schema": "../schemas/audio.schema.json",
+  "distance": 35,
+  "events": {
+    "order": {
+      "file": "order.wav",
+      "gain": 0.45,
+      "cooldown": 0.12
+    },
+    "growth": {
+      "file": "growth.wav",
+      "gain": 0.45,
+      "cooldown": 0.12
+    },
+    "mature": {
+      "file": "mature.wav",
+      "gain": 0.45,
+      "cooldown": 0.12
+    },
+    "birth": {
+      "file": "birth.wav",
+      "gain": 0.45,
+      "cooldown": 0.12
+    },
+    "shot": {
+      "file": "shot.wav",
+      "gain": 0.24,
+      "cooldown": 0.065
+    },
+    "hit": {
+      "file": "hit.wav",
+      "gain": 0.24,
+      "cooldown": 0.065
+    },
+    "death": {
+      "file": "death.wav",
+      "gain": 0.45,
+      "cooldown": 0.12
+    },
+    "colonize": {
+      "file": "colonize.wav",
+      "gain": 0.45,
+      "cooldown": 0.12
+    },
+    "heal": {
+      "file": "heal.wav",
+      "gain": 0.45,
+      "cooldown": 0.12
+    },
+    "win": {
+      "file": "win.wav",
+      "gain": 0.45,
+      "cooldown": 0.12
+    },
+    "lose": {
+      "file": "lose.wav",
+      "gain": 0.45,
+      "cooldown": 0.12
+    },
+    "break": {
+      "file": "break.wav",
+      "gain": 0.4,
+      "cooldown": 0.08
+    }
+  }
+}

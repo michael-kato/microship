@@ -8,12 +8,14 @@
 struct Body
 {
     uint32_t type;
+    uint32_t seed;
     Faction owner;
     Vec3 position;
     float radius;
     Color color;
     char model_path[256];
     Vec3 colony_normal;
+    Vec3 factory_root;
     float availability;
     float interior_radius, interior_fade;
     Color interior_scattering;
@@ -49,6 +51,7 @@ struct CombatVisuals
     bool flight_enabled;
     float acceleration, turn_rate, separation, bank;
     Color flash, injured;
+    float break_seconds,break_speed,break_drag,break_spin,break_shrink;
 };
 struct SpikeRules
 {

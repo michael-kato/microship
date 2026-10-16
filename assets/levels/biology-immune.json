@@ -10,7 +10,7 @@
   },
   "bodies": [
     {
-      "type": "infected",
+      "type": "unclaimed",
       "owner": "virus",
       "position": [
         -52.0,
@@ -44,7 +44,7 @@
       }
     },
     {
-      "type": "healthy",
+      "type": "unclaimed",
       "owner": "immune",
       "position": [
         48.0,

@@ -1,0 +1,562 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sound synthesis parameters",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "sounds": {
+      "type": "object",
+      "properties": {
+        "order": {
+          "type": "object",
+          "properties": {
+            "seconds": {
+              "type": "number",
+              "minimum": 0.03,
+              "maximum": 2
+            },
+            "start_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "end_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "noise": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "decay": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777215
+            }
+          },
+          "required": [
+            "seconds",
+            "start_hz",
+            "end_hz",
+            "noise",
+            "decay",
+            "seed"
+          ],
+          "additionalProperties": false
+        },
+        "growth": {
+          "type": "object",
+          "properties": {
+            "seconds": {
+              "type": "number",
+              "minimum": 0.03,
+              "maximum": 2
+            },
+            "start_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "end_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "noise": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "decay": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777215
+            }
+          },
+          "required": [
+            "seconds",
+            "start_hz",
+            "end_hz",
+            "noise",
+            "decay",
+            "seed"
+          ],
+          "additionalProperties": false
+        },
+        "mature": {
+          "type": "object",
+          "properties": {
+            "seconds": {
+              "type": "number",
+              "minimum": 0.03,
+              "maximum": 2
+            },
+            "start_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "end_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "noise": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "decay": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777215
+            }
+          },
+          "required": [
+            "seconds",
+            "start_hz",
+            "end_hz",
+            "noise",
+            "decay",
+            "seed"
+          ],
+          "additionalProperties": false
+        },
+        "birth": {
+          "type": "object",
+          "properties": {
+            "seconds": {
+              "type": "number",
+              "minimum": 0.03,
+              "maximum": 2
+            },
+            "start_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "end_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "noise": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "decay": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777215
+            }
+          },
+          "required": [
+            "seconds",
+            "start_hz",
+            "end_hz",
+            "noise",
+            "decay",
+            "seed"
+          ],
+          "additionalProperties": false
+        },
+        "shot": {
+          "type": "object",
+          "properties": {
+            "seconds": {
+              "type": "number",
+              "minimum": 0.03,
+              "maximum": 2
+            },
+            "start_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "end_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "noise": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "decay": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777215
+            }
+          },
+          "required": [
+            "seconds",
+            "start_hz",
+            "end_hz",
+            "noise",
+            "decay",
+            "seed"
+          ],
+          "additionalProperties": false
+        },
+        "hit": {
+          "type": "object",
+          "properties": {
+            "seconds": {
+              "type": "number",
+              "minimum": 0.03,
+              "maximum": 2
+            },
+            "start_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "end_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "noise": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "decay": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777215
+            }
+          },
+          "required": [
+            "seconds",
+            "start_hz",
+            "end_hz",
+            "noise",
+            "decay",
+            "seed"
+          ],
+          "additionalProperties": false
+        },
+        "death": {
+          "type": "object",
+          "properties": {
+            "seconds": {
+              "type": "number",
+              "minimum": 0.03,
+              "maximum": 2
+            },
+            "start_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "end_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "noise": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "decay": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777215
+            }
+          },
+          "required": [
+            "seconds",
+            "start_hz",
+            "end_hz",
+            "noise",
+            "decay",
+            "seed"
+          ],
+          "additionalProperties": false
+        },
+        "colonize": {
+          "type": "object",
+          "properties": {
+            "seconds": {
+              "type": "number",
+              "minimum": 0.03,
+              "maximum": 2
+            },
+            "start_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "end_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "noise": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "decay": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777215
+            }
+          },
+          "required": [
+            "seconds",
+            "start_hz",
+            "end_hz",
+            "noise",
+            "decay",
+            "seed"
+          ],
+          "additionalProperties": false
+        },
+        "heal": {
+          "type": "object",
+          "properties": {
+            "seconds": {
+              "type": "number",
+              "minimum": 0.03,
+              "maximum": 2
+            },
+            "start_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "end_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "noise": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "decay": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777215
+            }
+          },
+          "required": [
+            "seconds",
+            "start_hz",
+            "end_hz",
+            "noise",
+            "decay",
+            "seed"
+          ],
+          "additionalProperties": false
+        },
+        "win": {
+          "type": "object",
+          "properties": {
+            "seconds": {
+              "type": "number",
+              "minimum": 0.03,
+              "maximum": 2
+            },
+            "start_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "end_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "noise": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "decay": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777215
+            }
+          },
+          "required": [
+            "seconds",
+            "start_hz",
+            "end_hz",
+            "noise",
+            "decay",
+            "seed"
+          ],
+          "additionalProperties": false
+        },
+        "lose": {
+          "type": "object",
+          "properties": {
+            "seconds": {
+              "type": "number",
+              "minimum": 0.03,
+              "maximum": 2
+            },
+            "start_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "end_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "noise": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "decay": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777215
+            }
+          },
+          "required": [
+            "seconds",
+            "start_hz",
+            "end_hz",
+            "noise",
+            "decay",
+            "seed"
+          ],
+          "additionalProperties": false
+        },
+        "break": {
+          "type": "object",
+          "properties": {
+            "seconds": {
+              "type": "number",
+              "minimum": 0.03,
+              "maximum": 2
+            },
+            "start_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "end_hz": {
+              "type": "number",
+              "minimum": 20,
+              "maximum": 20000
+            },
+            "noise": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "decay": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777215
+            }
+          },
+          "required": [
+            "seconds",
+            "start_hz",
+            "end_hz",
+            "noise",
+            "decay",
+            "seed"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "order",
+        "growth",
+        "mature",
+        "birth",
+        "shot",
+        "hit",
+        "death",
+        "colonize",
+        "heal",
+        "win",
+        "lose",
+        "break"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "sounds"
+  ],
+  "additionalProperties": false
+}

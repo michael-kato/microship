@@ -134,7 +134,7 @@ static bool mesh_counts(const char* path, uint32_t* vertices, uint32_t* triangle
 }
 
 static bool add_model(Geometry* geometry, const char* path, Vec3 position, float scale,
-    Color color, float yaw_degrees)
+    Color color, float yaw_degrees,const MeshSource* source=0)
 {
     float angle = yaw_degrees * (float)(PI / 180.0);
     float cosine = std::cos(angle), sine = std::sin(angle);
@@ -154,6 +154,8 @@ static bool add_model(Geometry* geometry, const char* path, Vec3 position, float
             && fgetc(file) == EOF && !ferror(file);
     }
     if (file && fclose(file) != 0) valid = false;
+    if (valid && source && source->parts_path && source->parts_path[0])
+        valid=geometry_vary(&geometry->vertices[first_vertex],vertex_count,&geometry->triangles[first_triangle],triangle_count,*source);
     for (uint32_t i = first_vertex; valid && i < geometry->vertices.size(); ++i)
     {
         GpuVertex* v = &geometry->vertices[i];
@@ -222,7 +224,7 @@ bool geometry_build(Geometry* geometry,const MeshSource* sources,uint32_t count,
     {
         const MeshSource* source=&sources[i];MeshRange* range=&built.meshes[i];
         range->first=(uint32_t)built.triangles.size();
-        bool valid=source->path[0] ? add_model(&built,source->path,source->position,source->scale,source->color,source->yaw)
+        bool valid=source->path[0] ? add_model(&built,source->path,source->position,source->scale,source->color,source->yaw,source)
             : add_sphere(&built,source->position,source->scale,source->color,config);
         if (!valid) return false;
         range->count=(uint32_t)built.triangles.size()-range->first;

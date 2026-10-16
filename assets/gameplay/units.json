@@ -27,7 +27,13 @@
       "trails": true,
       "pick_radius": 0.35,
       "cue_radius": 0.22,
-      "hits": 3
+      "hits": 3,
+      "secondary_attack": {
+        "targets": [
+          "structures"
+        ],
+        "interval_factor": 8
+      }
     },
     {
       "name": "virus_bomber",
@@ -55,26 +61,32 @@
       "trails": false,
       "pick_radius": 0.65,
       "cue_radius": 0.65,
-      "hits": 3
+      "hits": 3,
+      "secondary_attack": {
+        "targets": [
+          "units"
+        ],
+        "interval_factor": 8
+      }
     },
     {
       "name": "immune_fighter",
       "faction": "immune",
       "group": "fighter",
       "model": "../models/immune_leukocyte.fmesh",
-      "scale": 0.15,
+      "scale": 0.38,
       "yaw_degrees": 0.0,
       "tint": [
         1.0,
         1.0,
         1.0
       ],
-      "speed": 3.5,
-      "health": 36.0,
-      "range": 3.2,
-      "cost": 12.0,
-      "shot_interval": 1.0,
-      "separation": 1.0,
+      "speed": 2.5,
+      "health": 72,
+      "range": 0.65,
+      "cost": 28,
+      "shot_interval": 0.8,
+      "separation": 0.7,
       "targets": [
         "units"
       ],
@@ -83,25 +95,141 @@
       "trails": true,
       "pick_radius": 0.35,
       "cue_radius": 0.22,
-      "hits": 3
+      "hits": 5,
+      "attack": {
+        "mode": "digest"
+      },
+      "secondary_attack": {
+        "targets": [
+          "structures"
+        ],
+        "interval_factor": 8
+      }
     },
     {
       "name": "immune_bomber",
       "faction": "immune",
       "group": "bomber",
       "model": "../models/immune_bomber.fmesh",
-      "scale": 0.65,
+      "scale": 0.75,
       "yaw_degrees": 0.0,
       "tint": [
         1.0,
         1.0,
         1.0
       ],
-      "speed": 2.5,
-      "health": 60.0,
+      "speed": 1.9,
+      "health": 120,
+      "range": 0.85,
+      "cost": 52,
+      "shot_interval": 1.3,
+      "separation": 1,
+      "targets": [
+        "structures"
+      ],
+      "colonizes": true,
+      "detaches": false,
+      "trails": false,
+      "pick_radius": 0.65,
+      "cue_radius": 0.65,
+      "hits": 5,
+      "attack": {
+        "mode": "digest"
+      },
+      "secondary_attack": {
+        "targets": [
+          "units"
+        ],
+        "interval_factor": 8
+      }
+    },
+    {
+      "name": "fungal_spore",
+      "faction": "fungus",
+      "group": "fighter",
+      "model": "../models/fungal_spore.fmesh",
+      "scale": 0.28,
+      "yaw_degrees": 0.0,
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "speed": 8,
+      "health": 24,
+      "range": 0.65,
+      "cost": 1,
+      "shot_interval": 1,
+      "separation": 0.5,
+      "targets": [
+        "units",
+        "structures"
+      ],
+      "colonizes": false,
+      "detaches": false,
+      "trails": true,
+      "pick_radius": 0.35,
+      "cue_radius": 0.22,
+      "hits": 2,
+      "attack": {
+        "mode": "spore",
+        "seek_radius": 160,
+        "blast_radius": 3.5,
+        "lifetime": 24,
+        "friendly_fire": true
+      }
+    },
+    {
+      "name": "swarm_fighter",
+      "faction": "virus",
+      "group": "fighter",
+      "model": "../models/virus_virion.fmesh",
+      "scale": 0.13,
+      "yaw_degrees": 0.0,
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "speed": 4.8,
+      "health": 24,
       "range": 3.2,
-      "cost": 30.0,
-      "shot_interval": 3.0,
+      "cost": 7,
+      "shot_interval": 0.8,
+      "separation": 1.0,
+      "targets": [
+        "units"
+      ],
+      "colonizes": true,
+      "detaches": true,
+      "trails": true,
+      "pick_radius": 0.35,
+      "cue_radius": 0.22,
+      "hits": 2,
+      "secondary_attack": {
+        "targets": [
+          "structures"
+        ],
+        "interval_factor": 8
+      }
+    },
+    {
+      "name": "swarm_bomber",
+      "faction": "virus",
+      "group": "bomber",
+      "model": "../models/virus_bomber.fmesh",
+      "scale": 0.52,
+      "yaw_degrees": 0.0,
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "speed": 3.5,
+      "health": 40,
+      "range": 3.2,
+      "cost": 18,
+      "shot_interval": 2.4,
       "separation": 2.0,
       "targets": [
         "structures"
@@ -111,7 +239,13 @@
       "trails": false,
       "pick_radius": 0.65,
       "cue_radius": 0.65,
-      "hits": 3
+      "hits": 2,
+      "secondary_attack": {
+        "targets": [
+          "units"
+        ],
+        "interval_factor": 8
+      }
     }
   ]
 }

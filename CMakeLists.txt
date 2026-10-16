@@ -77,11 +77,13 @@ file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/licenses/nile.txt")
 # Remove only the six inputs replaced by the JSON migration from an older bundle.
 foreach(legacy_asset IN ITEMS startup.game gameplay/biology.content
     levels/biology-virus.world levels/biology-immune.world
-    rendering/biology.render rendering/reference.render)
+    rendering/biology.render rendering/reference.render
+    levels/biology-body.json models/body_spore.fmesh models/fungus_fighter.fmesh models/fungus_bomber.fmesh
+    gameplay/trial-units.json gameplay/trial-buildings.json)
     file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/assets/${legacy_asset}")
 endforeach()
 file(GLOB_RECURSE authored_files CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/assets"
-    "${CMAKE_CURRENT_SOURCE_DIR}/assets/*.json")
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/*.json" "${CMAKE_CURRENT_SOURCE_DIR}/assets/*.wav")
 list(FILTER authored_files EXCLUDE REGEX "^models/source/")
 foreach(scene_asset IN LISTS authored_files)
     set(asset_output "${CMAKE_CURRENT_BINARY_DIR}/assets/${scene_asset}")
@@ -107,14 +109,14 @@ add_custom_target(microship_assets DEPENDS "${effects_output}" "${backdrop_outpu
 
 add_executable(microship
     source/content.cpp source/asset_json.cpp
-    source/effects.cpp
+    source/effects.cpp source/audio.cpp
     source/main.cpp
     source/microfacet.cpp
     source/camera.cpp
     source/world.cpp
     source/render_config.cpp
     source/presentation.cpp source/render_scene.cpp
-    source/geometry.cpp
+    source/geometry.cpp source/geometry_variation.cpp
     source/window.cpp
     source/simulation.cpp
     source/orders.cpp
@@ -122,7 +124,7 @@ add_executable(microship
     source/game.cpp
 )
 add_dependencies(microship microship_assets)
-target_link_libraries(microship PRIVATE Vulkan::Vulkan user32)
+target_link_libraries(microship PRIVATE Vulkan::Vulkan user32 winmm)
 target_compile_definitions(microship PRIVATE _WIN32_WINNT=0x0A00 _CRT_SECURE_NO_WARNINGS)
 
 set_target_properties(microship PROPERTIES
@@ -168,6 +170,9 @@ endif()
 add_test(NAME data_assets COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/data_assets.py $<TARGET_FILE:microship>)
 set_tests_properties(data_assets PROPERTIES TIMEOUT 45)
+add_test(NAME growth_factions COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/growth_factions.py $<TARGET_FILE:microship>)
+set_tests_properties(growth_factions PROPERTIES TIMEOUT 45)
 
 option(MICROSHIP_GPU_TESTS "Run real hardware Vulkan E2E scenarios (explicit opt-in)" OFF)
 if(MICROSHIP_GPU_TESTS)

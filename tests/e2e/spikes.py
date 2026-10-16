@@ -16,7 +16,15 @@ count=0
 with tempfile.TemporaryDirectory(prefix='microship-spikes-') as directory:
     out=Path(directory)
     def stage(side):
-        return stage_world(root/'tests/e2e/scenes'/('biology-two-'+side+'.json'),out)
+        data=stage_world(root/'tests/e2e/scenes'/('biology-two-'+side+'.json'),out)
+        # Symmetric projectile fixture for exact arrival, hit-count and recovery checks.
+        # Default immune units use the separate digestion scenarios.
+        for u in data['content']['units']:
+            u.pop('secondary_attack',None)
+            if u['faction']=='immune':
+                fighter=u['group']=='fighter'
+                u.update(attack={'mode':'projectile'},health=36 if fighter else 60,hits=3,range=3.2,shot_interval=1 if fighter else 3)
+        return data
     def run(name,text,ticks=1,orders='',expected=0,extra=()):
         global count
         scene=out/(name+'-world.json');write_world(scene,text)

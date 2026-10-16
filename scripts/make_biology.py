@@ -18,6 +18,12 @@ profiles=json.loads((out/'source/biology_profiles.json').read_text())
 rng=random.Random(profiles['seed'])
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 parts=[];models=[]
+component=0;components=[]
+
+def cell_part(pivot,movable=True,attachment=None):
+    global component
+    component=len(components)
+    components.append(dict(pivot=list(pivot),movable=movable,attachment=attachment))
 
 def finish(obj,color,roughness=.82,ior=1.35,smooth=True,material=0):
     obj.data.transform(Matrix.LocRotScale(obj.location,obj.rotation_euler.to_quaternion(),obj.scale))
@@ -31,6 +37,8 @@ def finish(obj,color,roughness=.82,ior=1.35,smooth=True,material=0):
         for entry in a.data:entry.value=value
     tag=mesh.attributes.new(name="surface",type="INT",domain="FACE")
     for entry in tag.data:entry.value=material
+    tag=mesh.attributes.new(name="component",type="INT",domain="POINT")
+    for entry in tag.data:entry.value=component
     for poly in mesh.polygons:poly.use_smooth=smooth
     mesh.update();parts.append(obj);return obj
 
@@ -61,14 +69,14 @@ def branches(start,direction,length,radius,depth,color,planar=False,buds=None):
         if not planar:child+=axis*rng.uniform(-p['jitter'],p['jitter'])
         branches(end,child,length*p['scale'],radius*p['radius_scale'],depth-1,color,planar,buds)
 
-def export(name):
+def export(name,anatomy=False):
     global parts
     bpy.ops.object.select_all(action='DESELECT')
     for obj in parts:obj.select_set(True)
     bpy.context.view_layer.objects.active=parts[0];bpy.ops.object.join()
     obj=bpy.context.object;obj.name=name;mesh=obj.data;mesh.calc_loop_triangles()
     colors=mesh.color_attributes['Color'].data;rough=mesh.attributes['roughness'].data;ior=mesh.attributes['ior'].data
-    records=[];indices=[];lookup={}
+    records=[];indices=[];lookup={};groups=[]
     for triangle in mesh.loop_triangles:
         row=[]
         for vi,li in zip(triangle.vertices,triangle.loops):
@@ -76,8 +84,21 @@ def export(name):
             if key not in lookup:
                 lookup[key]=len(records)
                 records.append((*mesh.vertices[vi].co,ior[vi].value,*normal,0,*colors[vi].color[:3],rough[vi].value))
+                groups.append(mesh.attributes['component'].data[vi].value)
             row.append(lookup[key])
         indices.append((*row,mesh.attributes["surface"].data[triangle.polygon_index].value))
+    if anatomy:
+        order=sorted(range(len(records)),key=lambda i:groups[i]);remap={old:new for new,old in enumerate(order)}
+        records=[records[i] for i in order]
+        indices=[(*(remap[i] for i in row[:3]),row[3]) for row in indices]
+        definitions=[];first=0
+        for index,part in enumerate(components):
+            count=groups.count(index)
+            if not count:raise RuntimeError('empty mesh part')
+            d=dict(first=first,count=count,pivot=part['pivot'],movable=part['movable'])
+            if part['attachment'] is not None:d['attachment']=list(part['attachment'])
+            definitions.append(d);first+=count
+        (out/(name+'.parts.json')).write_text(json.dumps({'$schema':'../schemas/mesh-parts.schema.json','vertices':len(records),'parts':definitions},indent=2)+'\n')
     if any(abs(x)>1.49 for row in records for x in row[:3]):raise RuntimeError(name+' exceeds local mesh bounds')
     with (out/(name+'.fmesh')).open('wb') as f:
         f.write(struct.pack('<8sII',b'FLMESH01',len(records),len(indices)))
@@ -87,6 +108,8 @@ def export(name):
     models.append(obj);parts=[];print(name,len(records),'vertices',len(indices),'triangles',flush=True)
 
 def cell(name,key):
+    global components
+    components=[];cell_part((0,0,0),False)
     p=profiles[key]
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=5,radius=1)
     obj=bpy.context.object
@@ -99,17 +122,22 @@ def cell(name,key):
         return tuple(p['membrane'][i]*(1-.23*wave)+p['rim'][i]*(.23*wave) for i in range(3))
     finish(obj,pigment,.38,ior=1.38,material=3)
     inner=profiles['interior']
+    cell_part(inner['nucleus_center'])
     sphere(inner['nucleus_center'],inner['nucleus_size'],p['nucleus'],3,.42)
     sphere(inner['nucleolus_center'],inner['nucleolus_size'],p['vesicle'],2,.4)
     for index,center in enumerate(inner['mitochondria']):
+        anchor=Vector(center)+Vector(center).normalized()*inner['mitochondrion_size'][1]
+        cell_part(center,attachment=anchor)
         sphere(center,inner['mitochondrion_size'],inner['mitochondrion_color'],2,.52)
         # Mitochondrial cristae are geometry rather than painted lines.
         for j in range(3):
             c=Vector(center)+Vector(((j-1)*.07,0,.085))
             sphere(c,(.018,.063,.018),p['nucleus'],1,.6)
     for index,center in enumerate(inner['vesicle_centers']):
+        cell_part(center)
         sphere(center,(.065,.055,.06),p['vesicle'],2,.44)
     # Curved endoplasmic reticulum surrounding the nucleus, inside the shell.
+    cell_part((0,0,0))
     for ring in range(3):
         previous=None
         for j in range(25):
@@ -118,11 +146,12 @@ def cell(name,key):
             if previous:rod(previous,point,inner['reticulum_tube'],inner['reticulum_color'])
             previous=point
     substrate=profiles['substrate']
+    cell_part((0,0,0))
     for i in range(substrate['roots']):
         angle=i*2.39996323;y=1-2*(i+.5)/substrate['roots'];r=math.sqrt(1-y*y)
         direction=Vector((r*math.cos(angle),y,r*math.sin(angle)))
         branches(direction*.12,direction,substrate['length'],substrate['radius'],substrate['depth'],substrate['color'])
-    export(name)
+    export(name,True)
 
 def virus(large):
     p=profiles['virus']
@@ -170,6 +199,13 @@ def node():
         a=i*math.tau/5;sphere((.25*math.cos(a),.82,.25*math.sin(a)),(.14,.14,.14),p['buds'],2)
     sphere((0,.87,0),(.20,.17,.20),p['membrane'],2)
     export('cell_replication_node')
+
+def spore():
+    p=profiles['fungal_spore'];sphere((0,0,0),(.48,.48,.48),p['body'],3,.45)
+    for i in range(9):
+        a=i*2.39996323;y=1-2*(i+.5)/9;r=math.sqrt(1-y*y);d=Vector((r*math.cos(a),y,r*math.sin(a)))
+        branches(d*.4,d,.18,.045,2,p['rays'],buds=p['core'])
+    export('fungal_spore')
 
 def factory(side):
     p=profiles[side];f=profiles['factory']
@@ -219,6 +255,10 @@ def background(name,key):
 
 cell('cell_infected','infected_cell');cell('cell_healthy','healthy_cell');cell('cell_neutral','neutral_cell')
 virus(False);virus(True);immune(False);immune(True);node();factory('virus');factory('immune')
+spore()
+# A single tapered local +Y segment. Runtime poses extend segments in sequence.
+rod((0,0,0),(0,1,0),.065,(1,1,1));export('growth_segment')
+sphere((0,0,0),(.12,.12,.12),(1,1,1),2,.55);export('growth_tip')
 # One reusable shaft and head, local +Z; attached, flying and embedded use this mesh.
 rod((0,0,0),(0,0,.87),.075,(1,1,1));sphere((0,0,.91),(.14,.14,.09),(1,1,1),1,.45)
 export('virus_spike')

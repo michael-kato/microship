@@ -6,6 +6,7 @@
 typedef uint32_t Faction;
 enum { FACTION_NEUTRAL=0, MAX_FACTIONS=9, MAX_GROUPS=8, MAX_UNIT_TYPES=32, MAX_PRODUCER_TYPES=8, MAX_BODY_TYPES=32, MAX_FACTORY_STRUCTURES=9 };
 enum { TARGET_UNITS=1, TARGET_STRUCTURES=2 };
+enum AttackMode { ATTACK_PROJECTILE,ATTACK_DIGEST,ATTACK_SPORE };
 struct GroupDefinition { bool declared;char key[32],selection[32],singular[32],plural[32]; };
 struct FactionDefinition
 {
@@ -13,26 +14,36 @@ struct FactionDefinition
     char name[32],label[32],producer_name[32],default_name[32],assault_name[32];
     Color color;
     uint32_t producer,default_unit,assault_unit;
+    bool automatic;
+    Color cell_tint;
+    float cell_strength,transform_seconds;
 };
 struct UnitDefinition
 {
     char name[32],faction_name[32],group_name[32],model_path[256];
     Faction faction;
-    uint32_t group,targets,hits;
+    uint32_t group,targets,secondary_targets,hits;
+    float secondary_interval;
     bool colonizes,detaches,trails;
     float scale,yaw_degrees;
     Color color;
     float speed,health,range,cost,shot_interval,separation,pick_radius,cue_radius;
+    AttackMode attack;
+    float seek_radius,blast_radius,lifetime;
+    bool friendly_fire;
 };
 struct BranchRules
 {
     uint32_t fields,count,seed;
-    float seconds,spacing,production;
+    uint32_t hits;
+    float health;
+    float seconds,spacing,production,regrow_seconds;
     Vec3 normal;
 };
 struct ProducerDefinition
 {
     char name[32],faction_name[32],model_path[256];
+    char segment_path[256],tip_path[256];
     Faction faction;
     float growth_seconds,health,collection,height,width;
     uint32_t hits;
@@ -41,6 +52,8 @@ struct ProducerDefinition
 struct BodyDefinition
 {
     char name[32],label[32],model_path[256];
+    char parts_path[256];
+    float shape_variation,part_variation;
     bool hosts_site;
 };
 struct Content

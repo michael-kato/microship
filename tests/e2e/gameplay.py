@@ -29,10 +29,11 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
         assert p.returncode==expected,(name,p.stdout,p.stderr)
         if expected:return None,p.stdout
         d=json.loads(state.read_text())
+        definitions={u['name']:u for u in text['content']['units']}
         for u in d['units']:
             assert all(math.isfinite(x) for x in u['position']),name+': invalid position'
-            maximum=36 if u['kind']==0 else 60
-            assert 0<=u['wounds']<=2 and abs(u['health']-maximum*(3-u['wounds'])/3)<.00001,name+': invalid hit count'
+            v=definitions[u['type']];maximum=v['health'];hits=v['hits']
+            assert 0<=u['wounds']<hits and abs(u['health']-maximum*(hits-u['wounds'])/hits)<.00001,name+': invalid hit count'
         return d,p.stdout
     def active(c):return sum(s['health']>0 for s in c['structures'])
     for side,player,home,enemy,neutral in [('virus',1,0,1,2),('immune',2,1,0,4)]:
@@ -75,14 +76,15 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
         assert sum(u['faction']==player and u['kind']==1 for u in priority['units'])>1
         enemy_pos='48 14 7' if side=='virus' else '-52 -4 7'
         scout=f'0 select fighters\n0 move {enemy_pos}\n'
-        found,_=run(side+'-scout',text,1800,scout)
+        scouting_ticks=3000
+        found,_=run(side+'-scout',text,scouting_ticks,scout)
         assert found['colonies'][enemy]['discovered'],'Scouts did not discover the enemy'
-        assert found==run(side+'-repeat',text,1800,scout)[0],'Replay was not deterministic'
+        assert found==run(side+'-repeat',text,scouting_ticks,scout)[0],'Replay was not deterministic'
         reset,_=run(side+'-restart',text,1800,scout,extra=('--restart',))
         assert reset['tick']==0 and not reset['colonies'][enemy]['discovered']
         assert all(active(c)<=1 for c in reset['colonies']),'Restart retained branches'
         dark=change(text,'appearance.ambient',[0,0,0])
-        unlit,_=run(side+'-lighting-independent',dark,1800,scout,extra=('--samples','1'))
+        unlit,_=run(side+'-lighting-independent',dark,scouting_ticks,scout,extra=('--samples','1'))
         assert all(unlit[k]==found[k] for k in ('colonies','units','effects','recovery','outcome')),'Light changed the game'
     # Short combat scene: ordinary startup metadata, closer homes and no AI expansion.
     compact=stage('virus')
@@ -97,6 +99,8 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
     compact=change(compact,'rules.ai.expansion_delay',300)
     compact=change(compact,'rules.economy',dict(storage=180,manufacture_seconds=1000,landing_seconds=1.5,enemy_attack_seconds=300))
     compact=branches(compact,count=1)
+    # This fixture checks explicit primary target masks. Default units also have a slow secondary attack.
+    for unit in compact['content']['units']:unit.pop('secondary_attack',None)
     fighters,_=run('fighters-cannot-bomb',compact,2400,'0 select fighters\n0 order 1\n')
     assert fighters['effects']['hits']>0 and fighters['effects']['deaths']>0,'No unit combat'
     assert fighters['colonies'][1]['health']==80 and fighters['colonies'][1]['wounds']==0,'Fighters damaged a factory'

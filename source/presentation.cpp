@@ -31,7 +31,8 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
         for (uint32_t i=0;i<w->body_count;++i)
         {
             const Body* c=&w->bodies[i];p->body_meshes[i]=(uint32_t)sources.size();
-            sources.push_back(MeshSource{c->model_path,c->position,c->radius,0,c->color});
+            const BodyDefinition& d=w->content.bodies[c->type];
+            sources.push_back(MeshSource{c->model_path,c->position,c->radius,0,c->color,d.parts_path,c->seed,d.shape_variation,d.part_variation});
         }
         for (uint32_t i=0;i<w->content.unit_count;++i)
         {
@@ -42,27 +43,36 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
                 { p->unit_meshes[i]=p->unit_meshes[j];shared=true;break; }
             if (shared) continue;
             p->unit_meshes[i]=(uint32_t)sources.size();
-            sources.push_back(MeshSource{definition->model_path,Vec3{},1,0,definition->color});
+            sources.push_back(MeshSource{definition->model_path,Vec3{},1,0,definition->color,0,0,0,0});
         }
         for (uint32_t i=0;i<w->content.producer_count;++i)
         {
             p->factory_meshes[i]=(uint32_t)sources.size();
-            sources.push_back(MeshSource{w->content.producers[i].model_path,Vec3{},1,0,Color{1,1,1}});
+            sources.push_back(MeshSource{w->content.producers[i].model_path,Vec3{},1,0,Color{1,1,1},0,0,0,0});
+            const ProducerDefinition& d=w->content.producers[i];
+            if (d.segment_path[0])
+            {
+                p->segment_meshes[i]=(uint32_t)sources.size();sources.push_back(MeshSource{d.segment_path,Vec3{},1,0,Color{1,1,1},0,0,0,0});
+                p->tip_meshes[i]=(uint32_t)sources.size();sources.push_back(MeshSource{d.tip_path,Vec3{},1,0,Color{1,1,1},0,0,0,0});
+            }
         }
         if (w->spikes.enabled)
         {
             p->spike_mesh=(uint32_t)sources.size();
-            sources.push_back(MeshSource{w->spikes.model,Vec3{},1,0,Color{1,1,1}});
+            sources.push_back(MeshSource{w->spikes.model,Vec3{},1,0,Color{1,1,1},0,0,0,0});
         }
         if (w->backdrop.model_path[0])
         {
             p->background_mesh=(uint32_t)sources.size();const Background* b=&w->backdrop;
-            sources.push_back(MeshSource{b->model_path,b->position,b->scale,0,b->color});
+            sources.push_back(MeshSource{b->model_path,b->position,b->scale,0,b->color,0,0,0,0});
         }
         if (!geometry_build(&scene->geometry,sources.data(),(uint32_t)sources.size(),config)) return false;
         p->unit_base=0;p->body_base=w->gameplay.enabled ? (uint32_t)MAX_UNITS : w->spawn_count;
         p->factory_base=p->body_base+w->body_count;
-        p->attached_base=p->factory_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES : 0);
+        p->stem_base=p->factory_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES : 0);
+        p->bud_base=p->stem_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES*GROWTH_SEGMENTS : 0);
+        p->debris_base=p->bud_base+(w->gameplay.enabled ? w->body_count : 0);
+        p->attached_base=p->debris_base+(w->gameplay.enabled ? MAX_LIMB_DEBRIS : 0);
         p->flying_base=p->attached_base+(w->spikes.enabled ? MAX_UNITS*w->spikes.count : 0);
         p->embedded_base=p->flying_base+(w->spikes.enabled ? MAX_PROJECTILES : 0);
         p->background_slot=p->embedded_base+(w->spikes.enabled ? 2*(MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES) : 0);
@@ -90,7 +100,7 @@ static float unit_visual_scale(const Simulation* s,const Unit* unit)
 {
     float size=simulation_unit_definition(s,unit)->scale;
     if (!s->world.combat.flight_enabled) return size;
-    float t=std::fmin(1.0f,unit->age/.25f);t=t*t*(3-2*t);size*=.3f+.7f*t;
+    float t=unit->hatched ? 1 : std::fmin(1.0f,unit->age/.25f);t=t*t*(3-2*t);size*=.3f+.7f*t;
     if (unit->landing>0) size*=1-.8f*std::fmin(1.0f,unit->landing/s->world.gameplay.landing_seconds);
     return size;
 }
@@ -126,6 +136,7 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
             }
         for (uint32_t j=0;j<u->wounds && j<MAX_EMBEDDED;++j)
         {
+            if (dot(u->embedded[j].direction,u->embedded[j].direction)<.01f) continue;
             Vec3 outward=posed_direction(u->embedded[j].direction,x,y,z);float length=std::fmax(r->scale,size*.45f);
             Vec3 root=add(add(u->position,scale(posed_direction(u->embedded[j].anchor,x,y,z),size)),scale(outward,length*.7f));
             spike_instance(state,embedded+i*2+j,root,scale(outward,-1),length,length*.5f,content_color(&s->world.content,u->embedded[j].faction));++state->embedded_spikes;
@@ -150,6 +161,7 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
             Vec3 tip=simulation_structure_position(s,i,k);
             for (uint32_t j=0;j<wounds && j<MAX_EMBEDDED;++j)
             {
+                if (dot(spikes[j].direction,spikes[j].direction)<.01f) continue;
                 Vec3 outward=spikes[j].direction;float length=r->scale*2;
                 spike_instance(state,embedded+MAX_UNITS*2+(i*MAX_FACTORY_STRUCTURES+k)*2+j,
                     add(add(tip,spikes[j].anchor),scale(outward,length*.7f)),scale(outward,-1),length,length*.5f,
@@ -200,8 +212,45 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
     for (uint32_t p=0;p<s->world.body_count;++p)
     {
         const Colony* colony=&s->colonies[p];if (colony->health<=0 || !s->visible_bodies[p]) continue;
+        if (s->world.content.factions[colony->faction].automatic) continue;
         if (s->world.gameplay.enabled)
         {
+            const ProducerDefinition* definition=simulation_producer_definition(s,p);
+            if (definition->segment_path[0])
+            {
+                Color color=content_color(&s->world.content,colony->faction);
+                for (uint32_t k=0;k<definition->branches.count;++k)
+                {
+                    if (k && colony->branches[k-1].health<=0) continue;
+                    float growth=k ? colony->branches[k-1].growth : colony->growth;
+                    for (uint32_t j=0;j<GROWTH_SEGMENTS;++j)
+                    {
+                        float extension=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_SEGMENTS-j));
+                        if (extension<=.0001f) continue;
+                        Vec3 start=colony->stems[k][j],delta=scale(subtract(colony->stems[k][j+1],start),extension);
+                        Vec3 y=normalize(delta),x=normalize(cross(std::fabs(y.z)<.9f ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
+                        float width=definition->width*(1-.12f*j)*(k ? .65f : 1)*(.55f+.45f*growth);
+                        uint32_t slot=state->stem_base+(p*MAX_FACTORY_STRUCTURES+k)*GROWTH_SEGMENTS+j;
+                        set_instance(state,slot,state->segment_meshes[colony->type],start,scale(x,width),delta,scale(z,width));
+                        uint32_t wounds=k ? colony->branches[k-1].wounds : colony->wounds;
+                        Color tint=wounds ? s->world.spikes.injury[std::min(1u,wounds-1)] : color;
+                        float* style=state->scene.instances[slot].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=1;
+                    }
+                    float size=definition->width*(k ? .55f : .8f)*(.4f+.6f*growth);
+                    uint32_t slot=factory_instance_slot(state,p,k);
+                    set_instance(state,slot,state->tip_meshes[colony->type],simulation_structure_position(s,p,k),Vec3{size,0,0},Vec3{0,size,0},Vec3{0,0,size});
+                    float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=1;
+                }
+                if (colony->building)
+                {
+                    const UnitDefinition& u=s->world.content.units[colony->building_kind];float t=colony->manufacturing;
+                    float size=u.scale*(.08f+.92f*t*t*(3-2*t));Vec3 tip=simulation_structure_position(s,p,colony->production_tip);
+                    Vec3 z=normalize(subtract(tip,s->world.bodies[p].position));
+                    Vec3 x=normalize(cross(std::fabs(z.y)<.9f ? Vec3{0,1,0} : Vec3{1,0,0},z)),y=cross(z,x);
+                    set_instance(state,state->bud_base+p,state->unit_meshes[colony->building_kind],tip,scale(x,size),scale(y,size),scale(z,size));
+                }
+                continue;
+            }
             Vec3 right,up,normal;simulation_producer_axes(simulation_producer_definition(s,p),&right,&up,&normal);
             for (uint32_t k=0;k<simulation_producer_definition(s,p)->branches.count;++k)
             {
@@ -215,6 +264,16 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
             continue;
         }
     }
+    for (uint32_t i=0;i<MAX_LIMB_DEBRIS;++i)
+    {
+        const LimbDebris& d=s->debris[i];if (d.seconds<=0 || !simulation_in_sight(s,d.start,0)) continue;
+        float shrink=std::fmin(1.0f,(d.seconds-d.age)/s->world.combat.break_shrink);
+        Vec3 delta=subtract(d.end,d.start),y=normalize(delta),x=normalize(cross(std::fabs(y.z)<.9f ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
+        uint32_t slot=state->debris_base+i;
+        set_instance(state,slot,state->segment_meshes[d.producer],d.start,scale(x,d.radius*shrink),delta,scale(z,d.radius*shrink));
+        Color color=content_color(&s->world.content,d.faction);float* style=state->scene.instances[slot].style;
+        style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=1;
+    }
     update_spike_instances(state,simulation);
 }
 
@@ -227,7 +286,11 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
         for (uint32_t axis=0;axis<3;++axis) scene->instances[i].transform[axis][axis]=1;
     for (uint32_t i=0;i<w->body_count;++i)
         if (simulation_body_known(s,i))
+        {
             set_instance(p,p->body_base+i,p->body_meshes[i],Vec3{},Vec3{1,0,0},Vec3{0,1,0},Vec3{0,0,1});
+            const CellAppearance& a=s->cell_appearance[i];float* style=scene->instances[p->body_base+i].style;
+            style[0]=a.tint.r;style[1]=a.tint.g;style[2]=a.tint.b;style[3]=a.strength;
+        }
     for (uint32_t i=0;i<scene->media.size();++i)
     {
         const Body* c=&w->bodies[p->medium_bodies[i]];RenderMedium* medium=&scene->media[i];

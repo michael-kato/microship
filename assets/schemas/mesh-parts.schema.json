@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mesh parts and attachments",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "vertices": {
+      "type": "integer",
+      "minimum": 3,
+      "maximum": 1000000
+    },
+    "parts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "properties": {
+          "first": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pivot": {
+            "$ref": "shared.schema.json#/$defs/position"
+          },
+          "movable": {
+            "type": "boolean"
+          },
+          "attachment": {
+            "$ref": "shared.schema.json#/$defs/position"
+          }
+        },
+        "required": [
+          "first",
+          "count",
+          "pivot",
+          "movable"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "vertices",
+    "parts"
+  ],
+  "additionalProperties": false
+}

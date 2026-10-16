@@ -117,6 +117,44 @@
         "projectile_scale"
       ],
       "additionalProperties": false
+    },
+    "limb_break": {
+      "type": "object",
+      "properties": {
+        "seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10
+        },
+        "speed": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10
+        },
+        "drag": {
+          "type": "number",
+          "maximum": 10,
+          "minimum": 0
+        },
+        "spin": {
+          "type": "number",
+          "maximum": 20,
+          "minimum": 0
+        },
+        "shrink_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10
+        }
+      },
+      "required": [
+        "seconds",
+        "speed",
+        "drag",
+        "spin",
+        "shrink_seconds"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [],

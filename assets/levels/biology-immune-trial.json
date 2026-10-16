@@ -1,0 +1,254 @@
+{
+  "$schema": "../schemas/world.schema.json",
+  "content": "../gameplay/faction-trials.json",
+  "rules": "../gameplay/rules.json",
+  "appearance": "../presentation/biology.json",
+  "effects": "../presentation/combat.json",
+  "match": {
+    "player": "immune",
+    "opponent": "virus"
+  },
+  "bodies": [
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [
+        -52.0,
+        -4.0,
+        0.0
+      ],
+      "radius": 4.2,
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "site": {
+        "availability": 1.0,
+        "normal": [
+          0.0,
+          0.29,
+          0.957
+        ]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [
+          0.035,
+          0.045,
+          0.04
+        ],
+        "absorption": 0.012,
+        "anisotropy": 0.2
+      },
+      "seed": 96083
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [
+        48.0,
+        14.0,
+        0.0
+      ],
+      "radius": 4.2,
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "site": {
+        "availability": 1.0,
+        "normal": [
+          0.0,
+          0.29,
+          0.957
+        ]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [
+          0.035,
+          0.045,
+          0.04
+        ],
+        "absorption": 0.012,
+        "anisotropy": 0.2
+      },
+      "seed": 103474
+    },
+    {
+      "type": "unclaimed",
+      "owner": "neutral",
+      "position": [
+        -30.0,
+        0.0,
+        0.0
+      ],
+      "radius": 2.1,
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "site": {
+        "availability": 0.75,
+        "normal": [
+          0.0,
+          0.29,
+          0.957
+        ]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [
+          0.035,
+          0.045,
+          0.04
+        ],
+        "absorption": 0.012,
+        "anisotropy": 0.2
+      },
+      "seed": 110865
+    },
+    {
+      "type": "unclaimed",
+      "owner": "neutral",
+      "position": [
+        -3.0,
+        -6.0,
+        0.0
+      ],
+      "radius": 2.7,
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "site": {
+        "availability": 1.0,
+        "normal": [
+          0.0,
+          0.29,
+          0.957
+        ]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [
+          0.035,
+          0.045,
+          0.04
+        ],
+        "absorption": 0.012,
+        "anisotropy": 0.2
+      },
+      "seed": 118256
+    },
+    {
+      "type": "unclaimed",
+      "owner": "neutral",
+      "position": [
+        24.0,
+        9.0,
+        0.0
+      ],
+      "radius": 2.1,
+      "tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "site": {
+        "availability": 0.75,
+        "normal": [
+          0.0,
+          0.29,
+          0.957
+        ]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [
+          0.035,
+          0.045,
+          0.04
+        ],
+        "absorption": 0.012,
+        "anisotropy": 0.2
+      },
+      "seed": 125647
+    }
+  ],
+  "spawns": [
+    {
+      "type": "immune_bomber",
+      "position": [
+        -54.6,
+        1.5,
+        5.0
+      ]
+    },
+    {
+      "type": "immune_fighter",
+      "position": [
+        -53.3,
+        1.5,
+        5.0
+      ]
+    },
+    {
+      "type": "immune_fighter",
+      "position": [
+        -52.0,
+        1.5,
+        5.0
+      ]
+    },
+    {
+      "type": "swarm_bomber",
+      "position": [
+        45.4,
+        19.5,
+        5.0
+      ]
+    },
+    {
+      "type": "swarm_fighter",
+      "position": [
+        46.7,
+        19.5,
+        5.0
+      ]
+    },
+    {
+      "type": "swarm_fighter",
+      "position": [
+        48.0,
+        19.5,
+        5.0
+      ]
+    },
+    {
+      "type": "swarm_fighter",
+      "position": [
+        49.3,
+        19.5,
+        5.0
+      ]
+    },
+    {
+      "type": "swarm_fighter",
+      "position": [
+        50.6,
+        19.5,
+        5.0
+      ]
+    }
+  ]
+}

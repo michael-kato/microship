@@ -6,6 +6,7 @@
 #include <memory>
 #include <new>
 #include "orders.h"
+#include "audio.h"
 #include "vector_math.h"
 
 #include <stdio.h>
@@ -140,7 +141,7 @@ static void gameplay_input(Game* game, const PointerInput* input, const RenderCo
         return;
     }
     for (uint32_t i=0;i<MAX_UNITS;++i)
-        if (s->units[i].health>0 && s->units[i].faction==s->world.player_faction)
+        if (s->units[i].health>0 && s->units[i].faction==s->world.player_faction && !s->world.content.factions[s->units[i].faction].automatic)
         {
             float radius=std::fmax(simulation_unit_definition(s,&s->units[i])->pick_radius,simulation_unit_definition(s,&s->units[i])->scale);
             float t=pick_distance(game->camera.position,ray,s->units[i].position,radius);
@@ -184,6 +185,12 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     snprintf(r->hud[5],96,"SCOUT TO FIND ENEMY PRODUCTION SITES");
     snprintf(r->hud[6],96,"CLEAR DEFENDERS / COLONIZE TO EXPAND");
     snprintf(r->hud[7],96,"F: %-15s S: %s",s->world.content.groups[0].plural,s->world.content.groups[1].plural);
+    if (s->world.content.factions[s->world.player_faction].automatic)
+    {
+        snprintf(r->hud[0],96,"MICROSHIP / %s     SPORES %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet);
+        snprintf(r->hud[1],96,"AUTOMATIC EMISSION / NO UNIT ORDERS");
+        snprintf(r->hud[3],96,"HOME: FOCUS   SPACE: PAUSE   R: RESTART");
+    }
     for (int j=0;j<4;++j) r->hud_status[j]=0;
     r->hud_status[0]=-1;
     Color accent=content_color(&s->world.content,s->world.player_faction);
@@ -197,7 +204,7 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
         bool ours=c->health>0 && c->faction==s->world.player_faction;
         r->hud_accent[3]=ours ? 1.0f : c->health>0 ? -1.0f : 0.0f;
         snprintf(r->hud[4],96,"%s %02d / %s",s->world.content.bodies[s->world.bodies[p].type].label,p+1,c->health>0 ? (ours ? "YOUR NODE" : "HOSTILE NODE") : "UNCLAIMED");
-        if (c->building) snprintf(r->hud[4]+strlen(r->hud[4]),96-strlen(r->hud[4]),"  BUILD %03.0f%%",c->manufacturing*100);
+        if (c->building) snprintf(r->hud[4]+strlen(r->hud[4]),96-strlen(r->hud[4]),"  %s %03.0f%%",s->world.content.factions[c->faction].automatic ? "SPORE" : "BUILD",c->manufacturing*100);
         if (c->capacity_blocked) snprintf(r->hud[4],96,"UNIT STORAGE FULL / BUILD HELD");
         if (s->world.gameplay.enabled)
         {
@@ -208,6 +215,12 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
         }
         snprintf(r->hud[6],96,"%s %05.1f / %.0f",s->world.content.resource_label,c->energy,s->world.gameplay.storage);
         snprintf(r->hud[7],96,"F: %.16s %s  S: %.16s %s",s->world.content.groups[0].plural,s->world.content.units[c->priority].group==0 ? "*" : " ",s->world.content.groups[1].plural,s->world.content.units[c->priority].group==1 ? "*" : " ");
+        if (s->world.content.factions[c->faction].automatic)
+        {
+            snprintf(r->hud[5],96,"AUTOMATIC SEEKING SPORES");
+            snprintf(r->hud[6],96,"SPORES CAN BE SHOT DOWN");
+            snprintf(r->hud[7],96,"BLASTS ALSO DAMAGE NEARBY FRIENDLIES");
+        }
         if (!ours) snprintf(r->hud[7],96,"CLEAR DEFENDERS TO ESTABLISH A SITE");
         r->hud_status[0]=-1;r->hud_status[1]=c->growth;
         r->hud_status[2]=c->energy/s->world.gameplay.storage;r->hud_status[3]=c->building ? c->manufacturing : 0;
@@ -232,9 +245,13 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
 int game_run(const GameOptions* options)
 {
     Game game = {};
+    Audio audio;if (!audio_load(&audio,options->audio_path,options->audio_capture_path)) return 1;
     std::unique_ptr<Presentation> presentation(new (std::nothrow) Presentation());
     if (!presentation) return 1;
-    if (!simulation_initialize(&game.simulation, options->world_path))
+    uint32_t seed=options->world_seed;
+    if (!options->world_seed_set && !options->smoke && !options->headless && !options->ticks && !options->capture_path) seed=GetTickCount()|1u;
+    printf("World variation seed: %u. Restart keeps this layout.\n",seed);
+    if (!simulation_initialize(&game.simulation, options->world_path,seed))
         return 1;
     game.initial_simulation=game.simulation;
     print_world(&game.simulation, options->world_path);
@@ -250,7 +267,7 @@ int game_run(const GameOptions* options)
         config.samples_per_pixel,config.max_transmission_layers,config.volume_rays_per_pixel,config.volume_steps);
     startup_camera(&game,&config);
     camera_apply_input(&game.camera, &options->camera_input, &config);
-    if (!orders_run(&game.simulation,options->replay_path,options->ticks)) return 1;
+    if (!orders_run(&game.simulation,options->replay_path,options->ticks,&audio)) return 1;
     game.pointer=options->camera_input;
     gameplay_input(&game,&options->camera_input,&config);
     printf("Initial camera: %g %g %g; target: %g %g %g.\n",game.camera.position.x,game.camera.position.y,game.camera.position.z,game.camera.target.x,game.camera.target.y,game.camera.target.z);
@@ -264,12 +281,13 @@ int game_run(const GameOptions* options)
         if (options->state_path && !simulation_write_state(&game.simulation,options->state_path)) return 1;
         if (options->scene_state_path && !render_scene_write(&presentation->scene,options->scene_state_path)) return 1;
         printf("Application lifecycle smoke passed: assets, simulation and render scene; GPU rendering excluded.\n");
-        return 0;
+        return audio_close(&audio) ? 0 : 1;
     }
     if (!presentation_build(presentation.get(),&game.simulation,&game.camera,&config)
         || !renderer_initialize(&game.renderer,&presentation->scene,&config,options->shader_path,
             options->builtin_shader_path,options->headless,options->debug_views,options->no_activate)) return 1;
     game.renderer.debug_stats = options->stats_set ? options->show_stats : !options->headless || options->debug_views;
+    if (!options->headless && !audio_open(&audio)) { renderer_shutdown(&game.renderer);return 1; }
     game.renderer.debug_views = options->debug_views;
     printf("Left-drag to pan; wheel to zoom. F1/F2 debug. Gameplay: 1 fighters, 2 bombers, 3 all; right-click to move or order; F/S factory production; Space pause; R restart.\n");
     const double tick_seconds = 1.0 / 60.0;
@@ -295,11 +313,14 @@ int game_run(const GameOptions* options)
         while (accumulator >= tick_seconds)
         {
             simulation_step(&game.simulation);
+            audio_events(&audio,&game.simulation,game.camera.target);
             accumulator -= tick_seconds;
         }
         if ((options->headless && !options->ticks) || options->time_set)
             simulation_set_time(&game.simulation, options->time_seconds + frames * options->step_seconds);
         overlay_enabled(&game,&config);
+        audio_events(&audio,&game.simulation,game.camera.target);
+        if (!audio_pump(&audio)) { success=false;break; }
         if (input.drag_x || input.drag_y || input.wheel)
             printf("Camera input: drag %g %g; wheel %g.\n", input.drag_x, input.drag_y, input.wheel);
         printf("Scene time: %.6f; camera: %g %g %g.\n",game.simulation.time_seconds,
@@ -319,6 +340,7 @@ int game_run(const GameOptions* options)
         printf("Application work: %.3f ms; explicit acquire/present waits: %.3f ms.\n",game.renderer.work_frame_ms,game.renderer.acquire_ms+game.renderer.present_ms);
     }
     if (!renderer_shutdown(&game.renderer)) success = false;
+    if (!audio_close(&audio)) success=false;
     if (options->state_path && !simulation_write_state(&game.simulation,options->state_path)) success=false;
     if (options->scene_state_path && !render_scene_write(&presentation->scene,options->scene_state_path)) success=false;
     if (frames)

@@ -80,6 +80,21 @@
               },
               "normal": {
                 "$ref": "shared.schema.json#/$defs/normal"
+              },
+              "health": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 10000
+              },
+              "hits": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 32
+              },
+              "regrow_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 300
               }
             },
             "required": [
@@ -89,6 +104,22 @@
               "production",
               "seed",
               "normal"
+            ],
+            "additionalProperties": false
+          },
+          "growth_meshes": {
+            "type": "object",
+            "properties": {
+              "segment": {
+                "$ref": "shared.schema.json#/$defs/path"
+              },
+              "tip": {
+                "$ref": "shared.schema.json#/$defs/path"
+              }
+            },
+            "required": [
+              "segment",
+              "tip"
             ],
             "additionalProperties": false
           }

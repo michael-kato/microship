@@ -66,6 +66,19 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
     {
         const Pop* pop=&s->pops[i];if (pop->duration<=0 || !simulation_in_sight(s,pop->position,0)) continue;float t=pop->age/pop->duration;
         float ease=1-(1-t)*(1-t);
+        if (pop->blast_radius>0)
+        {
+            float radius=pop->blast_radius*ease;Color color=content_color(&s->world.content,pop->faction);
+            segment(output,count,p,pop->position,pop->position,pop->blast_radius*.18f,color,(1-t)*(1-t),2);
+            for (uint32_t j=0;j<16;++j)
+            {
+                float a=j*6.2831853f/16,b=(j+1)*6.2831853f/16;
+                Vec3 x=add(pop->position,scale(add(scale(p.right,std::cos(a)),scale(p.up,std::sin(a))),radius));
+                Vec3 y=add(pop->position,scale(add(scale(p.right,std::cos(b)),scale(p.up,std::sin(b))),radius));
+                segment(output,count,p,x,y,v->trail_width,color,1-t,1);
+            }
+            continue;
+        }
         segment(output,count,p,pop->position,pop->position,v->pop_radius*(.2f+1.3f*ease),content_color(&s->world.content,pop->faction),(1-t)*(1-t),2);
         for (int j=0;j<7;++j)
         {

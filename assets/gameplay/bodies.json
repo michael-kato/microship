@@ -6,21 +6,36 @@
       "label": "CELL",
       "geometry": "mesh",
       "model": "../models/cell_infected.fmesh",
-      "hosts_site": true
+      "hosts_site": true,
+      "variation": {
+        "parts": "../models/cell_infected.parts.json",
+        "shape": 0.065,
+        "interior": 0.105
+      }
     },
     {
       "name": "healthy",
       "label": "CELL",
       "geometry": "mesh",
       "model": "../models/cell_healthy.fmesh",
-      "hosts_site": true
+      "hosts_site": true,
+      "variation": {
+        "parts": "../models/cell_healthy.parts.json",
+        "shape": 0.065,
+        "interior": 0.105
+      }
     },
     {
       "name": "unclaimed",
       "label": "CELL",
       "geometry": "mesh",
       "model": "../models/cell_neutral.fmesh",
-      "hosts_site": true
+      "hosts_site": true,
+      "variation": {
+        "parts": "../models/cell_neutral.parts.json",
+        "shape": 0.065,
+        "interior": 0.105
+      }
     }
   ]
 }
