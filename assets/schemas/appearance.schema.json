@@ -368,6 +368,11 @@
         },
         "tint": {
           "$ref": "shared.schema.json#/$defs/color"
+        },
+        "memory_half_life_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 60
         }
       },
       "required": [

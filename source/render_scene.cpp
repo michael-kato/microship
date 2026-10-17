@@ -53,6 +53,13 @@ bool render_scene_validate(const RenderScene* scene)
     valid=valid && std::isfinite(scene->fog_tint.r) && scene->fog_tint.r>=0 && scene->fog_tint.r<=1
         && std::isfinite(scene->fog_tint.g) && scene->fog_tint.g>=0 && scene->fog_tint.g<=1
         && std::isfinite(scene->fog_tint.b) && scene->fog_tint.b>=0 && scene->fog_tint.b<=1;
+    if (scene->fog_blur>0)
+    {
+        valid=valid && std::isfinite(scene->fog_field.low_x) && std::isfinite(scene->fog_field.low_y)
+            && std::isfinite(scene->fog_field.spacing) && scene->fog_field.spacing>0;
+        for (int i=0;valid && i<SIGHT_FIELD_CELLS;++i)
+            valid=std::isfinite(scene->fog_field.reveal[i]) && scene->fog_field.reveal[i]>=0 && scene->fog_field.reveal[i]<=1;
+    }
     for (uint32_t i=0;valid && i<scene->sight_count;++i)
         for (uint32_t j=0;j<4;++j) valid=valid && std::isfinite(scene->sight[i].center_radius[j]) && (j<3 || scene->sight[i].center_radius[j]>0);
     for (uint32_t i=0;valid && i<scene->instances.size();++i)
@@ -142,7 +149,9 @@ bool render_scene_write(const RenderScene* scene,const char* path)
     fprintf(file,"],\"fog\":{\"blur_radius\":%.6f,\"sight_feather\":%.6f,\"plane_z\":%.6f,\"tint\":[%.6f,%.6f,%.6f],\"sight\":[",scene->fog_blur,scene->fog_feather,scene->fog_plane_z,scene->fog_tint.r,scene->fog_tint.g,scene->fog_tint.b);
     for (uint32_t i=0;i<scene->sight_count;++i)
     { const float* v=scene->sight[i].center_radius;fprintf(file,"%s[%.6f,%.6f,%.6f,%.6f]",i ? "," : "",v[0],v[1],v[2],v[3]); }
-    fprintf(file,"]},\"bounds_min\":[%.6f,%.6f,%.6f],\"bounds_max\":[%.6f,%.6f,%.6f],\"effects\":%u,\"effect_segments\":[",
+    fprintf(file,"],\"grid\":{\"side\":%d,\"origin\":[%.9g,%.9g],\"spacing\":%.9g,\"reveal\":[",SIGHT_FIELD_SIDE,scene->fog_field.low_x,scene->fog_field.low_y,scene->fog_field.spacing);
+    if (scene->fog_blur>0) for (int i=0;i<SIGHT_FIELD_CELLS;++i) fprintf(file,"%s%.9g",i ? "," : "",scene->fog_field.reveal[i]);
+    fprintf(file,"]}},\"bounds_min\":[%.6f,%.6f,%.6f],\"bounds_max\":[%.6f,%.6f,%.6f],\"effects\":%u,\"effect_segments\":[",
         scene->bounds_min[0],scene->bounds_min[1],scene->bounds_min[2],scene->bounds_max[0],scene->bounds_max[1],scene->bounds_max[2],scene->effect_count);
     for (uint32_t i=0;i<scene->effect_count;++i)
     {

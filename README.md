@@ -4,7 +4,7 @@ Microscopic strategy inside a body, inspired by Eufloria. Command craft, scout l
 
 Virus forces use large swarms of light craft and spike projectiles. Immune forces use fewer, tougher craft that attach, digest, and heal. The fungal trial uses seeking explosive spores.
 
-Seeded membranes, organelles, branching factories, and wet anatomical backgrounds form the world. Units grow at factory tips. Damaged limbs break away. Fog strongly blurs areas outside current sight. Direct ray tracing provides light, shadows, and atmospheric scattering. Colors come from vertices; each frame uses current data only.
+Seeded membranes, organelles, branching factories, and wet anatomical backgrounds form the world. Units grow at factory tips. Damaged limbs break away. Fog returns gradually and strongly blurs unseen areas. Direct ray tracing provides light, shadows, and atmospheric scattering. Colors come from vertices; each frame uses current data only.
 
 Simulation rules remain separate from rendering. The project uses direct functions and contiguous data, with real application checks.
 

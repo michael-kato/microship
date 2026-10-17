@@ -2,6 +2,7 @@
 #define MICROSHIP_RENDER_BINDINGS_GLSL
 
 // Shared by C++ descriptor writes and GLSL layouts.
+#define FOG_FIELD_SIZE 128
 #define RENDER_BINDING_ACCELERATION 0
 #define RENDER_BINDING_BEAUTY 1
 #define RENDER_BINDING_VERTICES 2

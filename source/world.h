@@ -96,7 +96,7 @@ struct World
     Vec3 atmosphere_center;
     float atmosphere_radius,atmosphere_fade,atmosphere_absorption,atmosphere_phase;
     Color atmosphere_scattering;
-    float fog_blur,fog_feather,fog_plane_z;
+    float fog_blur,fog_feather,fog_plane_z,fog_half_life;
     Color fog_tint;
     StudioLight studio[3];
     uint32_t studio_mask;

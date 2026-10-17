@@ -2,6 +2,7 @@
 #define MICROSHIP_SIMULATION_H
 
 #include "world.h"
+#include "sight_field.h"
 #include "sound_events.h"
 
 enum { MAX_UNITS = 256, NO_BODY = -1, MAX_PROJECTILES=512, MAX_POPS=256, TRAIL_POINTS=8 };
@@ -115,6 +116,7 @@ struct Simulation
     double time_seconds;
     Unit units[MAX_UNITS];
     Trail trails[MAX_UNITS];
+    SightField fog_memory;
     Projectile projectiles[MAX_PROJECTILES];
     Pop pops[MAX_POPS];
     Impact impacts[MAX_POPS];
@@ -163,6 +165,7 @@ float simulation_production(const Simulation*,uint32_t cell);
 bool simulation_in_sight(const Simulation*,Vec3 position,float radius);
 bool simulation_body_known(const Simulation*,uint32_t cell);
 void simulation_update_sight(Simulation*);
+void simulation_update_fog(Simulation*,float dt);
 
 inline const UnitDefinition* simulation_unit_definition(const Simulation* s,const Unit* u)
 { return &s->world.content.units[u->type]; }

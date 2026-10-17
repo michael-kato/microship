@@ -24,4 +24,5 @@ layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
     vec4 focus_band; // Screen center, half width, falloff, maximum pixel radius.
     vec4 subsurface; // Global weight, diffuse wrap, transmission budget, thin-wall thickness.
     uvec4 subsurface_quality; // Number of existing film samples used for thickness transport.
+    vec4 fog_grid; // World origin XY, grid spacing, side length.
 } render;

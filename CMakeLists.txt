@@ -141,7 +141,7 @@ add_executable(microship
     source/geometry.cpp source/geometry_variation.cpp
     source/window.cpp
     source/simulation.cpp
-    source/flight.cpp
+    source/flight.cpp source/fog.cpp
     source/orders.cpp
     source/renderer.cpp
     source/game.cpp
@@ -241,3 +241,6 @@ set_tests_properties(backgrounds PROPERTIES TIMEOUT 45)
 add_test(NAME trails COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/trails.py $<TARGET_FILE:microship>)
 set_tests_properties(trails PROPERTIES TIMEOUT 30)
+add_test(NAME fog_memory COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/fog_memory.py $<TARGET_FILE:microship>)
+set_tests_properties(fog_memory PROPERTIES TIMEOUT 45)

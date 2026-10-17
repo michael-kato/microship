@@ -423,7 +423,7 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
                 for (uint32_t k=1;k<c.root_count;++k)
                 { c.branches[k-1].health=d.health;c.branches[k-1].growth=1;c.branches[k-1].generation=1; }
             }
-    simulation_update_sight(s);
+    simulation_update_sight(s);simulation_update_fog(s,0);
     snprintf(s->message,sizeof(s->message),"RIGHT-CLICK OPEN SPACE TO SCOUT. ORDER A KNOWN BODY TO INTERACT.");
     if (s->world.content.factions[s->world.player_faction].automatic)
     {
@@ -1363,7 +1363,7 @@ void simulation_step(Simulation* s)
     if (s->outcome<0)
     {
         if (s->world.combat.enabled) { advance_visuals(s,dt);recover_units(s,dt);for (uint32_t i=0;i<MAX_PROJECTILES;++i) s->projectiles[i].active=false;simulation_set_time(s,s->time_seconds+1.0/SIMULATION_TICKS_PER_SECOND_DOUBLE); }
-        return;
+        simulation_update_fog(s,dt);return;
     }
     if (s->world.gameplay.enabled)
     {
@@ -1399,6 +1399,7 @@ void simulation_step(Simulation* s)
             }
         }
     }
+    simulation_update_fog(s,dt);
     ++s->tick_count;simulation_set_time(s,s->time_seconds+1.0/SIMULATION_TICKS_PER_SECOND_DOUBLE);
 }
 

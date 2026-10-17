@@ -342,6 +342,7 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
     scene->fog_tint=w->fog_tint;scene->fog_feather=w->fog_feather;scene->fog_plane_z=w->fog_plane_z;
     if (scene->fog_blur>0)
     {
+        scene->fog_field=s->fog_memory;
         for (uint32_t i=0;i<w->body_count;++i)
             if (s->colonies[i].active && s->colonies[i].faction==w->player_faction)
                 add_sight(scene,w->bodies[i].position,w->sight_radius+w->bodies[i].radius);

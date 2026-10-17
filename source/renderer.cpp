@@ -24,9 +24,10 @@
 #include "../assets/shaders/render_bindings.glsl"
 #include "../assets/shaders/hud_layout.glsl"
 
+static_assert(SIGHT_FIELD_SIDE==FOG_FIELD_SIZE,"Fog CPU/GPU grid layout");
 static const int GPU_VERTEX_BYTES = 64;
 static const int GPU_MEDIUM_BYTES = 80;
-static const int GPU_RENDER_UNIFORM_BYTES = 512;
+static const int GPU_RENDER_UNIFORM_BYTES = 528;
 static const int GPU_DEBUG_PUSH_BYTES = 128;
 static const double MILLISECONDS_PER_SECOND = 1000.0;
 static const double BINARY_UNIT_SCALE = 1024.0;
@@ -85,6 +86,7 @@ struct RenderUniform
     float studio_direction[3][4], studio_color[3][4], thin_material[4], backdrop_wave[4];
     float fog[4],fog_tint[4],membrane_fade[4],focus_band[4],subsurface[4];
     uint32_t subsurface_quality[4];
+    float fog_grid[4];
 };
 
 static_assert(sizeof(GpuVertex) == GPU_VERTEX_BYTES, "Vertex shader layout");
@@ -678,6 +680,8 @@ static void scene_uniform(RenderUniform* uniform,const RenderScene* scene)
     uniform->quality[3]=scene->thin_blur_radius>0 ? 1 : 0;
     for (uint32_t i=0;i<scene->media.size();++i) if (scene->media[i].blur[0]>0 && scene->media[i].blur[2]>0) uniform->quality[3]=1;
     uniform->scene[1]=(uint32_t)scene->media.size();uniform->scene[2]=scene->sight_count;
+    uniform->fog_grid[0]=scene->fog_field.low_x;uniform->fog_grid[1]=scene->fog_field.low_y;
+    uniform->fog_grid[2]=scene->fog_field.spacing;uniform->fog_grid[3]=SIGHT_FIELD_SIDE;
     uniform->fog_tint[0]=scene->fog_tint.r;uniform->fog_tint[1]=scene->fog_tint.g;uniform->fog_tint[2]=scene->fog_tint.b;
     uniform->fog[0]=scene->fog_blur;uniform->fog[1]=scene->fog_feather;uniform->fog[2]=scene->fog_plane_z;
 }
@@ -788,11 +792,12 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
     if (!create_buffer(state, &state->energy, MICROFACET_TABLE_SIZE*MICROFACET_TABLE_SIZE*sizeof(float),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, host)) return false;
     microfacet_energy_table((float*)state->energy.mapped);
-    if (!create_buffer(state,&state->sight,sizeof(scene->sight),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host)) return false;
+    if (!create_buffer(state,&state->sight,sizeof(scene->sight)+sizeof(scene->fog_field.reveal),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host)) return false;
     state->medium_count=(uint32_t)scene->media.size();
     if (!create_buffer(state,&state->media,(state->medium_count ? state->medium_count : 1)*sizeof(RenderMedium),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host)) return false;
     if (state->medium_count) memcpy(state->media.mapped,scene->media.data(),state->medium_count*sizeof(RenderMedium));
-    memcpy(state->sight.mapped,scene->sight,sizeof(scene->sight));
+    if (scene->fog_blur>0) memcpy(state->sight.mapped,scene->fog_field.reveal,sizeof(scene->fog_field.reveal));
+    memcpy((char*)state->sight.mapped+sizeof(scene->fog_field.reveal),scene->sight,sizeof(scene->sight));
     state->effect_tile_count=scene->tile_count;state->effect_tile_size=scene->effect_tiles.size();
     state->uniform_data=uniform;memcpy(state->uniform.mapped,&uniform,sizeof(uniform));
     return true;
@@ -1564,7 +1569,8 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     scene_instances(state,scene);
     if (state->medium_count) memcpy(state->media.mapped,scene->media.data(),state->medium_count*sizeof(RenderMedium));
     update_grid_activity(state);
-    memcpy(state->sight.mapped,scene->sight,sizeof(scene->sight));
+    if (scene->fog_blur>0) memcpy(state->sight.mapped,scene->fog_field.reveal,sizeof(scene->fog_field.reveal));
+    memcpy((char*)state->sight.mapped+sizeof(scene->fog_field.reveal),scene->sight,sizeof(scene->sight));
     {
         memcpy(state->instances.mapped,state->instance_data.data(),state->instances.size);
         VkAccelerationStructureGeometryKHR geometry = {};

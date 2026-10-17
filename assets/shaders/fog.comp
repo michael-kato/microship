@@ -5,7 +5,7 @@
 layout(local_size_x=COMPUTE_GROUP_SIZE,local_size_y=COMPUTE_GROUP_SIZE) in;
 layout(set=0,binding=BLOOM_BINDING_BEAUTY,rgba32f) uniform image2D beauty;
 layout(set=0,binding=BLOOM_BINDING_HORIZONTAL,rgba32f) uniform image2D scratch;
-layout(set=0,binding=BLOOM_BINDING_SIGHT,std430) readonly buffer Sight { vec4 spheres[]; };
+layout(set=0,binding=BLOOM_BINDING_SIGHT,std430) readonly buffer Sight { float reveal[FOG_FIELD_SIZE*FOG_FIELD_SIZE];vec4 spheres[]; };
 layout(push_constant) uniform Filter
 {
     ivec2 extent;int radius;int pass;
@@ -21,9 +21,18 @@ float fog_amount(ivec2 pixel)
     float distance=(render.fog.z-render.camera_position.z)/direction.z;
     if (distance<=0) return 1;
     vec3 point=render.camera_position.xyz+distance*direction;
-    float nearest=1e30;
-    for (uint i=0;i<render.scene.z;++i) nearest=min(nearest,length(point-spheres[i].xyz)-spheres[i].w);
-    return smoothstep(-render.fog.y,0,nearest);
+    vec2 cell=(point.xy-render.fog_grid.xy)/render.fog_grid.z;float visibility=0.0;
+    if (all(greaterThanEqual(cell,vec2(0))) && all(lessThanEqual(cell,vec2(FOG_FIELD_SIZE-1))))
+    {
+        ivec2 lower=min(ivec2(cell),ivec2(FOG_FIELD_SIZE-2));vec2 f=cell-vec2(lower);int index=lower.y*FOG_FIELD_SIZE+lower.x;
+        visibility=mix(mix(reveal[index],reveal[index+1],f.x),mix(reveal[index+FOG_FIELD_SIZE],reveal[index+FOG_FIELD_SIZE+1],f.x),f.y);
+    }
+    // Extreme authored map spans can make this fixed field too coarse. Preserve
+    // current sight analytically in that case; normal maps use four field reads.
+    if (render.fog_grid.z>render.fog.y*.25)
+        for (uint i=0;i<render.scene.z;++i)
+            visibility=max(visibility,1.0-smoothstep(-render.fog.y,render.fog.y,length(point-spheres[i].xyz)-spheres[i].w));
+    return 1.0-visibility;
 }
 
 void main()

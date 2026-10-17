@@ -234,10 +234,12 @@ static bool load_appearance(World* w,const char* path,uint32_t seed)
     Json fog=json_find(root,"fog");
     if (json_present(fog))
     {
-        json_object(fog,"blur_radius|sight_feather|plane_z|tint");
+        json_object(fog,"blur_radius|sight_feather|plane_z|tint|memory_half_life_seconds");
         Json tint=json_find(fog,"tint");w->fog_tint=json_present(tint) ? json_color(tint) : Color{1,1,1};
         w->fog_blur=json_float(json_get(fog,"blur_radius"),1,256);
         w->fog_feather=json_positive(json_get(fog,"sight_feather"),100);
+        Json half_life=json_find(fog,"memory_half_life_seconds");
+        if (json_present(half_life)) w->fog_half_life=json_float(half_life,0,60);
         w->fog_plane_z=json_float(json_get(fog,"plane_z"),-MAX_BACKDROP_COORDINATE,MAX_BACKDROP_COORDINATE);
     }
     Json lights=json_find(root,"lights");

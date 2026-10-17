@@ -3,6 +3,7 @@
 
 #include "geometry.h"
 #include "types.h"
+#include "sight_field.h"
 #include <vector>
 
 // CPU render input. No game rules or graphics API resources are stored here.
@@ -33,6 +34,7 @@ struct RenderScene
     uint32_t effect_count, tile_count;
     RenderSight sight[MAX_RENDER_SIGHT];
     uint32_t sight_count;
+    SightField fog_field;
     float fog_blur,fog_feather,fog_plane_z;
     Color fog_tint;
     Color ambient, ambient_top, ambient_bottom;
