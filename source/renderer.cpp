@@ -1006,6 +1006,10 @@ static bool load_compute_pipeline(RendererState* state, const char* shader_path,
     pipeline.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     pipeline.stage.module = shader;
     pipeline.stage.pName = "main";
+    VkSpecializationMapEntry entry={VOLUME_STEPS_SPECIALIZATION_ID,0,sizeof(state->config.volume_steps)};
+    VkSpecializationInfo specialization={1,&entry,sizeof(state->config.volume_steps),&state->config.volume_steps};
+    // Built-in pipelines use the startup count. External shaders keep their own contract.
+    pipeline.stage.pSpecializationInfo=state->custom_shader ? 0 : &specialization;
     bool success = vk_ok(vkCreateComputePipelines(state->device, VK_NULL_HANDLE, 1, &pipeline, 0, output_pipeline), "Create compute pipeline");
 
     vkDestroyShaderModule(state->device, shader, 0);

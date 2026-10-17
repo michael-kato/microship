@@ -38,6 +38,11 @@ layout(set = 0, binding = RENDER_BINDING_TRIANGLES, std430) readonly buffer Tria
 };
 #include "render_uniform.glsl"
 
+// Zero keeps the runtime loop bound for external shader compatibility.
+layout(constant_id=VOLUME_STEPS_SPECIALIZATION_ID) const uint specialized_volume_steps=0u;
+uint integration_steps()
+{ return specialized_volume_steps>0u ? specialized_volume_steps : uint(render.display.w); }
+
 const float MIN_RAY_ORIGIN_OFFSET = 0.0001;
 const float RELATIVE_RAY_ORIGIN_OFFSET = 0.00001;
 const uint THIN_MEMBRANE_MATERIAL = 3u;
@@ -211,7 +216,7 @@ vec3 transmittance(vec3 origin, vec3 direction, float distance)
         float density_integral = end - begin;
         if (medium.scattering.w>0.0)
         {
-            uint steps = uint(render.display.w);
+            uint steps = integration_steps();
             float stride = (end - begin) / float(steps);
             density_integral = 0.0;
             for (uint j = 0u; j < steps; ++j)
@@ -243,39 +248,31 @@ float membrane_clear(float cosine)
 vec3 studio_visibility(vec3 origin,vec3 direction);
 vec3 sampled_visibility(vec3 point,vec3 normal,int light);
 
-vec3 volume_light(vec3 point,vec3 view_direction,Medium medium)
-{
-    // Analytic ambient fill: integrate the authored linear gradient against HG.
-    // This approximation is unoccluded. Studio lights use current geometry.
-    vec3 incident=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,
-        .5+.5*medium.absorption_phase.w*view_direction.y);
-    for (int light=0;light<3;++light)
-    {
-        if (render.studio_direction[light].w<=0.0) continue;
-        vec3 direction=render.studio_direction[light].xyz;
-        float phase=henyey_greenstein(clamp(dot(view_direction,direction),-1.0,1.0),medium.absorption_phase.w);
-        vec3 visibility=medium.lighting.x>0.0 ? sampled_visibility(point,vec3(0),light) : transmittance(point,direction,RAY_MAX);
-        incident+=phase*render.studio_color[light].rgb*visibility;
-    }
-    return medium.scattering.rgb*incident;
-}
+vec3 volume_incident(vec3 point,Medium medium,vec3 ambient,vec3 phases);
 
 vec3 single_scattering(vec3 origin,vec3 direction,float distance,out vec3 sharp)
 {
     vec3 radiance=vec3(0);sharp=vec3(0);
     float path_offset=dot(origin-render.camera_position.xyz,direction);
-    uint steps=uint(render.display.w);
+    uint steps=integration_steps();
     for (uint i=0u;i<render.scene.y;++i)
     {
         Medium medium=media[i];float begin,end;
         if (all(equal(medium.scattering.rgb,vec3(0)))) continue;
         if (!medium_interval(medium,origin,direction,distance,begin,end)) continue;
+        // Phase and ambient terms depend on this ray and medium, not the integration point.
+        vec3 ambient=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,
+            .5+.5*medium.absorption_phase.w*direction.y);
+        vec3 phases=vec3(0);
+        for (int light=0;light<3;++light)
+            if (render.studio_direction[light].w>0.0)
+                phases[light]=henyey_greenstein(clamp(dot(direction,render.studio_direction[light].xyz),-1.0,1.0),medium.absorption_phase.w);
         float stride=(end-begin)/float(steps);
         for (uint step=0u;step<steps;++step)
         {
             float d=begin+(float(step)+.5)*stride;
             vec3 point=origin+direction*d;
-            vec3 contribution=transmittance(origin,direction,d)*medium_density(medium,point)*volume_light(point,direction,medium)*stride;
+            vec3 contribution=transmittance(origin,direction,d)*medium_density(medium,point)*(medium.scattering.rgb*volume_incident(point,medium,ambient,phases))*stride;
             radiance+=contribution;
             if (medium_blur_radius(direction,path_offset+d)<=0.0) sharp+=contribution;
         }
@@ -314,8 +311,9 @@ float directional_energy(float cosine, float roughness)
 }
 
 vec3 evaluate_bsdf(vec3 normal, vec3 outgoing, vec3 incoming, vec3 albedo,
-                   float roughness, float ior, bool metal,float diffuse_weight)
+                   float roughness, float ior, bool metal,float diffuse_weight,out float interface_fresnel)
 {
+    interface_fresnel=0.0;
     float ni = max(0.0, dot(normal, incoming)), no = max(0.0, dot(normal, outgoing));
     if (ni <= 0.0 || no <= 0.0) return vec3(0.0);
     if (!metal && (roughness >= DIFFUSE_ROUGHNESS_THRESHOLD || ior <= 1.0)) return diffuse_weight*albedo / PI;
@@ -338,7 +336,7 @@ vec3 evaluate_bsdf(vec3 normal, vec3 outgoing, vec3 incoming, vec3 albedo,
         }
         return gain*f*distribution*ggx_mask(ni,alpha)*ggx_mask(no,alpha)/(4.0*ni*no);
     }
-    float f = fresnel(oh, ior);
+    float f = fresnel(oh, ior);interface_fresnel=f;
     float specular = f * distribution * ggx_mask(ni, alpha) * ggx_mask(no, alpha) / (4.0*ni*no);
     return diffuse_weight*albedo * ((1.0-f) / PI) + vec3(specular);
 }
@@ -456,12 +454,50 @@ vec3 sampled_visibility(vec3 point,vec3 normal,int light)
             uvec3 low=min(uvec3(floor(q)),uvec3(n-2u));vec3 f=q-vec3(low),sum=vec3(0);
             for (uint z=0u;z<2u;++z) for (uint y=0u;y<2u;++y) for (uint x=0u;x<2u;++x)
             {
-                vec3 w=mix(1.0-f,f,vec3(x,y,z));
-                sum+=grid_visibility[grid_index(i,uint(light),low+uvec3(x,y,z),n)].rgb*w.x*w.y*w.z;
+                vec3 w=mix(1.0-f,f,vec3(x,y,z));float weight=w.x*w.y*w.z;
+                sum+=grid_visibility[grid_index(i,uint(light),low+uvec3(x,y,z),n)].rgb*weight;
             }
             return sum;
         }
     return studio_visibility(point,render.studio_direction[light].xyz);
+}
+
+// All three volume lights use the same point and interpolation weights.
+vec3 volume_incident(vec3 point,Medium medium,vec3 ambient,vec3 phases)
+{
+    uint n=render.quality.y;
+    // Sparse light sets keep the per-light path and do not fetch unused grid channels.
+    bool shared_grid=n>0u && render.studio_direction[0].w>0.0 && render.studio_direction[1].w>0.0 && render.studio_direction[2].w>0.0;
+    if (medium.lighting.x>0.0 && shared_grid)
+        for (uint i=0u;i<render.scene.y;++i)
+        {
+            Medium m=media[i];float radius=m.center_radius.w;
+            if (m.lighting.z<=0.0 || length(point-m.center_radius.xyz)>=radius) continue;
+            vec3 q=clamp((point-m.center_radius.xyz+radius)/(2.0*radius)*float(n-1u),vec3(0),vec3(n-1u));
+            uvec3 low=min(uvec3(floor(q)),uvec3(n-2u));vec3 f=q-vec3(low);
+            vec3 key=vec3(0),fill=vec3(0),rim=vec3(0);
+            for (uint z=0u;z<2u;++z) for (uint y=0u;y<2u;++y) for (uint x=0u;x<2u;++x)
+            {
+                vec3 w=mix(1.0-f,f,vec3(x,y,z));uvec3 p=low+uvec3(x,y,z);float weight=w.x*w.y*w.z;
+                key+=grid_visibility[grid_index(i,0u,p,n)].rgb*weight;
+                fill+=grid_visibility[grid_index(i,1u,p,n)].rgb*weight;
+                rim+=grid_visibility[grid_index(i,2u,p,n)].rgb*weight;
+            }
+            vec3 incident=ambient;
+            incident+=phases[0]*render.studio_color[0].rgb*key;
+            incident+=phases[1]*render.studio_color[1].rgb*fill;
+            incident+=phases[2]*render.studio_color[2].rgb*rim;
+            return incident;
+        }
+    vec3 incident=ambient;
+    for (int light=0;light<3;++light)
+    {
+        if (render.studio_direction[light].w<=0.0) continue;
+        vec3 direction=render.studio_direction[light].xyz;
+        vec3 visibility=medium.lighting.x>0.0 ? (shared_grid ? studio_visibility(point,direction) : sampled_visibility(point,vec3(0),light)) : transmittance(point,direction,RAY_MAX);
+        incident+=phases[light]*render.studio_color[light].rgb*visibility;
+    }
+    return incident;
 }
 
 float scattering_weight(Surface s)
@@ -479,17 +515,16 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
     float scatter=scattering_weight(s);vec3 weighted=vec3(0);
     if (geometric_cosine>0.0 && (cosine>0.0 || scatter>0.0))
     {
-        vec3 reflected=evaluate_bsdf(s.normal,outgoing,direction,s.color,s.roughness,s.ior,s.metal,1.0-scatter)*max(0.0,cosine);
+        float interface_fresnel;
+        vec3 reflected=evaluate_bsdf(s.normal,outgoing,direction,s.color,s.roughness,s.ior,s.metal,1.0-scatter,interface_fresnel)*max(0.0,cosine);
         if (scatter>0.0)
         {
             // The wrap integrates to Lambert's energy over the front hemisphere.
             // Replace diffuse energy only. Keep the original specular highlight.
             float wrap=render.subsurface.y;
             float diffuse=(max(0.0,cosine)+wrap)/(1.0+2.0*wrap);
-            float f=0.0;
-            if (cosine>0.0 && s.roughness<DIFFUSE_ROUGHNESS_THRESHOLD && s.ior>1.0)
-                f=fresnel(max(MIN_SHADING_DENOMINATOR,dot(outgoing,normalize(direction+outgoing))),s.ior);
-            sss=s.color*((1.0-f)*scatter*(1.0-render.subsurface.z)*diffuse/PI);
+            // The direct lobe already evaluated this interface for the same light and view.
+            sss=s.color*((1.0-interface_fresnel)*scatter*(1.0-render.subsurface.z)*diffuse/PI);
             reflected+=sss;
         }
         weighted=(1.0-transmission)*reflected*render.studio_color[selected].rgb;
