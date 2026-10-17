@@ -109,13 +109,15 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
     for spawn in no_defenders['spawns']:
         if spawn['type'].startswith('immune_'):spawn['position'][0]=1000
     bombers,_=run('bombers-destroy-factory',no_defenders,5400,'0 select bombers\n0 order 1\n')
-    assert bombers['colonies'][1]['health']==0 and bombers['outcome']==1,'Bomber did not destroy the enemy factory'
+    assert bombers['outcome']==1 and bombers['sound_events']['win']==1,'Bomber did not destroy the enemy factory'
+    assert bombers['colonies'][1]['health']==0 or bombers['colonies'][1]['faction']==bombers['player_faction'],'The target still has enemy production'
     expanded_target=branches(no_defenders,seconds=1,count=9)
     for building in expanded_target['content']['buildings']:
         building['health']=80;building['hits']=3;building['branches'].update(health=45,hits=2)
     destroyed,_=run('destroy-grown-factory',expanded_target,5400,'0 select bombers\n0 order 1\n')
-    assert destroyed['colonies'][1]['health']==0
-    assert all(s['health']==0 for s in destroyed['colonies'][1]['structures']),'Root death left live branches'
+    assert destroyed['outcome']==1 and destroyed['sound_events']['win']==1
+    # Continued play can establish a new friendly factory after enemy supports are lost.
+    assert destroyed['colonies'][1]['faction']==destroyed['player_faction'] or all(s['health']==0 for s in destroyed['colonies'][1]['structures']),'Root death left live enemy branches'
     text=stage('virus')
     capacity=units(text,group='fighter',cost=.01)
     capacity=change(capacity,'rules.economy',dict(storage=10000,manufacture_seconds=.001,landing_seconds=1.5,enemy_attack_seconds=300))

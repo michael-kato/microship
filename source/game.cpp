@@ -265,7 +265,7 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
         { ++groups[simulation_unit_definition(s,&s->units[i])->group];++fleet;if (s->units[i].selected) ++selected; }
     snprintf(r->hud[HUD_LINE_TITLE],HUD_LINE_CAPACITY,"MICROSHIP / %s     FLEET %u     SELECTED %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet,selected);
     snprintf(r->hud[HUD_LINE_GROUPS],HUD_LINE_CAPACITY,"1 %-10s %-5u 2 %-10s %-5u 3 ALL",s->world.content.groups[0].plural,groups[0],s->world.content.groups[1].plural,groups[1]);
-    snprintf(r->hud[HUD_LINE_MESSAGE],HUD_LINE_CAPACITY,"%.55s",s->outcome ? (s->outcome>0 ? "ENEMY PRODUCTION SITES DESTROYED / R TO RESTART" : "COLONY LOST / R TO RESTART") : s->message);
+    snprintf(r->hud[HUD_LINE_MESSAGE],HUD_LINE_CAPACITY,"%.55s",s->outcome ? (s->outcome>0 ? "YOU WON / KEEP PLAYING / R TO RESTART" : "COLONY LOST / R TO RESTART") : s->message);
     snprintf(r->hud[HUD_LINE_HELP],HUD_LINE_CAPACITY,"RIGHT CLICK: ORDER   HOME: FOCUS   SPACE: PAUSE");
     snprintf(r->hud[HUD_LINE_SITE],HUD_LINE_CAPACITY,"SELECT A BODY");
     snprintf(r->hud[HUD_LINE_STRUCTURES],HUD_LINE_CAPACITY,"SCOUT TO FIND ENEMY PRODUCTION SITES");

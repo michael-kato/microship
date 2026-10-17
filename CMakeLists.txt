@@ -205,3 +205,7 @@ if(MICROSHIP_GPU_TESTS)
         --output "${CMAKE_CURRENT_BINARY_DIR}/biology-scale-render")
     set_tests_properties(biology_scale_render PROPERTIES TIMEOUT 35 LABELS gpu RUN_SERIAL TRUE)
 endif()
+
+add_test(NAME match_flow COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/match_flow.py $<TARGET_FILE:microship>)
+set_tests_properties(match_flow PROPERTIES TIMEOUT 45)

@@ -96,7 +96,7 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
         p->factory_base=p->body_base+w->body_count;
         p->stem_base=p->factory_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES : 0);
         p->bud_base=p->stem_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES*GROWTH_SEGMENTS : 0);
-        p->debris_base=p->bud_base+(w->gameplay.enabled ? w->body_count : 0);
+        p->debris_base=p->bud_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES : 0);
         p->attached_base=p->debris_base+(w->gameplay.enabled ? MAX_LIMB_DEBRIS : 0);
         p->flying_base=p->attached_base+(w->spikes.enabled ? MAX_UNITS*w->spikes.count : 0);
         p->embedded_base=p->flying_base+(w->spikes.enabled ? MAX_PROJECTILES : 0);
@@ -272,13 +272,14 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                         set_instance(state,slot,state->tip_meshes[colony->type],tip,scale(x,size),scale(y,size),scale(z,size));
                     float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=FACTORY_FACTION_TINT_STRENGTH;
                 }
-                if (colony->building)
+                for (uint32_t k=0;k<colony->structure_count;++k) if (colony->leaves[k].active)
                 {
-                    const UnitDefinition& u=s->world.content.units[colony->building_kind];float t=colony->manufacturing;
-                    float size=u.scale*(BUD_START_SCALE+BUD_GROWTH_SCALE*t*t*(3-2*t));Vec3 tip=simulation_structure_position(s,p,colony->production_tip);
+                    const LeafProduction& job=colony->leaves[k];
+                    const UnitDefinition& u=s->world.content.units[job.type];float t=job.progress;
+                    float size=u.scale*(BUD_START_SCALE+BUD_GROWTH_SCALE*t*t*(3-2*t));Vec3 tip=simulation_structure_position(s,p,k);
                     Vec3 z=normalize(subtract(tip,s->world.bodies[p].position));
                     Vec3 x=normalize(cross(std::fabs(z.y)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0},z)),y=cross(z,x);
-                    set_instance(state,state->bud_base+p,state->unit_meshes[colony->building_kind],tip,scale(x,size),scale(y,size),scale(z,size));
+                    set_instance(state,state->bud_base+p*MAX_FACTORY_STRUCTURES+k,state->unit_meshes[job.type],tip,scale(x,size),scale(y,size),scale(z,size));
                 }
                 continue;
             }

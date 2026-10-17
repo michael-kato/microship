@@ -431,7 +431,7 @@ void simulation_select(Simulation* s, int group)
 
 void simulation_order(Simulation* s, uint32_t cell)
 {
-    if (!simulation_body_known(s,cell) || s->outcome) return;
+    if (!simulation_body_known(s,cell) || s->outcome<0) return;
     if (s->world.content.factions[s->world.player_faction].automatic) { s->selected_body=(int)cell;return; }
     sound(s,SOUND_ORDER,s->world.bodies[cell].position);
     uint32_t count=0;
@@ -450,7 +450,7 @@ void simulation_order(Simulation* s, uint32_t cell)
 void simulation_move_to(Simulation* s,Vec3 destination)
 {
     if (s->world.content.factions[s->world.player_faction].automatic) return;
-    if (s->outcome || !std::isfinite(destination.x) || !std::isfinite(destination.y) || !std::isfinite(destination.z)
+    if (s->outcome<0 || !std::isfinite(destination.x) || !std::isfinite(destination.y) || !std::isfinite(destination.z)
         || std::fabs(destination.x)>MAX_MOVE_COORDINATE || std::fabs(destination.y)>MAX_MOVE_COORDINATE || std::fabs(destination.z)>MAX_MOVE_COORDINATE) return;
     uint32_t count=0;
     for (uint32_t i=0;i<MAX_UNITS;++i)
@@ -1123,7 +1123,7 @@ static void projectile_combat(Simulation* s,float dt)
             c->active=c->health>0;
             for (uint32_t j=1;j<c->structure_count;++j) c->active=c->active || c->branches[j-1].health>0;
             if (!c->active)
-            { c->energy=0;c->building=false;c->capacity_blocked=false;s->world.bodies[i].owner=FACTION_NEUTRAL; }
+            { c->energy=0;c->building=false;c->capacity_blocked=false;memset(c->leaves,0,sizeof(c->leaves));s->world.bodies[i].owner=FACTION_NEUTRAL; }
 
         }
 }
@@ -1199,52 +1199,75 @@ static void grow_colonies(Simulation* s, float dt)
         float production=simulation_production(s,p);
         c->uptake=s->world.bodies[p].availability;
         c->energy=std::fmin(rules->storage,c->energy+dt*d.collection*c->uptake*production);
-        if (!mature) continue;
+        if (!mature)
+        { memset(c->leaves,0,sizeof(c->leaves));c->building=false;c->manufacturing=0;c->capacity_blocked=false;continue; }
         uint32_t tips[MAX_FACTORY_STRUCTURES],count=0;
         for (uint32_t k=0;k<c->structure_count;++k)
         {
-            if ((k ? c->branches[k-1].health : c->health)<=0 || (k ? c->branches[k-1].growth : c->growth)<1) continue;
+            if ((k ? c->branches[k-1].health : c->health)<=0 || simulation_structure_growth(s,p,k)<1) continue;
             bool child=false;
             for (uint32_t j=k+1;j<c->structure_count;++j)
                 child=child || (c->parents[j]==(int32_t)k && c->branches[j-1].health>0);
             if (!child && (f.grammar!=GROWTH_TREE || simulation_structure_terminal(s,p,k))) tips[count++]=k;
         }
-        if (!count) continue;
-        if (!c->building)
+        // Each ready leaf owns a job. All jobs draw from the same cell nutrients.
+        bool ready[MAX_FACTORY_STRUCTURES]={};
+        for (uint32_t i=0;i<count;++i) ready[tips[i]]=true;
+        for (uint32_t k=0;k<c->structure_count;++k) if (!ready[k] && c->leaves[k].active)
         {
-            uint32_t type=c->priority;
-            uint32_t error=c->production_error+c->fighter_percent;
+            // A new child can replace a tip. Move its paid job to another ready leaf.
+            // Damage removes the job with the damaged support.
+            if (structure_health(c,k)<=0 || simulation_structure_growth(s,p,k)<1)
+            { c->leaves[k]=LeafProduction();continue; }
+            for (uint32_t j=0;j<count;++j) if (!c->leaves[tips[j]].active)
+            { c->leaves[tips[j]]=c->leaves[k];c->leaves[k]=LeafProduction();break; }
+            // If all ready leaves are busy, retain the paid job until one becomes free.
+        }
+        for (uint32_t i=0;i<c->structure_count;++i)
+        {
+            uint32_t k=(c->production_cursor+i)%c->structure_count;LeafProduction* job=&c->leaves[k];
+            if (!ready[k] || job->active) continue;
+            uint32_t type=c->priority,error=c->production_error+c->fighter_percent;
             if (c->ratio_enabled) type=(uint32_t)content_product(&s->world.content,c->faction,error>=100 ? 0 : 1);
             float cost=s->world.content.units[type].cost;
             bool automatic=s->world.content.factions[c->faction].automatic;
-            if (!automatic && c->energy<cost) continue;
+            if (!automatic && c->energy<cost) break;
             if (!automatic) c->energy-=cost;
-            c->building=true;c->building_kind=type;c->manufacturing=0;
-            // Commit one ratio step only when a unit starts. Waiting and pointer events consume no steps.
+            job->active=true;job->type=type;job->progress=0;
             if (c->ratio_enabled) c->production_error=error%100;
-            c->production_tip=tips[s->next_generation%count];
+            c->production_cursor=(k+1)%c->structure_count;
+            // Continue from the same cursor on the next tick. Do not skip other leaves.
+            break;
         }
-        if (structure_health(c,c->production_tip)<=0 || (c->production_tip ? c->branches[c->production_tip-1].growth : c->growth)<1)
-            c->production_tip=tips[0];
         float rate=s->world.ai_production_set && c->faction!=s->world.player_faction ? s->world.ai_production : 1;
-        c->manufacturing=std::fmin(1.0f,c->manufacturing+dt*rate*production/rules->manufacture_seconds);
-        if (c->manufacturing<1) continue;
-        uint32_t type=c->building_kind;const UnitDefinition* definition=&s->world.content.units[type];
-        Vec3 normal=s->world.bodies[p].colony_normal;
-        Vec3 axis=std::fabs(normal.z)<PRODUCTION_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0};
-        Vec3 tangent=normalize(cross(normal,axis));
-        float angle=(s->next_generation+1)*GOLDEN_ANGLE_RADIANS,spread=definition->scale*2;
-        Vec3 position=add(add(colony_tip(s,p),scale(normal,1.0f)),
-            add(scale(tangent,std::cos(angle)*spread),scale(cross(tangent,normal),std::sin(angle)*spread)));
-        if (d.segment_path[0])
+        float step=dt*rate/rules->manufacture_seconds;
+        c->building=false;c->manufacturing=0;c->capacity_blocked=false;
+        for (uint32_t k=0;k<c->structure_count;++k)
         {
-            Vec3 tip=simulation_structure_position(s,p,c->production_tip);
-            normal=normalize(subtract(tip,s->world.bodies[p].position));
-            position=add(tip,scale(normal,definition->scale*NEW_UNIT_TIP_CLEARANCE_SCALE));
+            LeafProduction* job=&c->leaves[k];if (!job->active || !ready[k]) continue;
+            job->progress=std::fmin(1.0f,job->progress+step);
+            if (job->progress>=1)
+            {
+                const UnitDefinition* definition=&s->world.content.units[job->type];
+                Vec3 normal=s->world.bodies[p].colony_normal;
+                Vec3 axis=std::fabs(normal.z)<PRODUCTION_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0};
+                Vec3 tangent=normalize(cross(normal,axis));
+                float angle=(s->next_generation+1)*GOLDEN_ANGLE_RADIANS,spread=definition->scale*2;
+                Vec3 position=add(add(colony_tip(s,p),scale(normal,1.0f)),
+                    add(scale(tangent,std::cos(angle)*spread),scale(cross(tangent,normal),std::sin(angle)*spread)));
+                if (d.segment_path[0])
+                {
+                    Vec3 tip=simulation_structure_position(s,p,k);
+                    normal=normalize(subtract(tip,s->world.bodies[p].position));
+                    position=add(tip,scale(normal,definition->scale*NEW_UNIT_TIP_CLEARANCE_SCALE));
+                }
+                if (spawn(s,job->type,position,(int)p,&normal))
+                { if (definition->group<2) ++c->produced[definition->group];++c->leaf_births[k];*job=LeafProduction();c->production_tip=k; }
+                else c->capacity_blocked=true;
+            }
+            if (job->active && (!c->building || job->progress>c->manufacturing))
+            { c->building=true;c->manufacturing=job->progress;c->building_kind=job->type;c->production_tip=k; }
         }
-        if (spawn(s,type,position,(int)p,&normal))
-        { if (definition->group<2) ++c->produced[definition->group];c->building=false;c->manufacturing=0;c->capacity_blocked=false; }
-        else c->capacity_blocked=true;
     }
 }
 
@@ -1281,6 +1304,7 @@ static void enemy_orders(Simulation* s)
 
 static void outcome(Simulation* s)
 {
+    if (s->outcome) return;
     bool friendly=false,hostile=false,units=false,enemy_units=false;
     for (uint32_t p=0;p<s->world.body_count;++p) if (s->colonies[p].active)
     {
@@ -1292,7 +1316,7 @@ static void outcome(Simulation* s)
         units=units || (s->units[i].health>0 && s->units[i].faction==s->world.player_faction);
         enemy_units=enemy_units || (s->units[i].health>0 && s->units[i].faction==s->world.opponent_faction);
     }
-    if (friendly && !hostile && (s->faction_established[s->world.opponent_faction] || !enemy_units)) { s->outcome=1;sound(s,SOUND_WIN,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"VICTORY: ENEMY PRODUCTION SITES DESTROYED. R TO RESTART."); }
+    if (friendly && !hostile && (s->faction_established[s->world.opponent_faction] || !enemy_units)) { s->outcome=1;sound(s,SOUND_WIN,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"YOU WON. CONTINUE PLAYING OR PRESS R TO RESTART."); }
     else if (!friendly && !units) { s->outcome=-1;sound(s,SOUND_LOSE,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"COLONY LOST. R TO RESTART."); }
 }
 
@@ -1300,7 +1324,7 @@ void simulation_step(Simulation* s)
 {
     if (s->paused) return;
     const float dt=1.0f/SIMULATION_TICKS_PER_SECOND_FLOAT;
-    if (s->outcome)
+    if (s->outcome<0)
     {
         if (s->world.combat.enabled) { advance_visuals(s,dt);recover_units(s,dt);for (uint32_t i=0;i<MAX_PROJECTILES;++i) s->projectiles[i].active=false;simulation_set_time(s,s->time_seconds+1.0/SIMULATION_TICKS_PER_SECOND_DOUBLE); }
         return;
@@ -1364,6 +1388,13 @@ bool simulation_write_state(const Simulation* s, const char* path)
         fprintf(file,",\"appearance\":{\"tint\":[%.6f,%.6f,%.6f],\"strength\":%.6f,\"factions\":[",s->cell_appearance[p].tint.r,s->cell_appearance[p].tint.g,s->cell_appearance[p].tint.b,s->cell_appearance[p].strength);
         for (uint32_t f=0;f<MAX_FACTIONS;++f) fprintf(file,"%s%.6f",f ? "," : "",s->cell_appearance[p].factions[f]);
         fprintf(file,"]}");
+        fprintf(file,",\"leaf_births\":[");
+        for (uint32_t k=0;k<c->structure_count;++k) fprintf(file,"%s%u",k ? "," : "",c->leaf_births[k]);
+        fprintf(file,"],\"leaf_jobs\":[");
+        bool comma=false;
+        for (uint32_t k=0;k<c->structure_count;++k) if (c->leaves[k].active)
+        { fprintf(file,"%s{\"leaf\":%u,\"progress\":%.6f,\"type\":\"%s\"}",comma ? "," : "",k,c->leaves[k].progress,s->world.content.units[c->leaves[k].type].name);comma=true; }
+        fprintf(file,"]");
         fprintf(file,",\"seed\":%u,\"root\":[%.6f,%.6f,%.6f],\"production_tip\":%u,\"discovered\":%s,\"visible\":%s,\"structures\":[",body.seed,body.factory_root.x,body.factory_root.y,body.factory_root.z,c->production_tip,s->discovered[p] ? "true" : "false",s->visible_bodies[p] ? "true" : "false");
         uint32_t count=s->world.gameplay.enabled && c->faction!=FACTION_NEUTRAL && s->world.content.bodies[s->world.bodies[p].type].hosts_site ? s->colonies[p].structure_count : 0;
         for (uint32_t k=0;k<count;++k)

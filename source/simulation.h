@@ -64,6 +64,12 @@ struct FactoryStructure
     uint32_t generation,wounds;
     EmbeddedSpike embedded[MAX_EMBEDDED];
 };
+struct LeafProduction
+{
+    float progress;
+    uint32_t type;
+    bool active;
+};
 struct Colony
 {
     Vec3 surface;
@@ -85,7 +91,9 @@ struct Colony
     float establishment_age;
     FactoryStructure branches[MAX_FACTORY_STRUCTURES-1];
     Vec3 stems[MAX_FACTORY_STRUCTURES][GROWTH_SEGMENTS+1];
-    uint32_t production_tip;
+    uint32_t production_tip,production_cursor;
+    LeafProduction leaves[MAX_FACTORY_STRUCTURES];
+    uint32_t leaf_births[MAX_FACTORY_STRUCTURES];
 };
 struct CellAppearance { Color tint;float strength,seconds;float factions[MAX_FACTIONS]; };
 struct LimbDebris

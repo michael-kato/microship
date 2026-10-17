@@ -104,7 +104,8 @@ with tempfile.TemporaryDirectory(prefix='microship-content-') as directory:
     changed['rules']['economy']=dict(storage=180,manufacture_seconds=1000,landing_seconds=1.5,enemy_attack_seconds=300)
     changed=branches(changed,count=1)
     destroyed,_,_=run('target-capability',changed,2400,'0 select fighters\n0 order 1\n')
-    assert destroyed['colonies'][1]['health']==0 and destroyed['outcome']==1,'Targeting still depends on group names'
+    assert destroyed['outcome']==1 and destroyed['sound_events']['win']==1,'Targeting still depends on group names'
+    assert destroyed['colonies'][1]['health']==0 or destroyed['colonies'][1]['faction']==destroyed['player_faction']
 
     # Five-hit types use the same combat loop and keep bounded embedded geometry.
     duel=units(compact,group='fighter',speed=.01,health=100,hits=5)
