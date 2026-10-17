@@ -17,13 +17,17 @@
     },
     "audio": {
       "$ref": "shared.schema.json#/$defs/path"
+    },
+    "menu": {
+      "$ref": "shared.schema.json#/$defs/path"
     }
   },
   "required": [
     "world",
     "render",
     "shader",
-    "audio"
+    "audio",
+    "menu"
   ],
   "additionalProperties": false
 }

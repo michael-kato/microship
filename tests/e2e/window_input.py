@@ -65,13 +65,13 @@ class Desktop:
             self.xt.XTestFakeButtonEvent.argtypes = [c.c_void_p, c.c_uint, c.c_int, c.c_ulong]
             self.xt.XTestFakeKeyEvent.argtypes = [c.c_void_p, c.c_uint, c.c_int, c.c_ulong]
 
-    def windows(self):
+    def windows(self, name="microship"):
         result = set()
         if sys.platform == 'win32':
             def visit(handle, _):
                 title = c.create_unicode_buffer(128)
                 self.api.GetWindowTextW(handle, title, len(title))
-                if title.value == 'microship': result.add(handle)
+                if title.value == name: result.add(handle)
                 return True
             callback = self.callback_type(visit)
             self.api.EnumWindows(callback, 0)
@@ -79,7 +79,7 @@ class Desktop:
             def visit(handle, depth):
                 title = c.c_void_p()
                 if self.api.XFetchName(self.display, handle, c.byref(title)) and title.value:
-                    if c.string_at(title.value) == b'microship':
+                    if c.string_at(title.value) == name.encode():
                         attributes = XWindowAttributes()
                         if self.api.XGetWindowAttributes(self.display, handle, c.byref(attributes)) and attributes.map_state == 2:
                             result.add(handle)

@@ -1,4 +1,5 @@
 #include "game.h"
+#include "start_menu.h"
 #include "asset_json.h"
 
 #include <errno.h>
@@ -23,7 +24,7 @@ static const int MAX_CLIENT_PIXEL_COORDINATE = 65535;
 static const double MAX_CURSOR_ANCHOR_COORDINATE = 100000.0;
 static const int MAX_AUDIO_CAPTURE_TICKS = 3600;
 
-static bool asset_paths(char* world, char* config, char* shader,char* audio,size_t capacity)
+static bool asset_paths(char* world, char* config, char* shader,char* audio,char* menu,size_t capacity)
 {
     char executable[EXECUTABLE_PATH_CAPACITY];
     DWORD count = GetModuleFileNameA(0, executable, sizeof(executable));
@@ -41,11 +42,12 @@ static bool asset_paths(char* world, char* config, char* shader,char* audio,size
     int length=snprintf(manifest,sizeof(manifest),"%s/assets/startup.json",executable);
     if (length<=0 || (size_t)length>=sizeof(manifest)) return false;
     JsonDocument document;if (!json_load(&document,manifest)) return false;
-    Json root=json_root(&document);json_object(root,"$schema|world|render|shader|audio");
+    Json root=json_root(&document);json_object(root,"$schema|world|render|shader|audio|menu");
     return json_path(json_get(root,"world"),manifest,world,capacity)
         && json_path(json_get(root,"render"),manifest,config,capacity)
         && json_path(json_get(root,"shader"),manifest,shader,capacity)
         && json_path(json_get(root,"audio"),manifest,audio,capacity)
+        && json_path(json_get(root,"menu"),manifest,menu,capacity)
         && document.valid;
 }
 
@@ -59,8 +61,8 @@ static void print_usage(FILE* output)
         "              [--smoke] [--stats|--no-stats] [--debug-views] [--no-activate]\n"
         "              [--replay PATH.orders] [--ticks N] [--state PATH.json] [--scene-state PATH.json]\n"
         "              [--audio-capture PATH.wav] (with --smoke and --ticks, at most 3600 ticks)\n"
-        "              [--world-seed N] [--audio PATH.json]\n"
-        "Default: direct ray-traced Win32 window; Escape or close to exit.\n"
+        "              [--world-seed N] [--audio PATH.json] [--menu|--no-menu] [--menu-select 1..3]\n"
+        "Default: faction menu, then direct ray-traced Win32 window; Escape or close to exit.\n"
         "Headless/capture runs default to one frame. PFM saves linear HDR before bloom; PPM saves display RGB.\n"
         "--smoke runs asset loading and simulation lifecycle without a GPU.\n");
 }
@@ -95,8 +97,9 @@ int main(int argc, char** argv)
 {
     setvbuf(stdout,0,_IONBF,0);
     GameOptions options = {};
-    char world_path[EXECUTABLE_PATH_CAPACITY], config_path[EXECUTABLE_PATH_CAPACITY], shader_path[EXECUTABLE_PATH_CAPACITY],audio_path[EXECUTABLE_PATH_CAPACITY];
-    if (!asset_paths(world_path, config_path, shader_path,audio_path,sizeof(world_path)))
+    char world_path[EXECUTABLE_PATH_CAPACITY], config_path[EXECUTABLE_PATH_CAPACITY], shader_path[EXECUTABLE_PATH_CAPACITY],audio_path[EXECUTABLE_PATH_CAPACITY],menu_path[EXECUTABLE_PATH_CAPACITY];
+    bool no_menu=false,force_menu=false;uint32_t menu_selection=0;
+    if (!asset_paths(world_path, config_path, shader_path,audio_path,menu_path,sizeof(world_path)))
     {
         fprintf(stderr, "Cannot locate assets beside the microship executable.\n");
         return 1;
@@ -113,7 +116,14 @@ int main(int argc, char** argv)
             print_usage(stdout);
             return 0;
         }
-        if (strcmp(argv[i], "--smoke") == 0)
+        if (!strcmp(argv[i],"--no-menu")) no_menu=true;
+        else if (!strcmp(argv[i],"--menu")) force_menu=true;
+        else if (!strcmp(argv[i],"--menu-select"))
+        {
+            if (++i==argc || !parse_integer(argv[i],1,8,&menu_selection))
+            { fprintf(stderr,"--menu-select requires a choice in [1,8].\n");return 2; }
+        }
+        else if (strcmp(argv[i], "--smoke") == 0)
             options.smoke = true;
         else if (strcmp(argv[i], "--vsync") == 0)
             options.vsync = true;
@@ -249,5 +259,12 @@ int main(int argc, char** argv)
     }
     if (!options.frames && (options.headless || options.capture_path))
         options.frames = 1;
+    bool diagnostic=options.smoke || options.headless || options.frames || options.capture_path || options.world_path!=world_path;
+    if (force_menu || menu_selection || (!no_menu && !diagnostic))
+    {
+        int result=start_menu(menu_path,world_path,sizeof(world_path),menu_selection);
+        if (result<=0) return result<0 ? 1 : 0;
+        options.world_path=world_path;
+    }
     return game_run(&options);
 }

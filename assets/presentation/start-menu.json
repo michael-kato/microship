@@ -1,0 +1,49 @@
+{
+  "$schema": "../schemas/start-menu.schema.json",
+  "title": "MICROSHIP",
+  "prompt": "Choose a faction. Click a card or press its number.",
+  "width": 1920,
+  "height": 1080,
+  "background": [
+    0.035,
+    0.012,
+    0.02
+  ],
+  "text": [
+    0.92,
+    0.85,
+    0.82
+  ],
+  "choices": [
+    {
+      "label": "VIRUS",
+      "description": "Grow branching factories. Command fighters and bombers.",
+      "world": "../levels/biology-virus.json",
+      "color": [
+        0.28,
+        0.8,
+        0.7
+      ]
+    },
+    {
+      "label": "IMMUNE",
+      "description": "Build durable units. Attach, digest, and recover.",
+      "world": "../levels/biology-immune.json",
+      "color": [
+        1,
+        0.72,
+        0.8
+      ]
+    },
+    {
+      "label": "FUNGAL",
+      "description": "Grow spore factories. Spores seek targets on their own.",
+      "world": "../levels/biology-fungus.json",
+      "color": [
+        0.74,
+        0.52,
+        0.32
+      ]
+    }
+  ]
+}

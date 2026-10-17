@@ -116,7 +116,7 @@ add_custom_target(microship_assets DEPENDS "${fog_output}" "${effects_output}" "
 add_executable(microship
     source/content.cpp source/asset_json.cpp
     source/effects.cpp source/audio.cpp
-    source/main.cpp
+    source/main.cpp source/start_menu.cpp
     source/microfacet.cpp
     source/camera.cpp
     source/world.cpp
@@ -131,7 +131,7 @@ add_executable(microship
     source/game.cpp
 )
 add_dependencies(microship microship_assets)
-target_link_libraries(microship PRIVATE Vulkan::Vulkan user32 winmm)
+target_link_libraries(microship PRIVATE Vulkan::Vulkan user32 gdi32 winmm)
 target_compile_definitions(microship PRIVATE _WIN32_WINNT=0x0A00 _CRT_SECURE_NO_WARNINGS)
 
 set_target_properties(microship PROPERTIES
