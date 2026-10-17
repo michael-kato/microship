@@ -25,8 +25,8 @@
 #include "../assets/shaders/hud_layout.glsl"
 
 static const int GPU_VERTEX_BYTES = 48;
-static const int GPU_MEDIUM_BYTES = 64;
-static const int GPU_RENDER_UNIFORM_BYTES = 448;
+static const int GPU_MEDIUM_BYTES = 80;
+static const int GPU_RENDER_UNIFORM_BYTES = 464;
 static const int GPU_DEBUG_PUSH_BYTES = 128;
 static const double MILLISECONDS_PER_SECOND = 1000.0;
 static const double BINARY_UNIT_SCALE = 1024.0;
@@ -37,7 +37,7 @@ static const double BACKDROP_TIME_WRAP_SECONDS = 10000.0;
 static const int GPU_DEBUG_PIXEL_BYTES = 80;
 static const int COMPANION_SHADER_PATH_CAPACITY = 1024;
 static const double NANOSECONDS_PER_MILLISECOND = 1000000.0;
-static const int RENDER_STORAGE_BUFFER_BINDINGS = 9;
+static const int RENDER_STORAGE_BUFFER_BINDINGS = 10;
 static const int RENDER_DESCRIPTOR_SET_COUNT = 3;
 static const int RENDER_STORAGE_IMAGE_BINDINGS = 3;
 static const int RENDER_SAMPLER_BINDINGS = 2;
@@ -49,12 +49,12 @@ static const int GPU_TRIANGLE_BYTES = 16;
 static const int HUD_MAX_LINE_CHARACTERS = HUD_LINE_CAPACITY-1;
 static const unsigned int STATS_TEXT_WIDTH_UNSIGNED = 512u;
 static const unsigned int STATS_TEXT_HEIGHT_UNSIGNED = 92u;
-static const int GPU_TIMESTAMP_COUNT = 11;
+static const int GPU_TIMESTAMP_COUNT = 12;
 static const int TIMESTAMP_WORD_BITS = 64;
 
 enum { SCENE_BUFFER_VERTICES=0, SCENE_BUFFER_TRIANGLES=1, SCENE_BUFFER_UNIFORM=2, SCENE_BUFFER_MEDIA=3, SCENE_BUFFER_ENERGY=4, SCENE_BUFFER_RESERVED=5, SCENE_BUFFER_DEBUG=6 };
 
-enum { GPU_TIME_FRAME_BEGIN=0, GPU_TIME_SURFACE_BEGIN=1, GPU_TIME_SURFACE_END=2, GPU_TIME_VOLUME_END=3, GPU_TIME_EFFECTS_BEGIN=4, GPU_TIME_BLOOM_END=5, GPU_TIME_OVERLAY_END=6, GPU_TIME_BACKDROP_END=7, GPU_TIME_UPLOAD_END=8, GPU_TIME_EFFECTS_END=9, GPU_TIME_GRID_END=10 };
+enum { GPU_TIME_FRAME_BEGIN=0, GPU_TIME_SURFACE_BEGIN=1, GPU_TIME_SURFACE_END=2, GPU_TIME_VOLUME_END=3, GPU_TIME_EFFECTS_BEGIN=4, GPU_TIME_BLOOM_END=5, GPU_TIME_OVERLAY_END=6, GPU_TIME_BACKDROP_END=7, GPU_TIME_UPLOAD_END=8, GPU_TIME_EFFECTS_END=9, GPU_TIME_GRID_END=10, GPU_TIME_MEDIUM_BLUR_END=11 };
 
 struct GpuBuffer
 {
@@ -83,7 +83,7 @@ struct RenderUniform
     uint32_t background_quality[4];
     float backdrop_style[4], backdrop_animation[4];
     float studio_direction[3][4], studio_color[3][4], thin_material[4], backdrop_wave[4];
-    float fog[4],fog_tint[4];
+    float fog[4],fog_tint[4],membrane_fade[4];
 };
 
 static_assert(sizeof(GpuVertex) == GPU_VERTEX_BYTES, "Vertex shader layout");
@@ -154,7 +154,7 @@ struct RendererState
     GpuBuffer instances;
     GpuBuffer tlas_buffer;
     GpuBuffer tlas_scratch;
-    GpuBuffer media,shadow_grid;
+    GpuBuffer media,shadow_grid,sharp_layer;
     uint32_t medium_count;
     GpuBuffer energy;
     GpuBuffer debug_pixels;
@@ -188,7 +188,7 @@ struct RendererState
     VkDescriptorPool bloom_descriptor_pool;
     VkDescriptorSet bloom_descriptors;
     VkPipelineLayout bloom_layout;
-    VkPipeline bloom_pipeline,fog_pipeline;
+    VkPipeline bloom_pipeline,fog_pipeline,medium_blur_pipeline;
     VkPipeline guide_surface_pipeline;
     VkImage output;
     VkDeviceMemory output_memory;
@@ -655,6 +655,7 @@ static void scene_uniform(RenderUniform* uniform,const RenderScene* scene)
     uniform->ambient_bottom[0]=scene->ambient_bottom.r;uniform->ambient_bottom[1]=scene->ambient_bottom.g;uniform->ambient_bottom[2]=scene->ambient_bottom.b;
     uniform->background_quality[0]=scene->background_samples;uniform->background_quality[1]=scene->background_triangles;
     uniform->backdrop_style[0]=scene->background_blur;uniform->backdrop_style[1]=scene->background_glow;uniform->backdrop_style[2]=scene->background_ambient;
+    uniform->membrane_fade[0]=scene->thin_edge_strength;uniform->membrane_fade[1]=scene->thin_edge_power;
     uniform->thin_material[0]=scene->thin_transmission;uniform->thin_material[1]=scene->thin_absorption;
     uniform->thin_material[2]=scene->lights_enabled ? 1 : 0;uniform->thin_material[3]=scene->thin_clarity;
     float total=0;
@@ -673,6 +674,8 @@ static void scene_uniform(RenderUniform* uniform,const RenderScene* scene)
     memcpy(uniform->backdrop_animation,scene->background_animation,sizeof(uniform->backdrop_animation));
     memcpy(uniform->scene_min,scene->bounds_min,3*sizeof(float));memcpy(uniform->scene_max,scene->bounds_max,3*sizeof(float));
     memcpy(uniform->foreground_min,scene->foreground_min,3*sizeof(float));memcpy(uniform->foreground_max,scene->foreground_max,3*sizeof(float));
+    uniform->quality[3]=0;
+    for (uint32_t i=0;i<scene->media.size();++i) if (scene->media[i].blur[0]>0 && scene->media[i].blur[2]>0) uniform->quality[3]=1;
     uniform->scene[1]=(uint32_t)scene->media.size();uniform->scene[2]=scene->sight_count;
     uniform->fog_tint[0]=scene->fog_tint.r;uniform->fog_tint[1]=scene->fog_tint.g;uniform->fog_tint[2]=scene->fog_tint.b;
     uniform->fog[0]=scene->fog_blur;uniform->fog[1]=scene->fog_feather;uniform->fog[2]=scene->fog_plane_z;
@@ -870,6 +873,10 @@ static bool create_output(RendererState* state)
     if (grid_bytes>state->properties.limits.maxStorageBufferRange)
     { fprintf(stderr,"Shadow grid exceeds the storage-buffer range.\n");return false; }
     if (!create_buffer(state,&state->shadow_grid,grid_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
+    VkDeviceSize sharp_bytes=state->uniform_data.quality[3] ? (VkDeviceSize)state->config.width*state->config.height*4*sizeof(float) : 4*sizeof(float);
+    if (sharp_bytes>state->properties.limits.maxStorageBufferRange)
+    { fprintf(stderr,"Medium sharp layer exceeds the storage-buffer range.\n");return false; }
+    if (!create_buffer(state,&state->sharp_layer,sharp_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
     state->capture_row.resize(state->config.width*3);
     state->capture_hdr_row.resize(state->config.width*3);
     return create_buffer(state, &state->readback, (VkDeviceSize)state->config.width*state->config.height*4*sizeof(float),
@@ -995,7 +1002,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
     if (state->properties.limits.maxPerStageDescriptorStorageBuffers < RENDER_STORAGE_BUFFER_BINDINGS ||
         state->properties.limits.maxDescriptorSetStorageBuffers < RENDER_STORAGE_BUFFER_BINDINGS)
     {
-        fprintf(stderr,"Renderer requires nine compute storage-buffer descriptors.\n");
+        fprintf(stderr,"Renderer requires ten compute storage-buffer descriptors.\n");
         return false;
     }
     VkDescriptorSetLayoutBinding bindings[RENDER_DESCRIPTOR_COUNT] = {};
@@ -1006,7 +1013,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
     for (uint32_t i = 0; i < RENDER_DESCRIPTOR_COUNT; ++i)
     {
         bindings[i].binding = i;
@@ -1082,6 +1089,8 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
     VkDescriptorBufferInfo effect_buffers[]={{state->effects.handle,0,state->effects.size},
         {state->effect_tiles.handle,0,state->effect_tiles.size},{state->instance_styles.handle,0,state->instance_styles.size}};
     for (uint32_t i=0;i<3;++i) writes[RENDER_BINDING_EFFECTS+i].pBufferInfo=&effect_buffers[i];
+    VkDescriptorBufferInfo sharp_buffer={state->sharp_layer.handle,0,state->sharp_layer.size};
+    writes[RENDER_BINDING_SHARP_LAYER].pBufferInfo=&sharp_buffer;
     vkUpdateDescriptorSets(state->device, RENDER_DESCRIPTOR_COUNT, writes, 0, 0);
     if (!vk_ok(vkAllocateDescriptorSets(state->device,&allocate,&state->effect_descriptors),"Allocate effects descriptors")) return false;
     image.imageView=state->hdr_view;
@@ -1125,7 +1134,7 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
     {
         bindings[i].binding = i;
         bindings[i].descriptorType = i==BLOOM_BINDING_UNIFORM ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER :
-            (i==BLOOM_BINDING_DEBUG || i==BLOOM_BINDING_SIGHT) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            (i==BLOOM_BINDING_DEBUG || i==BLOOM_BINDING_SIGHT || i==BLOOM_BINDING_SHARP_LAYER) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         bindings[i].descriptorCount = 1;
         bindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     }
@@ -1134,7 +1143,7 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
     layout.bindingCount = BLOOM_DESCRIPTOR_COUNT;
     layout.pBindings = bindings;
     if (!vk_ok(vkCreateDescriptorSetLayout(state->device, &layout, 0, &state->bloom_descriptor_layout), "Create bloom descriptor layout")) return false;
-    VkDescriptorPoolSize sizes[] = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,3},{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,2},{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,1}};
+    VkDescriptorPoolSize sizes[] = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,3},{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,3},{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,1}};
     VkDescriptorPoolCreateInfo pool = {};
     pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool.maxSets = 1;
@@ -1169,8 +1178,8 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
     writes[BLOOM_BINDING_DEBUG].descriptorCount = 1;
     writes[BLOOM_BINDING_DEBUG].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     writes[BLOOM_BINDING_DEBUG].pBufferInfo = &debug_buffer;
-    VkDescriptorBufferInfo extra_buffers[]={{state->uniform.handle,0,state->uniform.size},{state->sight.handle,0,state->sight.size}};
-    for (uint32_t i=0;i<2;++i)
+    VkDescriptorBufferInfo extra_buffers[]={{state->uniform.handle,0,state->uniform.size},{state->sight.handle,0,state->sight.size},{state->sharp_layer.handle,0,state->sharp_layer.size}};
+    for (uint32_t i=0;i<3;++i)
     {
         uint32_t binding=BLOOM_BINDING_UNIFORM+i;
         writes[binding].sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;writes[binding].dstSet=state->bloom_descriptors;
@@ -1188,7 +1197,8 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
     pipeline_layout.pPushConstantRanges = &constants;
     if (!vk_ok(vkCreatePipelineLayout(state->device, &pipeline_layout, 0, &state->bloom_layout), "Create bloom pipeline layout")) return false;
     return load_companion(state,ray_trace_path,"bloom.comp.spv",state->bloom_layout,&state->bloom_pipeline)
-        && load_companion(state,ray_trace_path,"fog.comp.spv",state->bloom_layout,&state->fog_pipeline);
+        && load_companion(state,ray_trace_path,"fog.comp.spv",state->bloom_layout,&state->fog_pipeline)
+        && load_companion(state,ray_trace_path,"medium_blur.comp.spv",state->bloom_layout,&state->medium_blur_pipeline);
 }
 
 static bool create_debug(RendererState* state, const char* builtin_shader_path)
@@ -1538,6 +1548,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     store_vector(uniform->camera_right, right);
     store_vector(uniform->camera_up, cross(right, forward));
     scene_uniform(uniform,scene);
+    if (state->custom_shader) uniform->quality[3]=0;
     if (scene->instances.size()!=state->instance_count || scene->media.size()!=state->medium_count
         || scene->geometry.meshes.size()!=state->mesh_count || scene->effect_tiles.size()!=state->effect_tile_size)
     { fprintf(stderr,"Render scene storage changed after initialization.\n");return false; }
@@ -1649,6 +1660,26 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     vkCmdDispatch(state->command, (state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, (state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, 1);
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_SURFACE_END);
     if (renderer->debug_views || scene->guides_required) shader_buffer_barrier(state->command);
+    if (uniform->quality[3])
+    {
+        shader_buffer_barrier(state->command);
+        vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->medium_blur_pipeline);
+        vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->bloom_layout,0,1,&state->bloom_descriptors,0,0);
+        for (int pass=0;pass<2;++pass)
+        {
+            image_barrier(state->command,state->hdr,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+                VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT,VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+            image_barrier(state->command,state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+                VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT,VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+            BloomParameters parameters={};parameters.extent[0]=state->config.width;parameters.extent[1]=state->config.height;parameters.pass=pass;
+            vkCmdPushConstants(state->command,state->bloom_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,sizeof(parameters),&parameters);
+            vkCmdDispatch(state->command,(state->config.width+7)/8,(state->config.height+7)/8,1);
+        }
+        vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->pipeline_layout,0,1,&state->descriptors,0,0);
+    }
+    vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_MEDIUM_BLUR_END);
     if (uniform->quality[0] && uniform->scene[1])
     {
         image_barrier(state->command,state->hdr,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
@@ -1743,12 +1774,15 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     double milliseconds = difference * state->properties.limits.timestampPeriod / NANOSECONDS_PER_MILLISECOND;
     printf("GPU trace: %.3f ms; %u spp; %u triangles\n", milliseconds,
         state->config.samples_per_pixel, state->triangle_count);
-    uint64_t surface_ticks = timestamps[GPU_TIME_SURFACE_END]-timestamps[GPU_TIME_SURFACE_BEGIN], volume_ticks = timestamps[GPU_TIME_VOLUME_END]-timestamps[GPU_TIME_SURFACE_END];
+    uint64_t surface_ticks = timestamps[GPU_TIME_SURFACE_END]-timestamps[GPU_TIME_SURFACE_BEGIN], volume_ticks = timestamps[GPU_TIME_VOLUME_END]-timestamps[GPU_TIME_MEDIUM_BLUR_END];
     if (state->timestamp_bits < TIMESTAMP_WORD_BITS)
     {
         surface_ticks &= (UINT64_C(1)<<state->timestamp_bits)-1;
         volume_ticks &= (UINT64_C(1)<<state->timestamp_bits)-1;
     }
+    uint64_t medium_blur_ticks=timestamps[GPU_TIME_MEDIUM_BLUR_END]-timestamps[GPU_TIME_SURFACE_END];
+    if (state->timestamp_bits<TIMESTAMP_WORD_BITS) medium_blur_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1;
+    printf("GPU medium blur: %.3f ms; native resolution; surface layer only.\n",medium_blur_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND);
     uint64_t grid_ticks=timestamps[GPU_TIME_GRID_END]-timestamps[GPU_TIME_BACKDROP_END];
     if (state->timestamp_bits<TIMESTAMP_WORD_BITS) grid_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1;
     printf("GPU shadow grid: %.3f ms; resolution %u; current frame only.\n",grid_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND,state->config.shadow_grid_resolution);
@@ -1822,6 +1856,7 @@ bool renderer_shutdown(Renderer* renderer)
             if (state->backdrop_memory[i]) vkFreeMemory(state->device,state->backdrop_memory[i],0);
         }
         if (state->guide_surface_pipeline) vkDestroyPipeline(state->device,state->guide_surface_pipeline,0);
+        if (state->medium_blur_pipeline) vkDestroyPipeline(state->device,state->medium_blur_pipeline,0);
         if (state->fog_pipeline) vkDestroyPipeline(state->device,state->fog_pipeline,0);
         if (state->bloom_pipeline) vkDestroyPipeline(state->device, state->bloom_pipeline, 0);
         if (state->bloom_layout) vkDestroyPipelineLayout(state->device, state->bloom_layout, 0);
@@ -1856,7 +1891,7 @@ bool renderer_shutdown(Renderer* renderer)
         if (state->tlas) state->destroy_as(state->device, state->tlas, 0);
         GpuBuffer* buffers[] = { &state->vertices, &state->triangles, &state->indices, &state->instances,
             &state->tlas_buffer, &state->tlas_scratch,
-            &state->uniform, &state->readback, &state->media, &state->shadow_grid, &state->energy, &state->sight,
+            &state->uniform, &state->readback, &state->media, &state->shadow_grid, &state->sharp_layer, &state->energy, &state->sight,
             &state->debug_pixels, &state->debug_text, &state->effects, &state->effect_tiles, &state->instance_styles };
         for (uint32_t i = 0; i < sizeof(buffers)/sizeof(buffers[0]); ++i) destroy_buffer(state, buffers[i]);
         if (state->output_view) vkDestroyImageView(state->device, state->output_view, 0);

@@ -47,6 +47,8 @@ bool render_scene_validate(const RenderScene* scene)
         && std::isfinite(scene->time_seconds) && scene->sight_count<=MAX_RENDER_SIGHT
         && std::isfinite(scene->fog_blur) && scene->fog_blur>=0 && scene->fog_blur<=256
         && std::isfinite(scene->fog_feather) && (scene->fog_blur==0 || scene->fog_feather>0) && std::isfinite(scene->fog_plane_z);
+    valid=valid && std::isfinite(scene->thin_edge_strength) && scene->thin_edge_strength>=0 && scene->thin_edge_strength<=1
+        && std::isfinite(scene->thin_edge_power) && scene->thin_edge_power>=0 && scene->thin_edge_power<=16;
     valid=valid && std::isfinite(scene->fog_tint.r) && scene->fog_tint.r>=0 && scene->fog_tint.r<=1
         && std::isfinite(scene->fog_tint.g) && scene->fog_tint.g>=0 && scene->fog_tint.g<=1
         && std::isfinite(scene->fog_tint.b) && scene->fog_tint.b>=0 && scene->fog_tint.b<=1;
@@ -65,7 +67,8 @@ bool render_scene_validate(const RenderScene* scene)
         const RenderMedium* m=&scene->media[i];
         for (uint32_t j=0;j<4;++j)
             valid=valid && std::isfinite(m->center_radius[j]) && std::isfinite(m->scattering[j])
-                && std::isfinite(m->absorption_phase[j]) && std::isfinite(m->lighting[j]);
+                && std::isfinite(m->absorption_phase[j]) && std::isfinite(m->lighting[j]) && std::isfinite(m->blur[j]);
+        valid=valid && m->blur[0]>=0 && m->blur[0]<=32 && m->blur[1]>=0 && m->blur[1]<=100 && m->blur[2]>=0 && m->blur[2]<=32;
         valid=valid && (m->lighting[0]==0 || m->lighting[0]==1) && m->center_radius[3]>=0 && m->scattering[3]>=0 && m->scattering[3]<=1;
     }
     for (uint32_t axis=0;axis<3;++axis)
@@ -128,6 +131,8 @@ bool render_scene_write(const RenderScene* scene,const char* path)
         const RenderMedium* m=&scene->media[i];
         fprintf(file,"%s[%.6f,%.6f,%.6f,%.6f]",i ? "," : "",m->center_radius[0],m->center_radius[1],m->center_radius[2],m->center_radius[3]);
     }
+    fprintf(file,"],\"membrane_fade\":[%.6f,%.6f],\"medium_blur\":[",scene->thin_edge_strength,scene->thin_edge_power);
+    for (uint32_t i=0;i<scene->media.size();++i) fprintf(file,"%s[%.6f,%.6f,%.6f]",i ? "," : "",scene->media[i].blur[0],scene->media[i].blur[1],scene->media[i].blur[2]);
     fprintf(file,"],\"medium_shadows\":[");
     for (uint32_t i=0;i<scene->media.size();++i) fprintf(file,"%s%s",i ? "," : "",scene->media[i].lighting[0]>0 ? "true" : "false");
     fprintf(file,"],\"fog\":{\"blur_radius\":%.6f,\"sight_feather\":%.6f,\"plane_z\":%.6f,\"tint\":[%.6f,%.6f,%.6f],\"sight\":[",scene->fog_blur,scene->fog_feather,scene->fog_plane_z,scene->fog_tint.r,scene->fog_tint.g,scene->fog_tint.b);

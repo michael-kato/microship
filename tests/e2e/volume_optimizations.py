@@ -21,6 +21,9 @@ parser.add_argument('--baseline',type=Path,help='Executable with its bundled ass
 parser.add_argument('--variants',nargs='+',choices=('baseline','current'),default=('current',))
 parser.add_argument('--output',type=Path,default=root/'build/volume-opt-review')
 parser.add_argument('--frames',type=int,choices=(1,2),default=1)
+parser.add_argument('--depth-blur',choices=('on','off'),help='Override the authored medium surface blur')
+parser.add_argument('--edge-fade',choices=('on','off'),help='Override the membrane view-angle fade')
+parser.add_argument('--weak-medium',action='store_true',help='Restore the previous cell scattering coefficients for comparison')
 parser.add_argument('--shadow-grid',type=int,help='Override current-frame visibility grid resolution; zero traces every shadow')
 parser.add_argument('--atmosphere-shadows',choices=('on','off'),help='Override geometry shadows for the global medium')
 parser.add_argument('--timing',action='store_true',help='Disable host validation for GPU stage timings')
@@ -29,6 +32,11 @@ args=parser.parse_args();out=args.output.resolve();out.mkdir(parents=True,exist_
 if 'baseline' in args.variants and not args.baseline:parser.error('--variants baseline requires --baseline PATH')
 binaries=dict(baseline=args.baseline.resolve() if args.baseline else None,current=args.binary.resolve())
 data=stage_world(root/'assets/levels/biology-virus.json',out)
+if args.edge_fade=='off':data['appearance']['thin_surface'].pop('edge_fade',None)
+for body in data['bodies']:
+    if 'medium' not in body:continue
+    if args.depth_blur=='off':body['medium'].pop('depth_blur',None)
+    if args.weak_medium:body['medium'].update(scattering=[.035,.045,.04],absorption=.012)
 config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3
 if args.shadow_grid is not None:config['lighting']['shadow_grid_resolution']=args.shadow_grid
 assert config['output']['width']==1920 and config['output']['height']==1080
@@ -70,7 +78,7 @@ if not args.run and not args.cpu:
     print(f'Prepared {len(prepared)} processes: native 1920x1080; 3 film + 1 volume + 1 backdrop; {args.frames} frames; 2 seconds per process; 5 seconds per GPU batch. No GPU work started.');sys.exit(0)
 environment=os.environ.copy();environment['MICROSHIP_VULKAN_VALIDATION']='0' if args.timing else '1'
 started=time.monotonic();report=[];reference_state=None
-labels=dict(application='Application frame',surface='GPU surface',volume='GPU volumes',acceleration='GPU acceleration update',gpu_total='total render',shadow_grid='GPU shadow grid')
+labels=dict(application='Application frame',surface='GPU surface',volume='GPU volumes',acceleration='GPU acceleration update',gpu_total='total render',shadow_grid='GPU shadow grid',medium_blur='GPU medium blur')
 for variant,prefix,invocation in prepared:
     remaining=5-(time.monotonic()-started)
     if not args.cpu and remaining<=0:raise RuntimeError('The five-second GPU batch limit expired')

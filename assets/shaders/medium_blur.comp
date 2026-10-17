@@ -1,0 +1,41 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#include "render_bindings.glsl"
+// Full-resolution spatial filtering of the current surface layer only.
+layout(local_size_x=COMPUTE_GROUP_SIZE,local_size_y=COMPUTE_GROUP_SIZE) in;
+layout(set=0,binding=BLOOM_BINDING_BEAUTY,rgba32f) uniform image2D beauty;
+layout(set=0,binding=BLOOM_BINDING_HORIZONTAL,rgba32f) uniform image2D scratch;
+layout(set=0,binding=BLOOM_BINDING_SHARP_LAYER,std430) readonly buffer SharpLayer { vec4 sharp_pixels[]; };
+layout(push_constant) uniform BlurPass
+{
+    ivec2 extent;int radius;int pass;
+    float threshold;float strength;float exposure;float views;
+} filter_pass;
+void main()
+{
+    ivec2 pixel=ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(pixel,filter_pass.extent))) return;
+    vec4 center=filter_pass.pass==0 ? imageLoad(beauty,pixel) : imageLoad(scratch,pixel);
+    vec3 sum=center.rgb;
+    if (center.a>.5)
+    {
+        sum=vec3(0);float weights=0;
+        for (int tap=-12;tap<=12;++tap)
+        {
+            int offset=int(round(float(tap)*center.a/12.0));
+            ivec2 p=clamp(pixel+(filter_pass.pass==0 ? ivec2(offset,0) : ivec2(0,offset)),ivec2(0),filter_pass.extent-1);
+            vec4 neighbor=filter_pass.pass==0 ? imageLoad(beauty,p) : imageLoad(scratch,p);
+            // Do not spread interior radiance onto the sharp wall or external objects.
+            if (neighbor.a<=0.0) continue;
+            float weight=exp(-.5*float(tap*tap)/16.0-abs(neighbor.a-center.a)/max(1.0,center.a*.2));
+            sum+=neighbor.rgb*weight;weights+=weight;
+        }
+        sum/=max(weights,.000001);
+    }
+    if (filter_pass.pass==0) imageStore(scratch,pixel,vec4(sum,center.a));
+    else
+    {
+        if (center.a>0.0) sum+=sharp_pixels[pixel.y*filter_pass.extent.x+pixel.x].rgb;
+        imageStore(beauty,pixel,vec4(sum,0));
+    }
+}

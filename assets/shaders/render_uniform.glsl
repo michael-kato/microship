@@ -10,7 +10,7 @@ layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
     uvec4 settings;   // Width, height, film samples per pixel, max transparent crossings.
     uvec4 scene;      // Fixed film seed, media count, two padding words.
     vec4 display;     // Exposure, tan(vertical FOV / 2), aspect, volume integration steps.
-    uvec4 quality;    // Volume film rays, reserved, conductor compensation, padding.
+    uvec4 quality;    // Volume film rays, visibility grid size, conductor compensation, medium blur enabled.
     vec4 scene_min;   // Conservative bounds of actual stationary mesh vertices.
     vec4 scene_max;
     vec4 ambient_top, ambient_bottom;
@@ -20,4 +20,5 @@ layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
     vec4 studio_direction[3],studio_color[3],thin_material,backdrop_wave;
     vec4 fog; // Blur radius in pixels, sight feather in world units, map plane Z.
     vec4 fog_tint;
+    vec4 membrane_fade; // View-angle opacity fade strength and power.
 } render;

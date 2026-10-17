@@ -161,6 +161,26 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "edge_fade": {
+          "type": "object",
+          "properties": {
+            "strength": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "power": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 16
+            }
+          },
+          "required": [
+            "strength",
+            "power"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [

@@ -253,7 +253,14 @@ static bool load_appearance(World* w,const char* path)
     Json thin=json_find(root,"thin_surface");
     if (json_present(thin))
     {
-        json_object(thin,"transmission|absorption|clarity");
+        json_object(thin,"transmission|absorption|clarity|edge_fade");
+        Json edge=json_find(thin,"edge_fade");
+        if (json_present(edge))
+        {
+            json_object(edge,"strength|power");
+            w->thin_edge_strength=json_float(json_get(edge,"strength"),0,1);
+            w->thin_edge_power=json_positive(json_get(edge,"power"),16);
+        }
         w->thin_transmission=json_float(json_get(thin,"transmission"),0,MAX_MEMBRANE_TRANSMISSION);
         w->thin_absorption=json_float(json_get(thin,"absorption"),0,MAX_MEMBRANE_ABSORPTION);w->thin_transmission_set=true;
         Json clarity=json_find(thin,"clarity");
@@ -310,7 +317,15 @@ static bool load_placements(World* w,Json root)
         Json medium=json_find(j,"medium");
         if (json_present(medium))
         {
-            json_object(medium,"radius_fraction|edge_fade|scattering|absorption|anisotropy");
+            json_object(medium,"radius_fraction|edge_fade|scattering|absorption|anisotropy|depth_blur");
+            Json blur=json_find(medium,"depth_blur");
+            if (json_present(blur))
+            {
+                json_object(blur,"pixels_per_unit|sharp_distance|max_radius");
+                b.interior_blur_rate=json_float(json_get(blur,"pixels_per_unit"),0,32);
+                b.interior_blur_sharp=json_float(json_get(blur,"sharp_distance"),0,100);
+                b.interior_blur_max=json_float(json_get(blur,"max_radius"),0,32);
+            }
             b.interior_radius=json_positive(json_get(medium,"radius_fraction"),1);
             b.interior_fade=json_float(json_get(medium,"edge_fade"),0,1);
             b.interior_scattering=json_color(json_get(medium,"scattering"),MAX_MEDIUM_SCATTERING);

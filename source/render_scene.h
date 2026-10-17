@@ -16,7 +16,7 @@ struct RenderInstance
 };
 struct RenderMedium
 {
-    float center_radius[4], scattering[4], absorption_phase[4],lighting[4]; // lighting.x enables geometry shadows.
+    float center_radius[4], scattering[4], absorption_phase[4],lighting[4],blur[4]; // lighting.x enables geometry shadows.
 };
 enum { MAX_RENDER_SIGHT=272 };
 struct RenderSight { float center_radius[4]; };
@@ -37,7 +37,7 @@ struct RenderScene
     Color fog_tint;
     Color ambient, ambient_top, ambient_bottom;
     RenderLight lights[3];
-    float thin_transmission, thin_absorption, thin_clarity;
+    float thin_transmission, thin_absorption, thin_clarity,thin_edge_strength,thin_edge_power;
     bool lights_enabled, guides_required;
     uint32_t background_samples, background_triangles;
     float background_blur, background_glow, background_ambient;

@@ -129,6 +129,32 @@
                 "type": "number",
                 "exclusiveMinimum": -0.95,
                 "exclusiveMaximum": 0.95
+              },
+              "depth_blur": {
+                "type": "object",
+                "properties": {
+                  "pixels_per_unit": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 32
+                  },
+                  "sharp_distance": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "max_radius": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 32
+                  }
+                },
+                "required": [
+                  "pixels_per_unit",
+                  "sharp_distance",
+                  "max_radius"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
