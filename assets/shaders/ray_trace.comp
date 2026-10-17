@@ -19,6 +19,7 @@ struct Vertex
     vec4 position;
     vec4 normal;
     vec4 color;
+    vec4 subsurface; // Mean free path RGB and scattering weight.
 };
 
 layout(set = 0, binding = RENDER_BINDING_ACCELERATION) uniform accelerationStructureEXT scene_acceleration;
@@ -302,11 +303,11 @@ float directional_energy(float cosine, float roughness)
 }
 
 vec3 evaluate_bsdf(vec3 normal, vec3 outgoing, vec3 incoming, vec3 albedo,
-                   float roughness, float ior, bool metal)
+                   float roughness, float ior, bool metal,float diffuse_weight)
 {
     float ni = max(0.0, dot(normal, incoming)), no = max(0.0, dot(normal, outgoing));
     if (ni <= 0.0 || no <= 0.0) return vec3(0.0);
-    if (!metal && (roughness >= DIFFUSE_ROUGHNESS_THRESHOLD || ior <= 1.0)) return albedo / PI;
+    if (!metal && (roughness >= DIFFUSE_ROUGHNESS_THRESHOLD || ior <= 1.0)) return diffuse_weight*albedo / PI;
     vec3 half_vector = normalize(incoming + outgoing);
     float nh = max(0.0, dot(normal, half_vector)), oh = max(MIN_SHADING_DENOMINATOR, dot(outgoing, half_vector));
     float alpha = max(MIN_GGX_ALPHA, roughness*roughness);
@@ -328,7 +329,7 @@ vec3 evaluate_bsdf(vec3 normal, vec3 outgoing, vec3 incoming, vec3 albedo,
     }
     float f = fresnel(oh, ior);
     float specular = f * distribution * ggx_mask(ni, alpha) * ggx_mask(no, alpha) / (4.0*ni*no);
-    return albedo * ((1.0-f) / PI) + vec3(specular);
+    return diffuse_weight*albedo * ((1.0-f) / PI) + vec3(specular);
 }
 
 struct InstanceStyle { vec4 tint,material; }; // Emission, target roughness, roughness weight, flags (unshadowed=1, thin tint=2).
@@ -338,7 +339,9 @@ struct Surface
 {
     vec3 point, normal, geometric_normal, color;
     float roughness, ior, emission;
-    bool metal,translucent,unshadowed;
+    bool metal,translucent,unshadowed,front_face;
+    vec4 subsurface;
+    uint instance;
 };
 
 bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surface surface)
@@ -377,6 +380,10 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
     if (dot(normal, -direction) <= 0.0)
         normal = geometric_normal;
 
+    float instance_scale=min(length(hit_to_world[0]),min(length(hit_to_world[1]),length(hit_to_world[2])));
+    surface.subsurface=a.subsurface*weights.x+b.subsurface*weights.y+c.subsurface*weights.z;
+    surface.subsurface.rgb*=instance_scale;
+    surface.instance=hit_instance;surface.front_face=dot(area_normal,direction)<0.0;
     surface.point = point; surface.normal = normal; surface.geometric_normal = geometric_normal;
     surface.color = color; surface.roughness = roughness; surface.ior = ior;
     surface.emission = emission; surface.metal = triangle.w == CONDUCTOR_MATERIAL;
@@ -446,22 +453,98 @@ vec3 sampled_visibility(vec3 point,vec3 normal,int light)
     return studio_visibility(point,render.studio_direction[light].xyz);
 }
 
+float scattering_weight(Surface s)
+{
+    return s.metal || s.unshadowed ? 0.0 : s.subsurface.a*render.subsurface.x;
+}
+
 vec3 evaluate_studio(Surface s,vec3 outgoing,int selected)
 {
     if (render.studio_direction[selected].w<=0.0) return vec3(0);
     vec3 direction=render.studio_direction[selected].xyz;
     float cosine=dot(s.normal,direction),geometric_cosine=dot(s.geometric_normal,direction);
     float transmission=s.translucent ? render.thin_material.x : 0.0;
-    vec3 f;
-    if (cosine>0.0 && geometric_cosine>0.0)
-        f=(1.0-transmission)*evaluate_bsdf(s.normal,outgoing,direction,s.color,s.roughness,s.ior,s.metal);
+    float scatter=scattering_weight(s);vec3 weighted=vec3(0);
+    if (geometric_cosine>0.0 && (cosine>0.0 || scatter>0.0))
+    {
+        vec3 reflected=evaluate_bsdf(s.normal,outgoing,direction,s.color,s.roughness,s.ior,s.metal,1.0-scatter)*max(0.0,cosine);
+        if (scatter>0.0)
+        {
+            // The wrap integrates to Lambert's energy over the front hemisphere.
+            // Replace diffuse energy only. Keep the original specular highlight.
+            float wrap=render.subsurface.y;
+            float diffuse=(max(0.0,cosine)+wrap)/(1.0+2.0*wrap);
+            float f=0.0;
+            if (cosine>0.0 && s.roughness<DIFFUSE_ROUGHNESS_THRESHOLD && s.ior>1.0)
+                f=fresnel(max(MIN_SHADING_DENOMINATOR,dot(outgoing,normalize(direction+outgoing))),s.ior);
+            reflected+=s.color*((1.0-f)*scatter*(1.0-render.subsurface.z)*diffuse/PI);
+        }
+        weighted=(1.0-transmission)*reflected*render.studio_color[selected].rgb;
+    }
     else if (cosine<0.0 && geometric_cosine<0.0 && transmission>0.0)
-        f=s.color*(transmission*(1.0-render.thin_material.w)/PI)*exp(-render.thin_material.y/max(MIN_MEMBRANE_DIRECTION_COSINE,-cosine));
-    else return vec3(0);
-    vec3 origin=s.point+s.geometric_normal*(geometric_cosine>0.0 ? point_epsilon(s.point) : -point_epsilon(s.point));
-    vec3 weighted=f*abs(cosine)*render.studio_color[selected].rgb;
+        weighted=s.color*((1.0-scatter)*transmission*(1.0-render.thin_material.w)*(-cosine)/PI)*
+            exp(-render.thin_material.y/max(MIN_MEMBRANE_DIRECTION_COSINE,-cosine))*render.studio_color[selected].rgb;
     if (max(weighted.r,max(weighted.g,weighted.b))<=0.0) return vec3(0);
+    vec3 origin=s.point+s.geometric_normal*(geometric_cosine>0.0 ? point_epsilon(s.point) : -point_epsilon(s.point));
     return weighted*(s.unshadowed ? vec3(1) : sampled_visibility(origin,s.geometric_normal*(geometric_cosine>0.0 ? 1.0 : -1.0),selected));
+}
+
+bool subsurface_exit(Surface s,vec3 direction,float limit,out vec3 exit_point,out float thickness)
+{
+    float epsilon=point_epsilon(s.point);
+    vec3 origin=s.point-s.geometric_normal*epsilon;
+    rayQueryEXT query;
+#if defined(MICROSHIP_DEBUG_BUFFERS) && !defined(MICROSHIP_NO_QUERY_COUNTERS)
+    ++debug_shadow_queries;
+#endif
+    rayQueryInitializeEXT(query,scene_acceleration,gl_RayFlagsNoOpaqueEXT,SURFACE_RAY_MASK,origin,0.0,direction,limit);
+    while (rayQueryProceedEXT(query))
+    {
+        if (rayQueryGetIntersectionTypeEXT(query,false)!=gl_RayQueryCandidateIntersectionTriangleEXT) continue;
+        if (rayQueryGetIntersectionInstanceIdEXT(query,false)!=s.instance || rayQueryGetIntersectionFrontFaceEXT(query,false)==s.front_face) continue;
+        uint triangle=rayQueryGetIntersectionPrimitiveIndexEXT(query,false)+rayQueryGetIntersectionInstanceCustomIndexEXT(query,false);
+        // A cell mesh contains both a hollow wall and solid organelles. The wall is not an organelle exit.
+        if (triangles[triangle].w!=0u) continue;
+        rayQueryConfirmIntersectionEXT(query);
+    }
+    if (rayQueryGetIntersectionTypeEXT(query,true)==gl_RayQueryCommittedIntersectionNoneEXT) return false;
+    thickness=rayQueryGetIntersectionTEXT(query,true)+epsilon;
+    exit_point=origin+direction*(thickness-epsilon);
+    return true;
+}
+
+vec3 evaluate_subsurface(Surface s,vec3 outgoing)
+{
+    float scatter=scattering_weight(s);
+    float radius=max(s.subsurface.r,max(s.subsurface.g,s.subsurface.b));
+    if (scatter<=0.0 || radius<=0.0 || render.subsurface.z<=0.0) return vec3(0);
+    // One geometric thickness query per surface at most. Use the strongest back light.
+    int selected=-1;float best=0.0;
+    for (int light=0;light<3;++light)
+    {
+        float cosine=-dot(s.geometric_normal,render.studio_direction[light].xyz);
+        float score=cosine*render.studio_direction[light].w;
+        if (score>best) { best=score;selected=light; }
+    }
+    if (selected<0) return vec3(0);
+    vec3 direction=render.studio_direction[selected].xyz,entry;float thickness;
+    float cosine=max(0.0,-dot(s.normal,direction));
+    if (cosine<=0.0) return vec3(0);
+    if (s.translucent)
+    {
+        // The wall encloses fluid. Its authored thickness is not the cell diameter.
+        thickness=render.subsurface.w/max(MIN_MEMBRANE_DIRECTION_COSINE,cosine);
+        entry=s.point+direction*point_epsilon(s.point);
+    }
+    else if (!subsurface_exit(s,direction,8.0*radius,entry,thickness)) return vec3(0);
+    vec3 attenuation=exp(-thickness/max(s.subsurface.rgb,vec3(MIN_SHADING_DENOMINATOR)));
+    float exit_transmission=1.0-fresnel(max(0.0,dot(s.normal,outgoing)),s.ior);
+    float entry_transmission=1.0-fresnel(cosine,s.ior);
+    float clear_budget=s.translucent ? 1.0-render.thin_material.x : 1.0;
+    vec3 light=s.color*attenuation*(scatter*render.subsurface.z*clear_budget*entry_transmission*exit_transmission*cosine/PI)*render.studio_color[selected].rgb;
+    // Query from the light-entry side. Other objects must still cast shadows.
+    vec3 visibility=sampled_visibility(entry+direction*point_epsilon(entry),direction,selected);
+    return light*visibility;
 }
 
 const float COSINE_GRADIENT_DENOMINATOR=3.0;
@@ -486,7 +569,7 @@ vec3 ambient_surface(Surface s,vec3 outgoing)
     return result;
 }
 
-vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel)
+vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float subsurface_sample_weight)
 {
     vec3 radiance=vec3(0),weight=vec3(1);float path_distance=0;bool through_wall=false;
     // The limit counts transparent crossings. An opaque surface after the last
@@ -523,6 +606,7 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel)
 #endif
         vec3 direct=s.color*s.emission;
         for (int light=0;light<3;++light) direct+=evaluate_studio(s,-direction,light);
+        if (subsurface_sample_weight>0.0) direct+=subsurface_sample_weight*evaluate_subsurface(s,-direction);
         float view_cosine=abs(dot(s.normal,direction));
         float opacity=s.translucent ? membrane_opacity(view_cosine) : 1.0;
         vec3 contribution=weight*(direct+ambient_surface(s,-direction))*opacity;
@@ -653,7 +737,12 @@ void main()
     for (uint sample_index = 0u; sample_index < sample_count; ++sample_index)
     {
         vec3 direction=film_direction(pixel,film_sample(sample_index,sample_count));
-        sum+=trace_direct(render.camera_position.xyz,direction,sample_index,pixel);
+        uint budget=min(sample_count,render.subsurface_quality.x);
+        // Prefer the center for an odd budget; other selected samples are mirrored pairs.
+        bool center=(sample_count&1u)!=0u && (budget&1u)!=0u;
+        bool selected=center ? sample_index<budget-1u || sample_index==sample_count-1u : sample_index<budget;
+        float weight=selected && budget>0u ? float(sample_count)/float(budget) : 0.0;
+        sum+=trace_direct(render.camera_position.xyz,direction,sample_index,pixel,weight);
     }
 
     vec3 radiance = sum/float(sample_count);

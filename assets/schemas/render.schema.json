@@ -217,6 +217,44 @@
         "max_radius"
       ],
       "additionalProperties": false
+    },
+    "subsurface": {
+      "type": "object",
+      "properties": {
+        "strength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "wrap": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "transmission": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "membrane_thickness": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "samples_per_pixel": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        }
+      },
+      "required": [
+        "strength",
+        "wrap",
+        "transmission",
+        "membrane_thickness",
+        "samples_per_pixel"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [

@@ -25,6 +25,8 @@ parser.add_argument('--depth-blur',choices=('on','off'),help='Override the autho
 parser.add_argument('--edge-fade',choices=('on','off'),help='Override the membrane view-angle fade')
 parser.add_argument('--wall-blur',choices=('on','off'),help='Override blur for all light transmitted through a wall')
 parser.add_argument('--tilt-shift',choices=('on','off'),help='Override the miniature focus band')
+parser.add_argument('--subsurface',choices=('on','off','wrap'),help='Compare SSS with no SSS or without thickness transmission')
+parser.add_argument('--subsurface-samples',type=int,help='Number of existing film samples used for SSS thickness')
 parser.add_argument('--weak-medium',action='store_true',help='Restore the previous cell scattering coefficients for comparison')
 parser.add_argument('--shadow-grid',type=int,help='Override current-frame visibility grid resolution; zero traces every shadow')
 parser.add_argument('--atmosphere-shadows',choices=('on','off'),help='Override geometry shadows for the global medium')
@@ -42,6 +44,9 @@ for body in data['bodies']:
     if args.weak_medium:body['medium'].update(scattering=[.035,.045,.04],absorption=.012)
 config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3
 if args.tilt_shift=='off':config.pop('tilt_shift',None)
+if args.subsurface=='off':config['subsurface']['strength']=0
+if args.subsurface=='wrap':config['subsurface']['transmission']=0
+if args.subsurface_samples is not None:config['subsurface']['samples_per_pixel']=args.subsurface_samples
 if args.shadow_grid is not None:config['lighting']['shadow_grid_resolution']=args.shadow_grid
 assert config['output']['width']==1920 and config['output']['height']==1080
 assert config['volume']==dict(rays_per_pixel=1,integration_steps=8)
@@ -57,7 +62,7 @@ if args.case=='opaque':data['appearance']['thin_surface']['transmission']=0
 if args.case=='thin':
     unit=next(u for u in data['content']['units'] if u['name']=='virus_fighter')
     source=(out/unit['model']).resolve();mesh=bytearray(source.read_bytes());vertices,triangles=struct.unpack_from('<II',mesh,8)
-    for t in range(triangles):struct.pack_into('<I',mesh,16+vertices*48+t*16+12,3)
+    for t in range(triangles):struct.pack_into('<I',mesh,16+vertices*(64 if mesh[:8]==b'FLMESH02' else 48)+t*16+12,3)
     (out/'transmitting-craft.fmesh').write_bytes(mesh);unit['model']='transmitting-craft.fmesh'
 world=out/(args.case+'-world.json');write_world(world,data)
 settings=out/'render.json';settings.write_text(json.dumps(config,indent=2)+'\n')

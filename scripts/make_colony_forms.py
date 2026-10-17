@@ -22,11 +22,13 @@ if set(data)!={'$schema','forms'}:raise ValueError('Unknown form document fields
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 seen=set()
 for form in data['forms']:
-    if set(form)!={'name','shape','color','roughness','ior'}:raise ValueError('Unknown form fields')
+    if set(form)!={'name','shape','color','roughness','ior','subsurface'}:raise ValueError('Unknown form fields')
     if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,30}',form['name']) or form['name'] in seen:raise ValueError('Invalid or duplicate form name')
     seen.add(form['name'])
     if not all(math.isfinite(v) and 0<=v<=1 for v in form['color']) or len(form['color'])!=3:raise ValueError('Invalid pigment')
     if not .02<=form['roughness']<=1 or not 1<=form['ior']<=3:raise ValueError('Invalid optical properties')
+    sss=form['subsurface']
+    if set(sss)!={'weight','radius'} or not 0<=sss['weight']<=1 or len(sss['radius'])!=3 or not all(math.isfinite(v) and .0001<=v<=10 for v in sss['radius']):raise ValueError('Invalid subsurface material')
     if form['shape']=='leaf':
         vertices=[(0,1,0),(0,-.35,0),(-.55,.25,0),(.55,.25,0),(0,.25,.18),(0,.25,-.08)]
         faces=[(1,2,4),(2,0,4),(0,3,4),(3,1,4),(2,1,5),(0,2,5),(3,0,5),(1,3,5)]
@@ -45,12 +47,12 @@ for form in data['forms']:
         row=[]
         for index in triangle.vertices:
             vertex=mesh.vertices[index];normal=vertex.normal if mesh.polygons[triangle.polygon_index].use_smooth else triangle.normal
-            row.append(len(records));records.append((*vertex.co,form['ior'],*normal,0,*form['color'],form['roughness']))
+            row.append(len(records));records.append((*vertex.co,form['ior'],*normal,0,*form['color'],form['roughness'],*sss['radius'],sss['weight']))
         triangles.append((*row,0))
     target=root/'assets/models'/(form['name']+'.fmesh')
     with target.open('wb') as stream:
-        stream.write(struct.pack('<8sII',b'FLMESH01',len(records),len(triangles)))
-        for row in records:stream.write(struct.pack('<12f',*row))
+        stream.write(struct.pack('<8sII',b'FLMESH02',len(records),len(triangles)))
+        for row in records:stream.write(struct.pack('<16f',*row))
         for row in triangles:stream.write(struct.pack('<4I',*row))
     print(target.name,len(triangles),'triangles')
 bpy.context.preferences.filepaths.save_version=0

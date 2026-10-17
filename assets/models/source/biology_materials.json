@@ -15,7 +15,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.48,
+        "radius": [
+          0.12,
+          0.075,
+          0.055
+        ]
+      }
     },
     "nucleus": {
       "roughness_min": 0.42,
@@ -31,7 +39,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.55,
+        "radius": [
+          0.08,
+          0.045,
+          0.1
+        ]
+      }
     },
     "nucleolus": {
       "roughness_min": 0.18,
@@ -47,7 +63,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.48,
+        "radius": [
+          0.055,
+          0.075,
+          0.1
+        ]
+      }
     },
     "mitochondrion": {
       "roughness_min": 0.43,
@@ -63,7 +87,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.58,
+        "radius": [
+          0.1,
+          0.05,
+          0.025
+        ]
+      }
     },
     "cristae": {
       "roughness_min": 0.24,
@@ -79,7 +111,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.4,
+        "radius": [
+          0.04,
+          0.025,
+          0.05
+        ]
+      }
     },
     "vesicle": {
       "roughness_min": 0.18,
@@ -95,7 +135,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.68,
+        "radius": [
+          0.1,
+          0.075,
+          0.065
+        ]
+      }
     },
     "reticulum": {
       "roughness_min": 0.5,
@@ -111,7 +159,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.55,
+        "radius": [
+          0.045,
+          0.07,
+          0.09
+        ]
+      }
     },
     "substrate": {
       "roughness_min": 0.74,
@@ -127,7 +183,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.38,
+        "radius": [
+          0.055,
+          0.08,
+          0.065
+        ]
+      }
     },
     "virus_capsid": {
       "roughness_min": 0.24,
@@ -143,7 +207,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.46,
+        "radius": [
+          0.1,
+          0.14,
+          0.18
+        ]
+      }
     },
     "virus_sheath": {
       "roughness_min": 0.4,
@@ -159,7 +231,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.46,
+        "radius": [
+          0.075,
+          0.12,
+          0.1
+        ]
+      }
     },
     "virus_fibre": {
       "roughness_min": 0.7,
@@ -175,7 +255,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.38,
+        "radius": [
+          0.04,
+          0.07,
+          0.055
+        ]
+      }
     },
     "immune_surface": {
       "roughness_min": 0.45,
@@ -191,7 +279,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.65,
+        "radius": [
+          0.22,
+          0.12,
+          0.15
+        ]
+      }
     },
     "immune_granule": {
       "roughness_min": 0.18,
@@ -207,7 +303,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.55,
+        "radius": [
+          0.1,
+          0.06,
+          0.08
+        ]
+      }
     },
     "fungal_stalk": {
       "roughness_min": 0.7,
@@ -223,7 +327,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.45,
+        "radius": [
+          0.13,
+          0.08,
+          0.035
+        ]
+      }
     },
     "fungal_cap": {
       "roughness_min": 0.33,
@@ -239,7 +351,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.58,
+        "radius": [
+          0.2,
+          0.12,
+          0.06
+        ]
+      }
     },
     "fungal_spore": {
       "roughness_min": 0.22,
@@ -255,7 +375,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.6,
+        "radius": [
+          0.16,
+          0.11,
+          0.05
+        ]
+      }
     },
     "spike": {
       "roughness_min": 0.24,
@@ -271,7 +399,15 @@
         1,
         1,
         1
-      ]
+      ],
+      "subsurface": {
+        "weight": 0.35,
+        "radius": [
+          0.06,
+          0.09,
+          0.075
+        ]
+      }
     }
   }
 }

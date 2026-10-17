@@ -52,5 +52,12 @@
     "focus_half_width": 0.14,
     "falloff": 0.3,
     "max_radius": 24
+  },
+  "subsurface": {
+    "strength": 1,
+    "wrap": 0.5,
+    "transmission": 0.35,
+    "membrane_thickness": 0.06,
+    "samples_per_pixel": 1
   }
 }

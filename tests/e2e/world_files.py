@@ -62,7 +62,7 @@ with tempfile.TemporaryDirectory(prefix='microship-json-e2e-') as directory:
 
     # Exercise mesh errors after the JSON declarations pass validation.
     mesh=out/'ship.fmesh';data=bytearray((bundle/'assets/models/virus_virion.fmesh').read_bytes())
-    vertices=struct.unpack_from('<I',data,8)[0];tag_offset=16+vertices*48+12
+    vertices=struct.unpack_from('<I',data,8)[0];tag_offset=16+vertices*(64 if data[:8]==b'FLMESH02' else 48)+12
     struct.pack_into('<I',data,tag_offset,2);mesh.write_bytes(data)
     unit=deepcopy(base['content']['units'][0]);unit.update(name='sample',model='ship.fmesh',scale=1,yaw_degrees=45)
     mobile=change(minimal,'bodies',[]);mobile['content']['groups']=base['content']['groups'];mobile['content']['units']=[unit]

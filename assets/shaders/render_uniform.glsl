@@ -22,4 +22,6 @@ layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
     vec4 fog_tint;
     vec4 membrane_fade; // View-angle opacity strength/power, transmitted blur radius.
     vec4 focus_band; // Screen center, half width, falloff, maximum pixel radius.
+    vec4 subsurface; // Global weight, diffuse wrap, transmission budget, thin-wall thickness.
+    uvec4 subsurface_quality; // Number of existing film samples used for thickness transport.
 } render;

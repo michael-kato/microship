@@ -129,17 +129,11 @@ Use `--smoke --world PATH.json` to check a level through application startup, si
 
 ## Meshes and rendering
 
-RGB is only one part of a vertex material. The mesh also stores roughness and index of refraction (IOR). The ray shader interpolates all three across each triangle. Roughness controls direct-light highlight width: low values give a narrow highlight; high values spread it. It does not change the mesh outline. Surface detail that changes an outline still needs geometry.
-
-`models/source/biology_materials.json` defines 17 surface profiles. Its local schema is `schemas/biology-materials.schema.json`. Each profile has `roughness_min`, `roughness_max`, `ior`, `frequency`, `pigment_low`, and `pigment_high`. Pigment values are RGB multipliers in `[0,1]`. The generator bakes broad object-space variation into vertex RGB and roughness. It rejects duplicate fields, unknown surfaces, missing fields, non-finite numbers, and invalid ranges. `roughness_min` must not exceed `roughness_max`.
-
-Edit the profiles, run `scripts/make_biology.py` in Blender, rebuild the asset bundle, and restart the application. This requires no material image maps and adds no render-time noise. The membrane, nucleus, vesicles, internal fibres, capsids, sheaths, immune tissue, granules, fungal stalks, caps, and spikes have separate finishes. The backdrop keeps its earlier material. `--scene-state` reports the roughness and IOR range of each loaded mesh. Ambient reflection remains an analytic gradient approximation; roughness controls the studio-light highlights.
-
-Runtime meshes use little-endian `FLMESH01`: eight-byte magic, two uint32 counts, 12 floats per vertex, and four uint32 values per triangle. Vertex fields are position XYZ, IOR, normal XYZ, emission, linear RGB, and roughness. Triangle fields are three indices and a surface tag: 0 dielectric, 2 conductor, 3 thin transmission. Tag 1 is unsupported. The loader checks length, indices, finite values, normals, materials, and area.
+Biological meshes carry vertex color, surface finish, and subsurface scattering data. See [MATERIALS.md](MATERIALS.md) for authoring, render controls, and the mesh format.
 
 Presentation builds a CPU `RenderScene` with mesh ranges, affine instances, tints, lights, bounded media, and effects. The Vulkan renderer consumes this data. It has no world, faction, unit-type, or building dependencies. Transforms, visibility, media, and effects describe the current scene.
 
-The soft backdrop uses current-frame visibility queries and two native-resolution spatial blur passes. It supplies no bounced light. Interior media use single scattering and remain unfiltered. GPU runs require a user request under the project rules. CPU checks do not establish GPU appearance, validation, timing, or native Windows behavior.
+The soft backdrop uses current-frame visibility queries and two native-resolution spatial blur passes. It supplies no bounced light. Interior media use single scattering. Light seen through a wall receives the current-frame wall filter. GPU runs require a user request under the project rules. CPU checks do not establish GPU appearance, validation, timing, or native Windows behavior.
 
 ## Direct ray tracing
 

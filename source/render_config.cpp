@@ -92,7 +92,7 @@ static const char* validate_config(const RenderConfig* config)
 bool render_config_load(RenderConfig* config,const char* path)
 {
     JsonDocument document;if (!json_load(&document,path)) return false;
-    Json root=json_root(&document);json_object(root,"$schema|output|sampling|volume|geometry|camera|lighting|bloom|tilt_shift");RenderConfig loaded={};
+    Json root=json_root(&document);json_object(root,"$schema|output|sampling|volume|geometry|camera|lighting|bloom|tilt_shift|subsurface");RenderConfig loaded={};
     {
         Json j=json_get(root,"output");json_object(j,"width|height|exposure");
         loaded.width=json_uint(json_get(j,"width"),1,MAX_RENDER_WIDTH);
@@ -136,6 +136,17 @@ bool render_config_load(RenderConfig* config,const char* path)
         loaded.bloom_radius=json_uint(json_get(j,"radius"),1,MAX_BLOOM_RADIUS);
         loaded.bloom_strength=json_float(json_get(j,"strength"),0,1);
         loaded.bloom_threshold=json_float(json_get(j,"threshold"),0,MAX_BLOOM_THRESHOLD);
+    }
+    Json subsurface=json_find(root,"subsurface");
+    if (json_present(subsurface))
+    {
+        json_object(subsurface,"strength|wrap|transmission|membrane_thickness|samples_per_pixel");
+        loaded.subsurface_samples=json_uint(json_get(subsurface,"samples_per_pixel"),1,MAX_RENDER_SAMPLES_PER_PIXEL);
+        if (loaded.subsurface_samples>loaded.samples_per_pixel) json_error(subsurface,"subsurface samples cannot exceed film samples");
+        loaded.subsurface_strength=json_float(json_get(subsurface,"strength"),0,1);
+        loaded.subsurface_wrap=json_float(json_get(subsurface,"wrap"),0,1);
+        loaded.subsurface_transmission=json_float(json_get(subsurface,"transmission"),0,1);
+        loaded.subsurface_thickness=json_positive(json_get(subsurface,"membrane_thickness"),1);
     }
     Json focus=json_find(root,"tilt_shift");
     if (json_present(focus))

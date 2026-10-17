@@ -24,9 +24,9 @@
 #include "../assets/shaders/render_bindings.glsl"
 #include "../assets/shaders/hud_layout.glsl"
 
-static const int GPU_VERTEX_BYTES = 48;
+static const int GPU_VERTEX_BYTES = 64;
 static const int GPU_MEDIUM_BYTES = 80;
-static const int GPU_RENDER_UNIFORM_BYTES = 480;
+static const int GPU_RENDER_UNIFORM_BYTES = 512;
 static const int GPU_DEBUG_PUSH_BYTES = 128;
 static const double MILLISECONDS_PER_SECOND = 1000.0;
 static const double BINARY_UNIT_SCALE = 1024.0;
@@ -83,7 +83,8 @@ struct RenderUniform
     uint32_t background_quality[4];
     float backdrop_style[4], backdrop_animation[4];
     float studio_direction[3][4], studio_color[3][4], thin_material[4], backdrop_wave[4];
-    float fog[4],fog_tint[4],membrane_fade[4],focus_band[4];
+    float fog[4],fog_tint[4],membrane_fade[4],focus_band[4],subsurface[4];
+    uint32_t subsurface_quality[4];
 };
 
 static_assert(sizeof(GpuVertex) == GPU_VERTEX_BYTES, "Vertex shader layout");
@@ -780,6 +781,9 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
     uniform.quality[2]=state->config.microfacet_energy_compensation;
     uniform.focus_band[0]=state->config.focus_center;uniform.focus_band[1]=state->config.focus_half_width;
     uniform.focus_band[2]=state->config.focus_falloff;uniform.focus_band[3]=state->config.focus_radius;
+    uniform.subsurface_quality[0]=state->config.subsurface_samples;
+    uniform.subsurface[0]=state->config.subsurface_strength;uniform.subsurface[1]=state->config.subsurface_wrap;
+    uniform.subsurface[2]=state->config.subsurface_transmission;uniform.subsurface[3]=state->config.subsurface_thickness;
     scene_uniform(&uniform,scene);
     if (!create_buffer(state, &state->energy, MICROFACET_TABLE_SIZE*MICROFACET_TABLE_SIZE*sizeof(float),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, host)) return false;
@@ -1452,6 +1456,7 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
     printf("Renderer: direct ray tracing; %ux%u native; %u film samples; %u transmission layers; %u triangles.\n",
         config->width,config->height,config->samples_per_pixel,config->max_transmission_layers,state->triangle_count);
     printf("Sampling: fixed mirrored film points; no stochastic surface transport, denoising, or temporal history.\n");
+    printf("Subsurface: %.2f strength; %u existing film samples; one strongest back light; current geometry.\n",config->subsurface_strength,config->subsurface_samples);
     printf("Volumes: %u film rays; %u midpoint integration steps; analytic ambient fill; ray-traced studio shadows.\n",
         config->volume_rays_per_pixel,config->volume_steps);
     printf("Current-frame guides: %llu bytes; no history or upscaling.\n",(unsigned long long)state->debug_pixels.size);

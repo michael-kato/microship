@@ -221,7 +221,7 @@ surface_names={'membrane','nucleus','nucleolus','mitochondrion','cristae','vesic
                'fungal_stalk','fungal_cap','fungal_spore','spike'}
 if set(materials)!=surface_names:raise ValueError('Incomplete or unknown material surfaces')
 for name,m in materials.items():
-    if set(m)!={'roughness_min','roughness_max','ior','frequency','pigment_low','pigment_high'}:
+    if set(m)!={'roughness_min','roughness_max','ior','frequency','pigment_low','pigment_high','subsurface'}:
         raise ValueError('Invalid material fields: '+name)
     def number(value,low,high):
         return type(value) in (int,float) and math.isfinite(value) and low<=value<=high
@@ -231,6 +231,9 @@ for name,m in materials.items():
     for key in ('pigment_low','pigment_high'):
         if not isinstance(m[key],list) or len(m[key])!=3 or not all(number(v,0,1) for v in m[key]):
             raise ValueError('Invalid material pigment: '+name)
+    s=m['subsurface']
+    if set(s)!={'weight','radius'} or not number(s['weight'],0,1) or len(s['radius'])!=3 or not all(number(v,.0001,10) for v in s['radius']):
+        raise ValueError('Invalid subsurface profile: '+name)
 rng=random.Random(profiles['seed'])
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 parts=[];models=[]
@@ -241,13 +244,15 @@ def cell_part(pivot,movable=True,attachment=None,minimum_scale=0):
     component=len(components)
     components.append(dict(pivot=list(pivot),movable=movable,attachment=attachment,minimum_scale=minimum_scale))
 
-def finish(obj,color,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,smooth=True,material=0,surface=None):
+def finish(obj,color,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,smooth=True,material=0,surface=None,subsurface=None):
     obj.data.transform(Matrix.LocRotScale(obj.location,obj.rotation_euler.to_quaternion(),obj.scale))
     obj.matrix_world=Matrix.Identity(4);mesh=obj.data
     colors=mesh.color_attributes.new(name='Color',type='FLOAT_COLOR',domain='POINT')
     m=materials[surface] if surface else None
+    scattering=materials[subsurface]['subsurface'] if subsurface else m['subsurface'] if m else None
     rough=mesh.attributes.new(name='roughness',type='FLOAT',domain='POINT')
     optical=mesh.attributes.new(name='ior',type='FLOAT',domain='POINT')
+    sss=mesh.color_attributes.new(name='Subsurface',type='FLOAT_COLOR',domain='POINT')
     for v in mesh.vertices:
         rgb=color(v.co) if callable(color) else color
         r=roughness
@@ -261,6 +266,7 @@ def finish(obj,color,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,smooth=True,mat
             r=m['roughness_min']+(m['roughness_max']-m['roughness_min'])*wave
         colors.data[v.index].color=(*rgb,1)
         rough.data[v.index].value=r;optical.data[v.index].value=m['ior'] if m else ior
+        sss.data[v.index].color=(*scattering['radius'],scattering['weight']) if scattering else (0,0,0,0)
     tag=mesh.attributes.new(name="surface",type="INT",domain="FACE")
     for entry in tag.data:entry.value=material
     tag=mesh.attributes.new(name="component",type="INT",domain="POINT")
@@ -268,16 +274,16 @@ def finish(obj,color,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,smooth=True,mat
     for poly in mesh.polygons:poly.use_smooth=smooth
     mesh.update();parts.append(obj);return obj
 
-def sphere(center,size,color,sub=2,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,surface=None):
+def sphere(center,size,color,sub=2,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,surface=None,subsurface=None):
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=sub,radius=1,location=center)
     obj=bpy.context.object;obj.scale=size
-    return finish(obj,color,roughness,ior,surface=surface)
+    return finish(obj,color,roughness,ior,surface=surface,subsurface=subsurface)
 
-def rod(a,b,radius,color,surface=None):
+def rod(a,b,radius,color,surface=None,subsurface=None):
     a,b=Vector(a),Vector(b);delta=b-a
     bpy.ops.mesh.primitive_cone_add(vertices=ROD_SIDES,radius1=radius,radius2=radius*ROD_TIP_RADIUS_SCALE,depth=delta.length,location=(a+b)/2)
     obj=bpy.context.object;obj.rotation_euler=delta.to_track_quat('Z','Y').to_euler()
-    return finish(obj,color,surface=surface)
+    return finish(obj,color,surface=surface,subsurface=subsurface)
 
 def branches(start,direction,length,radius,depth,color,planar=False,buds=None,surface=None,bud_surface=None):
     p=profiles['fractal'];start=Vector(start);direction=Vector(direction).normalized();end=start+direction*length
@@ -301,7 +307,7 @@ def export(name,anatomy=False):
     for obj in parts:obj.select_set(True)
     bpy.context.view_layer.objects.active=parts[0];bpy.ops.object.join()
     obj=bpy.context.object;obj.name=name;mesh=obj.data;mesh.calc_loop_triangles()
-    colors=mesh.color_attributes['Color'].data;rough=mesh.attributes['roughness'].data;ior=mesh.attributes['ior'].data
+    sss=mesh.color_attributes['Subsurface'].data;colors=mesh.color_attributes['Color'].data;rough=mesh.attributes['roughness'].data;ior=mesh.attributes['ior'].data
     records=[];indices=[];lookup={};groups=[]
     for triangle in mesh.loop_triangles:
         row=[]
@@ -309,7 +315,7 @@ def export(name,anatomy=False):
             normal=mesh.corner_normals[li].vector;key=(vi,*normal)
             if key not in lookup:
                 lookup[key]=len(records)
-                records.append((*mesh.vertices[vi].co,ior[vi].value,*normal,0,*colors[vi].color[:3],rough[vi].value))
+                records.append((*mesh.vertices[vi].co,ior[vi].value,*normal,0,*colors[vi].color[:3],rough[vi].value,*sss[vi].color))
                 groups.append(mesh.attributes['component'].data[vi].value)
             row.append(lookup[key])
         indices.append((*row,mesh.attributes["surface"].data[triangle.polygon_index].value))
@@ -328,8 +334,9 @@ def export(name,anatomy=False):
         (out/(name+'.parts.json')).write_text(json.dumps({'$schema':'../schemas/mesh-parts.schema.json','vertices':len(records),'parts':definitions},indent=2)+'\n')
     if any(abs(x)>MAX_LOCAL_COORDINATE for row in records for x in row[:3]):raise RuntimeError(name+' exceeds local mesh bounds')
     with (out/(name+'.fmesh')).open('wb') as f:
-        f.write(struct.pack('<8sII',b'FLMESH01',len(records),len(indices)))
-        for row in records:f.write(struct.pack('<12f',*row))
+        has_subsurface=any(row[15]>0 for row in records)
+        f.write(struct.pack('<8sII',b'FLMESH02' if has_subsurface else b'FLMESH01',len(records),len(indices)))
+        for row in records:f.write(struct.pack('<16f',*row) if has_subsurface else struct.pack('<12f',*row[:12]))
         for row in indices:f.write(struct.pack('<4I',*row))
     obj.location=((len(models)%SOURCE_PREVIEW_COLUMNS)*SOURCE_PREVIEW_SPACING,0,(len(models)//SOURCE_PREVIEW_COLUMNS)*SOURCE_PREVIEW_SPACING)
     models.append(obj);parts=[];print(name,len(records),'vertices',len(indices),'triangles',flush=True)
@@ -420,13 +427,13 @@ def immune(large):
     export('immune_'+('bomber' if large else 'leukocyte'))
 
 def node():
-    p=profiles['node'];sphere((0,NODE_BASE_Y,0),NODE_BASE_SIZE,p['stem'],2)
+    p=profiles['node'];sphere((0,NODE_BASE_Y,0),NODE_BASE_SIZE,p['stem'],2,subsurface='substrate')
     for i in range(4):
         y=NODE_FIRST_RING_Y+i*NODE_RING_SPACING;r=NODE_RING_BASE_RADIUS+NODE_RING_RADIUS_WAVE*math.sin(i)
-        sphere((NODE_RING_X_WAVE*math.sin(i*2),y,0),(r,NODE_RING_HALF_HEIGHT,r),p['membrane'],2)
+        sphere((NODE_RING_X_WAVE*math.sin(i*2),y,0),(r,NODE_RING_HALF_HEIGHT,r),p['membrane'],2,subsurface='membrane')
     for i in range(NODE_BUD_COUNT):
-        a=i*math.tau/NODE_BUD_COUNT;sphere((NODE_BUD_RING_RADIUS*math.cos(a),NODE_BUD_Y,NODE_BUD_RING_RADIUS*math.sin(a)),NODE_BUD_SIZE,p['buds'],2)
-    sphere((0,NODE_CROWN_Y,0),NODE_CROWN_SIZE,p['membrane'],2)
+        a=i*math.tau/NODE_BUD_COUNT;sphere((NODE_BUD_RING_RADIUS*math.cos(a),NODE_BUD_Y,NODE_BUD_RING_RADIUS*math.sin(a)),NODE_BUD_SIZE,p['buds'],2,subsurface='vesicle')
+    sphere((0,NODE_CROWN_Y,0),NODE_CROWN_SIZE,p['membrane'],2,subsurface='membrane')
     export('cell_replication_node')
 
 def spore():
@@ -529,8 +536,8 @@ sphere((0,0,0),BOMBER_PAYLOAD_SIZE,profiles['virus']['core'],1,surface='vesicle'
 immune(False);immune(True);node();factory('virus');factory('immune');factory('fungal_spore')
 spore()
 # A single tapered local +Y segment. Runtime poses extend segments in sequence.
-rod((0,0,0),(0,1,0),GROWTH_SEGMENT_RADIUS,(1,1,1));export('growth_segment')
-sphere((0,0,0),(GROWTH_TIP_RADIUS,GROWTH_TIP_RADIUS,GROWTH_TIP_RADIUS),(1,1,1),2,GROWTH_TIP_ROUGHNESS);export('growth_tip')
+rod((0,0,0),(0,1,0),GROWTH_SEGMENT_RADIUS,(1,1,1),subsurface='substrate');export('growth_segment')
+sphere((0,0,0),(GROWTH_TIP_RADIUS,GROWTH_TIP_RADIUS,GROWTH_TIP_RADIUS),(1,1,1),2,GROWTH_TIP_ROUGHNESS,subsurface='vesicle');export('growth_tip')
 # One reusable shaft and head, local +Z; attached, flying and embedded use this mesh.
 rod((0,0,0),(0,0,SPIKE_SHAFT_LENGTH),SPIKE_SHAFT_RADIUS,(1,1,1),'spike');sphere((0,0,SPIKE_HEAD_Z),SPIKE_HEAD_SIZE,(1,1,1),1,surface='spike')
 export('virus_spike')

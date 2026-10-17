@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='microship-medium-') as directory:
     models={b['name']:b for b in data['content']['bodies']}
     for body,mesh in zip(data['bodies'],scene['meshes']):
         raw=(out/models[body['type']]['model']).resolve().read_bytes();vertices,triangles=struct.unpack_from('<II',raw,8)
-        authored=sum(struct.unpack_from('<I',raw,16+vertices*48+t*16+12)[0]==3 for t in range(triangles))
+        authored=sum(struct.unpack_from('<I',raw,16+vertices*(64 if raw[:8]==b'FLMESH02' else 48)+t*16+12)[0]==3 for t in range(triangles))
         drawn=sum(t[3]==3 for t in mesh['deformation']['indices'])
         assert authored==drawn>0,'An extra membrane wall was added'
     assert scene['membrane_fade']==[1,2] and scene['wall_blur_radius']==12

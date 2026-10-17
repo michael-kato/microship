@@ -29,6 +29,8 @@ struct RenderConfig
     float bloom_strength;
     float bloom_threshold;
     float focus_center,focus_half_width,focus_falloff,focus_radius;
+    uint32_t subsurface_samples;
+    float subsurface_strength,subsurface_wrap,subsurface_transmission,subsurface_thickness;
 };
 
 bool render_config_load(RenderConfig* config, const char* path);

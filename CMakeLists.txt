@@ -232,3 +232,6 @@ set_tests_properties(cell_medium PROPERTIES TIMEOUT 30)
 add_test(NAME payloads COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/payloads.py $<TARGET_FILE:microship>)
 set_tests_properties(payloads PROPERTIES TIMEOUT 30)
+add_test(NAME subsurface COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/subsurface.py $<TARGET_FILE:microship>)
+set_tests_properties(subsurface PROPERTIES TIMEOUT 30)

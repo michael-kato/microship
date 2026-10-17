@@ -27,7 +27,7 @@ const float SECONDARY_PULSE_EXPONENT = 24.0;
 // This layer never supplies indirect illumination or gameplay collision.
 layout(local_size_x=COMPUTE_GROUP_SIZE,local_size_y=COMPUTE_GROUP_SIZE) in;
 layout(set=0,binding = RENDER_BINDING_ACCELERATION) uniform accelerationStructureEXT scene_acceleration;
-struct Vertex { vec4 position,normal,color; };
+struct Vertex { vec4 position,normal,color,subsurface; };
 layout(set=0,binding = RENDER_BINDING_VERTICES,std430) readonly buffer Vertices { Vertex vertices[]; };
 layout(set=0,binding = RENDER_BINDING_TRIANGLES,std430) readonly buffer Triangles { uvec4 triangles[]; };
 layout(set=0,binding = RENDER_BINDING_BACKGROUND_A,rgba16f) uniform writeonly image2D background_a;

@@ -8,7 +8,7 @@
 struct RenderConfig;
 
 // Matches std430. Surface tags: 0 dielectric, 2 conductor, 3 thin transmission.
-struct GpuVertex { float position[4],normal[4],color[4]; };
+struct GpuVertex { float position[4],normal[4],color[4],subsurface[4]; };
 struct GpuTriangle { uint32_t index[4]; };
 struct MeshRange
 {

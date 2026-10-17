@@ -32,7 +32,8 @@ static bool add_vertex(Geometry* geometry, Vec3 center, float radius, Color colo
         { (float)(center.x + radius * x), (float)(center.y + radius * y),
           (float)(center.z + radius * z), 1.0f },
         { (float)x, (float)y, (float)z, 0.0f },
-        { color.r, color.g, color.b, 1.0f }
+        { color.r, color.g, color.b, 1.0f },
+        { 0,0,0,0 }
     };
     if (!std::isfinite(vertex.position[0]) || !std::isfinite(vertex.position[1])
         || !std::isfinite(vertex.position[2]))
@@ -130,10 +131,12 @@ static bool validate_areas(Geometry* geometry)
     return true;
 }
 
-static bool mesh_header(FILE* file, uint32_t* vertex_count, uint32_t* triangle_count)
+static bool mesh_header(FILE* file, uint32_t* vertex_count, uint32_t* triangle_count,uint32_t* vertex_bytes)
 {
     char magic[MESH_MAGIC_BYTES];
-    return fread(magic, 1, MESH_MAGIC_BYTES, file) == MESH_MAGIC_BYTES && memcmp(magic, "FLMESH01", MESH_MAGIC_BYTES) == 0
+    if (fread(magic,1,MESH_MAGIC_BYTES,file)!=MESH_MAGIC_BYTES) return false;
+    *vertex_bytes=!memcmp(magic,"FLMESH02",MESH_MAGIC_BYTES) ? 64 : !memcmp(magic,"FLMESH01",MESH_MAGIC_BYTES) ? 48 : 0;
+    return *vertex_bytes!=0
         && fread(vertex_count, 4, 1, file) == 1 && fread(triangle_count, 4, 1, file) == 1
         && *vertex_count >= 3 && *vertex_count <= MAX_MESH_VERTICES
         && *triangle_count > 0 && *triangle_count <= MAX_MESH_TRIANGLES;
@@ -142,9 +145,9 @@ static bool mesh_header(FILE* file, uint32_t* vertex_count, uint32_t* triangle_c
 static bool mesh_counts(const char* path, uint32_t* vertices, uint32_t* triangles)
 {
     FILE* file = fopen(path, "rb");
-    bool valid = file && mesh_header(file, vertices, triangles);
+    uint32_t vertex_bytes=0;bool valid = file && mesh_header(file, vertices, triangles,&vertex_bytes);
     if (file) fclose(file);
-    if (!valid) fprintf(stderr, "%s: cannot read a valid FLMESH01 mesh header\n", path);
+    if (!valid) fprintf(stderr, "%s: cannot read a valid FLMESH01/02 mesh header\n", path);
     return valid;
 }
 
@@ -154,8 +157,8 @@ static bool add_model(Geometry* geometry, const char* path, Vec3 position, float
     float angle = yaw_degrees * (float)(PI / HALF_TURN_DEGREES);
     float cosine = std::cos(angle), sine = std::sin(angle);
     FILE* file = fopen(path, "rb");
-    uint32_t vertex_count = 0, triangle_count = 0;
-    bool valid = file && mesh_header(file, &vertex_count, &triangle_count);
+    uint32_t vertex_count = 0, triangle_count = 0,vertex_bytes=0;
+    bool valid = file && mesh_header(file, &vertex_count, &triangle_count,&vertex_bytes);
     uint32_t first_vertex = (uint32_t)geometry->vertices.size();
     uint32_t first_triangle = (uint32_t)geometry->triangles.size();
     valid = valid && first_vertex + vertex_count <= geometry->vertices.capacity()
@@ -164,8 +167,13 @@ static bool add_model(Geometry* geometry, const char* path, Vec3 position, float
     {
         geometry->vertices.resize(first_vertex + vertex_count);
         geometry->triangles.resize(first_triangle + triangle_count);
-        valid = fread(&geometry->vertices[first_vertex], sizeof(GpuVertex), vertex_count, file) == vertex_count
-            && fread(&geometry->triangles[first_triangle], sizeof(GpuTriangle), triangle_count, file) == triangle_count
+        if (vertex_bytes==sizeof(GpuVertex)) valid=fread(&geometry->vertices[first_vertex],sizeof(GpuVertex),vertex_count,file)==vertex_count;
+        else for (uint32_t v=0;valid && v<vertex_count;++v)
+        {
+            GpuVertex& vertex=geometry->vertices[first_vertex+v];vertex=GpuVertex();
+            valid=fread(&vertex,vertex_bytes,1,file)==1;
+        }
+        valid=valid && fread(&geometry->triangles[first_triangle], sizeof(GpuTriangle), triangle_count, file) == triangle_count
             && fgetc(file) == EOF && !ferror(file);
     }
     if (file && fclose(file) != 0) valid = false;
@@ -178,12 +186,15 @@ static bool add_model(Geometry* geometry, const char* path, Vec3 position, float
     {
         GpuVertex* v = &geometry->vertices[i];
         for (uint32_t j = 0; j < 4; ++j)
-            valid = valid && std::isfinite(v->position[j]) && std::isfinite(v->normal[j]) && std::isfinite(v->color[j]);
+            valid = valid && std::isfinite(v->position[j]) && std::isfinite(v->normal[j]) && std::isfinite(v->color[j]) && std::isfinite(v->subsurface[j]);
         float normal_squared = v->normal[0]*v->normal[0]+v->normal[1]*v->normal[1]+v->normal[2]*v->normal[2];
         valid = valid && v->position[3] >= 1 && v->position[3] <= 3
             && v->normal[3] >= 0 && v->normal[3] <= MAX_VERTEX_EMISSION
             && normal_squared > MIN_NORMAL_SQUARED_LENGTH && normal_squared < MAX_NORMAL_SQUARED_LENGTH
-            && v->color[3] >= MIN_MATERIAL_ROUGHNESS && v->color[3] <= 1;
+            && v->color[3] >= MIN_MATERIAL_ROUGHNESS && v->color[3] <= 1
+            && v->subsurface[3]>=0 && v->subsurface[3]<=1;
+        for (uint32_t j=0;j<3;++j) valid=valid && v->subsurface[j]>=0 && v->subsurface[j]<=10
+            && (v->subsurface[3]==0 || v->subsurface[j]>0);
         valid = valid && std::fabs(v->position[0]) <= MAX_LOCAL_COORDINATE && std::fabs(v->position[2]) <= MAX_LOCAL_COORDINATE;
         float x = v->position[0], z = v->position[2];
         v->position[0] = cosine * x + sine * z;
@@ -197,7 +208,7 @@ static bool add_model(Geometry* geometry, const char* path, Vec3 position, float
         {
             valid = valid && std::fabs(v->position[j]) <= MAX_LOCAL_COORDINATE && v->color[j] >= 0 && v->color[j] <= 1;
             v->position[j] = center[j] + scale * v->position[j];
-            v->color[j] *= tint[j];
+            v->color[j] *= tint[j];v->subsurface[j]*=scale;
             valid = valid && std::isfinite(v->position[j]);
         }
     }

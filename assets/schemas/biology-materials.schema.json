@@ -130,6 +130,31 @@
           },
           "minItems": 3,
           "maxItems": 3
+        },
+        "subsurface": {
+          "type": "object",
+          "properties": {
+            "weight": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "radius": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0.0001,
+                "maximum": 10
+              },
+              "minItems": 3,
+              "maxItems": 3
+            }
+          },
+          "required": [
+            "weight",
+            "radius"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -138,7 +163,8 @@
         "ior",
         "frequency",
         "pigment_low",
-        "pigment_high"
+        "pigment_high",
+        "subsurface"
       ],
       "additionalProperties": false
     }
