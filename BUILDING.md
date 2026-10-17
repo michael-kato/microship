@@ -22,3 +22,4 @@ python3 scripts/proton_run.py build/windows-cross/microship.exe --world assets/l
 All checks use the real application. Keep native 1920×1080, three film samples, one volume film ray, and one backdrop query. Each GPU process can use at most two frames and 2 seconds; a sequential batch can use at most 5 seconds. See [PROFILING.md](PROFILING.md) for commands and validation limits.
 
 To record flight paths, run `python3 tests/e2e/navigation.py build/windows-cross/microship.exe --output build/navigation`. With Matplotlib installed, run `python3 scripts/plot_flight.py build/navigation/paths.json --output build/navigation/flight-paths.svg`. The plot joins measured half-second positions.
+ s
