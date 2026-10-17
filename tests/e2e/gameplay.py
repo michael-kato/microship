@@ -52,9 +52,9 @@ with tempfile.TemporaryDirectory(prefix='microship-gameplay-') as directory:
         eye,target_text=line[len('Initial camera: '):-1].split('; target: ')
         eye=list(map(float,eye.split()));center=list(map(float,target_text.split()))
         distance=math.sqrt(sum((a-b)**2 for a,b in zip(eye,center)))
-        assert abs(distance-38)<.001,'Zoom exceeded the map scale limit'
+        assert abs(distance-180)<.001,'Zoom exceeded the map scale limit'
         visible_width=2*distance*math.tan(math.radians(22.5))*1920/1080
-        assert visible_width<100,'The map fits within one view at maximum zoom'
+        assert visible_width>250,'Maximum zoom cannot show the wider map'
         hidden,_=run(side+'-unknown-order',text,orders=f'0 select all\n0 order {enemy}\n')
         assert hidden['order']['count']==0,'An order exposed an unknown cell'
         assert all(u['target']==home for u in hidden['units'] if u['selected'])

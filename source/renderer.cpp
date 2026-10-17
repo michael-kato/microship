@@ -26,7 +26,7 @@
 
 static const int GPU_VERTEX_BYTES = 48;
 static const int GPU_MEDIUM_BYTES = 80;
-static const int GPU_RENDER_UNIFORM_BYTES = 464;
+static const int GPU_RENDER_UNIFORM_BYTES = 480;
 static const int GPU_DEBUG_PUSH_BYTES = 128;
 static const double MILLISECONDS_PER_SECOND = 1000.0;
 static const double BINARY_UNIT_SCALE = 1024.0;
@@ -83,7 +83,7 @@ struct RenderUniform
     uint32_t background_quality[4];
     float backdrop_style[4], backdrop_animation[4];
     float studio_direction[3][4], studio_color[3][4], thin_material[4], backdrop_wave[4];
-    float fog[4],fog_tint[4],membrane_fade[4];
+    float fog[4],fog_tint[4],membrane_fade[4],focus_band[4];
 };
 
 static_assert(sizeof(GpuVertex) == GPU_VERTEX_BYTES, "Vertex shader layout");
@@ -188,7 +188,7 @@ struct RendererState
     VkDescriptorPool bloom_descriptor_pool;
     VkDescriptorSet bloom_descriptors;
     VkPipelineLayout bloom_layout;
-    VkPipeline bloom_pipeline,fog_pipeline,medium_blur_pipeline;
+    VkPipeline bloom_pipeline,fog_pipeline,medium_blur_pipeline,focus_pipeline;
     VkPipeline guide_surface_pipeline;
     VkImage output;
     VkDeviceMemory output_memory;
@@ -655,7 +655,7 @@ static void scene_uniform(RenderUniform* uniform,const RenderScene* scene)
     uniform->ambient_bottom[0]=scene->ambient_bottom.r;uniform->ambient_bottom[1]=scene->ambient_bottom.g;uniform->ambient_bottom[2]=scene->ambient_bottom.b;
     uniform->background_quality[0]=scene->background_samples;uniform->background_quality[1]=scene->background_triangles;
     uniform->backdrop_style[0]=scene->background_blur;uniform->backdrop_style[1]=scene->background_glow;uniform->backdrop_style[2]=scene->background_ambient;
-    uniform->membrane_fade[0]=scene->thin_edge_strength;uniform->membrane_fade[1]=scene->thin_edge_power;
+    uniform->membrane_fade[0]=scene->thin_edge_strength;uniform->membrane_fade[1]=scene->thin_edge_power;uniform->membrane_fade[2]=scene->thin_blur_radius;
     uniform->thin_material[0]=scene->thin_transmission;uniform->thin_material[1]=scene->thin_absorption;
     uniform->thin_material[2]=scene->lights_enabled ? 1 : 0;uniform->thin_material[3]=scene->thin_clarity;
     float total=0;
@@ -674,7 +674,7 @@ static void scene_uniform(RenderUniform* uniform,const RenderScene* scene)
     memcpy(uniform->backdrop_animation,scene->background_animation,sizeof(uniform->backdrop_animation));
     memcpy(uniform->scene_min,scene->bounds_min,3*sizeof(float));memcpy(uniform->scene_max,scene->bounds_max,3*sizeof(float));
     memcpy(uniform->foreground_min,scene->foreground_min,3*sizeof(float));memcpy(uniform->foreground_max,scene->foreground_max,3*sizeof(float));
-    uniform->quality[3]=0;
+    uniform->quality[3]=scene->thin_blur_radius>0 ? 1 : 0;
     for (uint32_t i=0;i<scene->media.size();++i) if (scene->media[i].blur[0]>0 && scene->media[i].blur[2]>0) uniform->quality[3]=1;
     uniform->scene[1]=(uint32_t)scene->media.size();uniform->scene[2]=scene->sight_count;
     uniform->fog_tint[0]=scene->fog_tint.r;uniform->fog_tint[1]=scene->fog_tint.g;uniform->fog_tint[2]=scene->fog_tint.b;
@@ -778,6 +778,8 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
     uniform.quality[0]=state->config.volume_rays_per_pixel;
     uniform.quality[1]=state->config.shadow_grid_resolution;
     uniform.quality[2]=state->config.microfacet_energy_compensation;
+    uniform.focus_band[0]=state->config.focus_center;uniform.focus_band[1]=state->config.focus_half_width;
+    uniform.focus_band[2]=state->config.focus_falloff;uniform.focus_band[3]=state->config.focus_radius;
     scene_uniform(&uniform,scene);
     if (!create_buffer(state, &state->energy, MICROFACET_TABLE_SIZE*MICROFACET_TABLE_SIZE*sizeof(float),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, host)) return false;
@@ -1198,7 +1200,8 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
     if (!vk_ok(vkCreatePipelineLayout(state->device, &pipeline_layout, 0, &state->bloom_layout), "Create bloom pipeline layout")) return false;
     return load_companion(state,ray_trace_path,"bloom.comp.spv",state->bloom_layout,&state->bloom_pipeline)
         && load_companion(state,ray_trace_path,"fog.comp.spv",state->bloom_layout,&state->fog_pipeline)
-        && load_companion(state,ray_trace_path,"medium_blur.comp.spv",state->bloom_layout,&state->medium_blur_pipeline);
+        && load_companion(state,ray_trace_path,"medium_blur.comp.spv",state->bloom_layout,&state->medium_blur_pipeline)
+        && load_companion(state,ray_trace_path,"focus.comp.spv",state->bloom_layout,&state->focus_pipeline);
 }
 
 static bool create_debug(RendererState* state, const char* builtin_shader_path)
@@ -1635,7 +1638,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
         }
     }
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_BACKDROP_END);
-    if (renderer->debug_views || scene->guides_required) shader_buffer_barrier(state->command);
+    if (renderer->debug_views || scene->guides_required || uniform->quality[3]) shader_buffer_barrier(state->command);
 
     shader_buffer_barrier(state->command);
     vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->pipeline_layout,0,1,&state->descriptors,0,0);
@@ -1659,7 +1662,34 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
         0, 1, &state->descriptors, 0, 0);
     vkCmdDispatch(state->command, (state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, (state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, 1);
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_SURFACE_END);
-    if (renderer->debug_views || scene->guides_required) shader_buffer_barrier(state->command);
+    if (renderer->debug_views || scene->guides_required || uniform->quality[3]) shader_buffer_barrier(state->command);
+    if (uniform->quality[0] && uniform->scene[1])
+    {
+        image_barrier(state->command,state->hdr,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+            VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+        vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,
+            renderer->debug_views ? state->debug_volume_pipeline : state->volume_pipeline);
+        vkCmdDispatch(state->command,(state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,(state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,1);
+    }
+    vkCmdWriteTimestamp(state->command, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, state->queries, GPU_TIME_VOLUME_END);
+    if (renderer->debug_views || scene->guides_required || uniform->quality[3]) shader_buffer_barrier(state->command);
+    image_barrier(state->command, state->hdr, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+        VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+    vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_EFFECTS_BEGIN);
+    if (scene->guides_required && state->effect_count)
+    {
+        VkImage beauty=state->hdr;
+        image_barrier(state->command,beauty,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,VK_ACCESS_SHADER_WRITE_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+        vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->effects_pipeline);
+        vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->pipeline_layout,0,1,&state->effect_descriptors,0,0);
+        vkCmdDispatch(state->command,(state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,(state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,1);
+        image_barrier(state->command,beauty,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,VK_ACCESS_SHADER_WRITE_BIT,
+            VK_ACCESS_SHADER_READ_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+    }
+    vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_EFFECTS_END);
     if (uniform->quality[3])
     {
         shader_buffer_barrier(state->command);
@@ -1680,33 +1710,6 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
         vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->pipeline_layout,0,1,&state->descriptors,0,0);
     }
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_MEDIUM_BLUR_END);
-    if (uniform->quality[0] && uniform->scene[1])
-    {
-        image_barrier(state->command,state->hdr,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
-            VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-        vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,
-            renderer->debug_views ? state->debug_volume_pipeline : state->volume_pipeline);
-        vkCmdDispatch(state->command,(state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,(state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,1);
-    }
-    vkCmdWriteTimestamp(state->command, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, state->queries, GPU_TIME_VOLUME_END);
-    if (renderer->debug_views || scene->guides_required) shader_buffer_barrier(state->command);
-    image_barrier(state->command, state->hdr, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
-        VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-    vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_EFFECTS_BEGIN);
-    if (scene->guides_required && state->effect_count)
-    {
-        VkImage beauty=state->hdr;
-        image_barrier(state->command,beauty,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,VK_ACCESS_SHADER_WRITE_BIT,
-            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-        vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->effects_pipeline);
-        vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->pipeline_layout,0,1,&state->effect_descriptors,0,0);
-        vkCmdDispatch(state->command,(state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,(state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,1);
-        image_barrier(state->command,beauty,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,VK_ACCESS_SHADER_WRITE_BIT,
-            VK_ACCESS_SHADER_READ_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-    }
-    vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_EFFECTS_END);
     BloomParameters bloom = {};
     bloom.extent[0] = (int32_t)state->config.width;
     bloom.extent[1] = (int32_t)state->config.height;
@@ -1736,6 +1739,26 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
         image_barrier(state->command,state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
             VK_ACCESS_SHADER_READ_BIT,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
         bloom.pass=0;
+    }
+    if (state->config.focus_radius>0 && !renderer->debug_views)
+    {
+        vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->focus_pipeline);
+        vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->bloom_layout,0,1,&state->bloom_descriptors,0,0);
+        for (int pass=0;pass<2;++pass)
+        {
+            image_barrier(state->command,state->hdr,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+                VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT,VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+            image_barrier(state->command,state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+                VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT,VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+            bloom.pass=pass;vkCmdPushConstants(state->command,state->bloom_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,sizeof(bloom),&bloom);
+            vkCmdDispatch(state->command,(state->config.width+7)/8,(state->config.height+7)/8,1);
+        }
+        image_barrier(state->command,state->hdr,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+            VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+        image_barrier(state->command,state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+            VK_ACCESS_SHADER_READ_BIT,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
     }
     vkCmdBindPipeline(state->command, VK_PIPELINE_BIND_POINT_COMPUTE, state->bloom_pipeline);
     vkCmdBindDescriptorSets(state->command, VK_PIPELINE_BIND_POINT_COMPUTE, state->bloom_layout, 0, 1, &state->bloom_descriptors, 0, 0);
@@ -1774,15 +1797,15 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     double milliseconds = difference * state->properties.limits.timestampPeriod / NANOSECONDS_PER_MILLISECOND;
     printf("GPU trace: %.3f ms; %u spp; %u triangles\n", milliseconds,
         state->config.samples_per_pixel, state->triangle_count);
-    uint64_t surface_ticks = timestamps[GPU_TIME_SURFACE_END]-timestamps[GPU_TIME_SURFACE_BEGIN], volume_ticks = timestamps[GPU_TIME_VOLUME_END]-timestamps[GPU_TIME_MEDIUM_BLUR_END];
+    uint64_t surface_ticks = timestamps[GPU_TIME_SURFACE_END]-timestamps[GPU_TIME_SURFACE_BEGIN], volume_ticks = timestamps[GPU_TIME_VOLUME_END]-timestamps[GPU_TIME_SURFACE_END];
     if (state->timestamp_bits < TIMESTAMP_WORD_BITS)
     {
         surface_ticks &= (UINT64_C(1)<<state->timestamp_bits)-1;
         volume_ticks &= (UINT64_C(1)<<state->timestamp_bits)-1;
     }
-    uint64_t medium_blur_ticks=timestamps[GPU_TIME_MEDIUM_BLUR_END]-timestamps[GPU_TIME_SURFACE_END];
+    uint64_t medium_blur_ticks=timestamps[GPU_TIME_MEDIUM_BLUR_END]-timestamps[GPU_TIME_EFFECTS_END];
     if (state->timestamp_bits<TIMESTAMP_WORD_BITS) medium_blur_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1;
-    printf("GPU medium blur: %.3f ms; native resolution; surface layer only.\n",medium_blur_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND);
+    printf("GPU medium blur: %.3f ms; native resolution; transmitted light and effects.\n",medium_blur_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND);
     uint64_t grid_ticks=timestamps[GPU_TIME_GRID_END]-timestamps[GPU_TIME_BACKDROP_END];
     if (state->timestamp_bits<TIMESTAMP_WORD_BITS) grid_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1;
     printf("GPU shadow grid: %.3f ms; resolution %u; current frame only.\n",grid_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND,state->config.shadow_grid_resolution);
@@ -1793,7 +1816,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     printf("GPU surface: %.3f ms; GPU volumes: %.3f ms.\n",
         surface_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND,
         volume_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND);
-    uint64_t bloom_ticks = timestamps[GPU_TIME_BLOOM_END] - timestamps[GPU_TIME_EFFECTS_END];
+    uint64_t bloom_ticks = timestamps[GPU_TIME_BLOOM_END] - timestamps[GPU_TIME_MEDIUM_BLUR_END];
     if (state->timestamp_bits < TIMESTAMP_WORD_BITS)
         bloom_ticks &= (UINT64_C(1) << state->timestamp_bits) - 1;
     double bloom_ms = bloom_ticks * state->properties.limits.timestampPeriod / NANOSECONDS_PER_MILLISECOND;
@@ -1856,6 +1879,7 @@ bool renderer_shutdown(Renderer* renderer)
             if (state->backdrop_memory[i]) vkFreeMemory(state->device,state->backdrop_memory[i],0);
         }
         if (state->guide_surface_pipeline) vkDestroyPipeline(state->device,state->guide_surface_pipeline,0);
+        if (state->focus_pipeline) vkDestroyPipeline(state->device,state->focus_pipeline,0);
         if (state->medium_blur_pipeline) vkDestroyPipeline(state->device,state->medium_blur_pipeline,0);
         if (state->fog_pipeline) vkDestroyPipeline(state->device,state->fog_pipeline,0);
         if (state->bloom_pipeline) vkDestroyPipeline(state->device, state->bloom_pipeline, 0);

@@ -172,7 +172,7 @@ float medium_density(Medium medium, vec3 point)
 }
 
 // Artistic forward-scatter blur follows distance inside authored interior media.
-// It has no camera focal plane and does not blur vacuum or current-frame volume light.
+// It has no camera focal plane and does not blur vacuum.
 float medium_blur_radius(vec3 direction,float distance)
 {
     if (render.quality.w==0u) return 0;
@@ -331,7 +331,7 @@ vec3 evaluate_bsdf(vec3 normal, vec3 outgoing, vec3 incoming, vec3 albedo,
     return albedo * ((1.0-f) / PI) + vec3(specular);
 }
 
-struct InstanceStyle { vec4 tint,material; }; // Emission, target roughness, roughness weight, reserved.
+struct InstanceStyle { vec4 tint,material; }; // Emission, target roughness, roughness weight, flags (unshadowed=1, thin tint=2).
 layout(set=0,binding = RENDER_BINDING_INSTANCE_STYLES,std430) readonly buffer InstanceStyles { InstanceStyle instance_style[]; };
 
 struct Surface
@@ -382,9 +382,10 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
     surface.emission = emission; surface.metal = triangle.w == CONDUCTOR_MATERIAL;
     surface.translucent=triangle.w==THIN_MEMBRANE_MATERIAL;
     vec4 tint=instance_style[hit_instance].tint;
-    surface.color=mix(surface.color,tint.rgb,tint.a);
+    uint flags=uint(instance_style[hit_instance].material.w);
+    if ((flags&2u)==0u || surface.translucent) surface.color=mix(surface.color,tint.rgb,tint.a);
     surface.emission+=instance_style[hit_instance].material.x;
-    surface.unshadowed=instance_style[hit_instance].material.w>0.0;
+    surface.unshadowed=(flags&1u)!=0u;
     if (surface.translucent) surface.roughness=mix(surface.roughness,instance_style[hit_instance].material.y,instance_style[hit_instance].material.z);
     return true;
 }
@@ -487,7 +488,7 @@ vec3 ambient_surface(Surface s,vec3 outgoing)
 
 vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel)
 {
-    vec3 radiance=vec3(0),weight=vec3(1);float path_distance=0;
+    vec3 radiance=vec3(0),weight=vec3(1);float path_distance=0;bool through_wall=false;
     // The limit counts transparent crossings. An opaque surface after the last
     // allowed crossing can still be shaded. Exhaustion does not reveal the sky.
     for (uint layer=0u;layer<=render.settings.w;++layer)
@@ -496,7 +497,7 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel)
         bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
         weight*=transmittance(origin,direction,distance);
         path_distance+=distance;
-        float blur_radius=medium_blur_radius(direction,path_distance);
+        float blur_radius=max(medium_blur_radius(direction,path_distance),through_wall ? render.membrane_fade.z : 0.0);
         film_blur_max=max(film_blur_max,blur_radius);
         if (!hit)
         {
@@ -532,6 +533,7 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel)
 #endif
         float clear=s.translucent ? membrane_clear(view_cosine) : 0.0;
         if (clear<=0.0 || layer==render.settings.w) break;
+        through_wall=true;
         weight*=clear*mix(vec3(1),s.color,CLEAR_MEMBRANE_PIGMENT_WEIGHT*opacity)*exp(-render.thin_material.y*opacity/max(MIN_MEMBRANE_DIRECTION_COSINE,view_cosine));
         origin=s.point-s.geometric_normal*point_epsilon(s.point);
     }
@@ -674,26 +676,36 @@ void main()
     vec3 radiance = surface_radiance.rgb;
     // Volume film rays use the same fixed rule. Quadrature is deterministic.
     uint volume_count = render.scene.y > 0u ? render.quality.x : 0u;
-    vec3 volume_sum = vec3(0.0);
+    vec3 volume_sum = vec3(0.0),sharp_volume_sum=vec3(0.0);
     for (uint sample_index = 0u; sample_index < volume_count; ++sample_index)
     {
         vec3 direction=film_direction(pixel,film_sample(sample_index,volume_count));
-        vec3 origin=render.camera_position.xyz,weight=vec3(1);
+        vec3 origin=render.camera_position.xyz,weight=vec3(1);bool through_wall=false;
         for (uint depth=0u;depth<=render.settings.w;++depth)
         {
             uint triangle;vec2 barycentric;float distance;
             bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
-            volume_sum+=weight*single_scattering(origin,direction,distance);
+            vec3 scattering=weight*single_scattering(origin,direction,distance);
+            volume_sum+=scattering;if (!through_wall) sharp_volume_sum+=scattering;
             if (!hit || depth==render.settings.w) break;
             Surface s;if (!surface_at(triangle,barycentric,direction,s) || !s.translucent) break;
             float view_cosine=abs(dot(s.normal,direction)),opacity=membrane_opacity(view_cosine);
             float clear=membrane_clear(view_cosine);if (clear<=0.0) break;
+            through_wall=true;
             weight*=transmittance(origin,direction,distance)*clear*mix(vec3(1),s.color,CLEAR_MEMBRANE_PIGMENT_WEIGHT*opacity)
                 *exp(-render.thin_material.y*opacity/max(MIN_MEMBRANE_DIRECTION_COSINE,view_cosine));
             origin=s.point-s.geometric_normal*point_epsilon(s.point);
         }
     }
-    if (volume_count > 0u) radiance += volume_sum/float(volume_count);
+    if (volume_count > 0u)
+    {
+        radiance+=volume_sum/float(volume_count);
+        if (render.quality.w>0u && surface_radiance.a>0.0)
+        {
+            vec3 sharp=sharp_volume_sum/float(volume_count);
+            sharp_pixels[pixel.y*render.settings.x+pixel.x].rgb+=sharp;radiance-=sharp;
+        }
+    }
 #ifdef MICROSHIP_DEBUG_BUFFERS
     uint debug_index = pixel.y*render.settings.x+pixel.x;
     debug_pixels[debug_index].volume.rgb = volume_count > 0u ? volume_sum/float(volume_count) : vec3(0);
@@ -703,7 +715,7 @@ void main()
 #endif
     // Keep HDR energy until current-frame bloom and the display transform.
     #ifdef MICROSHIP_VOLUME_PASS
-    imageStore(output_image,ivec2(pixel),vec4(radiance,1.0));
+    imageStore(output_image,ivec2(pixel),vec4(radiance,surface_radiance.a));
 #else
     imageStore(output_image,ivec2(pixel),vec4(radiance,film_blur_max));
 #endif

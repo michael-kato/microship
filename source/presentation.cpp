@@ -117,7 +117,7 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
     for (uint32_t i=0;i<3;++i) scene->lights[i]=RenderLight{w->studio[i].direction,w->studio[i].color,w->studio[i].irradiance};
     scene->lights_enabled=w->studio_mask!=0;scene->guides_required=w->combat.enabled;
     scene->thin_transmission=w->thin_transmission;scene->thin_absorption=w->thin_absorption;scene->thin_clarity=w->thin_clarity;
-    scene->thin_edge_strength=w->thin_edge_strength;scene->thin_edge_power=w->thin_edge_power;
+    scene->thin_edge_strength=w->thin_edge_strength;scene->thin_edge_power=w->thin_edge_power;scene->thin_blur_radius=w->thin_blur_radius;
     scene->background_samples=w->backdrop_soft ? 0 : w->backdrop_samples;
     scene->background_triangles=w->backdrop_soft || !w->backdrop.model_path[0] ? 0 : scene->geometry.meshes[p->background_mesh].count;
     scene->background_blur=w->backdrop_soft ? w->backdrop_blur : 0;
@@ -349,7 +349,7 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
         {
             set_instance(p,p->body_base+i,p->body_meshes[i],Vec3{},Vec3{1,0,0},Vec3{0,1,0},Vec3{0,0,1});
             const CellAppearance& a=s->cell_appearance[i];float* style=scene->instances[p->body_base+i].style;
-            style[0]=a.tint.r;style[1]=a.tint.g;style[2]=a.tint.b;style[3]=s->visible_bodies[i] ? a.strength : 0;
+            style[0]=a.tint.r;style[1]=a.tint.g;style[2]=a.tint.b;style[3]=s->visible_bodies[i] ? a.strength : 0;style[7]=INSTANCE_TINT_THIN_ONLY;
             float weight=0,roughness=0;
             if (s->visible_bodies[i]) for (uint32_t f=1;f<MAX_FACTIONS;++f)
                 if (w->content.factions[f].cell_material)
@@ -397,7 +397,7 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
             Vec3{stretch.x,0,0},Vec3{0,stretch.y,0},Vec3{0,0,1});
         scene->instances[p->background_slot].mask=w->backdrop_soft ? 4 : 1;
         scene->instances[p->background_slot].background=true;
-        scene->instances[p->background_slot].style[7]=1;
+        scene->instances[p->background_slot].style[7]=INSTANCE_UNSHADOWED;
     }
     render_scene_bounds(scene);
     return effects_build(s,camera,config,scene->effects.data(),&scene->effect_count,scene->effect_tiles.data(),scene->tile_count);

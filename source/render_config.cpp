@@ -92,7 +92,7 @@ static const char* validate_config(const RenderConfig* config)
 bool render_config_load(RenderConfig* config,const char* path)
 {
     JsonDocument document;if (!json_load(&document,path)) return false;
-    Json root=json_root(&document);json_object(root,"$schema|output|sampling|volume|geometry|camera|lighting|bloom");RenderConfig loaded={};
+    Json root=json_root(&document);json_object(root,"$schema|output|sampling|volume|geometry|camera|lighting|bloom|tilt_shift");RenderConfig loaded={};
     {
         Json j=json_get(root,"output");json_object(j,"width|height|exposure");
         loaded.width=json_uint(json_get(j,"width"),1,MAX_RENDER_WIDTH);
@@ -136,6 +136,15 @@ bool render_config_load(RenderConfig* config,const char* path)
         loaded.bloom_radius=json_uint(json_get(j,"radius"),1,MAX_BLOOM_RADIUS);
         loaded.bloom_strength=json_float(json_get(j,"strength"),0,1);
         loaded.bloom_threshold=json_float(json_get(j,"threshold"),0,MAX_BLOOM_THRESHOLD);
+    }
+    Json focus=json_find(root,"tilt_shift");
+    if (json_present(focus))
+    {
+        json_object(focus,"focus_center|focus_half_width|falloff|max_radius");
+        loaded.focus_center=json_float(json_get(focus,"focus_center"),0,1);
+        loaded.focus_half_width=json_float(json_get(focus,"focus_half_width"),0,.5f);
+        loaded.focus_falloff=json_positive(json_get(focus,"falloff"),1);
+        loaded.focus_radius=json_float(json_get(focus,"max_radius"),0,64);
     }
     if (!document.valid) return false;
     const char* error=validate_config(&loaded);if (error) return json_error(root,error);

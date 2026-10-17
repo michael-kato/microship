@@ -91,7 +91,8 @@
     "edge_fade": {
       "strength": 1,
       "power": 2
-    }
+    },
+    "blur_radius": 12
   },
   "atmosphere": {
     "center": [

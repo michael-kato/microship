@@ -1,7 +1,7 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
 #include "render_bindings.glsl"
-// Full-resolution spatial filtering of the current surface layer only.
+// Full-resolution spatial filtering of the current transmitted layer.
 layout(local_size_x=COMPUTE_GROUP_SIZE,local_size_y=COMPUTE_GROUP_SIZE) in;
 layout(set=0,binding=BLOOM_BINDING_BEAUTY,rgba32f) uniform image2D beauty;
 layout(set=0,binding=BLOOM_BINDING_HORIZONTAL,rgba32f) uniform image2D scratch;
@@ -27,7 +27,8 @@ void main()
             vec4 neighbor=filter_pass.pass==0 ? imageLoad(beauty,p) : imageLoad(scratch,p);
             // Do not spread interior radiance onto the sharp wall or external objects.
             if (neighbor.a<=0.0) continue;
-            float weight=exp(-.5*float(tap*tap)/16.0-abs(neighbor.a-center.a)/max(1.0,center.a*.2));
+            // Mix across internal depth discontinuities to soften silhouettes.
+            float weight=exp(-.5*float(tap*tap)/16.0);
             sum+=neighbor.rgb*weight;weights+=weight;
         }
         sum/=max(weights,.000001);

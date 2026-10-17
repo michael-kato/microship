@@ -364,7 +364,7 @@ def cell(name,key):
     for index,center in enumerate(inner['vesicle_centers']):
         center=Vector(center)
         cell_part(center,attachment=center+center.normalized()*VESICLE_ATTACHMENT_RADIUS,minimum_scale=inner['vesicle_minimum_radius'][index])
-        sphere(center,VESICLE_SIZE,p['vesicle'],2,surface='vesicle')
+        sphere(center,VESICLE_SIZE,inner['vesicle_colors'][index],2,surface='vesicle')
     # Curved endoplasmic reticulum surrounding the nucleus, inside the shell.
     cell_part((0,0,0))
     for ring in range(3):

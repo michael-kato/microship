@@ -28,6 +28,7 @@ struct RenderConfig
     uint32_t bloom_radius;
     float bloom_strength;
     float bloom_threshold;
+    float focus_center,focus_half_width,focus_falloff,focus_radius;
 };
 
 bool render_config_load(RenderConfig* config, const char* path);

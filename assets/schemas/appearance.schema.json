@@ -181,6 +181,11 @@
             "power"
           ],
           "additionalProperties": false
+        },
+        "blur_radius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 32
         }
       },
       "required": [

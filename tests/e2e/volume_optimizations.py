@@ -16,13 +16,15 @@ from authored_assets import stage_world,write_world
 from save_progress import archive_capture
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('binary',type=Path)
-parser.add_argument('--case',choices=('near','normal','boundary','overlap','thin','opaque','solid','live'),default='near')
+parser.add_argument('--case',choices=('near','normal','boundary','overlap','thin','opaque','solid','live','far'),default='near')
 parser.add_argument('--baseline',type=Path,help='Executable with its bundled assets for a before/after comparison')
 parser.add_argument('--variants',nargs='+',choices=('baseline','current'),default=('current',))
 parser.add_argument('--output',type=Path,default=root/'build/volume-opt-review')
 parser.add_argument('--frames',type=int,choices=(1,2),default=1)
 parser.add_argument('--depth-blur',choices=('on','off'),help='Override the authored medium surface blur')
 parser.add_argument('--edge-fade',choices=('on','off'),help='Override the membrane view-angle fade')
+parser.add_argument('--wall-blur',choices=('on','off'),help='Override blur for all light transmitted through a wall')
+parser.add_argument('--tilt-shift',choices=('on','off'),help='Override the miniature focus band')
 parser.add_argument('--weak-medium',action='store_true',help='Restore the previous cell scattering coefficients for comparison')
 parser.add_argument('--shadow-grid',type=int,help='Override current-frame visibility grid resolution; zero traces every shadow')
 parser.add_argument('--atmosphere-shadows',choices=('on','off'),help='Override geometry shadows for the global medium')
@@ -33,11 +35,13 @@ if 'baseline' in args.variants and not args.baseline:parser.error('--variants ba
 binaries=dict(baseline=args.baseline.resolve() if args.baseline else None,current=args.binary.resolve())
 data=stage_world(root/'assets/levels/biology-virus.json',out)
 if args.edge_fade=='off':data['appearance']['thin_surface'].pop('edge_fade',None)
+if args.wall_blur=='off':data['appearance']['thin_surface'].pop('blur_radius',None)
 for body in data['bodies']:
     if 'medium' not in body:continue
     if args.depth_blur=='off':body['medium'].pop('depth_blur',None)
     if args.weak_medium:body['medium'].update(scattering=[.035,.045,.04],absorption=.012)
 config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3
+if args.tilt_shift=='off':config.pop('tilt_shift',None)
 if args.shadow_grid is not None:config['lighting']['shadow_grid_resolution']=args.shadow_grid
 assert config['output']['width']==1920 and config['output']['height']==1080
 assert config['volume']==dict(rays_per_pixel=1,integration_steps=8)
@@ -61,6 +65,7 @@ orders=out/'settle.orders';orders.write_text('0 select all\n0 order 0\n600 ratio
 base=['--world',str(world),'--config',str(settings),'--world-seed','1234','--ticks',str(ticks),'--no-stats']
 if ticks>600:base+=['--replay',str(orders)]
 if args.case in ('near','thin','opaque'):base+=['--camera-zoom','1000']
+if args.case=='far':base+=['--camera-zoom','-1000']
 if args.case=='live':
     if args.variants!=['current'] or args.frames!=2:parser.error('Live refit uses --variants current --frames 2')
 else:base+=['--time',str(ticks/60),'--step-seconds','0']

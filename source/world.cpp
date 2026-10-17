@@ -253,7 +253,8 @@ static bool load_appearance(World* w,const char* path)
     Json thin=json_find(root,"thin_surface");
     if (json_present(thin))
     {
-        json_object(thin,"transmission|absorption|clarity|edge_fade");
+        json_object(thin,"transmission|absorption|clarity|edge_fade|blur_radius");
+        Json blur=json_find(thin,"blur_radius");if (json_present(blur)) w->thin_blur_radius=json_float(blur,0,32);
         Json edge=json_find(thin,"edge_fade");
         if (json_present(edge))
         {

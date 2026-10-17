@@ -31,7 +31,7 @@
       0.0
     ],
     "min_distance": 8.0,
-    "max_distance": 38.0,
+    "max_distance": 180,
     "vertical_fov_degrees": 45.0
   },
   "lighting": {
@@ -46,5 +46,11 @@
   "volume": {
     "rays_per_pixel": 1,
     "integration_steps": 8
+  },
+  "tilt_shift": {
+    "focus_center": 0.52,
+    "focus_half_width": 0.14,
+    "falloff": 0.3,
+    "max_radius": 24
   }
 }

@@ -1,0 +1,31 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#include "render_bindings.glsl"
+#include "render_uniform.glsl"
+layout(local_size_x=COMPUTE_GROUP_SIZE,local_size_y=COMPUTE_GROUP_SIZE) in;
+layout(set=0,binding=BLOOM_BINDING_BEAUTY,rgba32f) uniform image2D beauty;
+layout(set=0,binding=BLOOM_BINDING_HORIZONTAL,rgba32f) uniform image2D scratch;
+layout(push_constant) uniform FocusPass
+{
+    ivec2 extent;int radius;int pass;
+    float threshold;float strength;float exposure;float views;
+} focus;
+void main()
+{
+    ivec2 pixel=ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(pixel,focus.extent))) return;
+    // A miniature focus band. Full native pixels, from this frame only; HUD is drawn later.
+    float y=(float(pixel.y)+.5)/float(focus.extent.y);
+    float amount=smoothstep(render.focus_band.y,render.focus_band.y+render.focus_band.z,abs(y-render.focus_band.x));
+    float radius=render.focus_band.w*amount;
+    vec3 sum=vec3(0);float weights=0;
+    for (int tap=-12;tap<=12;++tap)
+    {
+        int offset=int(round(float(tap)*radius/12.0));
+        ivec2 p=clamp(pixel+(focus.pass==0 ? ivec2(offset,0) : ivec2(0,offset)),ivec2(0),focus.extent-1);
+        float weight=exp(-.5*float(tap*tap)/16.0);
+        sum+=(focus.pass==0 ? imageLoad(beauty,p).rgb : imageLoad(scratch,p).rgb)*weight;weights+=weight;
+    }
+    if (focus.pass==0) imageStore(scratch,pixel,vec4(sum/weights,1));
+    else imageStore(beauty,pixel,vec4(sum/weights,1));
+}

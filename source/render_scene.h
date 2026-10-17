@@ -6,13 +6,13 @@
 #include <vector>
 
 // CPU render input. No game rules or graphics API resources are stored here.
-enum { INSTANCE_STYLE_FLOATS=8 };
+enum { INSTANCE_STYLE_FLOATS=8, INSTANCE_UNSHADOWED=1, INSTANCE_TINT_THIN_ONLY=2 };
 struct RenderInstance
 {
     float transform[3][4];
     uint32_t mesh, mask;
     bool background;
-    float style[INSTANCE_STYLE_FLOATS]; // RGB tint, weight; emission, target roughness, roughness weight, unshadowed.
+    float style[INSTANCE_STYLE_FLOATS]; // RGB tint, weight; emission, target roughness, roughness weight, flags.
 };
 struct RenderMedium
 {
@@ -37,7 +37,7 @@ struct RenderScene
     Color fog_tint;
     Color ambient, ambient_top, ambient_bottom;
     RenderLight lights[3];
-    float thin_transmission, thin_absorption, thin_clarity,thin_edge_strength,thin_edge_power;
+    float thin_transmission, thin_absorption, thin_clarity,thin_edge_strength,thin_edge_power,thin_blur_radius;
     bool lights_enabled, guides_required;
     uint32_t background_samples, background_triangles;
     float background_blur, background_glow, background_ambient;

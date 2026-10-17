@@ -185,6 +185,38 @@
         "integration_steps"
       ],
       "additionalProperties": false
+    },
+    "tilt_shift": {
+      "type": "object",
+      "properties": {
+        "focus_center": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "focus_half_width": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.5
+        },
+        "falloff": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "max_radius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 64
+        }
+      },
+      "required": [
+        "focus_center",
+        "focus_half_width",
+        "falloff",
+        "max_radius"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
