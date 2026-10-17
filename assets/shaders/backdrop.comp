@@ -23,7 +23,7 @@ const float FACING_GLOW_WEIGHT = 0.55;
 const float SECONDARY_PULSE_EXPONENT = 24.0;
 
 // Decorative background only: one center-ray visibility query, vertex color,
-// approximate ambient shading/emission, then two native-resolution blur passes.
+// ambient/emission and unshadowed wet studio reflections, then spatial blur.
 // This layer never supplies indirect illumination or gameplay collision.
 layout(local_size_x=COMPUTE_GROUP_SIZE,local_size_y=COMPUTE_GROUP_SIZE) in;
 layout(set=0,binding = RENDER_BINDING_ACCELERATION) uniform accelerationStructureEXT scene_acceleration;
@@ -54,8 +54,10 @@ void main()
             sum+=weight*(filter_pass.pass==1 ? textureLod(source_a,position,0).rgb : textureLod(source_b,position,0).rgb);
             weights+=weight;
         }
-        if (filter_pass.pass==1) imageStore(background_b,pixel,vec4(sum/weights,1));
-        else imageStore(background_a,pixel,vec4(sum/weights,1));
+        // Preserve the center-ray distance, without blurring it across silhouettes.
+        float distance=filter_pass.pass==1 ? texelFetch(source_a,pixel,0).a : texelFetch(source_b,pixel,0).a;
+        if (filter_pass.pass==1) imageStore(background_b,pixel,vec4(sum/weights,distance));
+        else imageStore(background_a,pixel,vec4(sum/weights,distance));
         return;
     }
     vec2 film=uv*2.0-1.0;film.y=-film.y;
@@ -66,11 +68,13 @@ void main()
         +film.y*render.display.y*render.camera_up.xyz);
     vec3 environment=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,0.5+0.5*direction.y);
     vec3 color=environment*ENVIRONMENT_FILL_SCALE*render.backdrop_style.z;
+    float distance=128.0; // Log2(1 + hit distance); 128 marks a miss in RGBA16F.
     rayQueryEXT query;
     rayQueryInitializeEXT(query,scene_acceleration,gl_RayFlagsOpaqueEXT,BACKDROP_RAY_MASK,render.camera_position.xyz,0.0,direction,RAY_MAX);
     while (rayQueryProceedEXT(query)) {}
     if (rayQueryGetIntersectionTypeEXT(query,true)!=gl_RayQueryCommittedIntersectionNoneEXT)
     {
+        distance=log2(1.0+rayQueryGetIntersectionTEXT(query,true));
         uint index=rayQueryGetIntersectionPrimitiveIndexEXT(query,true)+rayQueryGetIntersectionInstanceCustomIndexEXT(query,true);
         uvec3 triangle=triangles[index].xyz;
         Vertex a=vertices[triangle.x],b=vertices[triangle.y],c=vertices[triangle.z];
@@ -79,6 +83,7 @@ void main()
         vec3 pigment=a.color.rgb*w.x+b.color.rgb*w.y+c.color.rgb*w.z;
         mat3 normal_to_world=transpose(mat3(rayQueryGetIntersectionWorldToObjectEXT(query,true)));
         vec3 normal=normalize(normal_to_world*(a.normal.xyz*w.x+b.normal.xyz*w.y+c.normal.xyz*w.z));
+        if (dot(normal,-direction)<0.0) normal=-normal;
         float facing=abs(dot(normal,-direction));
         // A soft edge rolloff suppresses sparse-filter silhouette ringing.
         float shape=smoothstep(0.0,SILHOUETTE_FADE_COSINE,facing);
@@ -89,6 +94,31 @@ void main()
         for (int i=0;i<3;++i) ambient+=render.studio_color[i].rgb*(STUDIO_AMBIENT_WEIGHT*max(0.0,dot(normal,render.studio_direction[i].xyz)));
         color+=pigment*shape*(render.backdrop_style.y*(VEIN_BASE_GLOW+vein*pulse*VEIN_PULSE_GLOW)*(SILHOUETTE_FADE_COSINE+FACING_GLOW_WEIGHT*facing)
             +ambient*render.backdrop_style.z);
+        // Current-view GGX highlights. No shadow rays: gameplay cannot cast onto
+        // this decorative layer. Broad lobes survive the backdrop's spatial blur.
+        float roughness=dot(vec3(a.color.w,b.color.w,c.color.w),w);
+        if (roughness<0.9)
+        {
+            float ior=dot(vec3(a.position.w,b.position.w,c.position.w),w);
+            float f0=(ior-1.0)/(ior+1.0);f0*=f0;
+            float alpha=pow(max(roughness,0.18),2.0),alpha2=alpha*alpha;
+            float nv=max(0.01,dot(normal,-direction));
+            for (int i=0;i<3;++i)
+            {
+                vec3 light=render.studio_direction[i].xyz;
+                float nl=max(0.0,dot(normal,light));
+                vec3 half_vector=light-direction;
+                if (nl<=0.0 || dot(half_vector,half_vector)<0.000001) continue;
+                half_vector=normalize(half_vector);
+                float nh=max(0.0,dot(normal,half_vector)),vh=max(0.0,dot(-direction,half_vector));
+                float denominator=nh*nh*(alpha2-1.0)+1.0;
+                float distribution=alpha2/(3.14159265*denominator*denominator);
+                float gv=2.0*nv/(nv+sqrt(alpha2+(1.0-alpha2)*nv*nv));
+                float gl=2.0*nl/max(0.001,nl+sqrt(alpha2+(1.0-alpha2)*nl*nl));
+                float fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
+                color+=render.studio_color[i].rgb*(distribution*gv*gl*fresnel/(4.0*nv));
+            }
+        }
     }
-    imageStore(background_a,pixel,vec4(color,1));
+    imageStore(background_a,pixel,vec4(color,distance));
 }

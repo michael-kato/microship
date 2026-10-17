@@ -57,6 +57,7 @@ static void print_world(const Simulation* simulation, const char* path)
     const World* world=&simulation->world;
     printf("Loaded world '%s': %u bodies.\n",path,world->body_count);
     printf("Ambient diffuse RGB: %g %g %g.\n",world->ambient.r,world->ambient.g,world->ambient.b);
+    if (world->backdrop.model_path[0]) printf("Backdrop: %s.\n",world->backdrop.model_path);
     const Content* content=&world->content;
     for (uint32_t i = 0; i < world->body_count; ++i)
     {

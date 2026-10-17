@@ -28,7 +28,9 @@ def stage_world(source, directory):
     for name in ('rules','appearance','effects'):
         if name not in world:continue
         path=(source.parent/world[name]).resolve();world[name]=read(path)
-        if name=='appearance' and 'backdrop' in world[name]:model(world[name]['backdrop'],'model',path.parent)
+        if name=='appearance' and 'backdrop' in world[name]:
+            backdrop=world[name]['backdrop'];model(backdrop,'model',path.parent)
+            if 'variants' in backdrop:backdrop['variants']=[Path(os.path.relpath((path.parent/v).resolve(),directory)).as_posix() for v in backdrop['variants']]
         if name=='effects' and 'spikes' in world[name]:model(world[name]['spikes'],'model',path.parent)
     return world
 

@@ -569,6 +569,16 @@ vec3 ambient_surface(Surface s,vec3 outgoing)
     return result;
 }
 
+// The soft backdrop already has one current-frame center hit. Its unfiltered
+// log distance stops transport behind that surface, including clear wall chains.
+// Half-float quantization and the center footprint are backdrop approximations.
+float backdrop_remaining(vec3 origin,vec3 direction,uvec2 pixel)
+{
+    float encoded=texelFetch(soft_backdrop,ivec2(pixel),0).a;
+    float distance=encoded<128.0 ? exp2(encoded)-1.0 : RAY_MAX;
+    return max(0.0,distance-dot(origin-render.camera_position.xyz,direction));
+}
+
 vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float subsurface_sample_weight)
 {
     vec3 radiance=vec3(0),weight=vec3(1);float path_distance=0;bool through_wall=false;
@@ -578,6 +588,8 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
     {
         uint triangle;vec2 barycentric;float distance;
         bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
+        if (!hit && render.backdrop_style.x>0.0)
+            distance=backdrop_remaining(origin,direction,pixel);
         weight*=transmittance(origin,direction,distance);
         path_distance+=distance;
         float blur_radius=max(medium_blur_radius(direction,path_distance),through_wall ? render.membrane_fade.z : 0.0);
@@ -774,6 +786,8 @@ void main()
         {
             uint triangle;vec2 barycentric;float distance;
             bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
+            if (!hit && render.backdrop_style.x>0.0)
+                distance=backdrop_remaining(origin,direction,pixel);
             vec3 scattering=weight*single_scattering(origin,direction,distance);
             volume_sum+=scattering;if (!through_wall) sharp_volume_sum+=scattering;
             if (!hit || depth==render.settings.w) break;

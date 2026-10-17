@@ -5,6 +5,7 @@
 #include <string.h>
 #include <cmath>
 #include "asset_limits.h"
+#include "geometry.h"
 
 static const int MAX_PLACEMENT_COORDINATE = 1000000;
 static const int MAX_MEDIUM_ABSORPTION = 1000;
@@ -204,7 +205,7 @@ static bool load_effects(World* w,const char* path)
     }
     return d.valid;
 }
-static bool load_appearance(World* w,const char* path)
+static bool load_appearance(World* w,const char* path,uint32_t seed)
 {
     JsonDocument d;if (!json_load(&d,path)) return false;Json root=json_root(&d);
     json_object(root,"$schema|ambient|gradient|lights|thin_surface|backdrop|atmosphere|fog");
@@ -270,8 +271,28 @@ static bool load_appearance(World* w,const char* path)
     Json backdrop=json_find(root,"backdrop");
     if (json_present(backdrop))
     {
-        json_object(backdrop,"model|position|scale|tint|samples|soft|wave");
+        json_object(backdrop,"model|variants|position|scale|tint|samples|soft|wave");
         json_path(json_get(backdrop,"model"),path,w->backdrop.model_path);
+        Json variants=json_find(backdrop,"variants");
+        if (json_present(variants))
+        {
+            // Resolve the bank once. The odd live seed must still reach every entry.
+            char paths[16][ASSET_PATH_CAPACITY]={};uint32_t count=1;
+            memcpy(paths[0],w->backdrop.model_path,ASSET_PATH_CAPACITY);
+            JsonArray entries=json_array(variants,15);Json entry={};
+            while (json_next(&entries,&entry))
+            {
+                if (count>=16 || !json_path(entry,path,paths[count])) return false;
+                for (uint32_t i=0;i<count;++i) if (!strcmp(paths[i],paths[count])) return json_error(entry,"duplicate backdrop model");
+                ++count;
+            }
+            if (count==1) return json_error(variants,"backdrop variants must not be empty");
+            // Reject malformed alternatives even when another model was selected.
+            for (uint32_t i=0;i<count;++i)
+                if (!geometry_validate_model(paths[i])) return json_error(variants,"invalid backdrop model");
+            uint32_t mixed=seed; mixed=((mixed>>16)^mixed)*0x45d9f3bu;mixed=(mixed>>16)^mixed;
+            memcpy(w->backdrop.model_path,paths[mixed%count],ASSET_PATH_CAPACITY);
+        }
         w->backdrop.position=json_vector(json_get(backdrop,"position"),-MAX_BACKDROP_COORDINATE,MAX_BACKDROP_COORDINATE);
         w->backdrop.scale=json_positive(json_get(backdrop,"scale"),MAX_BACKDROP_SCALE);
         w->backdrop.color=json_color(json_get(backdrop,"tint"));
@@ -388,7 +409,7 @@ static bool validate_world(const World* world,const char* path)
     return true;
 }
 
-bool world_load(World* world,const char* path)
+bool world_load(World* world,const char* path,uint32_t seed)
 {
     JsonDocument d;if (!json_load(&d,path)) return false;Json root=json_root(&d);
     json_object(root,"$schema|content|rules|appearance|effects|match|bodies|spawns");
@@ -397,7 +418,7 @@ bool world_load(World* world,const char* path)
     char file[ASSET_PATH_CAPACITY]={};
     Json rules=json_find(root,"rules");if (json_present(rules) && (!json_path(rules,path,file) || !load_rules(&loaded,file))) return false;
     Json effects=json_find(root,"effects");if (json_present(effects) && (!json_path(effects,path,file) || !load_effects(&loaded,file))) return false;
-    if (!json_path(json_get(root,"appearance"),path,file) || !load_appearance(&loaded,file)) return false;
+    if (!json_path(json_get(root,"appearance"),path,file) || !load_appearance(&loaded,file,seed)) return false;
     Json match=json_get(root,"match");json_object(match,"player|opponent|starts");
     loaded.player_faction=read_owner(&loaded,json_get(match,"player"));loaded.opponent_faction=read_owner(&loaded,json_get(match,"opponent"));
     if (!loaded.player_faction || !loaded.opponent_faction || loaded.player_faction==loaded.opponent_faction)

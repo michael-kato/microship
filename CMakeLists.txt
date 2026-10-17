@@ -235,3 +235,6 @@ set_tests_properties(payloads PROPERTIES TIMEOUT 30)
 add_test(NAME subsurface COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/subsurface.py $<TARGET_FILE:microship>)
 set_tests_properties(subsurface PROPERTIES TIMEOUT 30)
+add_test(NAME backgrounds COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/backgrounds.py $<TARGET_FILE:microship>)
+set_tests_properties(backgrounds PROPERTIES TIMEOUT 45)

@@ -226,6 +226,15 @@ static bool add_model(Geometry* geometry, const char* path, Vec3 position, float
     return valid;
 }
 
+bool geometry_validate_model(const char* path)
+{
+    Geometry geometry={};uint32_t vertices=0,triangles=0;
+    if (!mesh_counts(path,&vertices,&triangles)) return false;
+    try { geometry.vertices.reserve(vertices);geometry.triangles.reserve(triangles); }
+    catch (const std::bad_alloc&) { fprintf(stderr,"Cannot allocate model validation storage.\n");return false; }
+    return add_model(&geometry,path,Vec3{0,0,0},1,Color{1,1,1},0) && validate_areas(&geometry);
+}
+
 bool geometry_build(Geometry* geometry,const MeshSource* sources,uint32_t count,const RenderConfig* config)
 {
     if (!count || count>MAX_SCENE_MESHES || config->sphere_segments<3 || config->sphere_segments>MAX_SPHERE_SEGMENTS

@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "extent": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 1.49
+      }
+    },
+    "grid": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "integer",
+        "minimum": 8,
+        "maximum": 128
+      }
+    },
+    "base_z": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 0
+    },
+    "fold_amplitude": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    },
+    "fold_frequency": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 32
+      }
+    },
+    "ior": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 3
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "enum": [
+              "flesh",
+              "bone",
+              "red_organs",
+              "blue_organs",
+              "veins",
+              "ligaments",
+              "intestines",
+              "villi"
+            ]
+          },
+          "color": {
+            "$ref": "shared.schema.json#/$defs/color"
+          },
+          "accent": {
+            "$ref": "shared.schema.json#/$defs/color"
+          },
+          "roughness": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 32
+          },
+          "radius": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "height": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "name",
+          "color",
+          "accent",
+          "roughness",
+          "count",
+          "radius",
+          "height"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "$schema",
+    "extent",
+    "grid",
+    "base_z",
+    "fold_amplitude",
+    "fold_frequency",
+    "ior",
+    "profiles"
+  ],
+  "additionalProperties": false
+}

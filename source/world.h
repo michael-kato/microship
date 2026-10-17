@@ -109,6 +109,6 @@ struct World
     uint32_t combat_fields;
 };
 
-bool world_load(World* world, const char* path);
+bool world_load(World* world, const char* path,uint32_t seed);
 
 #endif
