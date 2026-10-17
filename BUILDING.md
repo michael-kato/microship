@@ -26,3 +26,18 @@ To record flight paths, run `python3 tests/e2e/navigation.py build/windows-cross
 For the frame profiler checks, build the small Win32 input driver with `cmake --build build/windows-cross --target nanova_input_probe`. Run `python3 tests/e2e/profiler_window.py build/windows-cross/nanova.exe --run` for F1 messages and OS middle-button input. Run `python3 tests/e2e/profiler_render.py build/windows-cross/nanova.exe --run` for normal zoom, close zoom, and F2 compatibility. Without `--run`, these scripts start no GPU work. The input check uses `--frame-delay-ms 250` between its two frames to allow input delivery. This diagnostic delay requires a bounded `--frames` run, has a 250 ms limit, and is outside measured CPU work. It changes frame cadence and must not be used for performance measurements.
 
 To compare SSS and volume changes, preserve the old executable and its `assets/` folder before rebuilding. Then run `python3 tests/e2e/scattering_perf.py build/windows-cross/nanova.exe --baseline build/scattering-baseline/nanova.exe --cases near grown --run`. Without `--run`, the script prepares inputs only. Add `--timing` to disable host validation for timing comparisons. Use `--diagnose` instead of `--baseline` to measure SSS and volume controls. The script keeps the GPU limits above and checks full-image differences and simulation state for comparisons.
+
+## Static lighting and frame history
+
+Persistent static lighting and scattering bakes are permitted. Compute them
+from scene inputs and reuse them while their dependencies remain valid.
+Static baking is not a temporal image effect. Rebuild or bypass affected
+bakes before drawing when relevant geometry, poses, materials, lights, or
+media change. Dynamic contributions and camera-dependent terms use current
+input. Camera movement alone does not invalidate view-independent bakes.
+
+Do not reconstruct a frame from previous frame images or samples. TAA,
+reprojection, temporal denoising, and progressive accumulation across game
+frames remain excluded. For each cache, check dependency changes against
+fresh application renders; report image error, GPU time, bake time, and
+memory.
