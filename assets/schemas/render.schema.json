@@ -121,6 +121,18 @@
       "properties": {
         "microfacet_energy_compensation": {
           "type": "boolean"
+        },
+        "shadow_grid_resolution": {
+          "anyOf": [
+            {
+              "const": 0
+            },
+            {
+              "type": "integer",
+              "minimum": 8,
+              "maximum": 64
+            }
+          ]
         }
       },
       "required": [

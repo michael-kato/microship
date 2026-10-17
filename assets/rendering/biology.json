@@ -35,7 +35,8 @@
     "vertical_fov_degrees": 45.0
   },
   "lighting": {
-    "microfacet_energy_compensation": true
+    "microfacet_energy_compensation": true,
+    "shadow_grid_resolution": 32
   },
   "bloom": {
     "radius": 32,

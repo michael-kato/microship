@@ -125,7 +125,10 @@ bool render_config_load(RenderConfig* config,const char* path)
         loaded.vertical_fov_degrees=json_float(json_get(j,"vertical_fov_degrees"),1,MAX_RENDER_VERTICAL_FOV_DEGREES);
     }
     {
-        Json j=json_get(root,"lighting");json_object(j,"microfacet_energy_compensation");
+        Json j=json_get(root,"lighting");json_object(j,"microfacet_energy_compensation|shadow_grid_resolution");
+        Json grid=json_find(j,"shadow_grid_resolution");
+        loaded.shadow_grid_resolution=json_present(grid) ? json_uint(grid,0,64) : 0;
+        if (loaded.shadow_grid_resolution && loaded.shadow_grid_resolution<8) json_error(grid,"shadow grid resolution must be zero or in [8,64]");
         loaded.microfacet_energy_compensation=json_bool(json_get(j,"microfacet_energy_compensation"));
     }
     {

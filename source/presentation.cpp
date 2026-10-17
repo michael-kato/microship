@@ -372,7 +372,7 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
         medium->scattering[0]=c->interior_scattering.r;medium->scattering[1]=c->interior_scattering.g;medium->scattering[2]=c->interior_scattering.b;
         medium->scattering[3]=c->interior_fade;
         medium->absorption_phase[0]=medium->absorption_phase[1]=medium->absorption_phase[2]=c->interior_absorption;
-        medium->absorption_phase[3]=c->interior_anisotropy;medium->lighting[0]=1;
+        medium->absorption_phase[3]=c->interior_anisotropy;medium->lighting[0]=1;medium->lighting[1]=1;
     }
     if (w->gameplay.enabled) update_gameplay_instances(p,s);
     else

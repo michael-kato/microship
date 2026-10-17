@@ -49,12 +49,12 @@ static const int GPU_TRIANGLE_BYTES = 16;
 static const int HUD_MAX_LINE_CHARACTERS = HUD_LINE_CAPACITY-1;
 static const unsigned int STATS_TEXT_WIDTH_UNSIGNED = 512u;
 static const unsigned int STATS_TEXT_HEIGHT_UNSIGNED = 92u;
-static const int GPU_TIMESTAMP_COUNT = 10;
+static const int GPU_TIMESTAMP_COUNT = 11;
 static const int TIMESTAMP_WORD_BITS = 64;
 
 enum { SCENE_BUFFER_VERTICES=0, SCENE_BUFFER_TRIANGLES=1, SCENE_BUFFER_UNIFORM=2, SCENE_BUFFER_MEDIA=3, SCENE_BUFFER_ENERGY=4, SCENE_BUFFER_RESERVED=5, SCENE_BUFFER_DEBUG=6 };
 
-enum { GPU_TIME_FRAME_BEGIN=0, GPU_TIME_SURFACE_BEGIN=1, GPU_TIME_SURFACE_END=2, GPU_TIME_VOLUME_END=3, GPU_TIME_EFFECTS_BEGIN=4, GPU_TIME_BLOOM_END=5, GPU_TIME_OVERLAY_END=6, GPU_TIME_BACKDROP_END=7, GPU_TIME_UPLOAD_END=8, GPU_TIME_EFFECTS_END=9 };
+enum { GPU_TIME_FRAME_BEGIN=0, GPU_TIME_SURFACE_BEGIN=1, GPU_TIME_SURFACE_END=2, GPU_TIME_VOLUME_END=3, GPU_TIME_EFFECTS_BEGIN=4, GPU_TIME_BLOOM_END=5, GPU_TIME_OVERLAY_END=6, GPU_TIME_BACKDROP_END=7, GPU_TIME_UPLOAD_END=8, GPU_TIME_EFFECTS_END=9, GPU_TIME_GRID_END=10 };
 
 struct GpuBuffer
 {
@@ -154,7 +154,7 @@ struct RendererState
     GpuBuffer instances;
     GpuBuffer tlas_buffer;
     GpuBuffer tlas_scratch;
-    GpuBuffer media;
+    GpuBuffer media,shadow_grid;
     uint32_t medium_count;
     GpuBuffer energy;
     GpuBuffer debug_pixels;
@@ -202,7 +202,7 @@ struct RendererState
     VkDescriptorSet debug_descriptors;
     VkPipelineLayout pipeline_layout;
     VkPipeline pipeline;
-    VkPipeline volume_pipeline;
+    VkPipeline volume_pipeline,shadow_grid_pipeline;
     VkPipeline debug_surface_pipeline, debug_volume_pipeline, debug_overlay_pipeline;
     VkPipelineLayout debug_overlay_layout;
     double trace_ms, volume_ms, bloom_ms;
@@ -678,6 +678,24 @@ static void scene_uniform(RenderUniform* uniform,const RenderScene* scene)
     uniform->fog[0]=scene->fog_blur;uniform->fog[1]=scene->fog_feather;uniform->fog[2]=scene->fog_plane_z;
 }
 
+// Frustum culling changes render work only. Each active grid is fully overwritten this frame.
+static void update_grid_activity(RendererState* state)
+{
+    RenderMedium* media=(RenderMedium*)state->media.mapped;const RenderUniform& u=state->uniform_data;
+    float vertical=u.display[1],horizontal=vertical*u.display[2];
+    for (uint32_t i=0;i<state->medium_count;++i)
+    {
+        RenderMedium& m=media[i];float delta[3];
+        for (uint32_t j=0;j<3;++j) delta[j]=m.center_radius[j]-u.camera_position[j];
+        float x=0,y=0,z=0;
+        for (uint32_t j=0;j<3;++j) { x+=delta[j]*u.camera_right[j];y+=delta[j]*u.camera_up[j];z+=delta[j]*u.camera_forward[j]; }
+        float r=m.center_radius[3];
+        bool visible=z+r>0 && std::fabs(x)<=z*horizontal+r*std::sqrt(1+horizontal*horizontal)
+            && std::fabs(y)<=z*vertical+r*std::sqrt(1+vertical*vertical);
+        m.lighting[2]=state->config.shadow_grid_resolution && m.lighting[0]>0 && m.lighting[1]>0 && r>0 && visible ? 1.0f : 0.0f;
+    }
+}
+
 static void scene_instances(RendererState* state,const RenderScene* scene)
 {
     for (uint32_t i=0;i<state->instance_count;++i)
@@ -755,6 +773,7 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
     uniform.display[0]=state->config.exposure;uniform.display[1]=std::tan(state->config.vertical_fov_degrees*HALF_DEGREES_TO_RADIANS);
     uniform.display[2]=(float)state->config.width/state->config.height;uniform.display[3]=(float)state->config.volume_steps;
     uniform.quality[0]=state->config.volume_rays_per_pixel;
+    uniform.quality[1]=state->config.shadow_grid_resolution;
     uniform.quality[2]=state->config.microfacet_energy_compensation;
     scene_uniform(&uniform,scene);
     if (!create_buffer(state, &state->energy, MICROFACET_TABLE_SIZE*MICROFACET_TABLE_SIZE*sizeof(float),
@@ -846,6 +865,11 @@ static bool create_output(RendererState* state)
         || !create_buffer(state,&state->effect_tiles,state->effect_tile_size*sizeof(uint32_t),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host)
         || !create_buffer(state,&state->instance_styles,state->style_data.size()*sizeof(float),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host)) return false;
     memcpy(state->instance_styles.mapped,state->style_data.data(),state->style_data.size()*sizeof(float));
+    VkDeviceSize n=state->config.shadow_grid_resolution;
+    VkDeviceSize grid_bytes=n ? n*n*n*3*(state->medium_count ? state->medium_count : 1)*4*sizeof(float) : 4*sizeof(float);
+    if (grid_bytes>state->properties.limits.maxStorageBufferRange)
+    { fprintf(stderr,"Shadow grid exceeds the storage-buffer range.\n");return false; }
+    if (!create_buffer(state,&state->shadow_grid,grid_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
     state->capture_row.resize(state->config.width*3);
     state->capture_hdr_row.resize(state->config.width*3);
     return create_buffer(state, &state->readback, (VkDeviceSize)state->config.width*state->config.height*4*sizeof(float),
@@ -1026,7 +1050,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
         { state->uniform.handle, 0, state->uniform.size },
         { state->media.handle, 0, state->media.size },
         { state->energy.handle, 0, state->energy.size },
-        { state->energy.handle, 0, state->energy.size }, // Reserved descriptor 7; no sampler allocation.
+        { state->shadow_grid.handle, 0, state->shadow_grid.size }, // Current-frame visibility only.
         { state->debug_pixels.handle, 0, state->debug_pixels.size }
     };
     VkWriteDescriptorSet writes[RENDER_DESCRIPTOR_COUNT] = {};
@@ -1400,6 +1424,7 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
     bool success = create_instance(state) && create_device(state) && create_commands(state)
         && create_swapchain(state) && upload_scene(state, scene) && create_output(state) && create_pipeline(state, shader_path)
         && load_companion(state,shader_path,"volume.comp.spv",state->pipeline_layout,&state->volume_pipeline)
+        && load_companion(state,shader_path,"shadow_grid.comp.spv",state->pipeline_layout,&state->shadow_grid_pipeline)
         && create_bloom(state, shader_path) && create_debug(state,builtin_shader_path)
         && load_companion(state,builtin_shader_path,"effects.comp.spv",state->pipeline_layout,&state->effects_pipeline);
     if (success && (scene->background_blur>0))
@@ -1519,6 +1544,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     if (!update_meshes(state,scene->geometry)) return false;
     scene_instances(state,scene);
     if (state->medium_count) memcpy(state->media.mapped,scene->media.data(),state->medium_count*sizeof(RenderMedium));
+    update_grid_activity(state);
     memcpy(state->sight.mapped,scene->sight,sizeof(scene->sight));
     {
         memcpy(state->instances.mapped,state->instance_data.data(),state->instances.size);
@@ -1600,6 +1626,21 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_BACKDROP_END);
     if (renderer->debug_views || scene->guides_required) shader_buffer_barrier(state->command);
 
+    shader_buffer_barrier(state->command);
+    vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->pipeline_layout,0,1,&state->descriptors,0,0);
+    if (state->config.shadow_grid_resolution)
+    {
+        vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->shadow_grid_pipeline);
+        const RenderMedium* media=(const RenderMedium*)state->media.mapped;uint32_t n=state->config.shadow_grid_resolution;
+        for (uint32_t i=0;i<state->medium_count;++i) if (media[i].lighting[2]>0)
+        {
+            uint32_t parameters[4]={i,0,0,0};
+            vkCmdPushConstants(state->command,state->pipeline_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,BACKDROP_PUSH_BYTES,parameters);
+            vkCmdDispatch(state->command,(n+7)/8,(n*n+7)/8,1);
+        }
+        shader_buffer_barrier(state->command);
+    }
+    vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_GRID_END);
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_SURFACE_BEGIN);
     vkCmdBindPipeline(state->command, VK_PIPELINE_BIND_POINT_COMPUTE,
         renderer->debug_views ? state->debug_surface_pipeline : scene->guides_required ? state->guide_surface_pipeline : state->pipeline);
@@ -1708,6 +1749,9 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
         surface_ticks &= (UINT64_C(1)<<state->timestamp_bits)-1;
         volume_ticks &= (UINT64_C(1)<<state->timestamp_bits)-1;
     }
+    uint64_t grid_ticks=timestamps[GPU_TIME_GRID_END]-timestamps[GPU_TIME_BACKDROP_END];
+    if (state->timestamp_bits<TIMESTAMP_WORD_BITS) grid_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1;
+    printf("GPU shadow grid: %.3f ms; resolution %u; current frame only.\n",grid_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND,state->config.shadow_grid_resolution);
     uint64_t background_ticks=timestamps[GPU_TIME_BACKDROP_END]-timestamps[GPU_TIME_UPLOAD_END];
     if (state->timestamp_bits<TIMESTAMP_WORD_BITS) background_ticks &= (UINT64_C(1)<<state->timestamp_bits)-1;
     printf("GPU backdrop: %.3f ms; separate current-frame layer %u.\n",
@@ -1793,6 +1837,7 @@ bool renderer_shutdown(Renderer* renderer)
             if (hdr_memory[i]) vkFreeMemory(state->device, hdr_memory[i], 0);
         }
         if (state->pipeline) vkDestroyPipeline(state->device, state->pipeline, 0);
+        if (state->shadow_grid_pipeline) vkDestroyPipeline(state->device,state->shadow_grid_pipeline,0);
         if (state->volume_pipeline) vkDestroyPipeline(state->device,state->volume_pipeline,0);
         if (state->debug_surface_pipeline) vkDestroyPipeline(state->device,state->debug_surface_pipeline,0);
         if (state->debug_volume_pipeline) vkDestroyPipeline(state->device,state->debug_volume_pipeline,0);
@@ -1811,7 +1856,7 @@ bool renderer_shutdown(Renderer* renderer)
         if (state->tlas) state->destroy_as(state->device, state->tlas, 0);
         GpuBuffer* buffers[] = { &state->vertices, &state->triangles, &state->indices, &state->instances,
             &state->tlas_buffer, &state->tlas_scratch,
-            &state->uniform, &state->readback, &state->media, &state->energy, &state->sight,
+            &state->uniform, &state->readback, &state->media, &state->shadow_grid, &state->energy, &state->sight,
             &state->debug_pixels, &state->debug_text, &state->effects, &state->effect_tiles, &state->instance_styles };
         for (uint32_t i = 0; i < sizeof(buffers)/sizeof(buffers[0]); ++i) destroy_buffer(state, buffers[i]);
         if (state->output_view) vkDestroyImageView(state->device, state->output_view, 0);

@@ -21,6 +21,7 @@ parser.add_argument('--baseline',type=Path,help='Executable with its bundled ass
 parser.add_argument('--variants',nargs='+',choices=('baseline','current'),default=('current',))
 parser.add_argument('--output',type=Path,default=root/'build/volume-opt-review')
 parser.add_argument('--frames',type=int,choices=(1,2),default=1)
+parser.add_argument('--shadow-grid',type=int,help='Override current-frame visibility grid resolution; zero traces every shadow')
 parser.add_argument('--atmosphere-shadows',choices=('on','off'),help='Override geometry shadows for the global medium')
 parser.add_argument('--timing',action='store_true',help='Disable host validation for GPU stage timings')
 mode=parser.add_mutually_exclusive_group();mode.add_argument('--run',action='store_true');mode.add_argument('--cpu',action='store_true')
@@ -29,6 +30,7 @@ if 'baseline' in args.variants and not args.baseline:parser.error('--variants ba
 binaries=dict(baseline=args.baseline.resolve() if args.baseline else None,current=args.binary.resolve())
 data=stage_world(root/'assets/levels/biology-virus.json',out)
 config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3
+if args.shadow_grid is not None:config['lighting']['shadow_grid_resolution']=args.shadow_grid
 assert config['output']['width']==1920 and config['output']['height']==1080
 assert config['volume']==dict(rays_per_pixel=1,integration_steps=8)
 if args.atmosphere_shadows:data['appearance']['atmosphere']['shadows']=args.atmosphere_shadows=='on'
@@ -68,7 +70,7 @@ if not args.run and not args.cpu:
     print(f'Prepared {len(prepared)} processes: native 1920x1080; 3 film + 1 volume + 1 backdrop; {args.frames} frames; 2 seconds per process; 5 seconds per GPU batch. No GPU work started.');sys.exit(0)
 environment=os.environ.copy();environment['MICROSHIP_VULKAN_VALIDATION']='0' if args.timing else '1'
 started=time.monotonic();report=[];reference_state=None
-labels=dict(application='Application frame',surface='GPU surface',volume='GPU volumes',acceleration='GPU acceleration update',gpu_total='total render')
+labels=dict(application='Application frame',surface='GPU surface',volume='GPU volumes',acceleration='GPU acceleration update',gpu_total='total render',shadow_grid='GPU shadow grid')
 for variant,prefix,invocation in prepared:
     remaining=5-(time.monotonic()-started)
     if not args.cpu and remaining<=0:raise RuntimeError('The five-second GPU batch limit expired')
