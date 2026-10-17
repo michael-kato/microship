@@ -20,6 +20,7 @@ def stage_world(source, directory):
         content[name]=read(definition)[name]
         for item in content[name]:
             model(item,'model',definition.parent)
+            if 'payload' in item:model(item['payload'],'model',definition.parent)
             if 'variation' in item:model(item['variation'],'parts',definition.parent)
             if 'growth_meshes' in item:
                 for key in ('segment','tip'):model(item['growth_meshes'],key,definition.parent)

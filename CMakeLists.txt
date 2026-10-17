@@ -229,3 +229,6 @@ set_tests_properties(match_flow PROPERTIES TIMEOUT 45)
 add_test(NAME cell_medium COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/cell_medium.py $<TARGET_FILE:microship>)
 set_tests_properties(cell_medium PROPERTIES TIMEOUT 30)
+add_test(NAME payloads COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/payloads.py $<TARGET_FILE:microship>)
+set_tests_properties(payloads PROPERTIES TIMEOUT 30)

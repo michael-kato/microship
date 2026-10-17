@@ -83,7 +83,7 @@ with tempfile.TemporaryDirectory(prefix='microship-growth-') as directory:
     assert attached['faction_events']['digestions']>0 and any(u['faction']==2 and u['latch']>=0 for u in attached['units'])
     fed,_=run('digest-heal',fungus,240)
     assert fed['faction_events']['digest_heals']>0,'Digestion did not heal wounds'
-    assert all(u['faction']!=2 or u['ready_spikes']==22 for u in fed['units'])
+    assert all(u['faction']!=2 or u['ready_spikes']==11 for u in fed['units'])
     body=duel('fungus');body['spawns']=[dict(type='fungal_spore',position=[0,0,6]),dict(type='swarm_fighter',position=[2,0,6])]
     for u in body['content']['units']:
         if u['name']=='swarm_fighter':u.update(shot_interval=.1,detaches=False)

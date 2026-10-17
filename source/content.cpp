@@ -186,7 +186,7 @@ static bool load_units(Content* c,Json root,const char* path)
     json_object(root,"$schema|units");JsonArray a=json_array(json_get(root,"units"),MAX_UNIT_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|pick_radius|cue_radius|hits|attack|secondary_attack|autonomy");
+        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|pick_radius|cue_radius|hits|attack|secondary_attack|autonomy|payload");
         UnitDefinition u={};definition_name(j,u.name);
         Json attack=json_find(j,"attack");
         if (json_present(attack))
@@ -229,6 +229,16 @@ static bool load_units(Content* c,Json root,const char* path)
         u.cue_radius=json_positive(json_get(j,"cue_radius"),MAX_UNIT_CUE_RADIUS);
         u.hits=json_uint(json_get(j,"hits"),1,MAX_HIT_COUNT);
         u.colonizes=json_bool(json_get(j,"colonizes"));u.detaches=json_bool(json_get(j,"detaches"));u.trails=json_bool(json_get(j,"trails"));
+        Json payload=json_find(j,"payload");
+        if (json_present(payload))
+        {
+            json_object(payload,"model|reload_seconds|sockets");
+            json_path(json_get(payload,"model"),path,u.payload_model);
+            u.payload_reload=json_positive(json_get(payload,"reload_seconds"),3600);
+            JsonArray sockets=json_array(json_get(payload,"sockets"),MAX_UNIT_PAYLOADS);Json socket={};
+            while (json_next(&sockets,&socket)) u.payload_sockets[u.payload_count++]=json_vector(socket,-10,10);
+            if (!u.payload_count || u.detaches || u.attack!=ATTACK_PROJECTILE) json_error(payload,"payload requires sockets, projectile attack and detaches false");
+        }
         JsonArray targets=json_array(json_get(j,"targets"),MAX_UNIT_TARGETS);Json target={};
         while (json_next(&targets,&target))
         {

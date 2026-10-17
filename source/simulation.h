@@ -32,7 +32,7 @@ struct Unit
     float flash, cooldown, orbit_phase;
     Vec3 velocity,forward;
     float bank,age;
-    float spikes[MAX_SPIKES],damage_age,heal_timer;
+    float spikes[MAX_SPIKES],payloads[MAX_UNIT_PAYLOADS],damage_age,heal_timer;
     uint32_t wounds;
     EmbeddedSpike embedded[MAX_EMBEDDED];
     int32_t latch;
@@ -54,6 +54,8 @@ struct Projectile
     Vec3 direction;
     Vec3 anchor;
     float launch_scale;
+    uint32_t unit_type;
+    bool payload;
 };
 struct Pop { Vec3 position; float age, duration,blast_radius; Faction faction; };
 struct Impact { Vec3 position; float age,duration; Faction faction; };

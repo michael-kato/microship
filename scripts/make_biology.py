@@ -395,7 +395,7 @@ def virus(large):
         sphere((0,0,0),BOMBER_CAPSID_SIZE,p['body'],2,surface='virus_capsid')
         for side in (-1,1):
             for j in range(3):
-                z=(j-1)*BOMBER_PAYLOAD_SPACING;sphere((side*BOMBER_PAYLOAD_X_OFFSET,-BOMBER_PAYLOAD_Y_OFFSET,z),BOMBER_PAYLOAD_SIZE,p['core'],1,surface='vesicle')
+                z=(j-1)*BOMBER_PAYLOAD_SPACING
                 branches((side*BOMBER_RIB_ROOT_X_OFFSET,BOMBER_RIB_ROOT_Y_OFFSET,z),(side,BOMBER_RIB_Y_DIRECTION,BOMBER_RIB_Z_DIRECTION),BOMBER_RIB_LENGTH,BOMBER_RIB_RADIUS,3,p['spikes'],buds=p['body'],surface='virus_fibre',bud_surface='virus_capsid')
     export('virus_'+('bomber' if large else 'virion'))
 
@@ -524,7 +524,9 @@ def background(name,key):
     export(name)
 
 cell('cell_infected','infected_cell');cell('cell_healthy','healthy_cell');cell('cell_neutral','neutral_cell')
-virus(False);virus(True);immune(False);immune(True);node();factory('virus');factory('immune');factory('fungal_spore')
+virus(False);virus(True)
+sphere((0,0,0),BOMBER_PAYLOAD_SIZE,profiles['virus']['core'],1,surface='vesicle');export('virus_bomb')
+immune(False);immune(True);node();factory('virus');factory('immune');factory('fungal_spore')
 spore()
 # A single tapered local +Y segment. Runtime poses extend segments in sequence.
 rod((0,0,0),(0,1,0),GROWTH_SEGMENT_RADIUS,(1,1,1));export('growth_segment')

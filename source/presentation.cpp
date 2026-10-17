@@ -70,6 +70,11 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
             p->unit_meshes[i]=(uint32_t)sources.size();
             sources.push_back(MeshSource{definition->model_path,Vec3{},1,0,definition->color,0,0,0,0});
         }
+        for (uint32_t i=0;i<w->content.unit_count;++i) if (w->content.units[i].payload_count)
+        {
+            p->payload_meshes[i]=(uint32_t)sources.size();
+            sources.push_back(MeshSource{w->content.units[i].payload_model,Vec3{},1,0,Color{1,1,1},0,0,0,0});
+        }
         for (uint32_t i=0;i<w->content.producer_count;++i)
         {
             p->factory_meshes[i]=(uint32_t)sources.size();
@@ -98,7 +103,7 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
         p->bud_base=p->stem_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES*GROWTH_SEGMENTS : 0);
         p->debris_base=p->bud_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES : 0);
         p->attached_base=p->debris_base+(w->gameplay.enabled ? MAX_LIMB_DEBRIS : 0);
-        p->flying_base=p->attached_base+(w->spikes.enabled ? MAX_UNITS*w->spikes.count : 0);
+        p->flying_base=p->attached_base+(w->spikes.enabled ? MAX_UNITS*(w->spikes.count+MAX_UNIT_PAYLOADS) : 0);
         p->embedded_base=p->flying_base+(w->spikes.enabled ? MAX_PROJECTILES : 0);
         p->background_slot=p->embedded_base+(w->spikes.enabled ? MAX_EMBEDDED*(MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES) : 0);
         if (!presentation_prepare_membranes(p,s)) return false;
@@ -160,9 +165,17 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
             {
                 float growth=u->spikes[j];if (growth<=MIN_VISIBLE_SPIKE_GROWTH) continue;
                 Vec3 dir=posed_direction(simulation_spike_direction(j,r->count),x,y,z);
-                spike_instance(state,state->attached_base+i*r->count+j,add(u->position,scale(dir,r->root*size)),dir,
+                spike_instance(state,state->attached_base+i*(r->count+MAX_UNIT_PAYLOADS)+j,add(u->position,scale(dir,r->root*size)),dir,
                     size*r->length*growth,size*.5f*growth,color);++state->attached_spikes;
             }
+        const UnitDefinition* definition=simulation_unit_definition(s,u);
+        for (uint32_t j=0;j<definition->payload_count;++j)
+        {
+            float growth=u->payloads[j];if (growth<=MIN_VISIBLE_SPIKE_GROWTH) continue;
+            Vec3 position=add(u->position,scale(posed_direction(definition->payload_sockets[j],x,y,z),size));
+            set_instance(state,state->attached_base+i*(r->count+MAX_UNIT_PAYLOADS)+r->count+j,state->payload_meshes[u->type],position,
+                scale(x,size*growth),scale(y,size*growth),scale(z,size*growth));
+        }
         for (uint32_t j=0;j<u->wounds && j<MAX_EMBEDDED;++j)
         {
             if (dot(u->embedded[j].direction,u->embedded[j].direction)<MIN_EMBEDDED_DIRECTION_SQUARED) continue;
@@ -174,6 +187,13 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
     for (uint32_t i=0;i<MAX_PROJECTILES;++i)
     {
         const Projectile* p=&s->projectiles[i];if (!p->active || !simulation_in_sight(s,p->position,0)) continue;
+        if (p->payload)
+        {
+            Vec3 axis=std::fabs(p->direction.y)<SPIKE_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0};
+            Vec3 x=normalize(cross(axis,p->direction)),y=cross(p->direction,x);
+            set_instance(state,flying+i,state->payload_meshes[p->unit_type],p->position,scale(x,p->launch_scale),scale(y,p->launch_scale),scale(p->direction,p->launch_scale));
+            ++state->flying_spikes;continue;
+        }
         float blend=std::fmin(1.0f,p->age/PROJECTILE_SHRINK_SECONDS),length=p->launch_scale+(r->scale-p->launch_scale)*blend;
         spike_instance(state,flying+i,p->position,p->direction,length,length*.5f,content_color(&s->world.content,p->faction));++state->flying_spikes;
     }

@@ -6,7 +6,7 @@
 
 typedef uint32_t Faction;
 enum { FACTION_NEUTRAL=0, MAX_FACTIONS=9, MAX_GROUPS=8, MAX_UNIT_TYPES=32, MAX_PRODUCER_TYPES=8, MAX_BODY_TYPES=32, MAX_FACTORY_STRUCTURES=128 };
-enum { MAX_HIT_COUNT=32, BRANCH_FIELDS_COMPLETE=3 };
+enum { MAX_UNIT_PAYLOADS=6, MAX_HIT_COUNT=32, BRANCH_FIELDS_COMPLETE=3 };
 enum GrowthGrammar { GROWTH_AXIAL,GROWTH_FAN,GROWTH_HYPHA,GROWTH_TREE };
 enum { TARGET_UNITS=1, TARGET_STRUCTURES=2 };
 enum AttackMode { ATTACK_PROJECTILE,ATTACK_DIGEST,ATTACK_SPORE };
@@ -32,6 +32,10 @@ struct UnitDefinition
     uint32_t group,targets,secondary_targets,hits;
     float secondary_interval;
     bool colonizes,detaches,trails;
+    char payload_model[ASSET_PATH_CAPACITY];
+    Vec3 payload_sockets[MAX_UNIT_PAYLOADS];
+    uint32_t payload_count;
+    float payload_reload;
     float scale,yaw_degrees;
     Color color;
     float speed,health,range,cost,shot_interval,separation,pick_radius,cue_radius;

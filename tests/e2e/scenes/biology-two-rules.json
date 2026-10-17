@@ -22,7 +22,7 @@
     "bank": 0.55
   },
   "spikes": {
-    "count": 22,
+    "count": 11,
     "regrow_seconds": 5.0
   },
   "recovery": {

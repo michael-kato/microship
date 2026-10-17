@@ -61,7 +61,7 @@ with tempfile.TemporaryDirectory(prefix='microship-spikes-') as directory:
         one=run(side+'-one-hit',combat,20);check_hits(one)
         fighters=[u for u in one['units'] if u['kind']==0]
         assert len(fighters)==2 and all(u['wounds']==1 for u in fighters),'First impact did not leave one wound'
-        assert one['recovery']['detached']==1 and next(u for u in fighters if u['faction']==1)['ready_spikes']==21
+        assert one['recovery']['detached']==1 and next(u for u in fighters if u['faction']==1)['ready_spikes']==10
         two=run(side+'-two-hits',combat,60);check_hits(two)
         assert all(u['wounds']==2 for u in two['units'] if u['kind']==0),'Second impact did not leave two wounds'
         assert two['effects']['low_health']==2,'Two-hit survivors were not counted'
@@ -73,7 +73,7 @@ with tempfile.TemporaryDirectory(prefix='microship-spikes-') as directory:
         slow=change(combat,'effects.projectile.shot_interval',10)
         regrown=run(side+'-regrown',slow,480);check_hits(regrown)
         assert regrown['recovery']['regrown']==1 and regrown['recovery']['healed']==0
-        assert all(u['ready_spikes']==22 for u in regrown['units']),'Detached spike did not regrow'
+        assert all(u['ready_spikes']==11 for u in regrown['units']),'Detached spike did not regrow'
         # Keep both damaged fighters within the authored friendly recovery radius.
         recovery=change(slow,'rules.recovery.orbit_clearance',10)
         healed=run(side+'-friendly-recovery',recovery,480);check_hits(healed)
@@ -84,7 +84,7 @@ with tempfile.TemporaryDirectory(prefix='microship-spikes-') as directory:
         assert all(u['wounds']==0 for u in healed['units'] if u['faction']==player),'Friendly orbit did not remove wounds'
         reset=run(side+'-restart',combat,60,extra=('--restart',))
         assert reset['tick']==0 and reset['births']==4 and reset['recovery']=={'healed':0,'regrown':0,'detached':0}
-        assert all(c['health']==240 for c in reset['colonies']) and all(u['wounds']==0 and u['ready_spikes']==22 for u in reset['units'])
+        assert all(c['health']==240 for c in reset['colonies']) and all(u['wounds']==0 and u['ready_spikes']==11 for u in reset['units'])
         # Supply enough nutrients to measure the manufacturing rate.
         supplied=producers(text,collection=100)
         for body in supplied['bodies']:body['position'][0]*=10

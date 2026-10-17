@@ -346,6 +346,7 @@ static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,const 
             unit.health=definition->health;
             unit.target=target;unit.generation=++s->next_generation;
             for (uint32_t j=0;j<s->world.spikes.count;++j) unit.spikes[j]=1;
+            for (uint32_t j=0;j<definition->payload_count;++j) unit.payloads[j]=1;
             unit.orbit_phase=unit.generation*GOLDEN_ANGLE_RADIANS;unit.cooldown=(unit.generation%FIRE_COOLDOWN_PHASE_COUNT)*FIRE_COOLDOWN_PHASE_SECONDS;
             s->trails[i]=Trail();s->trails[i].points[0]=position;s->trails[i].count=1;
             s->units[i]=unit;++s->births;
@@ -842,6 +843,9 @@ static void recover_units(Simulation* s,float dt)
         for (uint32_t j=0;j<r->count;++j)
             if (u->spikes[j]<1)
             { float before=u->spikes[j];u->spikes[j]=std::fmin(1.0f,before+dt/r->regrow);if (u->spikes[j]==1) ++s->regrown; }
+        const UnitDefinition* definition=simulation_unit_definition(s,u);
+        for (uint32_t j=0;j<definition->payload_count;++j)
+            u->payloads[j]=std::fmin(1.0f,u->payloads[j]+dt/definition->payload_reload);
         bool friendly=false;
         if (u->target>=0)
         {
@@ -999,7 +1003,14 @@ static void projectile_combat(Simulation* s,float dt)
             start=add(start,scale(outward,s->world.spikes.root*size));launch_scale=size*s->world.spikes.length;
             u->spikes[spike]=0;++s->detached;
         }
-        Projectile p={};p.position=p.previous=start;p.target=target;p.colony=colony;p.faction=u->faction;p.structure=structure;
+        if (definition->payload_count)
+        {
+            uint32_t pod=0;while (pod<definition->payload_count && u->payloads[pod]<1) ++pod;
+            if (pod==definition->payload_count) continue;
+            start=add(u->position,scale(world_direction(u,definition->payload_sockets[pod]),definition->scale));
+            launch_scale=definition->scale;u->payloads[pod]=0;++s->detached;
+        }
+        Projectile p={};p.unit_type=u->type;p.payload=definition->payload_count>0;p.position=p.previous=start;p.target=target;p.colony=colony;p.faction=u->faction;p.structure=structure;
         if (s->world.spikes.enabled)
         {
             uint32_t index=colony ? structure_slot(target,structure) : (uint32_t)target;
@@ -1041,7 +1052,7 @@ static void projectile_combat(Simulation* s,float dt)
             {
                 uint32_t index=p->colony ? structure_slot(p->target,p->structure) : (uint32_t)p->target;
                 uint32_t slot=hit_count[index]++;
-                if (slot<2)
+                if (slot<2 && !p->payload)
                 {
                     Vec3 outward=scale(p->direction,-1);
                     landed[index][slot].direction=p->colony ? outward : local_direction(&s->units[p->target],outward);
@@ -1425,11 +1436,23 @@ bool simulation_write_state(const Simulation* s, const char* path)
             uint32_t ready=0;for (uint32_t j=0;j<s->world.spikes.count;++j) ready+=u->spikes[j]>=1;
             fprintf(file,"%s{\"slot\":%u,\"generation\":%u,\"faction\":%d,\"kind\":%d,\"health\":%.6f,\"target\":%d,\"position\":[%.6f,%.6f,%.6f],\"velocity\":[%.6f,%.6f,%.6f],\"bank\":%.6f,\"selected\":%s,\"wounds\":%u,\"ready_spikes\":%u,\"flash\":%.6f,\"visible\":%s,\"moving\":%s",
                 first ? "" : ",",i,u->generation,(int)u->faction,(int)simulation_unit_definition(s,u)->group,u->health,u->target,u->position.x,u->position.y,u->position.z,u->velocity.x,u->velocity.y,u->velocity.z,u->bank,u->selected ? "true" : "false",u->wounds,ready,u->flash,s->visible_units[i] ? "true" : "false",u->moving ? "true" : "false");
+            uint32_t pods=0;const UnitDefinition* definition=simulation_unit_definition(s,u);
+            for (uint32_t j=0;j<definition->payload_count;++j) pods+=u->payloads[j]>=1;
+            fprintf(file,",\"ready_payloads\":%u,\"payload_growth\":[",pods);
+            for (uint32_t j=0;j<definition->payload_count;++j) fprintf(file,"%s%.6f",j ? "," : "",u->payloads[j]);
+            fprintf(file,"]");
             static const char* tasks[]={"patrol","move","attack-unit","attack-structure","colonize","launch"};
             fprintf(file,",\"task\":\"%s\",\"attention\":%d,\"attention_generation\":%u,\"commanded\":%s,\"flight_goal\":[%.6f,%.6f,%.6f]",
                 tasks[u->task],u->attention,u->attention_generation,u->commanded ? "true" : "false",u->flight_goal.x,u->flight_goal.y,u->flight_goal.z);
             fprintf(file,",\"type\":\"%s\",\"latch\":%d,\"latch_generation\":%u,\"latch_colony\":%s}",simulation_unit_definition(s,u)->name,u->latch,u->latch_generation,u->latch_colony ? "true" : "false");first=false;
         }
+    fprintf(file,"],\"projectile_state\":[");first=true;
+    for (uint32_t i=0;i<MAX_PROJECTILES;++i) if (s->projectiles[i].active)
+    {
+        const Projectile& p=s->projectiles[i];
+        fprintf(file,"%s{\"type\":\"%s\",\"payload\":%s,\"position\":[%.6f,%.6f,%.6f],\"previous\":[%.6f,%.6f,%.6f],\"scale\":%.6f}",
+            first ? "" : ",",s->world.content.units[p.unit_type].name,p.payload ? "true" : "false",p.position.x,p.position.y,p.position.z,p.previous.x,p.previous.y,p.previous.z,p.launch_scale);first=false;
+    }
     uint32_t projectiles=0,pops=0,trails=0,flashes=0,low=0,impacts=0;
     for (uint32_t i=0;i<MAX_PROJECTILES;++i) projectiles+=s->projectiles[i].active;
     for (uint32_t i=0;i<MAX_POPS;++i) { pops+=s->pops[i].duration>0;impacts+=s->impacts[i].duration>0; }

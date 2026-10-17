@@ -83,6 +83,42 @@
         "leash_radius": 9,
         "response_seconds": 1.1,
         "cruise_fraction": 0.65
+      },
+      "payload": {
+        "model": "../models/virus_bomb.fmesh",
+        "reload_seconds": 12,
+        "sockets": [
+          [
+            -0.34,
+            -0.1,
+            -0.4
+          ],
+          [
+            -0.34,
+            -0.1,
+            0.0
+          ],
+          [
+            -0.34,
+            -0.1,
+            0.4
+          ],
+          [
+            0.34,
+            -0.1,
+            -0.4
+          ],
+          [
+            0.34,
+            -0.1,
+            0.0
+          ],
+          [
+            0.34,
+            -0.1,
+            0.4
+          ]
+        ]
       }
     },
     {
@@ -293,6 +329,42 @@
         "leash_radius": 9,
         "response_seconds": 1.1,
         "cruise_fraction": 0.65
+      },
+      "payload": {
+        "model": "../models/virus_bomb.fmesh",
+        "reload_seconds": 12,
+        "sockets": [
+          [
+            -0.34,
+            -0.1,
+            -0.4
+          ],
+          [
+            -0.34,
+            -0.1,
+            0.0
+          ],
+          [
+            -0.34,
+            -0.1,
+            0.4
+          ],
+          [
+            0.34,
+            -0.1,
+            -0.4
+          ],
+          [
+            0.34,
+            -0.1,
+            0.0
+          ],
+          [
+            0.34,
+            -0.1,
+            0.4
+          ]
+        ]
       }
     },
     {
