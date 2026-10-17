@@ -40,7 +40,13 @@ with tempfile.TemporaryDirectory(prefix='nanova-engulf-') as directory:
  first,_=run('held-a',held,45,'30 select all\n30 move 10 0 8\n');later,_=run('held-b',held,90,'30 select all\n30 move 10 0 8\n')
  a=find(first,'virus_fighter');b=find(later,'virus_fighter');assert a['held_by']>=0 and a['held_by']==b['held_by'] and a['position']==b['position'] and b['moving'],(a,b)
  assert b['wounds']>a['wounds'] and later['faction_events']['digestions']>0
- healed=deepcopy(held);unit(healed,'virus_fighter').update(targets=['units'],shot_interval=1.1,detaches=False,range=3.2);unit(healed,'immune_fighter')['attack']['release_hits']=32
+ armed=deepcopy(held);unit(armed,'virus_fighter').update(targets=['units'],shot_interval=.1,detaches=False)
+ armed_a,_=run('armed-held-a',armed,45);armed_b,_=run('armed-held-b',armed,90)
+ assert find(armed_a,'virus_fighter')['held_by']>=0 and find(armed_b,'virus_fighter')['held_by']>=0
+ assert armed_a['effects']['shots']==armed_b['effects']['shots'],'A captive continued firing'
+ healed=deepcopy(held);unit(healed,'immune_fighter')['attack']['release_hits']=32
+ healed['spawns'].append(dict(type='virus_bomber',position=[-2,0,8]))
+ unit(healed,'virus_bomber').update(speed=.01,targets=['units'],shot_interval=.9);unit(healed,'virus_bomber').pop('payload');unit(healed,'virus_bomber').pop('secondary_attack')
  fed,_=run('healed',healed,240);assert fed['faction_events']['digest_heals']>0 and find(fed,'immune_fighter')['health']>0,fed['faction_events']
  rescue=deepcopy(held);unit(rescue,'virus_fighter').update(hits=3,health=36,speed=.01)
  # Bombers supply supporting fire without changing the victim's own attack behavior.

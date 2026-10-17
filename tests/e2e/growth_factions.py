@@ -75,7 +75,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-growth-') as directory:
         d['rules']['economy']['manufacture_seconds']=1000;d['rules']['ai']['expansion_delay']=300
         for u in d['content']['units']:u['speed']=.01;u['cost']=100
         return d
-    fungus=duel('immune-trial');fungus['spawns']=[dict(type='immune_fighter',position=[0,0,6]),dict(type='swarm_fighter',position=[.35,0,6])]
+    fungus=duel('immune-trial');fungus['spawns']=[dict(type='immune_fighter',position=[0,0,6]),dict(type='swarm_fighter',position=[.35,0,6]),dict(type='swarm_fighter',position=[2,0,6])]
     for u in fungus['content']['units']:
         if u['name']=='swarm_fighter':u.update(hits=32,health=384,shot_interval=.15,detaches=False)
         if u['name']=='immune_fighter':

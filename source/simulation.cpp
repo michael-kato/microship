@@ -975,6 +975,9 @@ static void projectile_combat(Simulation* s,float dt)
     uint32_t hit_count[MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES]={};
     EmbeddedSpike landed[MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES][2]={};
     bool digest_heal[MAX_UNITS]={},burst[MAX_UNITS]={},expired[MAX_UNITS]={};
+    bool held[MAX_UNITS]={};
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+        if (!s->units[i].latch_colony && simulation_attachment_valid(s,&s->units[i])) held[s->units[i].latch]=true;
     uint32_t incoming[MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES]={};
     if (s->world.spikes.enabled) for (uint32_t i=0;i<MAX_PROJECTILES;++i)
     {
@@ -989,7 +992,9 @@ static void projectile_combat(Simulation* s,float dt)
         const UnitDefinition* definition=simulation_unit_definition(s,u);
         if (definition->attack==ATTACK_SPORE && u->age>=definition->lifetime)
         { expired[i]=true;continue; }
-        if (u->cooldown>0 || (definition->attack==ATTACK_DIGEST && u->latch_recovery>0)) continue;
+        // A held victim cannot fire. Supporting units must break the hold.
+        // Read the phase input: a newly captured victim stops on the next tick.
+        if (held[i] || u->cooldown>0 || (definition->attack==ATTACK_DIGEST && u->latch_recovery>0)) continue;
         int target=-1;bool colony=false;uint32_t structure=0;float nearest=simulation_unit_definition(s,u)->range;
         bool secondary=false;
         if (definition->attack==ATTACK_DIGEST && simulation_attachment_valid(s,u))
