@@ -140,8 +140,10 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
         if (u->selected)
         {
             Vec3 point;
-            if (v->target_line_alpha>0 && simulation_held_by(s,i)<0 && target_point(s,*u,&point))
-                segment(output,count,p,u->position,point,v->target_line_width,color,v->target_line_alpha,4);
+            float age=(s->tick_count-u->path_marker_tick)/SIMULATION_TICKS_PER_SECOND_FLOAT;
+            float fade=v->target_line_fade>0 ? 1-std::fmin(1.0f,std::fmax(0.0f,(age-v->target_line_hold)/v->target_line_fade)) : 1;
+            if (v->target_line_alpha*fade>0 && simulation_held_by(s,i)<0 && target_point(s,*u,&point))
+                segment(output,count,p,u->position,point,v->target_line_width,color,v->target_line_alpha*fade,4);
             segment(output,count,p,u->position,u->position,simulation_unit_definition(s,u)->cue_radius,color,SELECTION_CUE_ALPHA,3);
         }
     }

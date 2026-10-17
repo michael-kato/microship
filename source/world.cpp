@@ -162,8 +162,10 @@ static bool load_effects(World* w,const char* path)
     Json line=json_find(root,"target_line");
     if (json_present(line))
     {
-        json_object(line,"width|alpha");w->combat.target_line_width=json_positive(json_get(line,"width"),1);
+        json_object(line,"width|alpha|hold_seconds|fade_seconds");w->combat.target_line_width=json_positive(json_get(line,"width"),1);
         w->combat.target_line_alpha=json_float(json_get(line,"alpha"),0,1);
+        if (json_present(json_find(line,"hold_seconds"))) w->combat.target_line_hold=json_float(json_get(line,"hold_seconds"),0,60);
+        if (json_present(json_find(line,"fade_seconds"))) w->combat.target_line_fade=json_positive(json_get(line,"fade_seconds"),60);
     }
     Json fracture=json_find(root,"limb_break");
     if (json_present(fracture))

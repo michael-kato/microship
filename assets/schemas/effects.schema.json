@@ -173,6 +173,16 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "hold_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 60
+        },
+        "fade_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 60
         }
       },
       "required": [

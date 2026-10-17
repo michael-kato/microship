@@ -148,7 +148,7 @@ static void select_rectangle(Game* game,const RenderConfig* config,bool additive
         Vec3 offset=subtract(u->position,game->camera.position);float depth=dot(offset,forward);
         if (depth<=0) continue;
         float x=config->width*.5f+dot(offset,right)*focal/depth,y=config->height*.5f-dot(offset,up)*focal/depth;
-        if (x>=left && x<=right_edge && y>=top && y<=bottom) { u->selected=true;++count; }
+        if (x>=left && x<=right_edge && y>=top && y<=bottom) { u->selected=true;u->path_marker_tick=s->tick_count;++count; }
     }
     if (group>=0) snprintf(s->message,sizeof(s->message),"SELECTED %u %s ON SCREEN",count,s->world.content.groups[group].plural);
 }
@@ -166,7 +166,6 @@ static void selection_input(Game* game,PointerInput* input,const RenderConfig* c
         game->box[0]=input->press_x;game->box[1]=input->press_y;
     }
     if (!game->box_dragging) return;
-    input->drag_x=0;input->drag_y=0;
     game->box[2]=std::max(0,std::min((int)config->width-1,input->pointer_x));
     game->box[3]=std::max(0,std::min((int)config->height-HUD_BOTTOM_BAND_HEIGHT-1,input->pointer_y));
     game->box_moved=game->box_moved || input->pointer_moved;
@@ -248,6 +247,7 @@ static void gameplay_input(Game* game, PointerInput* input, const RenderConfig* 
         bool selected=s->units[unit].selected;
         if (!input->additive) for (uint32_t i=0;i<MAX_UNITS;++i) s->units[i].selected=false;
         s->units[unit].selected=input->additive ? !selected : true;
+        if (s->units[unit].selected) s->units[unit].path_marker_tick=s->tick_count;
     }
     else s->selected_body=cell;
 }
@@ -394,10 +394,10 @@ int game_run(const GameOptions* options)
     if (!presentation_build(presentation.get(),&game.simulation,&game.camera,&config)
         || !renderer_initialize(&game.renderer,&presentation->scene,&config,options->shader_path,
             options->builtin_shader_path,options->headless,options->debug_views,options->no_activate)) return 1;
-    game.renderer.debug_stats = options->stats_set ? options->show_stats : !options->headless || options->debug_views;
+    game.renderer.debug_stats = options->stats_set ? options->show_stats : false;
     if (!options->headless && !audio_open(&audio)) { renderer_shutdown(&game.renderer);return 1; }
     game.renderer.debug_views = options->debug_views;
-    printf("Left-drag to select; WASD/arrows to pan; wheel to zoom. F1/F2 debug. Gameplay: F/B select fighters/bombers on screen; 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
+    printf("Left-drag to select; middle-drag or WASD/arrows to pan; wheel to zoom. F1 profiler; F2 render buffers. Gameplay: F/B select fighters/bombers on screen; 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
     const double tick_seconds = 1.0 / SIMULATION_TICKS_PER_SECOND_DOUBLE;
     double previous = monotonic_seconds();
     double accumulator = 0.0;
@@ -405,9 +405,12 @@ int game_run(const GameOptions* options)
     uint32_t frames = 0;
     bool success = true;
     PointerInput input = {};
-    while ((!options->frames || frames < options->frames) && renderer_poll(&game.renderer, &input))
+    while (!options->frames || frames < options->frames)
     {
+        if (frames && options->frame_delay_ms) Sleep(options->frame_delay_ms);
         double start = monotonic_seconds();
+        Profiler* profile=&game.renderer.profiler;profiler_begin(profile,start*MILLISECONDS_PER_SECOND);
+        if (!renderer_poll(&game.renderer,&input)) break;
         double elapsed = start - previous;
         previous = start;
         game.renderer.previous_frame_ms = frames ? elapsed*MILLISECONDS_PER_SECOND : 0.0;
@@ -417,6 +420,7 @@ int game_run(const GameOptions* options)
         input.pan_seconds=(float)std::fmin(elapsed,MAX_FRAME_CATCHUP_SECONDS);
         game.pointer=input;ratio_pointer(&game,&input,&config);selection_input(&game,&input,&config);
         camera_apply_input(&game.camera,&input,&config);gameplay_input(&game,&input,&config);
+        double input_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_INPUT,start*MILLISECONDS_PER_SECOND,input_end);
         accumulator += elapsed < MAX_FRAME_CATCHUP_SECONDS ? elapsed : MAX_FRAME_CATCHUP_SECONDS;
         if (options->headless) accumulator=0;
         while (accumulator >= tick_seconds)
@@ -427,6 +431,8 @@ int game_run(const GameOptions* options)
         }
         if ((options->headless && !options->ticks) || options->time_set)
             simulation_set_time(&game.simulation, options->time_seconds + frames * options->step_seconds);
+        double simulation_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_SIMULATION,input_end,simulation_end);
+        profile->pointer_x=input.pointer_x;profile->pointer_y=input.pointer_y;
         overlay_enabled(&game,&config);
         audio_events(&audio,&game.simulation,game.camera.target);
         if (!audio_pump(&audio)) { success=false;break; }
@@ -437,13 +443,17 @@ int game_run(const GameOptions* options)
         printf("Scene time: %.6f; camera: %g %g %g.\n",game.simulation.time_seconds,
             game.camera.position.x,game.camera.position.y,game.camera.position.z);
         bool final_frame = options->frames && frames + 1 == options->frames;
-        if (!presentation_build(presentation.get(),&game.simulation,&game.camera,&config)
-            || !renderer_render(&game.renderer,&presentation->scene,&game.camera,final_frame ? options->capture_path : 0))
+        if (!presentation_build(presentation.get(),&game.simulation,&game.camera,&config)) { success=false;break; }
+        profiler_cpu(profile,PROFILE_SCENE,simulation_end,profiler_clock_ms());
+        if (!renderer_render(&game.renderer,&presentation->scene,&game.camera,final_frame ? options->capture_path : 0))
         {
             success = false;
             break;
         }
-        double frame_ms = (monotonic_seconds() - start) * MILLISECONDS_PER_SECOND;
+        double frame_end=profiler_clock_ms();
+        profiler_cpu(profile,PROFILE_CPU_FRAME,start*MILLISECONDS_PER_SECOND,frame_end);
+        profiler_finish(profile,options->frames && game.renderer.debug_stats);
+        double frame_ms=frame_end-start*MILLISECONDS_PER_SECOND;
         game.renderer.work_frame_ms=frame_ms-game.renderer.acquire_ms-game.renderer.present_ms;
         frame_total += frame_ms;
         ++frames;

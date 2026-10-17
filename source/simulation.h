@@ -24,6 +24,7 @@ struct Unit
     Vec3 position;
     float health, landing;
     uint32_t type, generation;
+    uint32_t path_marker_tick; // Selection/order feedback only.
     Faction faction;
     int32_t target;
     bool selected;

@@ -75,12 +75,13 @@ const vec3 CARD_TEXT_COLOR=vec3(.83,.85,.87);
 const vec3 PROGRESS_TRACK_COLOR=vec3(.1,.10,.13);
 const vec3 MANUFACTURE_PROGRESS_COLOR=vec3(.96,.69,.42);
 
-const int DEBUG_MASK_VEC4_COUNT=1570;
 
 // Procedural 4x7 glyphs: no font texture or atlas.
 layout(set=0,binding = RENDER_BINDING_UNIFORM,std140) uniform DebugText {
     uvec4 glyphs[FONT_GLYPH_COUNT/4];
-    uvec4 mask[DEBUG_MASK_VEC4_COUNT]; // Native 512x92 debug text plus 960x160 gameplay text, packed in bits.
+    uvec4 mask[DEBUG_MASK_VEC4_COUNT]; // Profiler and gameplay text, packed in bits.
+    ivec4 profile_rectangles[PROFILE_BAR_COUNT];
+    vec4 profile_colors[PROFILE_BAR_COUNT];
 } text_data;
 
 uint glyph(uint character)
@@ -223,7 +224,13 @@ void main()
     }
     if (stats && pixel.x<STATS_TEXT_WIDTH && pixel.y<STATS_TEXT_HEIGHT)
     {
-        value=views ? DEBUG_BACKGROUND_COLOR : value*STATS_BACKGROUND_BRIGHTNESS;
+        value=DEBUG_BACKGROUND_COLOR;
+        for (int i=0;i<PROFILE_BAR_COUNT;++i)
+        {
+            ivec4 r=text_data.profile_rectangles[i];
+            if (text_data.profile_colors[i].a>0.0 && all(greaterThanEqual(pixel,r.xy)) && all(lessThan(pixel,r.zw)))
+                value=text_data.profile_colors[i].rgb;
+        }
         uint bit=uint(pixel.y*STATS_TEXT_WIDTH+pixel.x), word=bit/uint(TEXT_MASK_WORD_BITS);
         if ((text_data.mask[word/4u][word%4u] & (1u << (bit%uint(TEXT_MASK_WORD_BITS))))!=0u)
             value=STATS_TEXT_COLOR;

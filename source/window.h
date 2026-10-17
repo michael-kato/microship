@@ -16,7 +16,9 @@ struct Window
     HINSTANCE instance;
     HWND handle;
     bool open;
-    bool dragging;
+    bool dragging,panning;
+    bool stats_held,buffers_held;
+    int32_t pan_x,pan_y;
     uint32_t camera_keys;
     int32_t pointer_x, pointer_y;
     int32_t press_x, press_y;

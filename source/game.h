@@ -14,6 +14,7 @@ struct GameOptions
     const char* audio_path;
     const char* audio_capture_path;
     uint32_t frames;
+    uint32_t frame_delay_ms; // Bounded OS-input diagnostics only.
     uint32_t samples;
     uint32_t seed;
     uint32_t world_seed;

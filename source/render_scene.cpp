@@ -182,7 +182,7 @@ bool render_scene_write(const RenderScene* scene,const char* path)
     for (uint32_t i=0;i<scene->effect_count;++i)
     {
         const EffectSegment& e=scene->effects[i];
-        fprintf(file,"%s[%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g]",i ? "," : "",e.start[0],e.start[1],e.start[2],e.start[3],e.end[0],e.end[1],e.end[2],e.end[3]);
+        fprintf(file,"%s[%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g]",i ? "," : "",e.start[0],e.start[1],e.start[2],e.start[3],e.end[0],e.end[1],e.end[2],e.end[3],e.color[0],e.color[1],e.color[2],e.color[3]);
     }
     fprintf(file,"]}\n");
     bool valid=!ferror(file);if (fclose(file)) valid=false;return valid;

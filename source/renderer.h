@@ -2,6 +2,7 @@
 #define NANOVA_RENDERER_H
 
 #include <stdint.h>
+#include "profiler.h"
 #include "../assets/shaders/hud_layout.glsl"
 
 struct RenderScene;
@@ -14,6 +15,7 @@ struct RendererState;
 struct Renderer
 {
     RendererState* state;
+    Profiler profiler;
     bool running;
     uint32_t scene_submissions;
     bool debug_stats;

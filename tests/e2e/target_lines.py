@@ -27,6 +27,17 @@ with tempfile.TemporaryDirectory(prefix='nanova-targets-') as directory:
  _,unselected=run('unselected');assert not lines(unselected)
  disabled=deepcopy(base);disabled['effects']['target_line']['alpha']=0
  same,none=run('lines-disabled',disabled,orders='0 select all\n0 move -32 2 8\n');assert not lines(none) and same==selected
+ # A long move keeps the target active while its marker fades.
+ slow=deepcopy(base)
+ for u in slow['content']['units']:u['speed']=.01
+ for ticks,alpha in ((180,.1),(210,.05),(240,0),(360,0)):
+  state,scene=run('fade-'+str(ticks),slow,ticks,'0 select all\n0 move -32 2 8\n')
+  fading=lines(scene)
+  if alpha:assert len(fading)==7 and all(abs(e[11]-alpha)<.00001 for e in fading),(ticks,fading)
+  else:assert not fading and all(u['moving'] for u in state['units'] if u['selected'])
+ for command in ('select all','move -30 3 8'):
+  _,scene=run('refresh-'+command.split()[0],slow,330,'0 select all\n0 move -32 2 8\n300 '+command+'\n')
+  assert len(lines(scene))==7 and all(abs(e[11]-.1)<.00001 for e in lines(scene))
  # An attached immune craft and its selected captive both suppress target lines.
  held=deepcopy(base);held['spawns']=[dict(type='immune_fighter',position=[-52,-1,6.4]),dict(type='virus_fighter',position=[-51.65,-1,6.4])]
  for u in held['content']['units']:u['speed']=.01

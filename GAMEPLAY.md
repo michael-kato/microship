@@ -44,7 +44,7 @@ Audio uses twelve generated PCM effects and a fixed sixteen-voice mixer. Off-scr
 | Shift-drag | Add craft in the rectangle to the selection |
 | WASD / arrow keys | Move the camera across the map |
 | Wheel | Zoom at the pointer |
-| Middle button | Unbound |
+| Middle-button drag | Pan the camera |
 | 1 / 2 / 3 | Select fighters / bombers / all units |
 | Shift-click | Add or remove a unit from the selection |
 | Right-click open space | Move selected craft and scout |
@@ -53,7 +53,7 @@ Audio uses twelve generated PCM effects and a fixed sixteen-voice mixer. Off-scr
 | F / B | Select your fighters / bombers on screen |
 | Home | Focus the selected cell or starting cell |
 | Space / R | Pause / restart |
-| F1 / F2 | Show timing data / current render buffers |
+| F1 / F2 | Toggle the frame profiler / current render buffers |
 
 Both sides start with craft at neutral cells. Select craft and right-click your starting cell to establish the first factory. One craft is consumed. The enemy establishes its first site automatically. The fungal trial uses an automatic founder.
 
@@ -63,12 +63,16 @@ The slider moves in one-percent steps. The left end makes fighters only; the rig
 
 A replay line has a tick, command, and argument. `0 ratio 75` requests 75 percent fighters and 25 percent bombers at the selected friendly cell. Use `0 cell 0` first to select cell zero. Replay orders use the production controls in the application. `--pointer-drag X1 Y1 X2 Y2` supplies one complete drag for application checks.
 
-One starting fighter automatically approaches and colonizes your neutral home cell. WASD or arrow keys move the camera. Right-click sends an order. The middle button is unbound.
+One starting fighter automatically approaches and colonizes your neutral home cell. WASD or arrow keys move the camera. Right-click sends an order. Drag with the middle button to pan the camera.
 
 F2 shows twelve current-frame panels. SSS CONTRIBUTION shows wrapped and transmitted scattering light. SSS FRACTION OF DIRECT shows its share of direct light. CELL BLUR RADIUS / 32 shows the cell blur radius, from black at zero to white at thirty-two pixels. These diagnostics use a shared current-frame buffer. Normal rendering does not allocate separate SSS or blur images.
 
 Immune craft accelerate toward an enemy inside 5.5 world units, with 3.5 times their normal top speed and three times their flight acceleration. Contact attaches the immune craft and holds a mobile victim. A held victim cannot move or fire. Digestion damages the victim and heals one wound per successful bite. Three incoming hits break the attachment and prevent a new hold for 2.5 seconds. Killing the immune craft also releases its victim. A darker rear makes the forward direction easier to see.
 
-Selected units show a faint line to their current movement or attack target. The line follows a visible, valid combat target. Attached units and held victims have no target line. Selection does not change an order. `target_line.width` and `alpha` in the effects file control the line.
+Selected units show a faint line to their current movement or attack target. The line follows a visible, valid combat target. Attached units and held victims have no target line. Path lines stay visible for three seconds, then fade over one second. Selection or a new order shows them again. Selection does not change an order. `target_line.hold_seconds`, `fade_seconds`, `width`, and `alpha` in the effects file control the line.
 
-Keyboard camera speed is twelve world units per second, set by `camera.keyboard_pan_speed`. Diagonal movement has the same speed as movement along one axis. Opposing directions cancel. WASD and arrow keys can be used together. Movement stops when the game loses focus. S moves the camera down. F and B replace the selection with your fighters or bombers in the current gameplay view. Craft behind the camera, outside the view, or behind the bottom HUD are excluded. These keys do not change production. The 1, 2, and 3 keys select across the map.
+Keyboard camera speed is twenty-four world units per second, set by `camera.keyboard_pan_speed`. Diagonal movement has the same speed as movement along one axis. Opposing directions cancel. WASD and arrow keys can be used together. Movement stops when the game loses focus. S moves the camera down. F and B replace the selection with your fighters or bombers in the current gameplay view. Craft behind the camera, outside the view, or behind the bottom HUD are excluded. These keys do not change production. The 1, 2, and 3 keys select across the map.
+
+F1 opens the frame profiler. CPU and GPU icicle graphs show a rolling mean of up to 120 completed frames. Child bars are below their parent. Both graphs use the same millisecond scale, but their clocks are not aligned. Hover over a bar to see its latest duration and mean. The top three GPU costs are shown below the graphs. The panel starts closed; `--stats` opens it at launch.
+
+CPU spans cover input, simulation, scene and audio preparation, render command recording, GPU submission and wait, presentation wait, and capture. CPU wall time includes time blocked on the GPU. GPU spans cover acceleration updates, backdrop, shadow grid, surface lighting and SSS, volume scattering, effects, cell blur, fog, tilt shift, bloom and display, the HUD, and output copy. Surface lighting and SSS share one shader and one timing span. Timings include stage barriers. The header shows both latest and mean durations. The panel uses the previous completed frame; no extra GPU wait is added for profiling. Timing history contains numbers only, with no image or lighting history. Bounded `--frames N --stats` runs also print each span and its mean.

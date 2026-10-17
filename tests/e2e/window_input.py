@@ -60,7 +60,7 @@ class Desktop:
             self.api.XSetInputFocus.argtypes = [c.c_void_p, c.c_ulong, c.c_int, c.c_ulong]
             self.api.XFlush.argtypes = [c.c_void_p]
             self.api.XKeysymToKeycode.argtypes = [c.c_void_p, c.c_ulong]
-            self.api.XKeysymToKeycode.restype = c.c_uint
+            self.api.XKeysymToKeycode.restype = c.c_ubyte
             self.xt.XTestFakeMotionEvent.argtypes = [c.c_void_p, c.c_int, c.c_int, c.c_int, c.c_ulong]
             self.xt.XTestFakeButtonEvent.argtypes = [c.c_void_p, c.c_uint, c.c_int, c.c_ulong]
             self.xt.XTestFakeKeyEvent.argtypes = [c.c_void_p, c.c_uint, c.c_int, c.c_ulong]
@@ -130,14 +130,15 @@ class Desktop:
             self.api.XFlush(self.display)
 
     def key(self, down, name):
-        arrows={'LEFT':(0x25,0xff51),'UP':(0x26,0xff52),'RIGHT':(0x27,0xff53),'DOWN':(0x28,0xff54)}
+        arrows={'F1':(0x70,0xffbe),'F2':(0x71,0xffbf),'LEFT':(0x25,0xff51),'UP':(0x26,0xff52),'RIGHT':(0x27,0xff53),'DOWN':(0x28,0xff54)}
         if sys.platform == 'win32':
             code=arrows[name][0] if name in arrows else ord(name)
-            flags=(1 if name in arrows else 0) | (0 if down else 2)
+            flags=(1 if name in ('LEFT','RIGHT','UP','DOWN') else 0) | (0 if down else 2)
             self.api.keybd_event(code,0,flags,0)
         else:
             symbol=arrows[name][1] if name in arrows else ord(name.lower())
             key=self.api.XKeysymToKeycode(self.display,symbol)
+            if not key:raise RuntimeError('No X11 keycode for '+name)
             self.xt.XTestFakeKeyEvent(self.display,key,int(down),0);self.api.XFlush(self.display)
 
     def wheel(self):

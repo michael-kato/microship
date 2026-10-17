@@ -457,7 +457,7 @@ void simulation_select(Simulation* s, int group)
     {
         Unit* u=&s->units[i];
         u->selected=u->health>0 && u->faction==s->world.player_faction && !s->world.content.factions[u->faction].automatic && (group<0 || (int)simulation_unit_definition(s,u)->group==group);
-        if (u->selected) ++count;
+        if (u->selected) { u->path_marker_tick=s->tick_count;++count; }
     }
     snprintf(s->message,sizeof(s->message),"SELECTED %u %s",count,group>=0 && group<MAX_GROUPS ? s->world.content.groups[group].plural : "UNITS");
 }
@@ -472,7 +472,7 @@ void simulation_order(Simulation* s, uint32_t cell)
         if (s->units[i].selected && s->units[i].health>0)
         {
             Unit& u=s->units[i];u.target=(int)cell;u.moving=false;u.landing=0;u.latch=-1;u.attention=-1;
-            u.commanded=!s->colonies[cell].active || s->colonies[cell].faction!=u.faction;u.response_timer=0;++count;
+            u.commanded=!s->colonies[cell].active || s->colonies[cell].faction!=u.faction;u.response_timer=0;u.path_marker_tick=s->tick_count;++count;
         }
     s->selected_body=(int)cell;
     if (count) { s->order_body=(int)cell;s->order_tick=s->tick_count;s->order_count=count; }
@@ -490,7 +490,7 @@ void simulation_move_to(Simulation* s,Vec3 destination)
         if (s->units[i].health>0 && s->units[i].selected)
         {
             Unit* u=&s->units[i];u->target=NO_BODY;u->destination=destination;u->moving=true;u->landing=0;u->latch=-1;++count;
-            u->commanded=true;u->attention=-1;
+            u->commanded=true;u->attention=-1;u->path_marker_tick=s->tick_count;
         }
     s->order_body=NO_BODY;s->order_count=count;s->order_tick=s->tick_count;
     snprintf(s->message,sizeof(s->message),"%u UNITS MOVING. SCOUT TO FIND CELLS.",count);

@@ -29,7 +29,6 @@ def run_window(binary,out,limit=2,keys=('W','D'),axes=(1,1),issue_order=True,scr
   for key in keys:desktop.key(True,key)
   # Queue the complete input sequence before the first poll. Two-frame checks
   # otherwise depend on Proton delivery finishing during one short GPU frame.
-  desktop.move(x+900,y+500);desktop.button(True,2);desktop.move(x+980,y+480);desktop.button(False,2)
   if issue_order:
    desktop.move(x+1400,y+500);desktop.button(True,3);desktop.button(False,3)
   # Keep the selection release position as the final pointer sample.
@@ -47,14 +46,14 @@ def run_window(binary,out,limit=2,keys=('W','D'),axes=(1,1),issue_order=True,scr
  assert 'Vulkan validation: enabled.' in output
  assert len(re.findall(r'Application frame:',output))==2,output
  pans=re.findall(r'Camera input: drag ([0-9.eE+-]+) ([0-9.eE+-]+);',output)
- assert all(float(x)==0 and float(y)==0 for x,y in pans),'Mouse buttons moved the camera'
+ assert all(float(x)==0 and float(y)==0 for x,y in pans),'Selection or orders moved the camera'
  positions=[list(map(float,row)) for row in re.findall(r'Scene time: [0-9.eE+-]+; camera: ([0-9.eE+-]+) ([0-9.eE+-]+) ([0-9.eE+-]+)',output)];assert len(positions)==2,output
  movement=[positions[1][i]-positions[0][i] for i in range(3)]
  keyboard=re.findall(r'Camera keyboard: pan ([0-9.eE+-]+) ([0-9.eE+-]+); seconds ([0-9.eE+-]+)\.',output)
  if axes!=(0,0):
   assert keyboard and tuple(map(float,keyboard[-1][:2]))==axes,(keyboard,output)
   seconds=float(keyboard[-1][2]);assert seconds>0
-  length=max(1,(axes[0]**2+axes[1]**2)**.5);expected=[12*seconds*axes[0]/length,12*seconds*axes[1]/length,0]
+  length=max(1,(axes[0]**2+axes[1]**2)**.5);speed=json.loads((root/'assets/rendering/biology.json').read_text())['camera']['keyboard_pan_speed'];expected=[speed*seconds*axes[0]/length,speed*seconds*axes[1]/length,0]
   assert all(abs(a-b)<.0003 for a,b in zip(movement,expected)),(movement,expected,output)
  else:assert not keyboard and movement==[0,0,0],(movement,keyboard)
  result=json.loads(state.read_text());selected=[u for u in result['units'] if u['selected']]
@@ -62,8 +61,8 @@ def run_window(binary,out,limit=2,keys=('W','D'),axes=(1,1),issue_order=True,scr
  assert len(selected)==expected_count,('Selected count',len(selected),expected_count)
  if screen_key:assert all(u['kind']==(0 if screen_key=='F' else 1) and u['faction']==1 for u in selected)
  if issue_order:assert result['order']['count']==7 and result['order']['cell']==-1 and all(u['moving'] for u in selected),(result['order'],[u['moving'] for u in selected])
- else:assert result['order']['count']==0,'The middle button issued an order'
- return dict(selected=len(selected),screen_key=screen_key,keyboard_axes=axes,camera_movement=movement,right_click_orders=7 if issue_order else 0,middle_button='unbound',frames=2,seconds=time.monotonic()-started,application_ms=list(map(float,re.findall(r'Application frame: ([0-9.]+)',output))))
+ else:assert result['order']['count']==0,'An order was issued without a right click'
+ return dict(selected=len(selected),screen_key=screen_key,keyboard_axes=axes,camera_movement=movement,right_click_orders=7 if issue_order else 0,frames=2,seconds=time.monotonic()-started,application_ms=list(map(float,re.findall(r'Application frame: ([0-9.]+)',output))))
 
 if __name__=='__main__':
  import argparse

@@ -16,7 +16,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-keyboard-') as folder:
   if expected:assert not state.exists();return None,None
   line=next(line for line in result.stdout.splitlines() if line.startswith('Initial camera:'));values=list(map(float,re.findall(r'-?\d+(?:\.\d+)?',line)))
   return values,json.loads(state.read_text())
- baseline,state=run('baseline');speed=settings['camera']['keyboard_pan_speed'];assert speed==12
+ baseline,state=run('baseline');speed=settings['camera']['keyboard_pan_speed']
  for x,y in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,1),(1,-1),(-1,-1),(0,0)):
   camera,same=run('direction-'+str(count),(x,y,1));magnitude=max(1,math.hypot(x,y));delta=[speed*x/magnitude,speed*y/magnitude,0]
   assert same==state,'Camera movement changed simulation or sight'
@@ -32,6 +32,8 @@ with tempfile.TemporaryDirectory(prefix='nanova-keyboard-') as folder:
  reset,_=run('restart',(1,1,1),extra=('--restart',));assert reset==baseline
  for pan in ((2,0,1),(0,-2,1),(0,0,-1),(0,0,61),('nan',0,1)):
   run('invalid-pan-'+str(count),pan,expected=2)
+ for value in ('-1','251','nan','1'):
+  run('invalid-delay-'+value,extra=('--frame-delay-ms',value),expected=2)
  for value in (-1,1001):
   bad=deepcopy(settings);bad['camera']['keyboard_pan_speed']=value;run('invalid-speed-'+str(count),config=bad,expected=1)
 print(f'Keyboard camera E2E passed: {count} application runs; cardinal and diagonal movement, elapsed time, map plane, rotated view, restart, unchanged sight and orders, optional settings and rejected input.')

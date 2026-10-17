@@ -143,7 +143,7 @@ add_executable(nanova
     source/simulation.cpp
     source/flight.cpp source/fog.cpp
     source/orders.cpp
-    source/renderer.cpp
+    source/renderer.cpp source/profiler.cpp
     source/game.cpp
 )
 add_dependencies(nanova nanova_assets)
@@ -263,3 +263,9 @@ set_tests_properties(keyboard_camera PROPERTIES TIMEOUT 30)
 add_test(NAME screen_selection COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/screen_selection.py $<TARGET_FILE:nanova>)
 set_tests_properties(screen_selection PROPERTIES TIMEOUT 30)
+
+# Explicit E2E input driver; it is not part of the distributed game.
+add_executable(nanova_input_probe EXCLUDE_FROM_ALL tests/e2e/win32_input.cpp)
+if(MINGW)
+    target_link_options(nanova_input_probe PRIVATE -static)
+endif()

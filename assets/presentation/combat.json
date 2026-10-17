@@ -49,6 +49,8 @@
   },
   "target_line": {
     "width": 0.008,
-    "alpha": 0.1
+    "alpha": 0.1,
+    "hold_seconds": 3,
+    "fade_seconds": 1
   }
 }

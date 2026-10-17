@@ -48,14 +48,14 @@ static const int DESCRIPTOR_POOL_TYPE_COUNT = 5;
 static const int BACKDROP_PUSH_BYTES = 16;
 static const int GPU_TRIANGLE_BYTES = 16;
 static const int HUD_MAX_LINE_CHARACTERS = HUD_LINE_CAPACITY-1;
-static const unsigned int STATS_TEXT_WIDTH_UNSIGNED = 512u;
-static const unsigned int STATS_TEXT_HEIGHT_UNSIGNED = 92u;
-static const int GPU_TIMESTAMP_COUNT = 12;
+static const unsigned int STATS_TEXT_WIDTH_UNSIGNED = STATS_TEXT_WIDTH;
+static const unsigned int STATS_TEXT_HEIGHT_UNSIGNED = STATS_TEXT_HEIGHT;
+static const int GPU_TIMESTAMP_COUNT = 15;
 static const int TIMESTAMP_WORD_BITS = 64;
 
 enum { SCENE_BUFFER_VERTICES=0, SCENE_BUFFER_TRIANGLES=1, SCENE_BUFFER_UNIFORM=2, SCENE_BUFFER_MEDIA=3, SCENE_BUFFER_ENERGY=4, SCENE_BUFFER_RESERVED=5, SCENE_BUFFER_DEBUG=6 };
 
-enum { GPU_TIME_FRAME_BEGIN=0, GPU_TIME_SURFACE_BEGIN=1, GPU_TIME_SURFACE_END=2, GPU_TIME_VOLUME_END=3, GPU_TIME_EFFECTS_BEGIN=4, GPU_TIME_BLOOM_END=5, GPU_TIME_OVERLAY_END=6, GPU_TIME_BACKDROP_END=7, GPU_TIME_UPLOAD_END=8, GPU_TIME_EFFECTS_END=9, GPU_TIME_GRID_END=10, GPU_TIME_MEDIUM_BLUR_END=11 };
+enum { GPU_TIME_FRAME_BEGIN=0, GPU_TIME_SURFACE_BEGIN=1, GPU_TIME_SURFACE_END=2, GPU_TIME_VOLUME_END=3, GPU_TIME_EFFECTS_BEGIN=4, GPU_TIME_BLOOM_END=5, GPU_TIME_OVERLAY_END=6, GPU_TIME_BACKDROP_END=7, GPU_TIME_UPLOAD_END=8, GPU_TIME_EFFECTS_END=9, GPU_TIME_GRID_END=10, GPU_TIME_MEDIUM_BLUR_END=11, GPU_TIME_FOG_END=12, GPU_TIME_FOCUS_END=13, GPU_TIME_COPY_END=14 };
 
 struct GpuBuffer
 {
@@ -114,6 +114,10 @@ struct DebugParameters
     int32_t hover[4],box[4];
 };
 static_assert(sizeof(DebugParameters) == GPU_DEBUG_PUSH_BYTES, "Debug push-constant layout");
+
+struct ProfileBars { int32_t rectangles[PROFILE_BAR_COUNT][4];float colors[PROFILE_BAR_COUNT][4]; };
+static_assert(PROFILE_NODE_COUNT==PROFILE_BAR_COUNT,"Profiler CPU/GPU bar layout");
+static_assert(FONT_UNIFORM_BYTES+(STATS_TEXT_WIDTH*STATS_TEXT_HEIGHT+HUD_TEXT_WIDTH*HUD_TEXT_HEIGHT)/8+sizeof(ProfileBars)<=65536,"Debug uniform fits the Vulkan minimum range");
 
 struct MeshAllocation
 {
@@ -854,7 +858,7 @@ static bool create_output(RendererState* state)
     }
     if (!create_buffer(state,&state->debug_pixels,debug_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
-    if (!create_buffer(state,&state->debug_text,FONT_UNIFORM_BYTES+(STATS_TEXT_WIDTH*STATS_TEXT_HEIGHT+HUD_TEXT_WIDTH*HUD_TEXT_HEIGHT)/TEXT_MASK_BYTE_BITS,VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    if (!create_buffer(state,&state->debug_text,FONT_UNIFORM_BYTES+(STATS_TEXT_WIDTH*STATS_TEXT_HEIGHT+HUD_TEXT_WIDTH*HUD_TEXT_HEIGHT)/TEXT_MASK_BYTE_BITS+sizeof(ProfileBars),VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) return false;
     memcpy(state->debug_text.mapped,debug_glyphs,sizeof(debug_glyphs));
     if (!create_render_image(state, VK_FORMAT_R32G32B32A32_SFLOAT, &state->hdr, &state->hdr_memory, &state->hdr_view)
@@ -1242,6 +1246,77 @@ static void shader_buffer_barrier(VkCommandBuffer command)
         0,1,&barrier,0,0,0,0);
 }
 
+// A fixed bit mask holds debug text. It is separate from all scene images.
+static void profile_text(RendererState* state,const char* text,int x,int y,int right)
+{
+    const int glyph_scale=2,spacing=10;
+    for (uint32_t c=0;text[c];++c)
+    {
+        int left=x+(int)c*spacing;if (left+FONT_GLYPH_WIDTH*glyph_scale>right) break;
+        unsigned char character=(unsigned char)text[c];uint32_t glyph=character<FONT_GLYPH_COUNT ? debug_glyphs[character] : 0;
+        for (int row=0;row<FONT_GLYPH_HEIGHT*glyph_scale;++row)
+            for (int column=0;column<FONT_GLYPH_WIDTH*glyph_scale;++column)
+                if (glyph&(1u<<((row/glyph_scale)*FONT_GLYPH_WIDTH+column/glyph_scale)))
+                {
+                    uint32_t bit=(y+row)*STATS_TEXT_WIDTH+left+column;
+                    state->text_mask[bit/TEXT_MASK_WORD_BITS]|=1u<<(bit%TEXT_MASK_WORD_BITS);
+                }
+    }
+}
+static void profile_overlay(RendererState* state,const Renderer* renderer,ProfileBars* bars)
+{
+    const Profiler* p=&renderer->profiler;char line[160];
+    snprintf(line,sizeof(line),"F1 FRAME PROFILER / ROLLING MEAN %u OF %u FRAMES",p->count,PROFILE_HISTORY);
+    profile_text(state,line,8,8,STATS_TEXT_WIDTH-8);
+    if (!p->count) { profile_text(state,"WAITING FOR THE FIRST COMPLETED FRAME",8,30,STATS_TEXT_WIDTH-8);return; }
+    snprintf(line,sizeof(line),"MEAN CPU %.2F / GPU %.2F MS   LAST CPU %.2F / GPU %.2F MS   %.1F FPS",
+        p->mean[PROFILE_CPU_FRAME].duration_ms,p->mean[PROFILE_GPU_FRAME].duration_ms,
+        p->latest[PROFILE_CPU_FRAME].duration_ms,p->latest[PROFILE_GPU_FRAME].duration_ms,
+        renderer->previous_frame_ms>0 ? MILLISECONDS_PER_SECOND/renderer->previous_frame_ms : 0);
+    profile_text(state,line,8,26,STATS_TEXT_WIDTH-8);
+    double range=std::ceil(std::fmax(p->mean[PROFILE_CPU_FRAME].duration_ms,p->mean[PROFILE_GPU_FRAME].duration_ms)/5.0)*5.0;
+    range=std::fmax(5.0,range);
+    snprintf(line,sizeof(line),"SEPARATE CPU/GPU CLOCKS / SAME SCALE 0 TO %.1F MS / BARS SHOW MEAN / HOVER FOR LAST",range);
+    profile_text(state,line,8,44,STATS_TEXT_WIDTH-8);
+    profile_text(state,"CPU / WALL TIME INCLUDING WAIT / CHILDREN BELOW PARENTS",8,64,STATS_TEXT_WIDTH-8);
+    profile_text(state,"GPU / EXECUTION TIME / CHILDREN BELOW PARENTS",8,156,STATS_TEXT_WIDTH-8);
+    static const float palette[8][3]={{.24f,.47f,.68f},{.38f,.56f,.77f},{.33f,.62f,.52f},{.66f,.48f,.29f},{.56f,.42f,.66f},{.55f,.35f,.32f},{.31f,.57f,.61f},{.53f,.53f,.34f}};
+    int hover=-1;
+    for (uint32_t i=0;i<PROFILE_NODE_COUNT;++i)
+    {
+        const ProfileDefinition& definition=profile_definitions[i];const ProfileSample& sample=p->mean[i];
+        if (sample.duration_ms<=0) continue;
+        int32_t* r=bars->rectangles[i];
+        r[0]=8+(int)(sample.start_ms/range*(STATS_TEXT_WIDTH-16));
+        r[1]=(i<PROFILE_GPU_FRAME ? 84 : 176)+definition.depth*22;
+        r[2]=std::min(STATS_TEXT_WIDTH-8,std::max(r[0]+1,8+(int)((sample.start_ms+sample.duration_ms)/range*(STATS_TEXT_WIDTH-16))));r[3]=r[1]+20;
+        memcpy(bars->colors[i],palette[i%8],3*sizeof(float));bars->colors[i][3]=1;
+        snprintf(line,sizeof(line),"%s %.2F",definition.name,sample.duration_ms);
+        profile_text(state,line,r[0]+4,r[1]+3,r[2]-3);
+        if (p->pointer_x>=r[0] && p->pointer_x<r[2] && p->pointer_y>=r[1] && p->pointer_y<r[3]) hover=(int)i;
+    }
+    if (hover>=0)
+        snprintf(line,sizeof(line),"%s / LAST %.3F MS / MEAN %.3F MS",profile_definitions[hover].name,p->latest[hover].duration_ms,p->mean[hover].duration_ms);
+    else
+    {
+        int top[3]={PROFILE_SURFACE,PROFILE_VOLUME,PROFILE_CELL_BLUR};
+        for (int rank=0;rank<3;++rank)
+        {
+            top[rank]=-1;
+            for (int i=PROFILE_ACCELERATION;i<PROFILE_NODE_COUNT;++i)
+            {
+                if (profile_definitions[i].depth!=2) continue;
+                bool used=false;for (int j=0;j<rank;++j) used=used || top[j]==i;
+                if (!used && (top[rank]<0 || p->mean[i].duration_ms>p->mean[top[rank]].duration_ms)) top[rank]=i;
+            }
+        }
+        snprintf(line,sizeof(line),"TOP GPU: %s %.2F / %s %.2F / %s %.2F MS",profile_definitions[top[0]].name,p->mean[top[0]].duration_ms,
+            profile_definitions[top[1]].name,p->mean[top[1]].duration_ms,profile_definitions[top[2]].name,p->mean[top[2]].duration_ms);
+    }
+    profile_text(state,line,8,250,STATS_TEXT_WIDTH-8);
+    profile_text(state,"SURFACE INCLUDES LIGHTING + SSS / GPU WAIT IS CPU BLOCKING / TIMINGS INCLUDE BARRIERS",8,274,STATS_TEXT_WIDTH-8);
+}
+
 static void draw_debug(RendererState* state, const Renderer* renderer)
 {
     DebugParameters parameters = {};
@@ -1259,30 +1334,8 @@ static void draw_debug(RendererState* state, const Renderer* renderer)
     memcpy(parameters.feedback,renderer->hud_feedback,sizeof(parameters.feedback));
     memcpy(parameters.hover,renderer->hover_marker,sizeof(parameters.hover));
     memcpy(parameters.box,renderer->selection_box,sizeof(parameters.box));
-    char lines[STATS_TEXT_LINES][STATS_LINE_CAPACITY] = {};
-    if (renderer->gpu_frame_ms>0)
-        snprintf(lines[0],sizeof(lines[0]),"GPU %.2f MS WORK %.2f MS",renderer->gpu_frame_ms,renderer->work_frame_ms);
-    else snprintf(lines[0],sizeof(lines[0]),"GPU -- MS WORK -- MS");
-    snprintf(lines[1],sizeof(lines[1]),"FPS %.1f %s",renderer->previous_frame_ms>0 ? MILLISECONDS_PER_SECOND/renderer->previous_frame_ms : 0,
-        state->headless ? "HEADLESS" : state->present_mode==VK_PRESENT_MODE_IMMEDIATE_KHR ? "VSYNC OFF" : "VSYNC ON");
-    snprintf(lines[2],sizeof(lines[2]),"ACQUIRE %.2f PRESENT %.2f MS",renderer->acquire_ms,renderer->present_ms);
-    uint32_t* mask = state->text_mask;
-    memset(mask,0,(STATS_TEXT_WIDTH*STATS_TEXT_HEIGHT+HUD_TEXT_WIDTH*HUD_TEXT_HEIGHT)/TEXT_MASK_BYTE_BITS);
-    for (uint32_t line = 0; line < STATS_TEXT_LINES; ++line)
-        for (uint32_t column = 0; column < STATS_LINE_CAPACITY-1; ++column)
-        {
-            unsigned char character = (unsigned char)lines[line][column];
-            uint32_t glyph = character < FONT_GLYPH_COUNT ? debug_glyphs[character] : 0;
-            for (uint32_t y = 0; y < FONT_GLYPH_HEIGHT; ++y)
-                for (uint32_t x = 0; x < FONT_GLYPH_WIDTH; ++x)
-                    if (glyph & (1u << (y*FONT_GLYPH_WIDTH+x)))
-                        for (uint32_t row = 0; row < STATS_GLYPH_SCALE; ++row)
-                            for (uint32_t col = 0; col < STATS_GLYPH_SCALE; ++col)
-                            {
-                                uint32_t bit = (TEXT_MARGIN+line*STATS_LINE_SPACING+y*STATS_GLYPH_SCALE+row)*STATS_TEXT_WIDTH+TEXT_MARGIN+column*STATS_CHARACTER_SPACING+x*STATS_GLYPH_SCALE+col;
-                                mask[bit/TEXT_MASK_WORD_BITS] |= 1u << (bit%TEXT_MASK_WORD_BITS);
-                            }
-        }
+    uint32_t* mask=state->text_mask;memset(mask,0,sizeof(state->text_mask));
+    ProfileBars bars={};if (renderer->debug_stats) profile_overlay(state,renderer,&bars);
     if (renderer->overlay_enabled)
         for (uint32_t line=0;line<HUD_TEXT_LINES;++line)
             for (uint32_t column=0;column<HUD_MAX_LINE_CHARACTERS && renderer->hud[line][column];++column)
@@ -1300,6 +1353,7 @@ static void draw_debug(RendererState* state, const Renderer* renderer)
                                 }
             }
     memcpy((uint32_t*)state->debug_text.mapped+FONT_GLYPH_COUNT,mask,sizeof(state->text_mask));
+    memcpy((char*)state->debug_text.mapped+FONT_UNIFORM_BYTES+sizeof(state->text_mask),&bars,sizeof(bars));
     vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->debug_overlay_pipeline);
     vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->debug_overlay_layout,
         0,1,&state->debug_descriptors,0,0);
@@ -1532,6 +1586,7 @@ static bool update_meshes(RendererState* state,const Geometry& scene)
 bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera* camera, const char* capture_path)
 {
     RendererState* state = renderer->state;
+    Profiler* profile=&renderer->profiler;double render_start=profiler_clock_ms(),phase_start=render_start;
     if (renderer->debug_views && (!state->debug_available || state->custom_shader))
     {
         fprintf(stderr,"Buffer views require the bundled integrator and an interactive or --debug-views launch.\n");
@@ -1549,6 +1604,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
         if (result != VK_SUBOPTIMAL_KHR && !vk_ok(result, "Acquire window image"))
             return false;
     }
+    double phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_ACQUIRE,phase_start,phase_end);phase_start=phase_end;
     if (!begin_commands(state))
         return false;
     vkCmdResetQueryPool(state->command,state->queries,0,GPU_TIMESTAMP_COUNT);
@@ -1614,6 +1670,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     vkCmdPipelineBarrier(state->command,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         0,1,&host_upload,0,0,0,0);
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_UPLOAD_END);
+    phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_UPLOAD,phase_start,phase_end);phase_start=phase_end;
     VkAccessFlags previous = state->output_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
         ? VK_ACCESS_TRANSFER_READ_BIT : VK_ACCESS_SHADER_WRITE_BIT;
     image_barrier(state->command, state->output, state->output_layout, VK_IMAGE_LAYOUT_GENERAL,
@@ -1751,6 +1808,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
             VK_ACCESS_SHADER_READ_BIT,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
         bloom.pass=0;
     }
+    vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_FOG_END);
     if (state->config.focus_radius>0 && !renderer->debug_views)
     {
         vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->focus_pipeline);
@@ -1771,6 +1829,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
         image_barrier(state->command,state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
             VK_ACCESS_SHADER_READ_BIT,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
     }
+    vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_FOCUS_END);
     vkCmdBindPipeline(state->command, VK_PIPELINE_BIND_POINT_COMPUTE, state->bloom_pipeline);
     vkCmdBindDescriptorSets(state->command, VK_PIPELINE_BIND_POINT_COMPUTE, state->bloom_layout, 0, 1, &state->bloom_descriptors, 0, 0);
     if (bloom.strength>0.0f)
@@ -1796,8 +1855,11 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_OVERLAY_END);
     if (capture_path || !state->headless)
         copy_output(state,image_index,capture_path);
+    vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_COPY_END);
+    phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_RECORD,phase_start,phase_end);phase_start=phase_end;
     if (!submit_commands(state, !state->headless))
         return false;
+    phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_SUBMIT_WAIT,phase_start,phase_end);phase_start=phase_end;
     uint64_t timestamps[GPU_TIMESTAMP_COUNT];
     if (!vk_ok(vkGetQueryPoolResults(state->device, state->queries, 0, GPU_TIMESTAMP_COUNT, sizeof(timestamps),
         timestamps, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT), "Read GPU timestamps"))
@@ -1842,6 +1904,29 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     printf("GPU fog/bloom/display: %.3f ms; total render: %.3f ms\n",bloom_ms,renderer->gpu_frame_ms);
     printf("GPU debug overlay: %.3f ms; buffer views %u; FPS stats %u.\n",debug_ms,
         renderer->debug_views ? 1u : 0u,renderer->debug_stats ? 1u : 0u);
+    static const struct { ProfileNode node;int begin,end; } spans[]={
+        {PROFILE_GPU_FRAME,GPU_TIME_FRAME_BEGIN,GPU_TIME_COPY_END},
+        {PROFILE_GPU_SCENE,GPU_TIME_FRAME_BEGIN,GPU_TIME_VOLUME_END},
+        {PROFILE_ACCELERATION,GPU_TIME_FRAME_BEGIN,GPU_TIME_UPLOAD_END},
+        {PROFILE_BACKDROP,GPU_TIME_UPLOAD_END,GPU_TIME_BACKDROP_END},
+        {PROFILE_SHADOW_GRID,GPU_TIME_BACKDROP_END,GPU_TIME_GRID_END},
+        {PROFILE_SURFACE,GPU_TIME_GRID_END,GPU_TIME_SURFACE_END},
+        {PROFILE_VOLUME,GPU_TIME_SURFACE_END,GPU_TIME_VOLUME_END},
+        {PROFILE_GPU_POST,GPU_TIME_VOLUME_END,GPU_TIME_BLOOM_END},
+        {PROFILE_EFFECTS,GPU_TIME_VOLUME_END,GPU_TIME_EFFECTS_END},
+        {PROFILE_CELL_BLUR,GPU_TIME_EFFECTS_END,GPU_TIME_MEDIUM_BLUR_END},
+        {PROFILE_FOG,GPU_TIME_MEDIUM_BLUR_END,GPU_TIME_FOG_END},
+        {PROFILE_FOCUS,GPU_TIME_FOG_END,GPU_TIME_FOCUS_END},
+        {PROFILE_BLOOM,GPU_TIME_FOCUS_END,GPU_TIME_BLOOM_END},
+        {PROFILE_GPU_OUTPUT,GPU_TIME_BLOOM_END,GPU_TIME_COPY_END},
+        {PROFILE_OVERLAY,GPU_TIME_BLOOM_END,GPU_TIME_OVERLAY_END},
+        {PROFILE_COPY,GPU_TIME_OVERLAY_END,GPU_TIME_COPY_END}
+    };
+    uint64_t mask=state->timestamp_bits<TIMESTAMP_WORD_BITS ? (UINT64_C(1)<<state->timestamp_bits)-1 : UINT64_MAX;
+    for (uint32_t i=0;i<sizeof(spans)/sizeof(spans[0]);++i)
+        profiler_span(profile,spans[i].node,((timestamps[spans[i].begin]-timestamps[GPU_TIME_FRAME_BEGIN])&mask)*scale,
+            ((timestamps[spans[i].end]-timestamps[spans[i].begin])&mask)*scale);
+    phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_READ_TIMES,phase_start,phase_end);phase_start=phase_end;
     state->trace_ms = milliseconds;
     state->volume_ms = volume_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND;
     state->bloom_ms = bloom_ms;
@@ -1864,10 +1949,13 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
             return false;
         present_ms=renderer_ms()-present_start;
     }
+    phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_PRESENT,phase_start,phase_end);phase_start=phase_end;
     renderer->acquire_ms=acquire_ms;renderer->present_ms=present_ms;
     printf("Presentation waits: acquire %.3f ms; present %.3f ms; GPU work %.3f ms.\n",renderer->acquire_ms,renderer->present_ms,renderer->gpu_frame_ms);
     if (capture_path && !capture_image(state, capture_path))
         return false;
+    phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_CAPTURE,phase_start,phase_end);
+    profiler_cpu(profile,PROFILE_RENDER,render_start,phase_end);
     ++renderer->scene_submissions;
     return !state->validation_failed.load();
 }
