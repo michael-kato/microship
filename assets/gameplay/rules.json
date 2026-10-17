@@ -8,7 +8,7 @@
     "enemy_attack_seconds": 140.0
   },
   "ai": {
-    "production_rate": 0.6,
+    "production_rate": 1,
     "expansion_delay": 22.0
   },
   "orbit": {

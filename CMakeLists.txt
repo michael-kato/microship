@@ -244,3 +244,6 @@ set_tests_properties(trails PROPERTIES TIMEOUT 30)
 add_test(NAME fog_memory COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/fog_memory.py $<TARGET_FILE:microship>)
 set_tests_properties(fog_memory PROPERTIES TIMEOUT 45)
+add_test(NAME difficulty COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/difficulty.py $<TARGET_FILE:microship>)
+set_tests_properties(difficulty PROPERTIES TIMEOUT 45)
