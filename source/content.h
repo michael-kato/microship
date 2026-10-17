@@ -32,6 +32,7 @@ struct UnitDefinition
     uint32_t group,targets,secondary_targets,hits;
     float secondary_interval;
     bool colonizes,detaches,trails;
+    Vec3 trail_origin;
     char payload_model[ASSET_PATH_CAPACITY];
     Vec3 payload_sockets[MAX_UNIT_PAYLOADS];
     uint32_t payload_count;

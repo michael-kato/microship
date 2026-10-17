@@ -186,7 +186,7 @@ static bool load_units(Content* c,Json root,const char* path)
     json_object(root,"$schema|units");JsonArray a=json_array(json_get(root,"units"),MAX_UNIT_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|pick_radius|cue_radius|hits|attack|secondary_attack|autonomy|payload");
+        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|trail_origin|pick_radius|cue_radius|hits|attack|secondary_attack|autonomy|payload");
         UnitDefinition u={};definition_name(j,u.name);
         Json attack=json_find(j,"attack");
         if (json_present(attack))
@@ -228,6 +228,8 @@ static bool load_units(Content* c,Json root,const char* path)
         u.pick_radius=json_positive(json_get(j,"pick_radius"),MAX_UNIT_PICK_RADIUS);
         u.cue_radius=json_positive(json_get(j,"cue_radius"),MAX_UNIT_CUE_RADIUS);
         u.hits=json_uint(json_get(j,"hits"),1,MAX_HIT_COUNT);
+        Json trail_origin=json_find(j,"trail_origin");
+        if (json_present(trail_origin)) u.trail_origin=json_vector(trail_origin,-10,10);
         u.colonizes=json_bool(json_get(j,"colonizes"));u.detaches=json_bool(json_get(j,"detaches"));u.trails=json_bool(json_get(j,"trails"));
         Json payload=json_find(j,"payload");
         if (json_present(payload))

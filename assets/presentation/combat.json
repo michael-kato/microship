@@ -7,7 +7,8 @@
     "trail_lifetime": 0.42,
     "flash_seconds": 0.12,
     "pop_seconds": 0.35,
-    "pop_radius": 0.48
+    "pop_radius": 0.48,
+    "trail_length_scale": 0.67
   },
   "damage": {
     "flash": [

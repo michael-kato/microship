@@ -51,13 +51,14 @@ void main()
         }
         else alpha=clamp((s.a.w+EDGE_FEATHER_PIXELS-distance)/EDGE_FEATHER_WIDTH_PIXELS,0.0,1.0);
         float depth=mix(s.a.z,s.b.z,t);
-        if (guide.vertex_hit.w>0.5 && guide.normal_depth.w>0.0 && depth>guide.normal_depth.w+GUIDE_DEPTH_MARGIN)
+        float margin=s.b.w<.5 ? 0.0 : GUIDE_DEPTH_MARGIN;
+        if (guide.vertex_hit.w>0.5 && guide.normal_depth.w>0.0 && depth>guide.normal_depth.w+margin)
             alpha*=guide.vertex_hit.w==THIN_MEMBRANE_GUIDE_CODE ? render.thin_material.x*MEMBRANE_EFFECT_TRANSMISSION : 0.0;
         float strength=s.b.w<.5 ? TRAIL_LIGHT_GAIN : s.b.w<SELECTION_KIND_LOWER_BOUND ? BURST_LIGHT_GAIN : 1.0;
         if (s.b.w>.5 && s.b.w<RING_KIND_LOWER_BOUND)
             alpha+=exp(-distance*distance/max(1.0,s.a.w*s.a.w*BURST_HALO_VARIANCE_SCALE))*BURST_HALO_GAIN;
         vec3 contribution=s.color.rgb*(s.color.a*alpha*strength);
-        bool foreground=s.b.w>SELECTION_KIND_LOWER_BOUND || (guide.normal_depth.w>0.0 && depth<=guide.normal_depth.w+GUIDE_DEPTH_MARGIN);
+        bool foreground=s.b.w>SELECTION_KIND_LOWER_BOUND || (guide.normal_depth.w>0.0 && depth<=guide.normal_depth.w+margin);
         if (render.quality.w>0u && value.a>0.0 && foreground) sharp+=contribution;
         else light+=contribution;
     }

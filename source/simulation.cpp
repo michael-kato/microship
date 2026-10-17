@@ -113,6 +113,31 @@ static Vec3 local_direction(const Unit* u,Vec3 world)
     Vec3 x,y,z;simulation_unit_axes(u,&x,&y,&z);return Vec3{dot(world,x),dot(world,y),dot(world,z)};
 }
 
+static const float SPAWN_SCALE_SECONDS = .25f;
+static const float SPAWN_START_SCALE = .3f;
+static const float SPAWN_GROWTH_SCALE = .7f;
+static const float LANDING_SHRINK_SCALE = .8f;
+float simulation_unit_scale(const Simulation* s,const Unit* unit)
+{
+    float size=simulation_unit_definition(s,unit)->scale;
+    if (!s->world.combat.flight_enabled) return size;
+    float t=unit->hatched ? 1 : std::fmin(1.0f,unit->age/SPAWN_SCALE_SECONDS);t=t*t*(3-2*t);size*=SPAWN_START_SCALE+SPAWN_GROWTH_SCALE*t;
+    if (unit->landing>0) size*=1-LANDING_SHRINK_SCALE*std::fmin(1.0f,unit->landing/s->world.gameplay.landing_seconds);
+    return size;
+}
+
+Vec3 simulation_trail_origin(const Simulation* s,const Unit* unit)
+{
+    Vec3 local=simulation_unit_definition(s,unit)->trail_origin;
+    Vec3 offset=world_direction(unit,local);
+    if (!s->world.combat.flight_enabled)
+    {
+        float yaw=simulation_unit_definition(s,unit)->yaw_degrees*(float)(3.141592653589793/180.0);
+        offset=Vec3{std::cos(yaw)*local.x+std::sin(yaw)*local.z,local.y,-std::sin(yaw)*local.x+std::cos(yaw)*local.z};
+    }
+    return add(unit->position,scale(offset,simulation_unit_scale(s,unit)));
+}
+
 static int home_body(const Simulation* s, Faction faction)
 {
     for (uint32_t i=0;i<s->world.body_count;++i)
@@ -348,7 +373,7 @@ static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,const 
             for (uint32_t j=0;j<s->world.spikes.count;++j) unit.spikes[j]=1;
             for (uint32_t j=0;j<definition->payload_count;++j) unit.payloads[j]=1;
             unit.orbit_phase=unit.generation*GOLDEN_ANGLE_RADIANS;unit.cooldown=(unit.generation%FIRE_COOLDOWN_PHASE_COUNT)*FIRE_COOLDOWN_PHASE_SECONDS;
-            s->trails[i]=Trail();s->trails[i].points[0]=position;s->trails[i].count=1;
+            s->trails[i]=Trail();s->trails[i].points[0]=simulation_trail_origin(s,&unit);s->trails[i].count=1;
             s->units[i]=unit;++s->births;
             sound(s,SOUND_BIRTH,position);
             return true;
@@ -829,7 +854,7 @@ static void advance_visuals(Simulation* s,float dt)
         t->timer+=dt;if (t->timer<v->trail_lifetime/(TRAIL_POINTS-1)) continue;
         t->timer=0;uint32_t count=t->count<TRAIL_POINTS ? t->count : TRAIL_POINTS-1;
         for (uint32_t j=count;j>0;--j) t->points[j]=t->points[j-1];
-        t->points[0]=u->position;t->count=count+1;
+        t->points[0]=simulation_trail_origin(s,u);t->count=count+1;
     }
 }
 

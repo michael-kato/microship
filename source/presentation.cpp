@@ -19,10 +19,6 @@ static const float MIN_VISUAL_MOTION_SQUARED = .000001f;
 static const float MIN_LEGACY_FACTORY_GROWTH = .02f;
 static const double FULL_TURN_RADIANS = 6.283185307179586;
 static const double BACKDROP_AXIS_PHASE_OFFSET = .7;
-static const float SPAWN_SCALE_SECONDS = .25f;
-static const float SPAWN_START_SCALE = .3f;
-static const float SPAWN_GROWTH_SCALE = .7f;
-static const float LANDING_SHRINK_SCALE = .8f;
 static const float SPIKE_AXIS_PARALLEL_LIMIT = .95f;
 static const float EMBEDDED_SPIKE_OUTWARD_SCALE = .7f;
 static const float INJURY_TINT_STRENGTH = .95f;
@@ -130,15 +126,6 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
     return true;
 }
 
-static float unit_visual_scale(const Simulation* s,const Unit* unit)
-{
-    float size=simulation_unit_definition(s,unit)->scale;
-    if (!s->world.combat.flight_enabled) return size;
-    float t=unit->hatched ? 1 : std::fmin(1.0f,unit->age/SPAWN_SCALE_SECONDS);t=t*t*(3-2*t);size*=SPAWN_START_SCALE+SPAWN_GROWTH_SCALE*t;
-    if (unit->landing>0) size*=1-LANDING_SHRINK_SCALE*std::fmin(1.0f,unit->landing/s->world.gameplay.landing_seconds);
-    return size;
-}
-
 static Vec3 posed_direction(Vec3 local,Vec3 x,Vec3 y,Vec3 z)
 { return add(add(scale(x,local.x),scale(y,local.y)),scale(z,local.z)); }
 static uint32_t factory_instance_slot(const Presentation* state,uint32_t cell,uint32_t structure)
@@ -158,7 +145,7 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         const Unit* u=&s->units[i];if (u->health<=0 || !s->visible_units[i]) continue;
-        float size=unit_visual_scale(s,u);Vec3 x,y,z;simulation_unit_axes(u,&x,&y,&z);
+        float size=simulation_unit_scale(s,u);Vec3 x,y,z;simulation_unit_axes(u,&x,&y,&z);
         Color color=u->flash>0 ? s->world.combat.flash : u->wounds ? r->injury[std::min(1u,u->wounds-1)] : content_color(&s->world.content,u->faction);
         if (simulation_unit_definition(s,u)->detaches)
             for (uint32_t j=0;j<r->count;++j)
@@ -250,7 +237,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
         }
         if (s->world.combat.flight_enabled)
         {
-            float size=unit_visual_scale(s,unit);Vec3 x,y,z;simulation_unit_axes(unit,&x,&y,&z);
+            float size=simulation_unit_scale(s,unit);Vec3 x,y,z;simulation_unit_axes(unit,&x,&y,&z);
             set_instance(state,state->unit_base+i,state->unit_meshes[unit->type],unit->position,scale(x,size),scale(y,size),scale(z,size));
             continue;
         }

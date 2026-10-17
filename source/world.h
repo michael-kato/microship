@@ -50,7 +50,7 @@ struct StudioLight { Vec3 direction; Color color; float irradiance; };
 struct CombatVisuals
 {
     bool enabled;
-    float projectile_speed, shot_interval, trail_width, trail_lifetime;
+    float projectile_speed, shot_interval, trail_width, trail_lifetime,trail_length_scale;
     float flash_seconds, pop_seconds, pop_radius;
     float orbit_clearance, orbit_speed;
     bool flight_enabled;

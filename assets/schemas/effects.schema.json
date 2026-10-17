@@ -43,6 +43,11 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 100
+        },
+        "trail_length_scale": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
         }
       },
       "required": [

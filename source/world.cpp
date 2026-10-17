@@ -172,11 +172,14 @@ static bool load_effects(World* w,const char* path)
     Json p=json_find(root,"projectile");
     if (json_present(p))
     {
-        json_object(p,"projectile_speed|shot_interval|trail_width|trail_lifetime|flash_seconds|pop_seconds|pop_radius");
+        json_object(p,"projectile_speed|shot_interval|trail_width|trail_lifetime|trail_length_scale|flash_seconds|pop_seconds|pop_radius");
         w->combat.projectile_speed=json_positive(json_get(p,"projectile_speed"),MAX_EFFECTS_PROJECTILE_SPEED);
         w->combat.shot_interval=json_positive(json_get(p,"shot_interval"),MAX_EFFECTS_SHOT_INTERVAL);
         w->combat.trail_width=json_positive(json_get(p,"trail_width"),1);
         w->combat.trail_lifetime=json_positive(json_get(p,"trail_lifetime"),MAX_EFFECTS_TRAIL_LIFETIME);
+        Json trail_scale=json_find(p,"trail_length_scale");
+        w->combat.trail_length_scale=json_present(trail_scale) ? json_positive(trail_scale,1) : 1;
+
         w->combat.flash_seconds=json_positive(json_get(p,"flash_seconds"),MAX_EFFECTS_FLASH_SECONDS);
         w->combat.pop_seconds=json_positive(json_get(p,"pop_seconds"),MAX_EFFECTS_POP_SECONDS);
         w->combat.pop_radius=json_positive(json_get(p,"pop_radius"),MAX_EFFECTS_POP_RADIUS);

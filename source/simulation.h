@@ -150,6 +150,8 @@ void simulation_production_ratio(Simulation*,uint32_t fighter_percent);
 void simulation_priority_type(Simulation*,uint32_t type);
 bool simulation_write_state(const Simulation* simulation, const char* path);
 Vec3 simulation_spike_direction(uint32_t index,uint32_t count);
+float simulation_unit_scale(const Simulation*,const Unit*);
+Vec3 simulation_trail_origin(const Simulation*,const Unit*);
 void simulation_unit_axes(const Unit*,Vec3* right,Vec3* up,Vec3* forward);
 void simulation_producer_axes(const ProducerDefinition*,Vec3* right,Vec3* up,Vec3* normal);
 Vec3 simulation_structure_position(const Simulation*,uint32_t cell,uint32_t structure);

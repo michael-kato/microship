@@ -71,12 +71,18 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         const Unit* u=&s->units[i];const Trail* t=&s->trails[i];if (u->health<=0 || !simulation_unit_definition(s,u)->trails || !s->visible_units[i]) continue;
-        Vec3 previous=u->position;
+        Vec3 origin=simulation_trail_origin(s,u),previous=origin;float total=0;
         for (uint32_t j=0;j<t->count;++j)
+        { Vec3 d=subtract(t->points[j],previous);total+=std::sqrt(dot(d,d));previous=t->points[j]; }
+        float remaining=total*v->trail_length_scale,target=remaining;previous=origin;
+        for (uint32_t j=0;j<t->count && remaining>0;++j)
         {
-            float fade=1-(float)j/TRAIL_POINTS;
-            segment(output,count,p,previous,t->points[j],v->trail_width*fade,content_color(&s->world.content,u->faction),fade*.5f,0);
-            previous=t->points[j];
+            Vec3 delta=subtract(t->points[j],previous);float distance=std::sqrt(dot(delta,delta));
+            if (distance<=0) continue;
+            float used=std::fmin(remaining,distance),fade=(remaining-.5f*used)/target;
+            Vec3 end=add(previous,scale(delta,used/distance));
+            segment(output,count,p,previous,end,v->trail_width*fade,content_color(&s->world.content,u->faction),fade*.5f,0);
+            previous=end;remaining-=used;
         }
     }
     for (uint32_t i=0;i<MAX_UNITS;++i)
