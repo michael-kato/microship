@@ -128,6 +128,31 @@
               },
               "friendly_fire": {
                 "type": "boolean"
+              },
+              "charge_radius": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 100
+              },
+              "charge_speed": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 8
+              },
+              "charge_acceleration": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 8
+              },
+              "release_hits": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 32
+              },
+              "release_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 10
               }
             },
             "required": [
@@ -177,8 +202,56 @@
                     ]
                   }
                 }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "mode": {
+                      "const": "digest"
+                    }
+                  }
+                },
+                "else": {
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "charge_radius"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "charge_speed"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "charge_acceleration"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "release_hits"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "release_seconds"
+                        ]
+                      }
+                    ]
+                  }
+                }
               }
-            ]
+            ],
+            "dependentRequired": {
+              "release_hits": [
+                "release_seconds"
+              ],
+              "release_seconds": [
+                "release_hits"
+              ]
+            }
           },
           "secondary_attack": {
             "type": "object",
@@ -293,6 +366,24 @@
               "minimum": -10,
               "maximum": 10
             }
+          },
+          "rear_tint": {
+            "type": "object",
+            "properties": {
+              "color": {
+                "$ref": "shared.schema.json#/$defs/color"
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "color",
+              "strength"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

@@ -247,3 +247,7 @@ set_tests_properties(fog_memory PROPERTIES TIMEOUT 45)
 add_test(NAME difficulty COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/difficulty.py $<TARGET_FILE:nanova>)
 set_tests_properties(difficulty PROPERTIES TIMEOUT 45)
+
+add_test(NAME immune_combat COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/immune_combat.py $<TARGET_FILE:nanova>)
+set_tests_properties(immune_combat PROPERTIES TIMEOUT 30)

@@ -78,7 +78,10 @@ with tempfile.TemporaryDirectory(prefix='nanova-growth-') as directory:
     fungus=duel('immune-trial');fungus['spawns']=[dict(type='immune_fighter',position=[0,0,6]),dict(type='swarm_fighter',position=[.35,0,6])]
     for u in fungus['content']['units']:
         if u['name']=='swarm_fighter':u.update(hits=32,health=384,shot_interval=.15,detaches=False)
-        if u['name']=='immune_fighter':u['shot_interval']=.25
+        if u['name']=='immune_fighter':
+            u['shot_interval']=.25
+            # Isolate feeding here. Allied rescue uses the shipping threshold in immune_combat.
+            u['attack']['release_hits']=32
     attached,_=run('digest-attach',fungus,30)
     assert attached['faction_events']['digestions']>0 and any(u['faction']==2 and u['latch']>=0 for u in attached['units'])
     fed,_=run('digest-heal',fungus,240)

@@ -43,6 +43,9 @@ struct UnitDefinition
     float unit_radius,structure_radius,colonize_radius,leash_radius,response_seconds,cruise_fraction;
     AttackMode attack;
     float seek_radius,blast_radius,lifetime;
+    float charge_radius,charge_speed,charge_acceleration,release_seconds;
+    uint32_t release_hits;
+    Color rear_tint;float rear_tint_strength;
     bool friendly_fire;
 };
 struct BranchRules

@@ -108,6 +108,23 @@ bool render_scene_write(const RenderScene* scene,const char* path)
         fprintf(file,"%s{\"triangles\":%u,\"low\":[%.6f,%.6f,%.6f],\"high\":[%.6f,%.6f,%.6f],\"roughness\":[%.6f,%.6f],\"ior\":[%.6f,%.6f]",
             i ? "," : "",m->count,m->low[0],m->low[1],m->low[2],m->high[0],m->high[1],m->high[2],rough_low,rough_high,ior_low,ior_high);
         fprintf(file,",\"subsurface_weight\":[%.6f,%.6f],\"subsurface_radius\":[%.6f,%.6f]",sss_low,sss_high,radius_low,radius_high);
+        float axis_colors[2][3]={};uint32_t axis_counts[2]={};
+        for (uint32_t v=m->first_vertex;v<m->first_vertex+m->vertex_count;++v)
+        {
+            const GpuVertex& vertex=scene->geometry.vertices[v];
+            float t=(vertex.position[2]-m->low[2])/std::fmax(.000001f,m->high[2]-m->low[2]);
+            if (t>.25f && t<.75f) continue;
+            uint32_t side=t<.5f ? 0u : 1u;++axis_counts[side];
+            for (uint32_t c=0;c<3;++c) axis_colors[side][c]+=vertex.color[c];
+        }
+        fprintf(file,",\"axis_colors\":[");
+        for (uint32_t side=0;side<2;++side)
+        {
+            if (side) fprintf(file,",");
+            if (!axis_counts[side]) fprintf(file,"null");
+            else fprintf(file,"[%.6f,%.6f,%.6f]",axis_colors[side][0]/axis_counts[side],axis_colors[side][1]/axis_counts[side],axis_colors[side][2]/axis_counts[side]);
+        }
+        fprintf(file,"]");
         if (m->deformable)
         {
             fprintf(file,",\"deformation\":{\"revision\":%llu,\"vertices\":[",(unsigned long long)m->revision);

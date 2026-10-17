@@ -37,7 +37,8 @@ struct Unit
     uint32_t wounds;
     EmbeddedSpike embedded[MAX_EMBEDDED];
     int32_t latch;
-    uint32_t latch_generation,latch_structure,latch_root_generation;
+    uint32_t latch_generation,latch_structure,latch_root_generation,latch_hits;
+    float latch_recovery;bool charging;
     bool latch_colony;
     Vec3 latch_offset;
 };
@@ -136,10 +137,12 @@ struct Simulation
     char message[SIMULATION_MESSAGE_CAPACITY];
     uint32_t shots, hits, deaths;
     uint32_t avoidance_events,factory_contacts;
-    uint32_t digestions,spore_bursts,digest_heals;
+    uint32_t digestions,spore_bursts,digest_heals,captures,releases;
     uint32_t last_flash_tick,last_low_tick,last_death_tick;
 };
 
+bool simulation_attachment_valid(const Simulation*,const Unit*);
+int32_t simulation_held_by(const Simulation*,uint32_t unit);
 bool simulation_initialize(Simulation* simulation, const char* world_path,uint32_t seed=0);
 void simulation_step(Simulation* simulation);
 void simulation_set_time(Simulation* simulation, double seconds);

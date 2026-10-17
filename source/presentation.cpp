@@ -93,6 +93,18 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
             sources.push_back(MeshSource{b->model_path,b->position,b->scale,0,b->color,0,0,0,0});
         }
         if (!geometry_build(&scene->geometry,sources.data(),(uint32_t)sources.size(),config)) return false;
+        for (uint32_t u=0;u<w->content.unit_count;++u)
+        {
+            const UnitDefinition& d=w->content.units[u];if (d.rear_tint_strength<=0) continue;
+            const MeshRange& mesh=scene->geometry.meshes[p->unit_meshes[u]];
+            const float tint[3]={d.rear_tint.r,d.rear_tint.g,d.rear_tint.b};
+            for (uint32_t v=mesh.first_vertex;v<mesh.first_vertex+mesh.vertex_count;++v)
+            {
+                GpuVertex& vertex=scene->geometry.vertices[v];float t=(vertex.position[2]-mesh.low[2])/std::fmax(.000001f,mesh.high[2]-mesh.low[2]);
+                float weight=d.rear_tint_strength*(1-t*t*(3-2*t));
+                for (uint32_t c=0;c<3;++c) vertex.color[c]*=1-weight+weight*tint[c];
+            }
+        }
         p->unit_base=0;p->body_base=w->gameplay.enabled ? (uint32_t)MAX_UNITS : w->spawn_count;
         p->factory_base=p->body_base+w->body_count;
         p->stem_base=p->factory_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES : 0);

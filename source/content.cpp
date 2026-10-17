@@ -196,12 +196,17 @@ static bool load_units(Content* c,Json root,const char* path)
     json_object(root,"$schema|units");JsonArray a=json_array(json_get(root,"units"),MAX_UNIT_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|trail_origin|pick_radius|cue_radius|hits|attack|secondary_attack|autonomy|payload");
-        UnitDefinition u={};definition_name(j,u.name);
+        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|trail_origin|pick_radius|cue_radius|hits|attack|secondary_attack|autonomy|payload|rear_tint");
+        UnitDefinition u={};definition_name(j,u.name);u.charge_speed=u.charge_acceleration=1;
+        Json rear=json_find(j,"rear_tint");
+        if (json_present(rear))
+        {
+            json_object(rear,"color|strength");u.rear_tint=json_color(json_get(rear,"color"));u.rear_tint_strength=json_float(json_get(rear,"strength"),0,1);
+        }
         Json attack=json_find(j,"attack");
         if (json_present(attack))
         {
-            json_object(attack,"mode|seek_radius|blast_radius|lifetime|friendly_fire");char mode[ASSET_NAME_CAPACITY]={};json_string(json_get(attack,"mode"),mode,ASSET_NAME_CAPACITY);
+            json_object(attack,"mode|seek_radius|blast_radius|lifetime|friendly_fire|charge_radius|charge_speed|charge_acceleration|release_hits|release_seconds");char mode[ASSET_NAME_CAPACITY]={};json_string(json_get(attack,"mode"),mode,ASSET_NAME_CAPACITY);
             if (!strcmp(mode,"digest")) u.attack=ATTACK_DIGEST;
             else if (!strcmp(mode,"spore"))
             {
@@ -210,6 +215,16 @@ static bool load_units(Content* c,Json root,const char* path)
                 u.friendly_fire=json_bool(json_get(attack,"friendly_fire"));
             }
             else if (strcmp(mode,"projectile")) json_error(attack,"unknown attack mode");
+            Json radius=json_find(attack,"charge_radius"),speed=json_find(attack,"charge_speed"),acceleration=json_find(attack,"charge_acceleration");
+            Json hits=json_find(attack,"release_hits"),seconds=json_find(attack,"release_seconds");
+            if (u.attack!=ATTACK_DIGEST && (json_present(radius) || json_present(speed) || json_present(acceleration) || json_present(hits) || json_present(seconds)))
+                json_error(attack,"charge and release parameters require digest mode");
+            if (json_present(radius)) u.charge_radius=json_positive(radius,100);
+            if (json_present(speed)) u.charge_speed=json_float(speed,1,8);
+            if (json_present(acceleration)) u.charge_acceleration=json_float(acceleration,1,8);
+            if (json_present(hits)) u.release_hits=json_uint(hits,1,MAX_HIT_COUNT);
+            if (json_present(seconds)) u.release_seconds=json_positive(seconds,10);
+            if (json_present(hits)!=json_present(seconds)) json_error(attack,"release requires both hits and seconds");
             if (u.attack!=ATTACK_SPORE && (json_present(json_find(attack,"seek_radius")) || json_present(json_find(attack,"blast_radius")) || json_present(json_find(attack,"lifetime")) || json_present(json_find(attack,"friendly_fire"))))
                 json_error(attack,"spore parameters require spore mode");
         }

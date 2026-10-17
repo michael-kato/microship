@@ -642,12 +642,40 @@ static void local_task(Simulation* s,Unit* u,const Vec3* positions,const int32_t
     if (chosen>=0) { u->target=chosen;u->task=TASK_COLONIZE; }
 }
 
+bool simulation_attachment_valid(const Simulation* s,const Unit* u)
+{
+    if (u->health<=0 || u->latch<0) return false;
+    if (u->latch_colony)
+    {
+        if ((uint32_t)u->latch>=s->world.body_count) return false;
+        const Colony& c=s->colonies[u->latch];
+        return c.active && c.generation==u->latch_root_generation && c.faction!=u->faction
+            && u->latch_structure<c.structure_count && structure_health(&c,u->latch_structure)>0
+            && structure_generation(&c,u->latch_structure)==u->latch_generation;
+    }
+    if (u->latch>=MAX_UNITS) return false;
+    const Unit& target=s->units[u->latch];
+    return target.health>0 && target.generation==u->latch_generation && target.faction!=u->faction;
+}
+int32_t simulation_held_by(const Simulation* s,uint32_t unit)
+{
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+        if (!s->units[i].latch_colony && s->units[i].latch==(int32_t)unit && simulation_attachment_valid(s,&s->units[i])) return (int32_t)i;
+    return -1;
+}
+
 static void move_units(Simulation* s, float dt)
 {
     const CombatVisuals* flight=&s->world.combat;
     FlightObstacles obstacles;flight_obstacles(s,&obstacles);
-    Vec3 positions[MAX_UNITS],velocities[MAX_UNITS];
-    for (uint32_t i=0;i<MAX_UNITS;++i) { positions[i]=s->units[i].position;velocities[i]=s->units[i].velocity; }
+    Vec3 positions[MAX_UNITS],velocities[MAX_UNITS];int32_t held_by[MAX_UNITS];
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    { positions[i]=s->units[i].position;velocities[i]=s->units[i].velocity;held_by[i]=-1;s->units[i].charging=false; }
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    {
+        const Unit& u=s->units[i];
+        if (!u.latch_colony && simulation_attachment_valid(s,&u) && held_by[u.latch]<0) held_by[u.latch]=(int32_t)i;
+    }
     // One approach slot per side and cell keeps a group from blocking its own landing point.
     int32_t settlers[MAX_BODIES][MAX_FACTIONS];
     for (uint32_t p=0;p<MAX_BODIES;++p) for (uint32_t f=0;f<MAX_FACTIONS;++f) settlers[p][f]=-1;
@@ -663,23 +691,17 @@ static void move_units(Simulation* s, float dt)
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         Unit* u=&s->units[i];
-        if (u->health<=0 || (u->target<0 && !u->moving)) continue;
+        if (u->health<=0) continue;
+        if (held_by[i]>=0) { u->velocity=Vec3{};u->flight_goal=u->position;continue; }
+        if (u->target<0 && !u->moving) continue;
         const UnitDefinition* definition=simulation_unit_definition(s,u);
         if (u->latch>=0 && !u->moving)
         {
-            bool valid=false;Vec3 point={};
-            if (u->latch_colony && (uint32_t)u->latch<s->world.body_count)
+            if (simulation_attachment_valid(s,u))
             {
-                const Colony& c=s->colonies[u->latch];
-                valid=c.active && c.generation==u->latch_root_generation && c.faction!=u->faction;
-                if (u->latch_structure) valid=valid && c.branches[u->latch_structure-1].health>0 && c.branches[u->latch_structure-1].generation==u->latch_generation;
-                else valid=valid && c.health>0 && c.root_generation==u->latch_generation;
-                if (valid) point=simulation_structure_position(s,u->latch,u->latch_structure);
+                Vec3 point=u->latch_colony ? simulation_structure_position(s,u->latch,u->latch_structure) : positions[u->latch];
+                u->position=add(point,u->latch_offset);u->velocity=Vec3{};u->flight_goal=point;continue;
             }
-            else if (!u->latch_colony && u->latch<MAX_UNITS)
-            { const Unit& target=s->units[u->latch];valid=target.health>0 && target.generation==u->latch_generation && target.faction!=u->faction;point=positions[u->latch]; }
-            if (valid)
-            { u->position=add(point,u->latch_offset);u->velocity=u->latch_colony ? Vec3{} : velocities[u->latch];continue; }
             u->latch=-1;
         }
         Vec3 combat_target={};bool strafe=false;
@@ -757,6 +779,11 @@ static void move_units(Simulation* s, float dt)
         u->flight_goal=goal;
         Vec3 delta=subtract(goal,u->position);float distance=length(delta);
         float speed=definition->speed*((u->task==TASK_PATROL || u->task==TASK_LAUNCH) ? definition->cruise_fraction : 1);
+        u->charging=definition->attack==ATTACK_DIGEST && u->latch_recovery<=0
+            && (u->task==TASK_ATTACK_UNIT || u->task==TASK_ATTACK_STRUCTURE) && distance>definition->range
+            && distance<definition->charge_radius && clear_shot(s,u->position,goal,u->task==TASK_ATTACK_STRUCTURE ? u->attention : NO_BODY);
+        if (u->charging) speed*=definition->charge_speed;
+        float acceleration=flight->acceleration*(u->charging ? definition->charge_acceleration : 1);
         if (flight->flight_enabled)
         {
             Vec3 desired=distance>POSITION_EPSILON ? scale(delta,std::fmin(speed,distance*FLIGHT_POSITION_GAIN)/distance) : Vec3{};
@@ -791,7 +818,7 @@ static void move_units(Simulation* s, float dt)
             desired=flight_avoid(s,obstacles,*u,desired,speed);
             float desired_speed=length(desired);if (desired_speed>speed) desired=scale(desired,speed/desired_speed);
             Vec3 change=subtract(desired,velocities[i]);float change_length=length(change);
-            if (change_length>flight->acceleration*dt) change=scale(change,flight->acceleration*dt/change_length);
+            if (change_length>acceleration*dt) change=scale(change,acceleration*dt/change_length);
             u->velocity=add(velocities[i],change);u->position=add(u->position,scale(u->velocity,dt));
             if (length(u->velocity)>MIN_HEADING_SPEED)
             {
@@ -856,7 +883,7 @@ static void advance_visuals(Simulation* s,float dt)
         if (s->pops[i].duration>0 && (s->pops[i].age+=dt)>=s->pops[i].duration) s->pops[i].duration=0;
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
-        Unit* u=&s->units[i];if (u->health>0) u->age+=dt;u->flash=std::fmax(0.0f,u->flash-dt);u->cooldown=std::fmax(0.0f,u->cooldown-dt);
+        Unit* u=&s->units[i];if (u->health>0) u->age+=dt;u->flash=std::fmax(0.0f,u->flash-dt);u->cooldown=std::fmax(0.0f,u->cooldown-dt);u->latch_recovery=std::fmax(0.0f,u->latch_recovery-dt);
         Trail* t=&s->trails[i];if (u->health<=0 || !simulation_unit_definition(s,u)->trails) { t->count=0;continue; }
         t->timer+=dt;if (t->timer<v->trail_lifetime/(TRAIL_POINTS-1)) continue;
         t->timer=0;uint32_t count=t->count<TRAIL_POINTS ? t->count : TRAIL_POINTS-1;
@@ -962,9 +989,11 @@ static void projectile_combat(Simulation* s,float dt)
         const UnitDefinition* definition=simulation_unit_definition(s,u);
         if (definition->attack==ATTACK_SPORE && u->age>=definition->lifetime)
         { expired[i]=true;continue; }
-        if (u->cooldown>0) continue;
+        if (u->cooldown>0 || (definition->attack==ATTACK_DIGEST && u->latch_recovery>0)) continue;
         int target=-1;bool colony=false;uint32_t structure=0;float nearest=simulation_unit_definition(s,u)->range;
         bool secondary=false;
+        if (definition->attack==ATTACK_DIGEST && simulation_attachment_valid(s,u))
+        { target=u->latch;colony=u->latch_colony;structure=u->latch_structure;secondary=colony ? !(definition->targets&TARGET_STRUCTURES) : !(definition->targets&TARGET_UNITS); }
         for (uint32_t pass=0;pass<2 && target<0;++pass)
         {
         uint32_t targets=pass ? definition->secondary_targets : definition->targets;
@@ -991,6 +1020,7 @@ static void projectile_combat(Simulation* s,float dt)
         {
             ++hit_count[colony ? structure_slot(target,structure) : (uint32_t)target];
             digest_heal[i]=true;++s->digestions;++s->hits;
+            if (!simulation_attachment_valid(s,u)) { u->latch_hits=0;++s->captures; }
             u->latch=target;u->latch_colony=colony;u->latch_structure=structure;
             u->latch_generation=colony ? structure_generation(&s->colonies[target],structure) : s->units[target].generation;
             u->latch_root_generation=colony ? s->colonies[target].generation : 0;
@@ -1114,6 +1144,15 @@ static void projectile_combat(Simulation* s,float dt)
                 float maximum=simulation_unit_definition(s,u)->health;
                 u->health=maximum*(simulation_unit_definition(s,u)->hits-u->wounds)/simulation_unit_definition(s,u)->hits;
                 if (hit_count[i]>0) u->damage_age=u->heal_timer=0;
+            }
+            if (hit_count[i]>0 && u->latch>=0 && simulation_unit_definition(s,u)->release_hits)
+            {
+                u->latch_hits+=hit_count[i];
+                if (u->health<=0 || u->latch_hits>=simulation_unit_definition(s,u)->release_hits)
+                {
+                    u->latch=-1;u->latch_hits=0;u->charging=false;
+                    u->latch_recovery=simulation_unit_definition(s,u)->release_seconds;++s->releases;
+                }
             }
             if (hit_count[i]>0) u->flash=v->flash_seconds;
             if (u->health>0 && hit_count[i]>0)
@@ -1415,7 +1454,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
     FILE* file=fopen(path,"wb");if (!file) { fprintf(stderr,"Cannot write state '%s'.\n",path);return false; }
     fprintf(file,"{\"tick\":%u,\"time\":%.9f,\"outcome\":%d,\"births\":%u,\"losses\":%u,\"landings\":%u,\"blocked_landings\":%u,",
         s->tick_count,s->time_seconds,s->outcome,s->births,s->losses,s->landings,s->blocked_landings);
-    fprintf(file,"\"faction_events\":{\"digestions\":%u,\"digest_heals\":%u,\"spore_bursts\":%u},\"sound_events\":{",s->digestions,s->digest_heals,s->spore_bursts);
+    fprintf(file,"\"faction_events\":{\"digestions\":%u,\"digest_heals\":%u,\"spore_bursts\":%u,\"captures\":%u,\"releases\":%u},\"sound_events\":{",s->digestions,s->digest_heals,s->spore_bursts,s->captures,s->releases);
     for (uint32_t i=0;i<SOUND_COUNT;++i) fprintf(file,"%s\"%s\":%u",i ? "," : "",sound_name(i),s->sounds.totals[i]);
     uint32_t fragments=0;for (uint32_t i=0;i<MAX_LIMB_DEBRIS;++i) fragments+=s->debris[i].seconds>0;
     fprintf(file,"},\"sound_dropped\":%u,\"fractures\":{\"limbs\":%u,\"fragments\":%u,\"replaced\":%u},\"colonies\":[",s->sounds.dropped,s->limbs_broken,fragments,s->debris_replaced);
@@ -1477,6 +1516,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
             static const char* tasks[]={"patrol","move","attack-unit","attack-structure","colonize","launch"};
             fprintf(file,",\"task\":\"%s\",\"attention\":%d,\"attention_generation\":%u,\"commanded\":%s,\"flight_goal\":[%.6f,%.6f,%.6f]",
                 tasks[u->task],u->attention,u->attention_generation,u->commanded ? "true" : "false",u->flight_goal.x,u->flight_goal.y,u->flight_goal.z);
+            fprintf(file,",\"held_by\":%d,\"charging\":%s,\"latch_hits\":%u,\"latch_recovery\":%.6f",simulation_held_by(s,i),u->charging ? "true" : "false",u->latch_hits,u->latch_recovery);
             fprintf(file,",\"type\":\"%s\",\"latch\":%d,\"latch_generation\":%u,\"latch_colony\":%s}",simulation_unit_definition(s,u)->name,u->latch,u->latch_generation,u->latch_colony ? "true" : "false");first=false;
         }
     fprintf(file,"],\"projectile_state\":[");first=true;
