@@ -218,7 +218,8 @@ static bool load_appearance(World* w,const char* path)
     Json atmosphere=json_find(root,"atmosphere");
     if (json_present(atmosphere))
     {
-        json_object(atmosphere,"center|radius|edge_fade|scattering|absorption|anisotropy");
+        json_object(atmosphere,"center|radius|edge_fade|scattering|absorption|anisotropy|shadows");
+        Json shadows=json_find(atmosphere,"shadows");w->atmosphere_shadows=!json_present(shadows) || json_bool(shadows);
         w->atmosphere_center=json_vector(json_get(atmosphere,"center"),-MAX_BACKDROP_COORDINATE,MAX_BACKDROP_COORDINATE);
         w->atmosphere_radius=json_positive(json_get(atmosphere,"radius"),MAX_BACKDROP_SCALE);
         w->atmosphere_fade=json_float(json_get(atmosphere,"edge_fade"),0,1);
@@ -229,7 +230,8 @@ static bool load_appearance(World* w,const char* path)
     Json fog=json_find(root,"fog");
     if (json_present(fog))
     {
-        json_object(fog,"blur_radius|sight_feather|plane_z");
+        json_object(fog,"blur_radius|sight_feather|plane_z|tint");
+        Json tint=json_find(fog,"tint");w->fog_tint=json_present(tint) ? json_color(tint) : Color{1,1,1};
         w->fog_blur=json_float(json_get(fog,"blur_radius"),1,256);
         w->fog_feather=json_positive(json_get(fog,"sight_feather"),100);
         w->fog_plane_z=json_float(json_get(fog,"plane_z"),-MAX_BACKDROP_COORDINATE,MAX_BACKDROP_COORDINATE);

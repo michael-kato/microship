@@ -299,6 +299,9 @@
           "type": "number",
           "minimum": -0.95,
           "maximum": 0.95
+        },
+        "shadows": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -328,6 +331,9 @@
           "type": "number",
           "minimum": -1000000,
           "maximum": 1000000
+        },
+        "tint": {
+          "$ref": "shared.schema.json#/$defs/color"
         }
       },
       "required": [

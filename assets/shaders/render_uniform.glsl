@@ -19,4 +19,5 @@ layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
     vec4 backdrop_style, backdrop_animation;
     vec4 studio_direction[3],studio_color[3],thin_material,backdrop_wave;
     vec4 fog; // Blur radius in pixels, sight feather in world units, map plane Z.
+    vec4 fog_tint;
 } render;

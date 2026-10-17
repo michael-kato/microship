@@ -41,5 +41,5 @@ void main()
     }
     sum/=weights;
     if (fog_pass.pass==0) imageStore(scratch,pixel,vec4(sum,1));
-    else imageStore(beauty,pixel,vec4(mix(imageLoad(beauty,pixel).rgb,sum,fog_amount(pixel)),1));
+    else imageStore(beauty,pixel,vec4(mix(imageLoad(beauty,pixel).rgb,sum*render.fog_tint.rgb,fog_amount(pixel)),1));
 }

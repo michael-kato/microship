@@ -91,11 +91,12 @@ struct World
     float backdrop_pulse, backdrop_period;
     Vec3 backdrop_wave; // Ray-warp amplitude, spatial frequency, angular speed.
     bool backdrop_wave_set;
-    bool atmosphere_enabled;
+    bool atmosphere_enabled,atmosphere_shadows;
     Vec3 atmosphere_center;
     float atmosphere_radius,atmosphere_fade,atmosphere_absorption,atmosphere_phase;
     Color atmosphere_scattering;
     float fog_blur,fog_feather,fog_plane_z;
+    Color fog_tint;
     StudioLight studio[3];
     uint32_t studio_mask;
     float thin_transmission, thin_absorption;

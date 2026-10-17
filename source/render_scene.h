@@ -12,11 +12,11 @@ struct RenderInstance
     float transform[3][4];
     uint32_t mesh, mask;
     bool background;
-    float style[INSTANCE_STYLE_FLOATS]; // RGB tint, weight; emission, target roughness, roughness weight, reserved.
+    float style[INSTANCE_STYLE_FLOATS]; // RGB tint, weight; emission, target roughness, roughness weight, unshadowed.
 };
 struct RenderMedium
 {
-    float center_radius[4], scattering[4], absorption_phase[4];
+    float center_radius[4], scattering[4], absorption_phase[4],lighting[4]; // lighting.x enables geometry shadows.
 };
 enum { MAX_RENDER_SIGHT=272 };
 struct RenderSight { float center_radius[4]; };
@@ -34,6 +34,7 @@ struct RenderScene
     RenderSight sight[MAX_RENDER_SIGHT];
     uint32_t sight_count;
     float fog_blur,fog_feather,fog_plane_z;
+    Color fog_tint;
     Color ambient, ambient_top, ambient_bottom;
     RenderLight lights[3];
     float thin_transmission, thin_absorption, thin_clarity;

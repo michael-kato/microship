@@ -25,8 +25,8 @@
 #include "../assets/shaders/hud_layout.glsl"
 
 static const int GPU_VERTEX_BYTES = 48;
-static const int GPU_MEDIUM_BYTES = 48;
-static const int GPU_RENDER_UNIFORM_BYTES = 432;
+static const int GPU_MEDIUM_BYTES = 64;
+static const int GPU_RENDER_UNIFORM_BYTES = 448;
 static const int GPU_DEBUG_PUSH_BYTES = 128;
 static const double MILLISECONDS_PER_SECOND = 1000.0;
 static const double BINARY_UNIT_SCALE = 1024.0;
@@ -83,7 +83,7 @@ struct RenderUniform
     uint32_t background_quality[4];
     float backdrop_style[4], backdrop_animation[4];
     float studio_direction[3][4], studio_color[3][4], thin_material[4], backdrop_wave[4];
-    float fog[4];
+    float fog[4],fog_tint[4];
 };
 
 static_assert(sizeof(GpuVertex) == GPU_VERTEX_BYTES, "Vertex shader layout");
@@ -674,6 +674,7 @@ static void scene_uniform(RenderUniform* uniform,const RenderScene* scene)
     memcpy(uniform->scene_min,scene->bounds_min,3*sizeof(float));memcpy(uniform->scene_max,scene->bounds_max,3*sizeof(float));
     memcpy(uniform->foreground_min,scene->foreground_min,3*sizeof(float));memcpy(uniform->foreground_max,scene->foreground_max,3*sizeof(float));
     uniform->scene[1]=(uint32_t)scene->media.size();uniform->scene[2]=scene->sight_count;
+    uniform->fog_tint[0]=scene->fog_tint.r;uniform->fog_tint[1]=scene->fog_tint.g;uniform->fog_tint[2]=scene->fog_tint.b;
     uniform->fog[0]=scene->fog_blur;uniform->fog[1]=scene->fog_feather;uniform->fog[2]=scene->fog_plane_z;
 }
 

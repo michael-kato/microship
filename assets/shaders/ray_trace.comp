@@ -68,6 +68,7 @@ struct Medium
     vec4 center_radius;
     vec4 scattering; // RGB coefficient; W outer fade fraction.
     vec4 absorption_phase;
+    vec4 lighting;
 };
 layout(set = 0, binding = RENDER_BINDING_MEDIA, std430) readonly buffer MediaBuffer { Medium media[]; };
 layout(set = 0, binding = RENDER_BINDING_ENERGY, std430) readonly buffer EnergyBuffer { float ggx_energy[]; };
@@ -211,7 +212,8 @@ vec3 volume_light(vec3 point,vec3 view_direction,Medium medium)
         if (render.studio_direction[light].w<=0.0) continue;
         vec3 direction=render.studio_direction[light].xyz;
         float phase=henyey_greenstein(clamp(dot(view_direction,direction),-1.0,1.0),medium.absorption_phase.w);
-        incident+=phase*render.studio_color[light].rgb*studio_visibility(point,direction);
+        vec3 visibility=medium.lighting.x>0.0 ? studio_visibility(point,direction) : transmittance(point,direction,RAY_MAX);
+        incident+=phase*render.studio_color[light].rgb*visibility;
     }
     return medium.scattering.rgb*incident;
 }
@@ -304,7 +306,7 @@ struct Surface
 {
     vec3 point, normal, geometric_normal, color;
     float roughness, ior, emission;
-    bool metal,translucent;
+    bool metal,translucent,unshadowed;
 };
 
 bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surface surface)
@@ -350,6 +352,7 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
     vec4 tint=instance_style[hit_instance].tint;
     surface.color=mix(surface.color,tint.rgb,tint.a);
     surface.emission+=instance_style[hit_instance].material.x;
+    surface.unshadowed=instance_style[hit_instance].material.w>0.0;
     if (surface.translucent) surface.roughness=mix(surface.roughness,instance_style[hit_instance].material.y,instance_style[hit_instance].material.z);
     return true;
 }
@@ -397,7 +400,7 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected)
     vec3 origin=s.point+s.geometric_normal*(geometric_cosine>0.0 ? point_epsilon(s.point) : -point_epsilon(s.point));
     vec3 weighted=f*abs(cosine)*render.studio_color[selected].rgb;
     if (max(weighted.r,max(weighted.g,weighted.b))<=0.0) return vec3(0);
-    return weighted*studio_visibility(origin,direction);
+    return weighted*(s.unshadowed ? vec3(1) : studio_visibility(origin,direction));
 }
 
 const float COSINE_GRADIENT_DENOMINATOR=3.0;

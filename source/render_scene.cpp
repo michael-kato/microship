@@ -47,6 +47,9 @@ bool render_scene_validate(const RenderScene* scene)
         && std::isfinite(scene->time_seconds) && scene->sight_count<=MAX_RENDER_SIGHT
         && std::isfinite(scene->fog_blur) && scene->fog_blur>=0 && scene->fog_blur<=256
         && std::isfinite(scene->fog_feather) && (scene->fog_blur==0 || scene->fog_feather>0) && std::isfinite(scene->fog_plane_z);
+    valid=valid && std::isfinite(scene->fog_tint.r) && scene->fog_tint.r>=0 && scene->fog_tint.r<=1
+        && std::isfinite(scene->fog_tint.g) && scene->fog_tint.g>=0 && scene->fog_tint.g<=1
+        && std::isfinite(scene->fog_tint.b) && scene->fog_tint.b>=0 && scene->fog_tint.b<=1;
     for (uint32_t i=0;valid && i<scene->sight_count;++i)
         for (uint32_t j=0;j<4;++j) valid=valid && std::isfinite(scene->sight[i].center_radius[j]) && (j<3 || scene->sight[i].center_radius[j]>0);
     for (uint32_t i=0;valid && i<scene->instances.size();++i)
@@ -62,8 +65,8 @@ bool render_scene_validate(const RenderScene* scene)
         const RenderMedium* m=&scene->media[i];
         for (uint32_t j=0;j<4;++j)
             valid=valid && std::isfinite(m->center_radius[j]) && std::isfinite(m->scattering[j])
-                && std::isfinite(m->absorption_phase[j]);
-        valid=valid && m->center_radius[3]>=0 && m->scattering[3]>=0 && m->scattering[3]<=1;
+                && std::isfinite(m->absorption_phase[j]) && std::isfinite(m->lighting[j]);
+        valid=valid && (m->lighting[0]==0 || m->lighting[0]==1) && m->center_radius[3]>=0 && m->scattering[3]>=0 && m->scattering[3]<=1;
     }
     for (uint32_t axis=0;axis<3;++axis)
         valid=valid && std::isfinite(scene->bounds_min[axis]) && std::isfinite(scene->bounds_max[axis])
@@ -125,7 +128,9 @@ bool render_scene_write(const RenderScene* scene,const char* path)
         const RenderMedium* m=&scene->media[i];
         fprintf(file,"%s[%.6f,%.6f,%.6f,%.6f]",i ? "," : "",m->center_radius[0],m->center_radius[1],m->center_radius[2],m->center_radius[3]);
     }
-    fprintf(file,"],\"fog\":{\"blur_radius\":%.6f,\"sight_feather\":%.6f,\"plane_z\":%.6f,\"sight\":[",scene->fog_blur,scene->fog_feather,scene->fog_plane_z);
+    fprintf(file,"],\"medium_shadows\":[");
+    for (uint32_t i=0;i<scene->media.size();++i) fprintf(file,"%s%s",i ? "," : "",scene->media[i].lighting[0]>0 ? "true" : "false");
+    fprintf(file,"],\"fog\":{\"blur_radius\":%.6f,\"sight_feather\":%.6f,\"plane_z\":%.6f,\"tint\":[%.6f,%.6f,%.6f],\"sight\":[",scene->fog_blur,scene->fog_feather,scene->fog_plane_z,scene->fog_tint.r,scene->fog_tint.g,scene->fog_tint.b);
     for (uint32_t i=0;i<scene->sight_count;++i)
     { const float* v=scene->sight[i].center_radius;fprintf(file,"%s[%.6f,%.6f,%.6f,%.6f]",i ? "," : "",v[0],v[1],v[2],v[3]); }
     fprintf(file,"]},\"bounds_min\":[%.6f,%.6f,%.6f],\"bounds_max\":[%.6f,%.6f,%.6f],\"effects\":%u}\n",

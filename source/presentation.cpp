@@ -330,7 +330,7 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
     static_assert(MAX_RENDER_SIGHT>=MAX_UNITS+MAX_BODIES,"Sight source capacity");
     if (!presentation_update_membranes(p,s)) return false;
     scene->sight_count=0;scene->fog_blur=w->sight_radius>0 ? w->fog_blur : 0;
-    scene->fog_feather=w->fog_feather;scene->fog_plane_z=w->fog_plane_z;
+    scene->fog_tint=w->fog_tint;scene->fog_feather=w->fog_feather;scene->fog_plane_z=w->fog_plane_z;
     if (scene->fog_blur>0)
     {
         for (uint32_t i=0;i<w->body_count;++i)
@@ -362,7 +362,7 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
         {
             medium->center_radius[0]=w->atmosphere_center.x;medium->center_radius[1]=w->atmosphere_center.y;medium->center_radius[2]=w->atmosphere_center.z;medium->center_radius[3]=w->atmosphere_radius;
             medium->scattering[0]=w->atmosphere_scattering.r;medium->scattering[1]=w->atmosphere_scattering.g;medium->scattering[2]=w->atmosphere_scattering.b;medium->scattering[3]=w->atmosphere_fade;
-            medium->absorption_phase[0]=medium->absorption_phase[1]=medium->absorption_phase[2]=w->atmosphere_absorption;medium->absorption_phase[3]=w->atmosphere_phase;
+            medium->absorption_phase[0]=medium->absorption_phase[1]=medium->absorption_phase[2]=w->atmosphere_absorption;medium->absorption_phase[3]=w->atmosphere_phase;medium->lighting[0]=w->atmosphere_shadows ? 1.0f : 0.0f;
             continue;
         }
         const Body* c=&w->bodies[p->medium_bodies[i]];
@@ -371,7 +371,7 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
         medium->scattering[0]=c->interior_scattering.r;medium->scattering[1]=c->interior_scattering.g;medium->scattering[2]=c->interior_scattering.b;
         medium->scattering[3]=c->interior_fade;
         medium->absorption_phase[0]=medium->absorption_phase[1]=medium->absorption_phase[2]=c->interior_absorption;
-        medium->absorption_phase[3]=c->interior_anisotropy;
+        medium->absorption_phase[3]=c->interior_anisotropy;medium->lighting[0]=1;
     }
     if (w->gameplay.enabled) update_gameplay_instances(p,s);
     else
@@ -394,6 +394,7 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
             Vec3{stretch.x,0,0},Vec3{0,stretch.y,0},Vec3{0,0,1});
         scene->instances[p->background_slot].mask=w->backdrop_soft ? 4 : 1;
         scene->instances[p->background_slot].background=true;
+        scene->instances[p->background_slot].style[7]=1;
     }
     render_scene_bounds(scene);
     return effects_build(s,camera,config,scene->effects.data(),&scene->effect_count,scene->effect_tiles.data(),scene->tile_count);

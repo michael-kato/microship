@@ -98,16 +98,22 @@
     "radius": 160,
     "edge_fade": 0.2,
     "scattering": [
-      0.003,
       0.0045,
-      0.006
+      0.0013,
+      0.0018
     ],
     "absorption": 0.0007,
-    "anisotropy": 0.45
+    "anisotropy": 0.45,
+    "shadows": false
   },
   "fog": {
     "blur_radius": 96,
     "sight_feather": 2,
-    "plane_z": 0
+    "plane_z": 0,
+    "tint": [
+      0.34,
+      0.09,
+      0.13
+    ]
   }
 }

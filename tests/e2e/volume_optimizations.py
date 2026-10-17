@@ -16,11 +16,12 @@ from authored_assets import stage_world,write_world
 from save_progress import archive_capture
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('binary',type=Path)
-parser.add_argument('--case',choices=('near','normal','boundary','overlap','thin','opaque','live'),default='near')
+parser.add_argument('--case',choices=('near','normal','boundary','overlap','thin','opaque','solid','live'),default='near')
 parser.add_argument('--baseline',type=Path,help='Executable with its bundled assets for a before/after comparison')
 parser.add_argument('--variants',nargs='+',choices=('baseline','current'),default=('current',))
 parser.add_argument('--output',type=Path,default=root/'build/volume-opt-review')
 parser.add_argument('--frames',type=int,choices=(1,2),default=1)
+parser.add_argument('--atmosphere-shadows',choices=('on','off'),help='Override geometry shadows for the global medium')
 parser.add_argument('--timing',action='store_true',help='Disable host validation for GPU stage timings')
 mode=parser.add_mutually_exclusive_group();mode.add_argument('--run',action='store_true');mode.add_argument('--cpu',action='store_true')
 args=parser.parse_args();out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
@@ -30,6 +31,9 @@ data=stage_world(root/'assets/levels/biology-virus.json',out)
 config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3
 assert config['output']['width']==1920 and config['output']['height']==1080
 assert config['volume']==dict(rays_per_pixel=1,integration_steps=8)
+if args.atmosphere_shadows:data['appearance']['atmosphere']['shadows']=args.atmosphere_shadows=='on'
+if args.case=='solid':
+    data['appearance']['backdrop'].pop('soft');data['appearance']['backdrop'].pop('wave',None);data['appearance']['backdrop']['samples']=1;data['rules'].pop('exploration',None)
 ticks=4800
 if args.case=='boundary':
     data['appearance']['atmosphere'].update(center=data['bodies'][0]['position'],radius=26,edge_fade=.4)
