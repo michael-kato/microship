@@ -19,6 +19,11 @@ with tempfile.TemporaryDirectory(prefix='nanova-polish-') as directory:
     config=out/'camera.json'
     config.write_text(json.dumps(change(json.loads((root/'assets/rendering/biology.json').read_text()),'camera.position',[0,11,36])))
     world=root/'tests/e2e/scenes/biology-two-virus.json'
+    authored=established_world(world,out);definitions={u['name']:u for u in authored['content']['units']}
+    acceleration=authored['rules']['flight']['acceleration']
+    def speed_limit(u):
+        definition=definitions[u['type']]
+        return definition['speed']*definition.get('attack',{}).get('charge_speed',1)
     def run(name,ticks=1,orders='',extra=(),scene=world,expected=0):
         global count
         state=out/(name+'.json');replay=out/(name+'.orders');replay.write_text(orders)
@@ -56,19 +61,20 @@ with tempfile.TemporaryDirectory(prefix='nanova-polish-') as directory:
         assert data['order']=={'cell':0,'tick':0,'count':1}
         assert any(abs(u['bank'])>.01 for u in data['units'] if u['kind']==0),'No banking'
         for u in data['units']:
-            speed=3.5 if u['kind']==0 else 2.5
+            speed=speed_limit(u)
             assert math.sqrt(dot(u['velocity'],u['velocity']))<=speed+.0001
     for before,after in zip(snapshots,snapshots[1:]):
         previous={u['generation']:u for u in before['units']}
         for u in after['units']:
             if u['generation'] in previous:
                 # Attached units follow their target. These are flight bounds.
-                if u['latch']>=0 or previous[u['generation']]['latch']>=0:continue
+                if u['latch']>=0 or previous[u['generation']]['latch']>=0 or u['held_by']>=0 or previous[u['generation']]['held_by']>=0:continue
                 distance=sub(u['position'],previous[u['generation']]['position'])
-                speed=3.5 if u['kind']==0 else 2.5
+                speed=speed_limit(u)
                 assert math.sqrt(dot(distance,distance))<=speed/60+.002,'Visible flight jumped'
                 delta=sub(u['velocity'],previous[u['generation']]['velocity'])
-                assert math.sqrt(dot(delta,delta))<=9/60+.00001,'Acceleration exceeded authored bound'
+                boost=definitions[u['type']].get('attack',{}).get('charge_acceleration',1) if u['charging'] or previous[u['generation']]['charging'] else 1
+                assert math.sqrt(dot(delta,delta))<=acceleration*boost/60+.00001,'Acceleration exceeded authored bound'
     selected,_=run('selection-order',2,'0 select fighters\n0 order 1\n')
     assert selected['order']['count']==6 and sum(u['selected'] for u in selected['units'])==6
     assert all(u['target']==1 for u in selected['units'] if u['selected'])
