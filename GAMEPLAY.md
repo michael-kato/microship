@@ -50,7 +50,7 @@ Audio uses twelve generated PCM effects and a fixed sixteen-voice mixer. Off-scr
 | Right-click open space | Move selected craft and scout |
 | Right-click a known cell | Attack, orbit, or establish a factory |
 | Click your factory cell, then drag its slider | Set the fighter / bomber production ratio |
-| F / B | Set production to fighters only / bombers only |
+| F / B | Select your fighters / bombers on screen |
 | Home | Focus the selected cell or starting cell |
 | Space / R | Pause / restart |
 | F1 / F2 | Show timing data / current render buffers |
@@ -71,4 +71,4 @@ Immune craft accelerate toward an enemy inside 5.5 world units, with 3.5 times t
 
 Selected units show a faint line to their current movement or attack target. The line follows a visible, valid combat target. Attached units and held victims have no target line. Selection does not change an order. `target_line.width` and `alpha` in the effects file control the line.
 
-Keyboard camera speed is twelve world units per second, set by `camera.keyboard_pan_speed`. Diagonal movement has the same speed as movement along one axis. Opposing directions cancel. WASD and arrow keys can be used together. Movement stops when the game loses focus. S moves the camera down; B sets bomber production.
+Keyboard camera speed is twelve world units per second, set by `camera.keyboard_pan_speed`. Diagonal movement has the same speed as movement along one axis. Opposing directions cancel. WASD and arrow keys can be used together. Movement stops when the game loses focus. S moves the camera down. F and B replace the selection with your fighters or bombers in the current gameplay view. Craft behind the camera, outside the view, or behind the bottom HUD are excluded. These keys do not change production. The 1, 2, and 3 keys select across the map.

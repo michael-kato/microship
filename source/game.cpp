@@ -131,25 +131,26 @@ static void ratio_pointer(Game* game,PointerInput* input,const RenderConfig* con
     if (input->pointer_released || input->pointer_cancelled || !input->pointer_held) game->ratio_dragging=false;
 }
 
-static void select_box(Game* game,const RenderConfig* config,bool additive)
+static void select_rectangle(Game* game,const RenderConfig* config,bool additive,int group,
+    int left,int top,int right_edge,int bottom)
 {
     Simulation* s=&game->simulation;
     if (s->world.content.factions[s->world.player_faction].automatic) return;
     Vec3 forward=normalize(subtract(game->camera.target,game->camera.position));
     Vec3 right=normalize(cross(forward,game->camera.up)),up=cross(right,forward);
     float focal=config->height/(2*std::tan(config->vertical_fov_degrees*HALF_DEGREES_TO_RADIANS));
-    int left=std::min(game->box[0],game->box[2]),top=std::min(game->box[1],game->box[3]);
-    int right_edge=std::max(game->box[0],game->box[2]),bottom=std::max(game->box[1],game->box[3]);
+    uint32_t count=0;
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         Unit* u=&s->units[i];
         if (!additive) u->selected=false;
-        if (u->health<=0 || u->faction!=s->world.player_faction) continue;
+        if (u->health<=0 || u->faction!=s->world.player_faction || (group>=0 && (int)simulation_unit_definition(s,u)->group!=group)) continue;
         Vec3 offset=subtract(u->position,game->camera.position);float depth=dot(offset,forward);
         if (depth<=0) continue;
         float x=config->width*.5f+dot(offset,right)*focal/depth,y=config->height*.5f-dot(offset,up)*focal/depth;
-        if (x>=left && x<=right_edge && y>=top && y<=bottom) u->selected=true;
+        if (x>=left && x<=right_edge && y>=top && y<=bottom) { u->selected=true;++count; }
     }
+    if (group>=0) snprintf(s->message,sizeof(s->message),"SELECTED %u %s ON SCREEN",count,s->world.content.groups[group].plural);
 }
 
 static void selection_input(Game* game,PointerInput* input,const RenderConfig* config)
@@ -171,7 +172,13 @@ static void selection_input(Game* game,PointerInput* input,const RenderConfig* c
     game->box_moved=game->box_moved || input->pointer_moved;
     if (input->pointer_released)
     {
-        if (game->box_moved) { select_box(game,config,input->additive);input->click=false; }
+        if (game->box_moved)
+        {
+            select_rectangle(game,config,input->additive,-1,
+                std::min(game->box[0],game->box[2]),std::min(game->box[1],game->box[3]),
+                std::max(game->box[0],game->box[2]),std::max(game->box[1],game->box[3]));
+            input->click=false;
+        }
         game->box_dragging=false;
     }
 }
@@ -182,7 +189,6 @@ static void gameplay_input(Game* game, PointerInput* input, const RenderConfig* 
     if (input->restart) { *s=game->initial_simulation;game->ratio_dragging=false;startup_camera(game,config); }
     if (input->pause) s->paused=!s->paused;
     if (input->group) simulation_select(s,input->group==3 ? -1 : (int)input->group-1);
-    if (input->priority) simulation_priority(s,(int)input->priority-1);
     if (input->focus)
     {
         int p=s->selected_body;
@@ -191,6 +197,9 @@ static void gameplay_input(Game* game, PointerInput* input, const RenderConfig* 
         if (p>=0)
         { Vec3 offset=subtract(game->camera.position,game->camera.target);game->camera.target=s->world.bodies[p].position;game->camera.position=add(game->camera.target,offset); }
     }
+    if (input->screen_group)
+        select_rectangle(game,config,false,(int)input->screen_group-1,
+            0,0,(int)config->width-1,(int)config->height-HUD_BOTTOM_BAND_HEIGHT-1);
     if (!input->click && !input->command) return;
     if ((input->click || input->command) && (input->click ? input->click_y : input->command_y)>=(int)config->height-HUD_BOTTOM_BAND_HEIGHT)
     {
@@ -267,7 +276,7 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     snprintf(r->hud[HUD_LINE_TITLE],HUD_LINE_CAPACITY,"NANOVA / %s     FLEET %u     SELECTED %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet,selected);
     snprintf(r->hud[HUD_LINE_GROUPS],HUD_LINE_CAPACITY,"1 %-10s %-5u 2 %-10s %-5u 3 ALL",s->world.content.groups[0].plural,groups[0],s->world.content.groups[1].plural,groups[1]);
     snprintf(r->hud[HUD_LINE_MESSAGE],HUD_LINE_CAPACITY,"%.55s",s->outcome ? (s->outcome>0 ? "YOU WON / KEEP PLAYING / R TO RESTART" : "COLONY LOST / R TO RESTART") : s->message);
-    snprintf(r->hud[HUD_LINE_HELP],HUD_LINE_CAPACITY,"RIGHT CLICK: ORDER   HOME: FOCUS   SPACE: PAUSE");
+    snprintf(r->hud[HUD_LINE_HELP],HUD_LINE_CAPACITY,"F/B: ON SCREEN   RIGHT CLICK: ORDER   SPACE: PAUSE");
     snprintf(r->hud[HUD_LINE_SITE],HUD_LINE_CAPACITY,"SELECT A BODY");
     snprintf(r->hud[HUD_LINE_STRUCTURES],HUD_LINE_CAPACITY,"SCOUT TO FIND ENEMY PRODUCTION SITES");
     snprintf(r->hud[HUD_LINE_RESOURCE],HUD_LINE_CAPACITY,"CLEAR DEFENDERS / COLONIZE TO EXPAND");
@@ -388,7 +397,7 @@ int game_run(const GameOptions* options)
     game.renderer.debug_stats = options->stats_set ? options->show_stats : !options->headless || options->debug_views;
     if (!options->headless && !audio_open(&audio)) { renderer_shutdown(&game.renderer);return 1; }
     game.renderer.debug_views = options->debug_views;
-    printf("Left-drag to select; WASD/arrows to pan; wheel to zoom. F1/F2 debug. Gameplay: 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
+    printf("Left-drag to select; WASD/arrows to pan; wheel to zoom. F1/F2 debug. Gameplay: F/B select fighters/bombers on screen; 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
     const double tick_seconds = 1.0 / SIMULATION_TICKS_PER_SECOND_DOUBLE;
     double previous = monotonic_seconds();
     double accumulator = 0.0;

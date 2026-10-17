@@ -4,7 +4,7 @@ import json,re,subprocess,sys,threading,time
 from pathlib import Path
 from window_input import Desktop
 root=Path(__file__).resolve().parents[2]
-def run_window(binary,out,limit=2,keys=('W','D'),axes=(1,1),issue_order=True):
+def run_window(binary,out,limit=2,keys=('W','D'),axes=(1,1),issue_order=True,screen_key=None):
  out.mkdir(parents=True,exist_ok=True);desktop=Desktop();existing=desktop.windows();state=out/'controls-state.json';capture=out/'controls.ppm'
  prefix=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
  cmd=[*prefix,'--no-menu','--frames','2','--samples','3','--world-seed','1234','--no-stats','--capture',str(capture),'--state',str(state)]
@@ -23,6 +23,8 @@ def run_window(binary,out,limit=2,keys=('W','D'),axes=(1,1),issue_order=True):
   assert handle,'The Nanova window did not appear'
   x,y=desktop.focus_point(handle);x-=80;y-=80
   desktop.move(x+600,y+250);desktop.button(True,1);desktop.move(x+1320,y+850);desktop.button(False,1)
+  if screen_key:
+   for key in ('3',screen_key):desktop.key(True,key);desktop.key(False,key)
   # Send held keys during renderer startup so Proton can deliver them before polling.
   for key in keys:desktop.key(True,key)
   # Queue the complete input sequence before the first poll. Two-frame checks
@@ -56,10 +58,12 @@ def run_window(binary,out,limit=2,keys=('W','D'),axes=(1,1),issue_order=True):
   assert all(abs(a-b)<.0003 for a,b in zip(movement,expected)),(movement,expected,output)
  else:assert not keyboard and movement==[0,0,0],(movement,keyboard)
  result=json.loads(state.read_text());selected=[u for u in result['units'] if u['selected']]
- assert len(selected)==7,('Selected count',len(selected))
+ expected_count=6 if screen_key=='F' else 1 if screen_key=='B' else 7
+ assert len(selected)==expected_count,('Selected count',len(selected),expected_count)
+ if screen_key:assert all(u['kind']==(0 if screen_key=='F' else 1) and u['faction']==1 for u in selected)
  if issue_order:assert result['order']['count']==7 and result['order']['cell']==-1 and all(u['moving'] for u in selected),(result['order'],[u['moving'] for u in selected])
  else:assert result['order']['count']==0,'The middle button issued an order'
- return dict(selected=7,keyboard_axes=axes,camera_movement=movement,right_click_orders=7 if issue_order else 0,middle_button='unbound',frames=2,seconds=time.monotonic()-started,application_ms=list(map(float,re.findall(r'Application frame: ([0-9.]+)',output))))
+ return dict(selected=len(selected),screen_key=screen_key,keyboard_axes=axes,camera_movement=movement,right_click_orders=7 if issue_order else 0,middle_button='unbound',frames=2,seconds=time.monotonic()-started,application_ms=list(map(float,re.findall(r'Application frame: ([0-9.]+)',output))))
 
 if __name__=='__main__':
  import argparse

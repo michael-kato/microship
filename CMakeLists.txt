@@ -259,3 +259,7 @@ set_tests_properties(target_lines PROPERTIES TIMEOUT 30)
 add_test(NAME keyboard_camera COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/keyboard_camera.py $<TARGET_FILE:nanova>)
 set_tests_properties(keyboard_camera PROPERTIES TIMEOUT 30)
+
+add_test(NAME screen_selection COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/screen_selection.py $<TARGET_FILE:nanova>)
+set_tests_properties(screen_selection PROPERTIES TIMEOUT 30)

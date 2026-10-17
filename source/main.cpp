@@ -57,7 +57,7 @@ static void print_usage(FILE* output)
     fprintf(output, "Usage: nanova [--world PATH] [--config PATH] [--shader PATH] [--headless]\n"
         "              [--frames N] [--capture PATH.ppm|PATH.pfm] [--samples N] [--seed N]\n"
         "              [--vsync] [--time SECONDS] [--step-seconds N] [--camera-drag X Y] [--camera-zoom N]\n"
-        "              [--camera-pointer X Y] [--click X Y] [--command X Y] [--select-group 1..3] [--focus] [--additive] [--restart]\n"
+        "              [--camera-pointer X Y] [--click X Y] [--command X Y] [--select-group 1..3] [--select-screen-group 1..2] [--focus] [--additive] [--restart]\n"
         "              [--pointer-drag X1 Y1 X2 Y2] (client pixels)\n"
         "              [--smoke] [--stats|--no-stats] [--debug-views] [--no-activate]\n"
         "              [--replay PATH.orders] [--ticks N] [--state PATH.json] [--scene-state PATH.json]\n"
@@ -147,6 +147,12 @@ int main(int argc, char** argv)
             if (++i==argc || strlen(argv[i])!=1 || argv[i][0]<'1' || argv[i][0]>'3')
             { fprintf(stderr,"--select-group requires 1, 2 or 3.\n");return 2; }
             options.camera_input.group=(uint32_t)(argv[i][0]-'0');
+        }
+        else if (strcmp(argv[i],"--select-screen-group")==0)
+        {
+            if (++i==argc || strlen(argv[i])!=1 || argv[i][0]<'1' || argv[i][0]>'2')
+            { fprintf(stderr,"--select-screen-group requires 1 or 2.\n");return 2; }
+            options.camera_input.screen_group=(uint32_t)(argv[i][0]-'0');
         }
         else if (strcmp(argv[i],"--camera-pan")==0)
         {

@@ -16,7 +16,7 @@ struct PointerInput
     bool pointer_pressed,pointer_held,pointer_released,pointer_cancelled,pointer_moved;
     int32_t press_x,press_y;
     uint32_t group; // 1 fighters, 2 bombers, 3 all; zero keeps the selection.
-    uint32_t priority; // 1 fighter, 2 bomber.
+    uint32_t screen_group; // 1 fighters, 2 bombers in the current view.
 };
 struct Camera { Vec3 position, target, up; };
 

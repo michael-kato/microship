@@ -103,7 +103,7 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
         if (wparam == VK_F1) { window->input.toggle_stats = !window->input.toggle_stats; return 0; }
         if (wparam == VK_F2) { window->input.toggle_buffers = !window->input.toggle_buffers; return 0; }
         if (wparam>='1' && wparam<='3') { window->input.group=(uint32_t)(wparam-'0');return 0; }
-        if (wparam=='F' || wparam=='B') { window->input.priority=wparam=='F' ? 1u : 2u;return 0; }
+        if (wparam=='F' || wparam=='B') { window->input.screen_group=wparam=='F' ? 1u : 2u;return 0; }
         if (wparam==VK_SPACE) { window->input.pause=true;return 0; }
         if (wparam=='R') { window->input.restart=true;return 0; }
         if (wparam==VK_HOME) { window->input.focus=true;return 0; }
