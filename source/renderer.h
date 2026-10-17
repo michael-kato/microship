@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_RENDERER_H
-#define MICROSHIP_RENDERER_H
+#ifndef NANOVA_RENDERER_H
+#define NANOVA_RENDERER_H
 
 #include <stdint.h>
 #include "../assets/shaders/hud_layout.glsl"

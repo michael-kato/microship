@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_CONTENT_H
-#define MICROSHIP_CONTENT_H
+#ifndef NANOVA_CONTENT_H
+#define NANOVA_CONTENT_H
 #include "types.h"
 #include <stdint.h>
 #include "asset_limits.h"

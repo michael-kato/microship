@@ -1,6 +1,6 @@
 {
   "$schema": "../schemas/start-menu.schema.json",
-  "title": "MICROSHIP",
+  "title": "Nanova",
   "prompt": "Choose a faction. Click a card or press its number.",
   "width": 1920,
   "height": 1080,

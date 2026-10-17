@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_RENDER_SCENE_H
-#define MICROSHIP_RENDER_SCENE_H
+#ifndef NANOVA_RENDER_SCENE_H
+#define NANOVA_RENDER_SCENE_H
 
 #include "geometry.h"
 #include "types.h"

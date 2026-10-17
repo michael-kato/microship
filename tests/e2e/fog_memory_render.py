@@ -26,7 +26,7 @@ for name,world,ticks in cases:
  commands.append([*prefix,'--world',str(wp),'--config',str(cp),'--world-seed','1234','--replay',str(replay),'--ticks',str(ticks),'--time','0','--step-seconds','0','--headless','--frames',str(a.frames),'--capture',str(out/(name+'.ppm')),'--state',str(out/(name+'-state.json')),'--no-stats'])
 (out/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
 if not a.run:print('Prepared five native 1920x1080 cases; no GPU work started.');sys.exit(0)
-env=os.environ.copy();env['MICROSHIP_VULKAN_VALIDATION']='0' if a.timing else '1';start=time.monotonic();report={};images={}
+env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1';start=time.monotonic();report={};images={}
 for (name,_,_),command in zip(cases,commands):
  remaining=5-(time.monotonic()-start);assert remaining>0,'GPU batch limit expired'
  result=subprocess.run(command,capture_output=True,text=True,env=env,timeout=min(2,remaining));(out/(name+'.log')).write_text(result.stdout+result.stderr);assert result.returncode==0,(name,result.stdout,result.stderr)

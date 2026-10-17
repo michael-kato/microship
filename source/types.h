@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_TYPES_H
-#define MICROSHIP_TYPES_H
+#ifndef NANOVA_TYPES_H
+#define NANOVA_TYPES_H
 
 // Plain records keep XYZ coordinates distinct from RGB channels without a library.
 

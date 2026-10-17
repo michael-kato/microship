@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_PRESENTATION_H
-#define MICROSHIP_PRESENTATION_H
+#ifndef NANOVA_PRESENTATION_H
+#define NANOVA_PRESENTATION_H
 #include "render_scene.h"
 #include "world.h"
 struct Simulation;

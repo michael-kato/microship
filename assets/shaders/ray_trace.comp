@@ -2,7 +2,7 @@
 #extension GL_EXT_ray_query : require
 #extension GL_GOOGLE_include_directive : require
 #include "render_bindings.glsl"
-#ifdef MICROSHIP_DEBUG_BUFFERS
+#ifdef NANOVA_DEBUG_BUFFERS
 #include "debug_buffers.glsl"
 vec3 debug_direct = vec3(0.0);
 vec4 debug_vertex_hit = vec4(0.0), debug_normal_depth = vec4(0.0);
@@ -23,7 +23,7 @@ struct Vertex
 };
 
 layout(set = 0, binding = RENDER_BINDING_ACCELERATION) uniform accelerationStructureEXT scene_acceleration;
-#ifdef MICROSHIP_VOLUME_PASS
+#ifdef NANOVA_VOLUME_PASS
 layout(set = 0, binding = RENDER_BINDING_BEAUTY, rgba32f) uniform image2D output_image;
 #else
 layout(set = 0, binding = RENDER_BINDING_BEAUTY, rgba32f) uniform writeonly image2D output_image;
@@ -122,7 +122,7 @@ bool closest_hit(vec3 origin, vec3 direction, out uint triangle_index,
     if (!scene_box_intersection(origin,direction,RAY_MAX,0.0))
     { triangle_index=0u;barycentric=vec2(0);return false; }
     rayQueryEXT query;
-#if defined(MICROSHIP_DEBUG_BUFFERS) && !defined(MICROSHIP_NO_QUERY_COUNTERS)
+#if defined(NANOVA_DEBUG_BUFFERS) && !defined(NANOVA_NO_QUERY_COUNTERS)
     ++debug_closest_queries;
 #endif
     rayQueryInitializeEXT(query, scene_acceleration, gl_RayFlagsOpaqueEXT,
@@ -401,7 +401,7 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
 // multiply attenuation; opaque intersections stop the query.
 vec3 studio_visibility(vec3 origin,vec3 direction)
 {
-#if defined(MICROSHIP_DEBUG_BUFFERS) && !defined(MICROSHIP_NO_QUERY_COUNTERS)
+#if defined(NANOVA_DEBUG_BUFFERS) && !defined(NANOVA_NO_QUERY_COUNTERS)
     ++debug_shadow_queries;
 #endif
     rayQueryEXT q;rayQueryInitializeEXT(q,scene_acceleration,gl_RayFlagsNoOpaqueEXT,SURFACE_RAY_MASK,origin,0.0,direction,RAY_MAX);
@@ -494,7 +494,7 @@ bool subsurface_exit(Surface s,vec3 direction,float limit,out vec3 exit_point,ou
     float epsilon=point_epsilon(s.point);
     vec3 origin=s.point-s.geometric_normal*epsilon;
     rayQueryEXT query;
-#if defined(MICROSHIP_DEBUG_BUFFERS) && !defined(MICROSHIP_NO_QUERY_COUNTERS)
+#if defined(NANOVA_DEBUG_BUFFERS) && !defined(NANOVA_NO_QUERY_COUNTERS)
     ++debug_shadow_queries;
 #endif
     rayQueryInitializeEXT(query,scene_acceleration,gl_RayFlagsNoOpaqueEXT,SURFACE_RAY_MASK,origin,0.0,direction,limit);
@@ -599,13 +599,13 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
             vec3 background=render.backdrop_style.x>0.0 ? texelFetch(soft_backdrop,ivec2(pixel),0).rgb : environment_radiance(direction);
             radiance+=weight*background;
             if (blur_radius<=0.0) film_sharp_sum+=weight*background;
-#ifdef MICROSHIP_DEBUG_BUFFERS
+#ifdef NANOVA_DEBUG_BUFFERS
             debug_direct+=weight*background;
 #endif
             break;
         }
         Surface s;if (!surface_at(triangle,barycentric,direction,s)) break;
-#ifdef MICROSHIP_DEBUG_BUFFERS
+#ifdef NANOVA_DEBUG_BUFFERS
         if (layer==0u)
         {
             ++debug_primary_hits;
@@ -624,7 +624,7 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
         vec3 contribution=weight*(direct+ambient_surface(s,-direction))*opacity;
         radiance+=contribution;
         if (blur_radius<=0.0) film_sharp_sum+=contribution;
-#ifdef MICROSHIP_DEBUG_BUFFERS
+#ifdef NANOVA_DEBUG_BUFFERS
         debug_direct+=weight*direct*opacity;
 #endif
         float clear=s.translucent ? membrane_clear(view_cosine) : 0.0;
@@ -708,7 +708,7 @@ bool pixel_only_background(uvec2 pixel)
         farthest*cone+point_epsilon(center),low,high);
 }
 
-#ifdef MICROSHIP_SHADOW_GRID_PASS
+#ifdef NANOVA_SHADOW_GRID_PASS
 layout(push_constant) uniform GridPass { uint medium;uint unused0;uint unused1;uint unused2; } grid_pass;
 void main()
 {
@@ -727,14 +727,14 @@ void main()
     if (pixel.x >= render.settings.x || pixel.y >= render.settings.y)
         return;
 
-#ifndef MICROSHIP_VOLUME_PASS
-#ifndef MICROSHIP_DISABLE_VACUUM_SKIP
+#ifndef NANOVA_VOLUME_PASS
+#ifndef NANOVA_DISABLE_VACUUM_SKIP
     // All samples here have exactly the same uniform-environment radiance.
     // No path traversal, random draws or repeated per-sample normalization.
     if (render.backdrop_style.x>0.0 && pixel_is_vacuum(pixel))
     {
         vec3 background=texelFetch(soft_backdrop,ivec2(pixel),0).rgb;
-#ifdef MICROSHIP_DEBUG_BUFFERS
+#ifdef NANOVA_DEBUG_BUFFERS
         debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(vec4(0),vec4(0),
             vec4(background,0),vec4(background,0),vec4(0));
 #endif
@@ -763,7 +763,7 @@ void main()
         sharp_pixels[pixel.y*render.settings.x+pixel.x]=vec4(film_blur_max>0.0 ? film_sharp_sum/float(sample_count) : vec3(0),1);
         if (film_blur_max>0.0) radiance-=film_sharp_sum/float(sample_count);
     }
-#ifdef MICROSHIP_DEBUG_BUFFERS
+#ifdef NANOVA_DEBUG_BUFFERS
     debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(debug_vertex_hit,debug_normal_depth,
         vec4(debug_direct/float(sample_count),float(debug_primary_hits)/float(sample_count)),
         vec4(radiance,float(debug_closest_queries)),
@@ -809,7 +809,7 @@ void main()
             sharp_pixels[pixel.y*render.settings.x+pixel.x].rgb+=sharp;radiance-=sharp;
         }
     }
-#ifdef MICROSHIP_DEBUG_BUFFERS
+#ifdef NANOVA_DEBUG_BUFFERS
     uint debug_index = pixel.y*render.settings.x+pixel.x;
     debug_pixels[debug_index].volume.rgb = volume_count > 0u ? volume_sum/float(volume_count) : vec3(0);
     debug_pixels[debug_index].surface.w += float(debug_closest_queries);
@@ -817,7 +817,7 @@ void main()
 #endif
 #endif
     // Keep HDR energy until current-frame bloom and the display transform.
-    #ifdef MICROSHIP_VOLUME_PASS
+    #ifdef NANOVA_VOLUME_PASS
     imageStore(output_image,ivec2(pixel),vec4(radiance,surface_radiance.a));
 #else
     imageStore(output_image,ivec2(pixel),vec4(radiance,film_blur_max));

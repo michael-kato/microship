@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_WINDOW_H
-#define MICROSHIP_WINDOW_H
+#ifndef NANOVA_WINDOW_H
+#define NANOVA_WINDOW_H
 
 #include <stdint.h>
 #include "camera.h"

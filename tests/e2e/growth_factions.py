@@ -14,7 +14,7 @@ from asset_data import established_world,write_world,change
 repo_root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(repo_root/'scripts/proton_run.py'),str(binary)]
 count=0
-with tempfile.TemporaryDirectory(prefix='microship-growth-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanova-growth-') as directory:
     out=Path(directory)
     def stage(side):return established_world(repo_root/'assets/levels'/('biology-'+side+'.json'),out)
     def run(name,data,ticks=1,extra=(),orders='',expected=0):

@@ -13,13 +13,13 @@ a=parser.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=Tru
 command=[str(a.binary.resolve())] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(a.binary.resolve())]
 desktop=Desktop();started=time.monotonic()
 for choice,faction in ([(1,1)] if a.gpu else [(0,0),(1,1),(2,2),(3,3)]):
-    existing=desktop.windows('microship - Choose faction');state=out/(str(choice)+'-state.json')
+    existing=desktop.windows('nanova - Choose faction');state=out/(str(choice)+'-state.json')
     args=['--menu','--frames','1','--samples','3','--state',str(state),'--capture',str(out/'menu-game.ppm')] if a.gpu else ([] if choice==0 else ['--smoke','--menu','--state',str(state)])
     p=subprocess.Popen([*command,*args],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
     try:
         deadline=time.monotonic()+(1.4 if a.gpu else 4);handle=None
         while time.monotonic()<deadline and p.poll() is None:
-            found=desktop.windows('microship - Choose faction')-existing
+            found=desktop.windows('nanova - Choose faction')-existing
             if found:handle=next(iter(found));break
             time.sleep(.005)
         assert handle,'The launch menu did not appear'

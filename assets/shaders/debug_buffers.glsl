@@ -8,7 +8,7 @@ struct DebugPixel
     vec4 surface;      // Surface-pass HDR; W: actual closest-hit BVH queries.
     vec4 volume;       // Current-frame in-scattering; W: actual shadow BVH queries.
 };
-#ifndef MICROSHIP_DEBUG_BINDING
-#define MICROSHIP_DEBUG_BINDING RENDER_BINDING_DEBUG
+#ifndef NANOVA_DEBUG_BINDING
+#define NANOVA_DEBUG_BINDING RENDER_BINDING_DEBUG
 #endif
-layout(set = 0, binding = MICROSHIP_DEBUG_BINDING, std430) buffer DebugBuffer { DebugPixel debug_pixels[]; };
+layout(set = 0, binding = NANOVA_DEBUG_BINDING, std430) buffer DebugBuffer { DebugPixel debug_pixels[]; };

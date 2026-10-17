@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "microship render",
+  "title": "nanova render",
   "type": "object",
   "properties": {
     "$schema": {

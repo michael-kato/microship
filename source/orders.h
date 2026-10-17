@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_ORDERS_H
-#define MICROSHIP_ORDERS_H
+#ifndef NANOVA_ORDERS_H
+#define NANOVA_ORDERS_H
 #include <stdint.h>
 struct Simulation;
 struct Audio;

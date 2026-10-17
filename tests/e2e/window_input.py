@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Drive a real microship window with OS mouse/keyboard events, then exit it."""
+"""Drive a real nanova window with OS mouse/keyboard events, then exit it."""
 
 import json
 import ctypes as c
@@ -65,7 +65,7 @@ class Desktop:
             self.xt.XTestFakeButtonEvent.argtypes = [c.c_void_p, c.c_uint, c.c_int, c.c_ulong]
             self.xt.XTestFakeKeyEvent.argtypes = [c.c_void_p, c.c_uint, c.c_int, c.c_ulong]
 
-    def windows(self, name="microship"):
+    def windows(self, name="nanova"):
         result = set()
         if sys.platform == 'win32':
             def visit(handle, _):
@@ -155,7 +155,7 @@ def main():
     binary, config_path = (Path(arg).resolve() for arg in sys.argv[1:])
     desktop = Desktop()
     existing = desktop.windows()
-    with tempfile.TemporaryDirectory(prefix='microship-window-e2e-') as directory:
+    with tempfile.TemporaryDirectory(prefix='nanova-window-e2e-') as directory:
         config = Path(directory) / 'native.json'
         contents = json.loads(config_path.read_text())
         contents['output'].update(width=1920,height=1080)
@@ -177,7 +177,7 @@ def main():
                 time.sleep(.01)
             if handle is None:
                 output, errors = process.communicate(timeout=2)
-                raise RuntimeError('microship did not create its production window\n'+output+'\n'+errors)
+                raise RuntimeError('nanova did not create its production window\n'+output+'\n'+errors)
             x,y = desktop.focus_point(handle)
             desktop.move(x,y)
             time.sleep(.03)

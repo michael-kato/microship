@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_CAMERA_H
-#define MICROSHIP_CAMERA_H
+#ifndef NANOVA_CAMERA_H
+#define NANOVA_CAMERA_H
 
 #include "types.h"
 #include <stdint.h>

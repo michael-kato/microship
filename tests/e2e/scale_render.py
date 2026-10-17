@@ -42,7 +42,7 @@ for side,home,enemy,ticks,frames in [('virus',0,1,1,1),('virus',0,1,1,2),('immun
         p.communicate();raise RuntimeError('GPU process timeout. No later case was launched.')
     (out/(name+'.log')).write_text(stdout+stderr)
     assert p.returncode==0,stdout+stderr
-    if os.environ.get('MICROSHIP_VULKAN_VALIDATION')=='1':assert 'Vulkan validation: enabled.' in stdout
+    if os.environ.get('NANOVA_VULKAN_VALIDATION')=='1':assert 'Vulkan validation: enabled.' in stdout
     data=image.read_bytes();assert re.match(rb'P6\s+1920\s+1080\s+255\s',data),'Capture size changed'
     archive_capture(image,'direct-rays-'+name)
     assert 'Renderer: direct ray tracing;' in stdout,stdout

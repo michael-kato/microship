@@ -53,7 +53,7 @@ static bool asset_paths(char* world, char* config, char* shader,char* audio,char
 
 static void print_usage(FILE* output)
 {
-    fprintf(output, "Usage: microship [--world PATH] [--config PATH] [--shader PATH] [--headless]\n"
+    fprintf(output, "Usage: nanova [--world PATH] [--config PATH] [--shader PATH] [--headless]\n"
         "              [--frames N] [--capture PATH.ppm|PATH.pfm] [--samples N] [--seed N]\n"
         "              [--vsync] [--time SECONDS] [--step-seconds N] [--camera-drag X Y] [--camera-zoom N]\n"
         "              [--camera-pointer X Y] [--click X Y] [--command X Y] [--select-group 1..3] [--focus] [--additive] [--restart]\n"
@@ -101,7 +101,7 @@ int main(int argc, char** argv)
     bool no_menu=false,force_menu=false;uint32_t menu_selection=0;
     if (!asset_paths(world_path, config_path, shader_path,audio_path,menu_path,sizeof(world_path)))
     {
-        fprintf(stderr, "Cannot locate assets beside the microship executable.\n");
+        fprintf(stderr, "Cannot locate assets beside the nanova executable.\n");
         return 1;
     }
     options.world_path = world_path;

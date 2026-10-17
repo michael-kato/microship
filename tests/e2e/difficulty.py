@@ -6,7 +6,7 @@ from pathlib import Path
 from asset_data import established_world,write_world,branches,producers,units
 root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve();prefix=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
-with tempfile.TemporaryDirectory(prefix='microship-difficulty-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanova-difficulty-') as directory:
  out=Path(directory)
  def run(name,data,expected=0):
   global count

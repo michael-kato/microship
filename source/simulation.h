@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_SIMULATION_H
-#define MICROSHIP_SIMULATION_H
+#ifndef NANOVA_SIMULATION_H
+#define NANOVA_SIMULATION_H
 
 #include "world.h"
 #include "sight_field.h"

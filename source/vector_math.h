@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_VECTOR_MATH_H
-#define MICROSHIP_VECTOR_MATH_H
+#ifndef NANOVA_VECTOR_MATH_H
+#define NANOVA_VECTOR_MATH_H
 
 #include "types.h"
 #include <cmath>

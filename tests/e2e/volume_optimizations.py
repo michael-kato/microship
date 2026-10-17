@@ -86,7 +86,7 @@ for variant in args.variants:
 (out/'commands.json').write_text(json.dumps([v[2] for v in prepared],indent=2)+'\n')
 if not args.run and not args.cpu:
     print(f'Prepared {len(prepared)} processes: native 1920x1080; 3 film + 1 volume + 1 backdrop; {args.frames} frames; 2 seconds per process; 5 seconds per GPU batch. No GPU work started.');sys.exit(0)
-environment=os.environ.copy();environment['MICROSHIP_VULKAN_VALIDATION']='0' if args.timing else '1'
+environment=os.environ.copy();environment['NANOVA_VULKAN_VALIDATION']='0' if args.timing else '1'
 started=time.monotonic();report=[];reference_state=None
 labels=dict(application='Application frame',surface='GPU surface',volume='GPU volumes',acceleration='GPU acceleration update',gpu_total='total render',shadow_grid='GPU shadow grid',medium_blur='GPU medium blur')
 for variant,prefix,invocation in prepared:

@@ -1,7 +1,7 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
 #include "render_bindings.glsl"
-#define MICROSHIP_DEBUG_BINDING BLOOM_BINDING_DEBUG
+#define NANOVA_DEBUG_BINDING BLOOM_BINDING_DEBUG
 #include "debug_buffers.glsl"
 
 const float SRGB_POWER_SCALE = 1.055;

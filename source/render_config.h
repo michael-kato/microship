@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_RENDER_CONFIG_H
-#define MICROSHIP_RENDER_CONFIG_H
+#ifndef NANOVA_RENDER_CONFIG_H
+#define NANOVA_RENDER_CONFIG_H
 
 #include <stdint.h>
 #include "types.h"

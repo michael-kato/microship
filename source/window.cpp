@@ -113,10 +113,10 @@ bool window_open(Window* window, uint32_t width, uint32_t height, bool activate)
     klass.lpfnWndProc = window_message;
     klass.hInstance = window->instance;
     klass.hCursor = LoadCursorA(0, IDC_ARROW);
-    klass.lpszClassName = "microshipWindow";
+    klass.lpszClassName = "nanovaWindow";
     if (!RegisterClassA(&klass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
     {
-        fprintf(stderr, "Cannot register microship window (Windows error %lu).\n", GetLastError());
+        fprintf(stderr, "Cannot register nanova window (Windows error %lu).\n", GetLastError());
         return false;
     }
     DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
@@ -124,12 +124,12 @@ bool window_open(Window* window, uint32_t width, uint32_t height, bool activate)
     RECT extent = { 0, 0, (LONG)width, (LONG)height };
     if (!AdjustWindowRectExForDpi(&extent, style, FALSE, extended, GetDpiForSystem()))
         return false;
-    window->handle = CreateWindowExA(extended, klass.lpszClassName, "microship", style,
+    window->handle = CreateWindowExA(extended, klass.lpszClassName, "Nanova", style,
         CW_USEDEFAULT, CW_USEDEFAULT, extent.right - extent.left, extent.bottom - extent.top,
         0, 0, window->instance, window);
     if (!window->handle)
     {
-        fprintf(stderr, "Cannot create microship window (Windows error %lu).\n", GetLastError());
+        fprintf(stderr, "Cannot create nanova window (Windows error %lu).\n", GetLastError());
         return false;
     }
     RECT client;
@@ -168,7 +168,7 @@ void window_close(Window* window)
     if (window->handle)
         DestroyWindow(window->handle);
     if (window->instance)
-        UnregisterClassA("microshipWindow", window->instance);
+        UnregisterClassA("nanovaWindow", window->instance);
     *window = Window();
 }
 

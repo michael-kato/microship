@@ -11,7 +11,7 @@ from asset_data import stage_world,write_world
 root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
-with tempfile.TemporaryDirectory(prefix='microship-subsurface-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanova-subsurface-') as directory:
     out=Path(directory);data=stage_world(root/'assets/levels/biology-virus.json',out)
     settings=json.loads((root/'assets/rendering/biology.json').read_text())
     def run(name,world=data,config=settings,expected=0,ticks=1):

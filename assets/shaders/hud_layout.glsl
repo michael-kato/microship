@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_HUD_LAYOUT_GLSL
-#define MICROSHIP_HUD_LAYOUT_GLSL
+#ifndef NANOVA_HUD_LAYOUT_GLSL
+#define NANOVA_HUD_LAYOUT_GLSL
 
 // Pixel offsets from the left, right, or bottom edge, as named.
 #define HUD_BOTTOM_BAND_HEIGHT 164

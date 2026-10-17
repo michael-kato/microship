@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_AUDIO_H
-#define MICROSHIP_AUDIO_H
+#ifndef NANOVA_AUDIO_H
+#define NANOVA_AUDIO_H
 #include "sound_events.h"
 #include <stdint.h>
 #include <vector>

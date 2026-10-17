@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_GAME_H
-#define MICROSHIP_GAME_H
+#ifndef NANOVA_GAME_H
+#define NANOVA_GAME_H
 
 #include <stdint.h>
 #include "camera.h"

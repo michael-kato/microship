@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_FACTORY_SHAPE_H
-#define MICROSHIP_FACTORY_SHAPE_H
+#ifndef NANOVA_FACTORY_SHAPE_H
+#define NANOVA_FACTORY_SHAPE_H
 
 // Keep visible stems, contact bounds, and detached fragments at the same size.
 static const float FACTORY_STEM_TAPER_PER_SEGMENT=.12f;

@@ -45,7 +45,7 @@ for name,data,ticks,replay,extra in cases:
 if not args.run:
     print(f'Prepared {len(prepared)} native 1920x1080 cases in {out}. No GPU processes started. Use --run only after approval.')
     sys.exit(0)
-environment=os.environ.copy();environment['MICROSHIP_VULKAN_VALIDATION']='1'
+environment=os.environ.copy();environment['NANOVA_VULKAN_VALIDATION']='1'
 started=time.monotonic();report=[]
 for name,capture,invocation in prepared:
     remaining=30-(time.monotonic()-started)

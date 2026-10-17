@@ -91,7 +91,7 @@ for name,world,render,ticks,frames in cases:
         p.communicate();raise RuntimeError('GPU timeout; no later case was launched')
     (out/(name+'.log')).write_text(stdout+stderr);assert p.returncode==0,stdout+stderr
     assert re.match(rb'P6\s+1920\s+1080\s+255\s',capture.read_bytes())
-    if os.environ.get('MICROSHIP_VULKAN_VALIDATION')=='1':assert 'Vulkan validation: enabled.' in stdout
+    if os.environ.get('NANOVA_VULKAN_VALIDATION')=='1':assert 'Vulkan validation: enabled.' in stdout
     archive_capture(capture,name)
     d=json.loads(state.read_text())
     if name=='immune-breaks-factory-limbs':

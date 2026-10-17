@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_EFFECTS_H
-#define MICROSHIP_EFFECTS_H
+#ifndef NANOVA_EFFECTS_H
+#define NANOVA_EFFECTS_H
 #include "render_scene.h"
 struct Simulation;
 struct Camera;

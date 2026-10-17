@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_GEOMETRY_H
-#define MICROSHIP_GEOMETRY_H
+#ifndef NANOVA_GEOMETRY_H
+#define NANOVA_GEOMETRY_H
 
 #include <stdint.h>
 #include <vector>

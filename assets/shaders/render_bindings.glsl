@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_RENDER_BINDINGS_GLSL
-#define MICROSHIP_RENDER_BINDINGS_GLSL
+#ifndef NANOVA_RENDER_BINDINGS_GLSL
+#define NANOVA_RENDER_BINDINGS_GLSL
 
 // Shared by C++ descriptor writes and GLSL layouts.
 #define FOG_FIELD_SIZE 128

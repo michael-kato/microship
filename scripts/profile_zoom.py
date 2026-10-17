@@ -84,7 +84,7 @@ if not args.run:
     print(f'Prepared five native 1920x1080 cases in {out}; {args.film_samples} film samples, two frames per process, {args.process_seconds:g} seconds per process, {args.batch_seconds:g} seconds for the batch. No GPU work started.')
     sys.exit(0)
 
-environment=os.environ.copy();environment['MICROSHIP_VULKAN_VALIDATION']='1';started=time.monotonic();report=[]
+environment=os.environ.copy();environment['NANOVA_VULKAN_VALIDATION']='1';started=time.monotonic();report=[]
 labels={'application':'Application frame','surface':'GPU surface','volume':'GPU volumes','backdrop':'GPU backdrop',
     'acceleration':'GPU acceleration update','effects':'GPU effects','display':'GPU fog/bloom/display','gpu_total':'total render'}
 for case in cases:

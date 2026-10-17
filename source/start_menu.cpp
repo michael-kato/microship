@@ -93,14 +93,14 @@ int start_menu(const char* path,char* world,size_t capacity,uint32_t selection)
     {
         if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) && GetLastError()!=ERROR_ACCESS_DENIED) return -1;
         HINSTANCE instance=GetModuleHandleA(0);WNDCLASSA klass={};klass.lpfnWndProc=menu_message;klass.hInstance=instance;
-        klass.hCursor=LoadCursorA(0,IDC_ARROW);klass.lpszClassName="microshipStartMenu";
+        klass.hCursor=LoadCursorA(0,IDC_ARROW);klass.lpszClassName="nanovaStartMenu";
         if (!RegisterClassA(&klass) && GetLastError()!=ERROR_CLASS_ALREADY_EXISTS) return -1;
         DWORD style=WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX;RECT extent={0,0,(LONG)menu.width,(LONG)menu.height};
         if (!AdjustWindowRectExForDpi(&extent,style,FALSE,0,GetDpiForSystem())) return -1;
         int margin=60,gap=24,width=((int)menu.width-margin*2-gap*((int)menu.count-1))/(int)menu.count;
         for (uint32_t i=0;i<menu.count;++i) menu.choices[i].bounds=RECT{margin+(int)i*(width+gap),380,margin+(int)i*(width+gap)+width,760};
         menu.open=true;
-        HWND handle=CreateWindowExA(0,klass.lpszClassName,"microship - Choose faction",style,CW_USEDEFAULT,CW_USEDEFAULT,
+        HWND handle=CreateWindowExA(0,klass.lpszClassName,"nanova - Choose faction",style,CW_USEDEFAULT,CW_USEDEFAULT,
             extent.right-extent.left,extent.bottom-extent.top,0,0,instance,&menu);
         if (!handle) return -1;
         ShowWindow(handle,SW_SHOW);UpdateWindow(handle);printf("Start menu ready.\n");

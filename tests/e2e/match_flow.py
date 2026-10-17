@@ -12,7 +12,7 @@ from asset_data import stage_world,established_world,write_world,branches
 root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
-with tempfile.TemporaryDirectory(prefix='microship-match-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanova-match-') as directory:
     out=Path(directory)
     def run(name,data=None,ticks=1,orders='',extra=()):
         global count
@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='microship-match-') as directory:
         assert scene['fog']['tint'][0]>scene['fog']['tint'][2]>scene['fog']['tint'][1]
         assert any(i['mask']==4 and i['style'][7]==1 for i in scene['instances'])
     # Check menu data through the executable-relative startup path, without a GPU.
-    copied=out/'menu-app';(copied/'assets').mkdir(parents=True);shutil.copy2(binary,copied/'microship.exe')
+    copied=out/'menu-app';(copied/'assets').mkdir(parents=True);shutil.copy2(binary,copied/'nanova.exe')
     manifest=json.loads((binary.parent/'assets/startup.json').read_text())
     for key in ('world','render','shader','audio'):manifest[key]=os.path.relpath(binary.parent/'assets'/manifest[key],copied/'assets')
     manifest['menu']='menu.json';(copied/'assets/startup.json').write_text(json.dumps(manifest))
@@ -44,7 +44,7 @@ with tempfile.TemporaryDirectory(prefix='microship-match-') as directory:
     missing=deepcopy(menu);missing['choices'][0]['world']='missing.json';invalid.append(missing)
     for bad in invalid:
         (copied/'assets/menu.json').write_text(json.dumps(bad))
-        invocation=[str(copied/'microship.exe')] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(copied/'microship.exe')]
+        invocation=[str(copied/'nanova.exe')] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(copied/'nanova.exe')]
         p=subprocess.run([*invocation,'--smoke','--menu-select','1'],capture_output=True,text=True,timeout=10);count+=1
         assert p.returncode==1 and p.stderr and 'Application lifecycle smoke passed' not in p.stdout
     for side,home in (('virus',0),('immune',1)):

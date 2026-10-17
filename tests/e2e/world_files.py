@@ -37,7 +37,7 @@ def failure(result,path):
     assert 'Application lifecycle smoke passed' not in result.stdout,details
 
 
-with tempfile.TemporaryDirectory(prefix='microship-json-e2e-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanova-json-e2e-') as directory:
     out=Path(directory);scene=out/'editable.json'
     base=established_world(root/'assets/levels/biology-virus.json',out)
     minimal=dict(content=dict(bodies=[dict(name='fixture',label='BODY',geometry='sphere',hosts_site=False)],

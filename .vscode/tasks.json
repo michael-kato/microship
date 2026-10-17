@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "microship: configure Windows",
+            "label": "nanova: configure Windows",
             "type": "process",
             "command": "cmake",
             "args": [
@@ -14,7 +14,7 @@
                 "-DCMAKE_BUILD_TYPE=Release",
                 "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
                 "-DCMAKE_CROSSCOMPILING_EMULATOR=python3;${workspaceFolder}/scripts/proton_run.py",
-                "-DMICROSHIP_GPU_TESTS=OFF"
+                "-DNANOVA_GPU_TESTS=OFF"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -23,7 +23,7 @@
             "hide": true
         },
         {
-            "label": "microship: build Windows",
+            "label": "nanova: build Windows",
             "type": "process",
             "command": "cmake",
             "args": [
@@ -32,13 +32,13 @@
                 "--config",
                 "Release",
                 "--target",
-                "microship",
+                "nanova",
                 "--parallel"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
             },
-            "dependsOn": "microship: configure Windows",
+            "dependsOn": "nanova: configure Windows",
             "problemMatcher": [
                 "$gcc"
             ],
@@ -48,18 +48,18 @@
             }
         },
         {
-            "label": "microship: run (Proton)",
+            "label": "nanova: run (Proton)",
             "detail": "Play the virus-side biological prototype with ambient lighting.",
             "type": "process",
             "command": "python3",
             "args": [
                 "${workspaceFolder}/scripts/proton_run.py",
-                "${workspaceFolder}/build/windows-cross/microship.exe"
+                "${workspaceFolder}/build/windows-cross/nanova.exe"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
             },
-            "dependsOn": "microship: build Windows",
+            "dependsOn": "nanova: build Windows",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
@@ -71,7 +71,7 @@
             }
         },
         {
-            "label": "microship: CPU E2E checks (Proton)",
+            "label": "nanova: CPU E2E checks (Proton)",
             "type": "process",
             "command": "bash",
             "args": [
@@ -90,27 +90,27 @@
             }
         },
         {
-            "label": "microship: gameplay E2E (Proton)",
+            "label": "nanova: gameplay E2E (Proton)",
             "detail": "Incremental build and CPU-only biological gameplay checks for both sides.",
             "type": "process",
             "command": "python3",
             "args": [
                 "${workspaceFolder}/tests/e2e/biology.py",
-                "${workspaceFolder}/build/windows-cross/microship.exe"
+                "${workspaceFolder}/build/windows-cross/nanova.exe"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
             },
-            "dependsOn": "microship: build Windows",
+            "dependsOn": "nanova: build Windows",
             "problemMatcher": []
         },
         {
-            "label": "microship: play as virus (Proton)",
+            "label": "nanova: play as virus (Proton)",
             "type": "process",
             "command": "python3",
             "args": [
                 "${workspaceFolder}/scripts/proton_run.py",
-                "${workspaceFolder}/build/windows-cross/microship.exe",
+                "${workspaceFolder}/build/windows-cross/nanova.exe",
                 "--world",
                 "${workspaceFolder}/assets/levels/biology-virus.world",
                 "--config",
@@ -119,7 +119,7 @@
             "options": {
                 "cwd": "${workspaceFolder}"
             },
-            "dependsOn": "microship: build Windows",
+            "dependsOn": "nanova: build Windows",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
@@ -131,12 +131,12 @@
             }
         },
         {
-            "label": "microship: play as white blood cells (Proton)",
+            "label": "nanova: play as white blood cells (Proton)",
             "type": "process",
             "command": "python3",
             "args": [
                 "${workspaceFolder}/scripts/proton_run.py",
-                "${workspaceFolder}/build/windows-cross/microship.exe",
+                "${workspaceFolder}/build/windows-cross/nanova.exe",
                 "--world",
                 "${workspaceFolder}/assets/levels/biology-immune.world",
                 "--config",
@@ -145,7 +145,7 @@
             "options": {
                 "cwd": "${workspaceFolder}"
             },
-            "dependsOn": "microship: build Windows",
+            "dependsOn": "nanova: build Windows",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
@@ -157,12 +157,12 @@
             }
         },
         {
-            "label": "microship: planetary prototype (Proton)",
+            "label": "nanova: planetary prototype (Proton)",
             "type": "process",
             "command": "python3",
             "args": [
                 "${workspaceFolder}/scripts/proton_run.py",
-                "${workspaceFolder}/build/windows-cross/microship.exe",
+                "${workspaceFolder}/build/windows-cross/nanova.exe",
                 "--world",
                 "${workspaceFolder}/assets/levels/prototype.world",
                 "--config",
@@ -171,7 +171,7 @@
             "options": {
                 "cwd": "${workspaceFolder}"
             },
-            "dependsOn": "microship: build Windows",
+            "dependsOn": "nanova: build Windows",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1

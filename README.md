@@ -1,4 +1,4 @@
-# microship
+# Nanova
 
 Microscopic strategy inside a body, inspired by Eufloria. Command craft, scout living cells, establish factories, and expand. Both sides start around neutral cells. Fighters prefer units; bombers prefer factories. A slider sets their production ratio. Destroy enemy factories to win.
 
@@ -12,5 +12,5 @@ C++ and Vulkan target Windows. Linux builds use MinGW, `glslc`, and an initializ
 
 ```sh
 bash scripts/check.sh --cpu
-python3 scripts/proton_run.py build/windows-cross/microship.exe
+python3 scripts/proton_run.py build/windows-cross/nanova.exe
 ```

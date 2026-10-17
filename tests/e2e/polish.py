@@ -14,7 +14,7 @@ root=Path(__file__).resolve().parents[2]
 binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
-with tempfile.TemporaryDirectory(prefix='microship-polish-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanova-polish-') as directory:
     out=Path(directory)
     config=out/'camera.json'
     config.write_text(json.dumps(change(json.loads((root/'assets/rendering/biology.json').read_text()),'camera.position',[0,11,36])))

@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_WORLD_H
-#define MICROSHIP_WORLD_H
+#ifndef NANOVA_WORLD_H
+#define NANOVA_WORLD_H
 
 #include <stdint.h>
 #include "types.h"

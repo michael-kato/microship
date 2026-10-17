@@ -1,5 +1,5 @@
-#ifndef MICROSHIP_ASSET_JSON_H
-#define MICROSHIP_ASSET_JSON_H
+#ifndef NANOVA_ASSET_JSON_H
+#define NANOVA_ASSET_JSON_H
 #include <stdint.h>
 #include <stddef.h>
 #include "types.h"

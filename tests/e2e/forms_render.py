@@ -31,7 +31,7 @@ cases.append(('box-window',out/'box-window.ppm',[sys.executable,str(root/'tests/
 (out/'commands.json').write_text(json.dumps([v[2] for v in cases],indent=2)+'\n')
 if not args.run:
     print(f'Prepared {len(cases)} processes in {out}. Four one-frame captures and one two-frame native input check. No GPU work started.');sys.exit(0)
-environment=os.environ.copy();environment['MICROSHIP_VULKAN_VALIDATION']='1';started=time.monotonic();report=[]
+environment=os.environ.copy();environment['NANOVA_VULKAN_VALIDATION']='1';started=time.monotonic();report=[]
 for name,capture,invocation in cases:
     remaining=30-(time.monotonic()-started)
     if remaining<=0:raise RuntimeError('The thirty-second GPU batch limit has expired')
