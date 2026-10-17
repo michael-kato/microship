@@ -23,6 +23,15 @@ void camera_apply_input(Camera* camera, const PointerInput* input, const RenderC
         * std::tan(config->vertical_fov_degrees * HALF_DEGREES_TO_RADIANS) / config->height;
     Vec3 translation = add(scale(right, -input->drag_x * units_per_pixel),
                            scale(up, input->drag_y * units_per_pixel));
+    // Pan across the map plane. Preserve camera height and viewing direction.
+    Vec3 horizontal={right.x,right.y,0};float planar_length=std::sqrt(dot(horizontal,horizontal));
+    float magnitude=std::sqrt(input->pan_x*input->pan_x+input->pan_y*input->pan_y);
+    if (planar_length>0 && magnitude>0 && input->pan_seconds>0)
+    {
+        horizontal=scale(horizontal,1/planar_length);Vec3 vertical={-horizontal.y,horizontal.x,0};
+        float distance=config->camera_keyboard_speed*input->pan_seconds/std::fmax(1.0f,magnitude);
+        translation=add(translation,scale(add(scale(horizontal,input->pan_x),scale(vertical,input->pan_y)),distance));
+    }
     camera->target = add(camera->target, translation);
     float zoom = distance * std::exp(-input->wheel * ZOOM_EXPONENT_PER_WHEEL_STEP);
     if (zoom < config->camera_min_distance) zoom = config->camera_min_distance;

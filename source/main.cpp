@@ -15,6 +15,7 @@
 #endif
 #include <windows.h>
 
+static const int MAX_CAMERA_PAN_SECONDS = 60;
 static const int MAX_COMMAND_SAMPLES = 4096;
 static const int MAX_COMMAND_TICKS = 1000000;
 static const int EXECUTABLE_PATH_CAPACITY = 4096;
@@ -61,7 +62,7 @@ static void print_usage(FILE* output)
         "              [--smoke] [--stats|--no-stats] [--debug-views] [--no-activate]\n"
         "              [--replay PATH.orders] [--ticks N] [--state PATH.json] [--scene-state PATH.json]\n"
         "              [--audio-capture PATH.wav] (with --smoke and --ticks, at most 3600 ticks)\n"
-        "              [--world-seed N] [--audio PATH.json] [--menu|--no-menu] [--menu-select 1..3]\n"
+        "              [--camera-pan X Y SECONDS] [--world-seed N] [--audio PATH.json] [--menu|--no-menu] [--menu-select 1..3]\n"
         "Default: faction menu, then direct ray-traced Win32 window; Escape or close to exit.\n"
         "Headless/capture runs default to one frame. PFM saves linear HDR before bloom; PPM saves display RGB.\n"
         "--smoke runs asset loading and simulation lifecycle without a GPU.\n");
@@ -146,6 +147,14 @@ int main(int argc, char** argv)
             if (++i==argc || strlen(argv[i])!=1 || argv[i][0]<'1' || argv[i][0]>'3')
             { fprintf(stderr,"--select-group requires 1, 2 or 3.\n");return 2; }
             options.camera_input.group=(uint32_t)(argv[i][0]-'0');
+        }
+        else if (strcmp(argv[i],"--camera-pan")==0)
+        {
+            double values[3];
+            for (uint32_t j=0;j<3;++j)
+                if (++i==argc || !parse_real(argv[i],&values[j]) || values[j]<(j==2 ? 0 : -1) || values[j]>(j==2 ? MAX_CAMERA_PAN_SECONDS : 1))
+                { fprintf(stderr,"--camera-pan requires X/Y in [-1,1] and seconds in [0,60].\n");return 2; }
+            options.camera_input.pan_x=(float)values[0];options.camera_input.pan_y=(float)values[1];options.camera_input.pan_seconds=(float)values[2];
         }
         else if (strcmp(argv[i],"--pointer-drag")==0)
         {

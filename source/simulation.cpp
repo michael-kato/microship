@@ -431,7 +431,7 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
             u.commanded=true;u.task=TASK_COLONIZE;break;
         }
     simulation_update_sight(s);simulation_update_fog(s,0);
-    snprintf(s->message,sizeof(s->message),"MIDDLE-CLICK OPEN SPACE TO SCOUT. ORDER A KNOWN BODY TO INTERACT.");
+    snprintf(s->message,sizeof(s->message),"RIGHT-CLICK OPEN SPACE TO SCOUT. ORDER A KNOWN BODY TO INTERACT.");
     if (s->world.content.factions[s->world.player_faction].automatic)
     {
         s->selected_body=home_body(s,s->world.player_faction);
@@ -440,7 +440,7 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
     if (s->world.neutral_start)
     {
         s->selected_body=home_body(s,s->world.player_faction);
-        snprintf(s->message,sizeof(s->message),s->world.auto_colonize ? "FIRST FIGHTER IS ESTABLISHING YOUR SITE" : "SELECT CRAFT / MIDDLE-CLICK YOUR CELL TO BUILD");
+        snprintf(s->message,sizeof(s->message),s->world.auto_colonize ? "FIRST FIGHTER IS ESTABLISHING YOUR SITE" : "SELECT CRAFT / RIGHT-CLICK YOUR CELL TO BUILD");
     }
     return true;
 }

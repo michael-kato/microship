@@ -104,6 +104,11 @@
           "type": "number",
           "exclusiveMinimum": 1,
           "exclusiveMaximum": 179
+        },
+        "keyboard_pan_speed": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
         }
       },
       "required": [

@@ -267,7 +267,7 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     snprintf(r->hud[HUD_LINE_TITLE],HUD_LINE_CAPACITY,"NANOVA / %s     FLEET %u     SELECTED %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet,selected);
     snprintf(r->hud[HUD_LINE_GROUPS],HUD_LINE_CAPACITY,"1 %-10s %-5u 2 %-10s %-5u 3 ALL",s->world.content.groups[0].plural,groups[0],s->world.content.groups[1].plural,groups[1]);
     snprintf(r->hud[HUD_LINE_MESSAGE],HUD_LINE_CAPACITY,"%.55s",s->outcome ? (s->outcome>0 ? "YOU WON / KEEP PLAYING / R TO RESTART" : "COLONY LOST / R TO RESTART") : s->message);
-    snprintf(r->hud[HUD_LINE_HELP],HUD_LINE_CAPACITY,"MIDDLE CLICK: ORDER   HOME: FOCUS   SPACE: PAUSE");
+    snprintf(r->hud[HUD_LINE_HELP],HUD_LINE_CAPACITY,"RIGHT CLICK: ORDER   HOME: FOCUS   SPACE: PAUSE");
     snprintf(r->hud[HUD_LINE_SITE],HUD_LINE_CAPACITY,"SELECT A BODY");
     snprintf(r->hud[HUD_LINE_STRUCTURES],HUD_LINE_CAPACITY,"SCOUT TO FIND ENEMY PRODUCTION SITES");
     snprintf(r->hud[HUD_LINE_RESOURCE],HUD_LINE_CAPACITY,"CLEAR DEFENDERS / COLONIZE TO EXPAND");
@@ -388,7 +388,7 @@ int game_run(const GameOptions* options)
     game.renderer.debug_stats = options->stats_set ? options->show_stats : !options->headless || options->debug_views;
     if (!options->headless && !audio_open(&audio)) { renderer_shutdown(&game.renderer);return 1; }
     game.renderer.debug_views = options->debug_views;
-    printf("Left-drag to select; right-drag to pan; wheel to zoom. F1/F2 debug. Gameplay: 1 fighters, 2 bombers, 3 all; middle-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
+    printf("Left-drag to select; WASD/arrows to pan; wheel to zoom. F1/F2 debug. Gameplay: 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
     const double tick_seconds = 1.0 / SIMULATION_TICKS_PER_SECOND_DOUBLE;
     double previous = monotonic_seconds();
     double accumulator = 0.0;
@@ -405,6 +405,7 @@ int game_run(const GameOptions* options)
         if (input.toggle_stats) game.renderer.debug_stats = !game.renderer.debug_stats;
         if (input.toggle_buffers) game.renderer.debug_views = !game.renderer.debug_views;
         if (input.restart && game.simulation.world.gameplay.enabled) { accumulator=0;elapsed=0; }
+        input.pan_seconds=(float)std::fmin(elapsed,MAX_FRAME_CATCHUP_SECONDS);
         game.pointer=input;ratio_pointer(&game,&input,&config);selection_input(&game,&input,&config);
         camera_apply_input(&game.camera,&input,&config);gameplay_input(&game,&input,&config);
         accumulator += elapsed < MAX_FRAME_CATCHUP_SECONDS ? elapsed : MAX_FRAME_CATCHUP_SECONDS;
@@ -420,6 +421,8 @@ int game_run(const GameOptions* options)
         overlay_enabled(&game,&config);
         audio_events(&audio,&game.simulation,game.camera.target);
         if (!audio_pump(&audio)) { success=false;break; }
+        if (input.pan_x || input.pan_y)
+            printf("Camera keyboard: pan %g %g; seconds %.9g.\n",input.pan_x,input.pan_y,input.pan_seconds);
         if (input.drag_x || input.drag_y || input.wheel)
             printf("Camera input: drag %g %g; wheel %g.\n", input.drag_x, input.drag_y, input.wheel);
         printf("Scene time: %.6f; camera: %g %g %g.\n",game.simulation.time_seconds,

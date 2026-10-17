@@ -129,6 +129,17 @@ class Desktop:
             self.xt.XTestFakeButtonEvent(self.display, button, int(down), 0)
             self.api.XFlush(self.display)
 
+    def key(self, down, name):
+        arrows={'LEFT':(0x25,0xff51),'UP':(0x26,0xff52),'RIGHT':(0x27,0xff53),'DOWN':(0x28,0xff54)}
+        if sys.platform == 'win32':
+            code=arrows[name][0] if name in arrows else ord(name)
+            flags=(1 if name in arrows else 0) | (0 if down else 2)
+            self.api.keybd_event(code,0,flags,0)
+        else:
+            symbol=arrows[name][1] if name in arrows else ord(name.lower())
+            key=self.api.XKeysymToKeycode(self.display,symbol)
+            self.xt.XTestFakeKeyEvent(self.display,key,int(down),0);self.api.XFlush(self.display)
+
     def wheel(self):
         if sys.platform == 'win32': self.api.mouse_event(0x800, 0, 0, 240, 0)
         else:
@@ -149,59 +160,14 @@ class Desktop:
 
 
 def main():
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
-    from gpu_environment import check_gpu_environment
-    check_gpu_environment()
-    binary, config_path = (Path(arg).resolve() for arg in sys.argv[1:])
-    desktop = Desktop()
-    existing = desktop.windows()
-    with tempfile.TemporaryDirectory(prefix='nanova-window-e2e-') as directory:
-        config = Path(directory) / 'native.json'
-        contents = json.loads(config_path.read_text())
-        contents['output'].update(width=1920,height=1080)
-        contents['sampling']['samples_per_pixel']=6
-        contents['volume']['rays_per_pixel']=1
-        config.write_text(json.dumps(contents,indent=2))
-        command = [str(binary)]
-        if binary.suffix.lower() == '.exe' and sys.platform != 'win32':
-            command = [sys.executable, str(Path(__file__).resolve().parents[2] / 'scripts/proton_run.py'), str(binary)]
-        process = subprocess.Popen([*command, '--config', str(config), '--time', '60', '--frames', '2'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        try:
-            deadline, handle = time.monotonic()+8, None
-            while time.monotonic() < deadline:
-                new = desktop.windows() - existing
-                if new:
-                    handle = next(iter(new))
-                    break
-                if process.poll() is not None: break
-                time.sleep(.01)
-            if handle is None:
-                output, errors = process.communicate(timeout=2)
-                raise RuntimeError('nanova did not create its production window\n'+output+'\n'+errors)
-            x,y = desktop.focus_point(handle)
-            desktop.move(x,y)
-            time.sleep(.03)
-            desktop.button(True)
-            time.sleep(.03)
-            desktop.move(x+8,y-4)
-            time.sleep(.03)
-            desktop.button(False)
-            desktop.wheel()
-            time.sleep(.15)
-            desktop.escape()
-            output, errors = process.communicate(timeout=8)
-            inputs = re.findall(r'Camera input: drag ([\d.-]+) ([\d.-]+); wheel ([\d.-]+)', output)
-            totals = tuple(sum(float(row[i]) for row in inputs) for i in range(3))
-            if process.returncode or totals != (8.0,-4.0,2.0) or 'Rendered ' not in output:
-                raise RuntimeError(f'Mouse drag/wheel or Escape failed: {totals}\n{output}\n{errors}')
-        finally:
-            if process.poll() is None:
-                if handle is not None: desktop.escape()
-                try: process.communicate(timeout=2)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.communicate()
-    print('Window-input E2E passed: actual mouse drag, wheel zoom, Escape, rendering and shutdown.')
+    import os
+    from control_window import run_window
+    # The explicit legacy entry point accepts the same binary/config arguments.
+    # Production input is now covered by the bounded keyboard and mouse scenario.
+    binary=Path(sys.argv[1]).resolve()
+    os.environ['NANOVA_VULKAN_VALIDATION']='1'
+    with tempfile.TemporaryDirectory(prefix='nanova-window-input-') as folder:
+        print(run_window(binary,Path(folder)))
 
 
 if __name__ == '__main__':

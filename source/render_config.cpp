@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <cmath>
 
+static const int MAX_CAMERA_KEYBOARD_SPEED = 1000;
 static const int MAX_BLOOM_THRESHOLD = 1000000;
 static const int MAX_BLOOM_RADIUS = 64;
 static const int MAX_RENDER_VERTICAL_FOV_DEGREES = 179;
@@ -116,7 +117,9 @@ bool render_config_load(RenderConfig* config,const char* path)
         loaded.sphere_rings=json_uint(json_get(j,"sphere_rings"),MIN_RENDER_SPHERE_RINGS,MAX_RENDER_SPHERE_RINGS);
     }
     {
-        Json j=json_get(root,"camera");json_object(j,"position|target|up|min_distance|max_distance|vertical_fov_degrees");
+        Json j=json_get(root,"camera");json_object(j,"position|target|up|min_distance|max_distance|vertical_fov_degrees|keyboard_pan_speed");
+        Json keyboard=json_find(j,"keyboard_pan_speed");
+        if (json_present(keyboard)) loaded.camera_keyboard_speed=json_float(keyboard,0,MAX_CAMERA_KEYBOARD_SPEED);
         loaded.camera_position=json_vector(json_get(j,"position"),-MAX_CAMERA_POSITION_COMPONENT,MAX_CAMERA_POSITION_COMPONENT);
         loaded.camera_target=json_vector(json_get(j,"target"),-MAX_CAMERA_TARGET_COMPONENT,MAX_CAMERA_TARGET_COMPONENT);
         loaded.camera_up=json_vector(json_get(j,"up"),-MAX_CAMERA_UP_COMPONENT,MAX_CAMERA_UP_COMPONENT);

@@ -6,6 +6,17 @@
 static const int DRAG_THRESHOLD_PIXELS = 5;
 static const int KEY_WAS_DOWN_BIT = 30;
 static const int KEY_PRESSED_MASK = 0x8000;
+enum { CAMERA_A=1u<<0,CAMERA_D=1u<<1,CAMERA_W=1u<<2,CAMERA_S=1u<<3,
+    CAMERA_LEFT=1u<<4,CAMERA_RIGHT=1u<<5,CAMERA_UP=1u<<6,CAMERA_DOWN=1u<<7 };
+static uint32_t camera_key(WPARAM key)
+{
+    switch (key)
+    {
+        case 'A':return CAMERA_A;case 'D':return CAMERA_D;case 'W':return CAMERA_W;case 'S':return CAMERA_S;
+        case VK_LEFT:return CAMERA_LEFT;case VK_RIGHT:return CAMERA_RIGHT;case VK_UP:return CAMERA_UP;case VK_DOWN:return CAMERA_DOWN;
+        default:return 0;
+    }
+}
 
 static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam, LPARAM lparam)
 {
@@ -34,13 +45,6 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
         return 0;
     }
     if (window && message == WM_ERASEBKGND) return 1;
-    if (window && message==WM_RBUTTONDOWN)
-    {
-        window->panning=true;window->pointer_x=(short)LOWORD(lparam);window->pointer_y=(short)HIWORD(lparam);
-        SetCapture(handle);return 0;
-    }
-    if (window && message==WM_RBUTTONUP)
-    { window->panning=false;if (!window->dragging) ReleaseCapture();return 0; }
     if (window && message == WM_LBUTTONDOWN)
     {
         window->dragging = true;window->input.pointer_pressed=true;
@@ -60,19 +64,16 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
             window->input.pointer_x=(short)LOWORD(lparam);window->input.pointer_y=(short)HIWORD(lparam);window->input.pointer_valid=true;
         }
         else if (window->dragging) window->input.pointer_cancelled=true;
-        if (message==WM_CAPTURECHANGED) window->panning=false;
         window->dragging = false;
-        if (message == WM_LBUTTONUP && !window->panning) ReleaseCapture();
+        if (message == WM_LBUTTONUP) ReleaseCapture();
         return 0;
     }
     if (window && message == WM_MOUSEMOVE)
     {
         int32_t x = (short)LOWORD(lparam), y = (short)HIWORD(lparam);
         window->input.pointer_x=x;window->input.pointer_y=y;window->input.pointer_valid=true;
-        if (!window->dragging && !window->panning) return 0;
+        if (!window->dragging) return 0;
         if (abs(x-window->press_x)+abs(y-window->press_y)>DRAG_THRESHOLD_PIXELS) window->moved=true;
-        if (window->panning)
-        { window->input.drag_x += x - window->pointer_x;window->input.drag_y += y - window->pointer_y; }
         window->pointer_x = x;
         window->pointer_y = y;
         return 0;
@@ -84,14 +85,25 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
         window->input.wheel += (short)HIWORD(wparam) / (float)WHEEL_DELTA;
         return 0;
     }
-    if (window && message==WM_MBUTTONUP)
+    if (window && message==WM_RBUTTONUP)
     { window->input.command=true;window->input.command_x=(short)LOWORD(lparam);window->input.command_y=(short)HIWORD(lparam);return 0; }
+    if (window && (message==WM_KILLFOCUS || (message==WM_ACTIVATEAPP && !wparam)))
+    window->camera_keys=0;
+    if (window && (message==WM_KEYDOWN || message==WM_KEYUP))
+    {
+        uint32_t key=camera_key(wparam);
+        if (key)
+        {
+            if (message==WM_KEYDOWN) window->camera_keys|=key;else window->camera_keys&=~key;
+            return 0;
+        }
+    }
     if (window && message == WM_KEYDOWN && !(lparam & (1L << KEY_WAS_DOWN_BIT)))
     {
         if (wparam == VK_F1) { window->input.toggle_stats = !window->input.toggle_stats; return 0; }
         if (wparam == VK_F2) { window->input.toggle_buffers = !window->input.toggle_buffers; return 0; }
         if (wparam>='1' && wparam<='3') { window->input.group=(uint32_t)(wparam-'0');return 0; }
-        if (wparam=='F' || wparam=='S') { window->input.priority=wparam=='F' ? 1u : 2u;return 0; }
+        if (wparam=='F' || wparam=='B') { window->input.priority=wparam=='F' ? 1u : 2u;return 0; }
         if (wparam==VK_SPACE) { window->input.pause=true;return 0; }
         if (wparam=='R') { window->input.restart=true;return 0; }
         if (wparam==VK_HOME) { window->input.focus=true;return 0; }
@@ -156,6 +168,9 @@ bool window_poll(Window* window, PointerInput* input)
     *input = window->input;
     input->pointer_held=window->dragging;input->pointer_moved=window->moved;input->press_x=window->press_x;input->press_y=window->press_y;
     input->additive=(GetKeyState(VK_SHIFT)&KEY_PRESSED_MASK)!=0;
+    bool left=(window->camera_keys&(CAMERA_A|CAMERA_LEFT))!=0,right=(window->camera_keys&(CAMERA_D|CAMERA_RIGHT))!=0;
+    bool up=(window->camera_keys&(CAMERA_W|CAMERA_UP))!=0,down=(window->camera_keys&(CAMERA_S|CAMERA_DOWN))!=0;
+    input->pan_x=(float)right-(float)left;input->pan_y=(float)up-(float)down;
     POINT point;
     if (GetCursorPos(&point) && ScreenToClient(window->handle,&point))
     { input->pointer_x=point.x;input->pointer_y=point.y;input->pointer_valid=true; }

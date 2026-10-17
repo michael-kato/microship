@@ -20,6 +20,7 @@ struct RenderConfig
     Vec3 camera_position;
     Vec3 camera_target;
     Vec3 camera_up;
+    float camera_keyboard_speed;
     float camera_min_distance;
     float camera_max_distance;
     uint32_t volume_steps;

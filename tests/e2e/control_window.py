@@ -4,15 +4,14 @@ import json,re,subprocess,sys,threading,time
 from pathlib import Path
 from window_input import Desktop
 root=Path(__file__).resolve().parents[2]
-def run_window(binary,out,limit=2):
+def run_window(binary,out,limit=2,keys=('W','D'),axes=(1,1),issue_order=True):
  out.mkdir(parents=True,exist_ok=True);desktop=Desktop();existing=desktop.windows();state=out/'controls-state.json';capture=out/'controls.ppm'
  prefix=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
  cmd=[*prefix,'--no-menu','--frames','2','--samples','3','--world-seed','1234','--no-stats','--capture',str(capture),'--state',str(state)]
- started=time.monotonic();process=subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1);ready=threading.Event();stdout=[];stderr=[]
+ started=time.monotonic();process=subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1);stdout=[];stderr=[]
  def read(pipe,lines):
   for line in pipe:
    lines.append(line)
-   if line.startswith('Scene time:'):ready.set()
  readers=[threading.Thread(target=read,args=(process.stdout,stdout)),threading.Thread(target=read,args=(process.stderr,stderr))]
  for reader in readers:reader.start()
  try:
@@ -24,12 +23,18 @@ def run_window(binary,out,limit=2):
   assert handle,'The Nanova window did not appear'
   x,y=desktop.focus_point(handle);x-=80;y-=80
   desktop.move(x+600,y+250);desktop.button(True,1);desktop.move(x+1320,y+850);desktop.button(False,1)
-  assert ready.wait(max(.01,limit-(time.monotonic()-started))),'First frame did not start'
-  # The first frame has consumed selection. These events feed the second frame.
-  desktop.move(x+900,y+500);desktop.button(True,3);desktop.move(x+980,y+480);desktop.button(False,3)
-  desktop.move(x+1400,y+500);desktop.button(True,2);desktop.button(False,2)
+  # Send held keys during renderer startup so Proton can deliver them before polling.
+  for key in keys:desktop.key(True,key)
+  # Queue the complete input sequence before the first poll. Two-frame checks
+  # otherwise depend on Proton delivery finishing during one short GPU frame.
+  desktop.move(x+900,y+500);desktop.button(True,2);desktop.move(x+980,y+480);desktop.button(False,2)
+  if issue_order:
+   desktop.move(x+1400,y+500);desktop.button(True,3);desktop.button(False,3)
+  # Keep the selection release position as the final pointer sample.
+  desktop.move(x+1320,y+850)
   process.wait(timeout=max(.01,limit-(time.monotonic()-started)))
  finally:
+  for key in keys:desktop.key(False,key)
   if process.poll() is None:
    process.terminate()
    try:process.wait(timeout=.2)
@@ -39,12 +44,26 @@ def run_window(binary,out,limit=2):
  assert process.returncode==0,(output,errors)
  assert 'Vulkan validation: enabled.' in output
  assert len(re.findall(r'Application frame:',output))==2,output
- pans=re.findall(r'Camera input: drag ([0-9.eE+-]+) ([0-9.eE+-]+);',output);total=[sum(float(v[i]) for v in pans) for i in range(2)];assert total==[80,-20],(total,output)
+ pans=re.findall(r'Camera input: drag ([0-9.eE+-]+) ([0-9.eE+-]+);',output)
+ assert all(float(x)==0 and float(y)==0 for x,y in pans),'Mouse buttons moved the camera'
+ positions=[list(map(float,row)) for row in re.findall(r'Scene time: [0-9.eE+-]+; camera: ([0-9.eE+-]+) ([0-9.eE+-]+) ([0-9.eE+-]+)',output)];assert len(positions)==2,output
+ movement=[positions[1][i]-positions[0][i] for i in range(3)]
+ keyboard=re.findall(r'Camera keyboard: pan ([0-9.eE+-]+) ([0-9.eE+-]+); seconds ([0-9.eE+-]+)\.',output)
+ if axes!=(0,0):
+  assert keyboard and tuple(map(float,keyboard[-1][:2]))==axes,(keyboard,output)
+  seconds=float(keyboard[-1][2]);assert seconds>0
+  length=max(1,(axes[0]**2+axes[1]**2)**.5);expected=[12*seconds*axes[0]/length,12*seconds*axes[1]/length,0]
+  assert all(abs(a-b)<.0003 for a,b in zip(movement,expected)),(movement,expected,output)
+ else:assert not keyboard and movement==[0,0,0],(movement,keyboard)
  result=json.loads(state.read_text());selected=[u for u in result['units'] if u['selected']]
- assert len(selected)==7 and result['order']['count']==7 and result['order']['cell']==-1 and all(u['moving'] for u in selected),result
- return dict(selected=7,pan_pixels=total,middle_click_orders=7,frames=2,seconds=time.monotonic()-started,application_ms=list(map(float,re.findall(r'Application frame: ([0-9.]+)',output))))
+ assert len(selected)==7,('Selected count',len(selected))
+ if issue_order:assert result['order']['count']==7 and result['order']['cell']==-1 and all(u['moving'] for u in selected),(result['order'],[u['moving'] for u in selected])
+ else:assert result['order']['count']==0,'The middle button issued an order'
+ return dict(selected=7,keyboard_axes=axes,camera_movement=movement,right_click_orders=7 if issue_order else 0,middle_button='unbound',frames=2,seconds=time.monotonic()-started,application_ms=list(map(float,re.findall(r'Application frame: ([0-9.]+)',output))))
+
 if __name__=='__main__':
  import argparse
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/control-window');p.add_argument('--run',action='store_true');a=p.parse_args()
  if not a.run:print('Prepared one two-frame 1920x1080 OS input check. Use --run to start it.');sys.exit(0)
+ import os;os.environ['NANOVA_VULKAN_VALIDATION']='1'
  print(json.dumps(run_window(a.binary.resolve(),a.output.resolve()),indent=2))

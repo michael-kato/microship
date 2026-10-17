@@ -32,7 +32,8 @@
     ],
     "min_distance": 8.0,
     "max_distance": 38.0,
-    "vertical_fov_degrees": 45.0
+    "vertical_fov_degrees": 45.0,
+    "keyboard_pan_speed": 12
   },
   "lighting": {
     "microfacet_energy_compensation": true
