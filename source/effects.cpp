@@ -41,10 +41,58 @@ static bool project(const Projection& p,Vec3 world,float* screen)
 static void segment(EffectSegment* output,uint32_t* count,const Projection& p,Vec3 a,Vec3 b,float width,Color color,float alpha,int kind)
 {
     if (*count>=MAX_EFFECT_SEGMENTS || (kind==0 && dot(subtract(a,b),subtract(a,b))<MIN_TRAIL_SEGMENT_SQUARED_LENGTH)) return;
+    if (kind==4)
+    {
+        float from=dot(subtract(a,p.eye),p.forward),to=dot(subtract(b,p.eye),p.forward);
+        float near=EFFECT_NEAR_CLIP_DISTANCE*1.1f;
+        if (from<=near) return;
+        if (to<near) b=add(a,scale(subtract(b,a),(from-near)/(from-to)));
+    }
     EffectSegment e={};if (!project(p,a,e.start) || !project(p,b,e.end)) return;
     e.start[3]=std::fmax(MIN_EFFECT_RADIUS_PIXELS,e.start[3]*width);e.end[3]=(float)kind;
     e.color[0]=color.r;e.color[1]=color.g;e.color[2]=color.b;e.color[3]=alpha;
     output[(*count)++]=e;
+}
+static bool target_point(const Simulation* s,const Unit& u,Vec3* point)
+{
+    if (simulation_attachment_valid(s,&u)) return false;
+    if (u.moving) { *point=u.destination;return true; }
+    if (u.task==TASK_ATTACK_UNIT)
+    {
+        if (u.attention<0 || u.attention>=MAX_UNITS) return false;
+        const Unit& target=s->units[u.attention];
+        if (target.health<=0 || target.generation!=u.attention_generation || !s->visible_units[u.attention]) return false;
+        *point=target.position;return true;
+    }
+    if (u.task==TASK_ATTACK_STRUCTURE)
+    {
+        if (u.attention<0 || (uint32_t)u.attention>=s->world.body_count || !s->visible_bodies[u.attention]) return false;
+        const Colony& c=s->colonies[u.attention];uint32_t k=u.attention_structure;
+        if (!c.active || c.generation!=u.attention_colony_generation || k>=c.structure_count) return false;
+        if ((k ? c.branches[k-1].health : c.health)<=0 || (k ? c.branches[k-1].generation : c.root_generation)!=u.attention_generation) return false;
+        *point=simulation_structure_position(s,u.attention,k);return true;
+    }
+    *point=u.flight_goal;return u.age>0;
+}
+// A tile circle encloses its square. Reject tiles far from a segment so long
+// target lines do not fill their entire screen-space bounding rectangle.
+static bool tile_intersects(const EffectSegment& e,int x,int y)
+{
+    float ax=e.start[0],ay=e.start[1],dx=e.end[0]-ax,dy=e.end[1]-ay;
+    float cx=(x+.5f)*EFFECT_TILE,cy=(y+.5f)*EFFECT_TILE;
+    float t=std::fmax(0.0f,std::fmin(1.0f,((cx-ax)*dx+(cy-ay)*dy)/std::fmax(MIN_TRAIL_SEGMENT_SQUARED_LENGTH,dx*dx+dy*dy)));
+    float radius=EFFECT_TILE*.70710679f+e.start[3]+EFFECT_TILE_RADIUS_MARGIN_PIXELS;
+    dx=cx-(ax+t*dx);dy=cy-(ay+t*dy);return dx*dx+dy*dy<=radius*radius;
+}
+static void tile_row(const EffectSegment& e,int y,int* low,int* high)
+{
+    float dy=e.end[1]-e.start[1];if (e.end[3]!=4 || std::fabs(dy)<.0001f) return;
+    float radius=e.start[3]+EFFECT_TILE_RADIUS_MARGIN_PIXELS;
+    float t0=(y*EFFECT_TILE-radius-e.start[1])/dy,t1=((y+1)*EFFECT_TILE+radius-e.start[1])/dy;
+    t0=std::fmax(0.0f,std::fmin(1.0f,t0));t1=std::fmax(0.0f,std::fmin(1.0f,t1));
+    float x0=e.start[0]+t0*(e.end[0]-e.start[0]),x1=e.start[0]+t1*(e.end[0]-e.start[0]);
+    *low=std::max(*low,(int)std::floor((std::fmin(x0,x1)-radius)/EFFECT_TILE));
+    *high=std::min(*high,(int)std::floor((std::fmax(x0,x1)+radius)/EFFECT_TILE));
 }
 static bool tile_rectangle(const EffectSegment& e,uint32_t width,uint32_t height,int* r)
 {
@@ -90,7 +138,12 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
         const Unit* u=&s->units[i];if (u->health<=0 || !s->visible_units[i]) continue;
         Color color=content_color(&s->world.content,u->faction);
         if (u->selected)
+        {
+            Vec3 point;
+            if (v->target_line_alpha>0 && simulation_held_by(s,i)<0 && target_point(s,*u,&point))
+                segment(output,count,p,u->position,point,v->target_line_width,color,v->target_line_alpha,4);
             segment(output,count,p,u->position,u->position,simulation_unit_definition(s,u)->cue_radius,color,SELECTION_CUE_ALPHA,3);
+        }
     }
     for (uint32_t i=0;i<MAX_POPS;++i)
     {
@@ -134,7 +187,11 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
     for (uint32_t i=0;i<*count;++i)
     {
         int r[4];if (!tile_rectangle(output[i],width,height,r)) continue;
-        for (int y=r[1];y<=r[3];++y) for (int x=r[0];x<=r[2];++x) ++cursors[y*width+x];
+        for (int y=r[1];y<=r[3];++y)
+        {
+            int low=r[0],high=r[2];tile_row(output[i],y,&low,&high);
+            for (int x=low;x<=high;++x) if (tile_intersects(output[i],x,y)) ++cursors[y*width+x];
+        }
     }
     for (uint32_t i=0;i<tile_count;++i)
     { offsets[i+1]=offsets[i]+cursors[i];cursors[i]=offsets[i]; }
@@ -142,7 +199,11 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
     for (uint32_t i=0;i<*count;++i)
     {
         int r[4];if (!tile_rectangle(output[i],width,height,r)) continue;
-        for (int y=r[1];y<=r[3];++y) for (int x=r[0];x<=r[2];++x) indices[cursors[y*width+x]++]=i;
+        for (int y=r[1];y<=r[3];++y)
+        {
+            int low=r[0],high=r[2];tile_row(output[i],y,&low,&high);
+            for (int x=low;x<=high;++x) if (tile_intersects(output[i],x,y)) indices[cursors[y*width+x]++]=i;
+        }
     }
     return true;
 }

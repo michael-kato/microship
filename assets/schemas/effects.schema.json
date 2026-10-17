@@ -160,6 +160,26 @@
         "shrink_seconds"
       ],
       "additionalProperties": false
+    },
+    "target_line": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "alpha": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "width",
+        "alpha"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [],

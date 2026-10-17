@@ -53,6 +53,7 @@ struct CombatVisuals
     bool enabled;
     float projectile_speed, shot_interval, trail_width, trail_lifetime,trail_length_scale;
     float flash_seconds, pop_seconds, pop_radius;
+    float target_line_width,target_line_alpha;
     float orbit_clearance, orbit_speed;
     bool flight_enabled;
     float acceleration, turn_rate, separation, bank;

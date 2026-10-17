@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+"""Check selected-unit target lines through complete application runs."""
+from copy import deepcopy
+import json,math,subprocess,sys,tempfile
+from pathlib import Path
+from asset_data import stage_world,write_world
+root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve();prefix=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
+count=0
+with tempfile.TemporaryDirectory(prefix='nanova-targets-') as directory:
+ out=Path(directory);base=stage_world(root/'assets/levels/biology-virus.json',out);base['match']['auto_colonize']=False
+ def run(name,world=base,ticks=60,orders=''):
+  global count
+  wp=out/(name+'-world.json');write_world(wp,world);state=out/(name+'-state.json');scene=out/(name+'-scene.json')
+  cmd=[*prefix,'--smoke','--world',str(wp),'--ticks',str(ticks),'--world-seed','1234','--state',str(state),'--scene-state',str(scene)]
+  if orders:
+   rp=out/(name+'.orders');rp.write_text(orders);cmd+=['--replay',str(rp)]
+  result=subprocess.run(cmd,capture_output=True,text=True,timeout=10);count+=1;assert result.returncode==0,(name,result.stdout,result.stderr)
+  return json.loads(state.read_text()),json.loads(scene.read_text())
+ def lines(scene):return [e for e in scene['effect_segments'] if e[7]==4]
+ selected,view=run('moving',orders='0 select all\n0 move -32 2 8\n');segments=lines(view);assert len(segments)==7
+ f=[0,-6/math.sqrt(436),-20/math.sqrt(436)];up=[0,-f[2],f[1]];eye=[-52,2,20];focal=1080/(2*math.tan(math.radians(22.5)))
+ def project(point):
+  v=[a-b for a,b in zip(point,eye)];z=sum(a*b for a,b in zip(v,f));return [960+v[0]*focal/z,540-sum(a*b for a,b in zip(v,up))*focal/z]
+ endpoint=project([-32,2,8])
+ assert all(math.dist(e[4:6],endpoint)<.001 for e in segments)
+ for e,u in zip(segments,[u for u in selected['units'] if u['selected']]):assert math.dist(e[:2],project(u['position']))<.001
+ _,unselected=run('unselected');assert not lines(unselected)
+ disabled=deepcopy(base);disabled['effects']['target_line']['alpha']=0
+ same,none=run('lines-disabled',disabled,orders='0 select all\n0 move -32 2 8\n');assert not lines(none) and same==selected
+ # An attached immune craft and its selected captive both suppress target lines.
+ held=deepcopy(base);held['spawns']=[dict(type='immune_fighter',position=[-52,-1,6.4]),dict(type='virus_fighter',position=[-51.65,-1,6.4])]
+ for u in held['content']['units']:u['speed']=.01
+ for side in ('virus','immune'):
+  held['match']['player']=side;held['match']['opponent']='immune' if side=='virus' else 'virus'
+  state,scene=run('held-'+side,held,30,'0 select all\n');selected_units=[u for u in state['units'] if u['selected']]
+  assert len(selected_units)==1 and (selected_units[0]['latch']>=0 or selected_units[0]['held_by']>=0),(side,selected_units)
+  assert not lines(scene),(side,lines(scene))
+ # Long diagonal orders must fit the fixed effect tile storage.
+ crowd=deepcopy(base);crowd['spawns']=[dict(type='virus_fighter',position=[-52+(i%9)*.1,-1+(i//9)*.1,6.4]) for i in range(63)]+[dict(type='immune_fighter',position=[48,17,6.4])]
+ state,scene=run('long-orders',crowd,1,'0 select all\n0 move 1000 -1000 0\n');assert len(lines(scene))==63
+print(f'Target line E2E passed: {count} application runs; selection, projected endpoints, disabled appearance, captured units, and long orders.')

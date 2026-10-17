@@ -158,7 +158,13 @@ static bool load_rules(World* w,const char* path)
 static bool load_effects(World* w,const char* path)
 {
     JsonDocument d;if (!json_load(&d,path)) return false;Json root=json_root(&d);
-    json_object(root,"$schema|projectile|damage|injury|spikes|limb_break");
+    json_object(root,"$schema|projectile|damage|injury|spikes|limb_break|target_line");
+    Json line=json_find(root,"target_line");
+    if (json_present(line))
+    {
+        json_object(line,"width|alpha");w->combat.target_line_width=json_positive(json_get(line,"width"),1);
+        w->combat.target_line_alpha=json_float(json_get(line,"alpha"),0,1);
+    }
     Json fracture=json_find(root,"limb_break");
     if (json_present(fracture))
     {

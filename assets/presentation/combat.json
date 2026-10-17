@@ -46,5 +46,9 @@
     "drag": 1.5,
     "spin": 2.8,
     "shrink_seconds": 0.5
+  },
+  "target_line": {
+    "width": 0.008,
+    "alpha": 0.1
   }
 }
