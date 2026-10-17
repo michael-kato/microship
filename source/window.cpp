@@ -34,12 +34,12 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
         return 0;
     }
     if (window && message == WM_ERASEBKGND) return 1;
-    if (window && message==WM_MBUTTONDOWN)
+    if (window && message==WM_RBUTTONDOWN)
     {
         window->panning=true;window->pointer_x=(short)LOWORD(lparam);window->pointer_y=(short)HIWORD(lparam);
         SetCapture(handle);return 0;
     }
-    if (window && message==WM_MBUTTONUP)
+    if (window && message==WM_RBUTTONUP)
     { window->panning=false;if (!window->dragging) ReleaseCapture();return 0; }
     if (window && message == WM_LBUTTONDOWN)
     {
@@ -84,7 +84,7 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
         window->input.wheel += (short)HIWORD(wparam) / (float)WHEEL_DELTA;
         return 0;
     }
-    if (window && message==WM_RBUTTONUP)
+    if (window && message==WM_MBUTTONUP)
     { window->input.command=true;window->input.command_x=(short)LOWORD(lparam);window->input.command_y=(short)HIWORD(lparam);return 0; }
     if (window && message == WM_KEYDOWN && !(lparam & (1L << KEY_WAS_DOWN_BIT)))
     {

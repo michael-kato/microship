@@ -40,9 +40,11 @@ with tempfile.TemporaryDirectory(prefix='nanova-startup-') as directory:
         # The neutral cell shapes exist for blur, while discovery still limits orders.
         assert sum(i['mesh']<len(data['bodies']) for i in drawing['instances'])==len(data['bodies'])
         assert not initial['colonies'][enemy]['discovered']
+        founders=[u for u in initial['units'] if u['faction']==factions[player]['id'] and u['commanded']]
+        assert len(founders)==1 and founders[0]['kind']==0 and founders[0]['task']=='colonize'
         orbit,_=run(path.stem+'-orbit',data,600)
-        assert not any(c['active'] for c in orbit['colonies']) and orbit['outcome']==0
-        assert orbit['landings']==0 and orbit['units'][0]['position']!=initial['units'][0]['position']
+        assert orbit['colonies'][home]['active'] and not orbit['colonies'][enemy]['active'] and orbit['outcome']==0
+        assert orbit['landings']==1 and orbit['units'][0]['position']!=initial['units'][0]['position']
         replay=f'0 select all\n0 order {home}\n' if not factions[player]['production'].get('mode')=='spores' else ''
         settled,_=run(path.stem+'-settle',data,2400,replay)
         assert settled['colonies'][home]['active'] and settled['colonies'][enemy]['active'],path.name

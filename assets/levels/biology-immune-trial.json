@@ -16,7 +16,8 @@
         "faction": "virus",
         "cell": 1
       }
-    ]
+    ],
+    "auto_colonize": true
   },
   "bodies": [
     {

@@ -424,7 +424,8 @@ bool world_load(World* world,const char* path,uint32_t seed)
     Json rules=json_find(root,"rules");if (json_present(rules) && (!json_path(rules,path,file) || !load_rules(&loaded,file))) return false;
     Json effects=json_find(root,"effects");if (json_present(effects) && (!json_path(effects,path,file) || !load_effects(&loaded,file))) return false;
     if (!json_path(json_get(root,"appearance"),path,file) || !load_appearance(&loaded,file,seed)) return false;
-    Json match=json_get(root,"match");json_object(match,"player|opponent|starts");
+    Json match=json_get(root,"match");json_object(match,"player|opponent|starts|auto_colonize");
+    Json automatic=json_find(match,"auto_colonize");if (json_present(automatic)) loaded.auto_colonize=json_bool(automatic);
     loaded.player_faction=read_owner(&loaded,json_get(match,"player"));loaded.opponent_faction=read_owner(&loaded,json_get(match,"opponent"));
     if (!loaded.player_faction || !loaded.opponent_faction || loaded.player_faction==loaded.opponent_faction)
         return json_error(match,"match requires two distinct non-neutral factions");

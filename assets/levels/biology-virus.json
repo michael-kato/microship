@@ -16,7 +16,8 @@
         "faction": "immune",
         "cell": 1
       }
-    ]
+    ],
+    "auto_colonize": true
   },
   "bodies": [
     {

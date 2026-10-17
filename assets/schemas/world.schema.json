@@ -49,6 +49,9 @@
             ],
             "additionalProperties": false
           }
+        },
+        "auto_colonize": {
+          "type": "boolean"
         }
       },
       "required": [

@@ -45,18 +45,20 @@ Audio uses twelve generated PCM effects and a fixed sixteen-voice mixer. Off-scr
 | Middle drag / wheel | Pan / zoom at the pointer |
 | 1 / 2 / 3 | Select fighters / bombers / all units |
 | Shift-click | Add or remove a unit from the selection |
-| Right-click open space | Move selected craft and scout |
-| Right-click a known cell | Attack, orbit, or establish a factory |
+| Middle-click open space | Move selected craft and scout |
+| Middle-click a known cell | Attack, orbit, or establish a factory |
 | Click your factory cell, then drag its slider | Set the fighter / bomber production ratio |
 | F / S | Set production to fighters only / bombers only |
 | Home | Focus the selected cell or starting cell |
 | Space / R | Pause / restart |
 | F1 / F2 | Show timing data / current render buffers |
 
-Both sides start with craft at neutral cells. Select craft and right-click your starting cell to establish the first factory. One craft is consumed. The enemy establishes its first site automatically. The fungal trial uses an automatic founder.
+Both sides start with craft at neutral cells. Select craft and middle-click your starting cell to establish the first factory. One craft is consumed. The enemy establishes its first site automatically. The fungal trial uses an automatic founder.
 
 A normal launch opens the faction menu. `--world PATH` selects a level directly. `--no-menu` starts the default level. `--menu` opens the menu for a diagnostic run. `--menu-select 1..3` uses the same faction choice without opening a menu window.
 
 The slider moves in one-percent steps. The left end makes fighters only; the right end makes bombers only. Each cell keeps its own setting. Units already in production finish before the new mix applies. The ratio controls future production, not surviving unit counts. Restart restores startup state. Automatic spore emitters have no ratio control.
 
 A replay line has a tick, command, and argument. `0 ratio 75` requests 75 percent fighters and 25 percent bombers at the selected friendly cell. Use `0 cell 0` first to select cell zero. Replay orders use the production controls in the application. `--pointer-drag X1 Y1 X2 Y2` supplies one complete drag for application checks.
+
+One starting fighter automatically approaches and colonizes your neutral home cell. Right-drag pans the camera. Middle-click sends an order.

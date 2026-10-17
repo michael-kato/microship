@@ -65,7 +65,7 @@ class Desktop:
             self.xt.XTestFakeButtonEvent.argtypes = [c.c_void_p, c.c_uint, c.c_int, c.c_ulong]
             self.xt.XTestFakeKeyEvent.argtypes = [c.c_void_p, c.c_uint, c.c_int, c.c_ulong]
 
-    def windows(self, name="nanova"):
+    def windows(self, name="Nanova"):
         result = set()
         if sys.platform == 'win32':
             def visit(handle, _):
@@ -123,8 +123,8 @@ class Desktop:
             self.xt.XTestFakeMotionEvent(self.display, -1, x, y, 0)
             self.api.XFlush(self.display)
 
-    def button(self, down, button=2):
-        if sys.platform == 'win32': self.api.mouse_event(({1:(2,4),2:(32,64)}[button])[0 if down else 1], 0, 0, 0, 0)
+    def button(self, down, button=3):
+        if sys.platform == 'win32': self.api.mouse_event(({1:(2,4),2:(32,64),3:(8,16)}[button])[0 if down else 1], 0, 0, 0, 0)
         else:
             self.xt.XTestFakeButtonEvent(self.display, button, int(down), 0)
             self.api.XFlush(self.display)

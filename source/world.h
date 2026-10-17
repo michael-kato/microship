@@ -73,7 +73,7 @@ struct World
     Body bodies[MAX_BODIES];
     uint32_t body_count;
     Faction start_owner[MAX_BODIES];
-    bool neutral_start;
+    bool neutral_start,auto_colonize;
     Spawn spawns[MAX_SPAWNS];
     uint32_t spawn_count;
     Content content;
