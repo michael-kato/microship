@@ -45,7 +45,12 @@ with tempfile.TemporaryDirectory(prefix='nanova-backgrounds-') as directory:
     first=run('repeat-a',data,1234);second=run('repeat-b',data,1234)
     assert first==second,'Fixed-seed backdrop is not repeatable'
     reset=run('restart',data,1234,restart=True);initial=run('initial',data,1234)
-    assert reset[2]==initial[2] and reset[1]['meshes']==initial[1]['meshes'],'Restart changed backdrop geometry'
+    def background_mesh(view):
+        instance=next(v for v in view['instances'] if v['mask']==4)
+        return view['meshes'][instance['mesh']]
+    # The auto-settled cell can morph by tick 600. Compare the backdrop itself.
+    assert reset[2]==initial[2] and background_mesh(reset[1])==background_mesh(initial[1]),'Restart changed backdrop geometry'
+    assert reset[0]['tick']==0 and not reset[0]['colonies'][0]['active'] and initial[0]['colonies'][0]['active']
     # Render presentation cannot change combat or production results.
     a=deepcopy(data);a['appearance']['backdrop'].pop('variants')
     reference=run('simulation-flesh',a,1234)[0];a['appearance']['backdrop']['model']=bank[-1]
