@@ -25,7 +25,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
         data=stage_world(root/'assets/levels'/('biology-'+side+'.json'),out)
         for building in data['content']['buildings']:building.update(establishment_seconds=4,growth_seconds=.1)
         for profile in data['content']['factions']:
-            if 'cell_appearance' in profile:profile['cell_appearance']['seconds']=12
+            if 'cell_appearance' in profile:profile['cell_appearance'].update(seconds=12,morph_seconds=12)
         data['rules']['ai']['expansion_delay']=1 if side=='fungus' else 300
         data['rules']['economy']['enemy_attack_seconds']=300;data['rules']['economy']['manufacture_seconds']=1
         orders='' if side=='fungus' else f'0 select all\n0 order {home}\n'
@@ -52,6 +52,9 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
             assert abs(math.dist(v2[3:],[0,0,0])-1)<1e-5
             assert distance<=data['bodies'][home]['radius']*profile['cell_appearance'].get('displacement',{}).get('height',0)+1e-5
         assert moved>100 if side!='immune' else moved==0
+        colors=base['wall_colors'];wall_colors=[colors[i] for i in wall]
+        assert len({tuple(c) for c in wall_colors})>100
+        assert max(c[0]/max(c[2],1e-6) for c in wall_colors)-min(c[0]/max(c[2],1e-6) for c in wall_colors)>.08,'Wall pigment only changed brightness'
         def face_normal(vertices,triangle):
             a,b,c=(vertices[i][:3] for i in triangle[:3]);u=[y-x for x,y in zip(a,b)];v=[y-x for x,y in zip(a,c)]
             return [u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]]

@@ -2,6 +2,8 @@
 #extension GL_GOOGLE_include_directive : require
 #include "render_bindings.glsl"
 #include "render_uniform.glsl"
+#define NANOVA_DEBUG_BINDING BLOOM_BINDING_DEBUG
+#include "debug_buffers.glsl"
 layout(local_size_x=COMPUTE_GROUP_SIZE,local_size_y=COMPUTE_GROUP_SIZE) in;
 layout(set=0,binding=BLOOM_BINDING_BEAUTY,rgba32f) uniform image2D beauty;
 layout(set=0,binding=BLOOM_BINDING_HORIZONTAL,rgba32f) uniform image2D scratch;
@@ -17,6 +19,8 @@ void main()
     // A miniature focus band. Full native pixels, from this frame only; HUD is drawn later.
     float y=(float(pixel.y)+.5)/float(focus.extent.y);
     float amount=smoothstep(render.focus_band.y,render.focus_band.y+render.focus_band.z,abs(y-render.focus_band.x));
+    DebugPixel guide=debug_pixels[pixel.y*focus.extent.x+pixel.x];
+    if (guide.vertex_hit.w==3.0) amount=0.0;
     float radius=render.focus_band.w*amount;
     vec3 sum=vec3(0);float weights=0;
     for (int tap=-12;tap<=12;++tap)

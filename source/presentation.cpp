@@ -382,6 +382,7 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
         medium->scattering[3]=c->interior_fade;
         medium->absorption_phase[0]=medium->absorption_phase[1]=medium->absorption_phase[2]=c->interior_absorption;
         medium->blur[0]=c->interior_blur_rate;medium->blur[1]=c->interior_blur_sharp;medium->blur[2]=c->interior_blur_max;
+        medium->blur[3]=c->interior_blur_fraction ? 1.0f : 0.0f;medium->lighting[3]=c->radius;
         medium->absorption_phase[3]=c->interior_anisotropy;medium->lighting[0]=1;medium->lighting[1]=1;
     }
     if (w->gameplay.enabled) update_gameplay_instances(p,s);

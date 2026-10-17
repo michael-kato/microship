@@ -7,6 +7,7 @@ struct DebugPixel
     vec4 direct;       // Camera-visible/direct radiance; W: primary coverage, then packed display RGB8 after display conversion.
     vec4 surface;      // Surface-pass HDR; W: actual closest-hit BVH queries.
     vec4 volume;       // Current-frame in-scattering; W: actual shadow BVH queries.
+    vec4 scatter_blur; // SSS light contribution RGB; maximum cell blur radius in pixels.
 };
 #ifndef NANOVA_DEBUG_BINDING
 #define NANOVA_DEBUG_BINDING RENDER_BINDING_DEBUG

@@ -76,7 +76,8 @@ bool render_scene_validate(const RenderScene* scene)
         for (uint32_t j=0;j<4;++j)
             valid=valid && std::isfinite(m->center_radius[j]) && std::isfinite(m->scattering[j])
                 && std::isfinite(m->absorption_phase[j]) && std::isfinite(m->lighting[j]) && std::isfinite(m->blur[j]);
-        valid=valid && m->blur[0]>=0 && m->blur[0]<=32 && m->blur[1]>=0 && m->blur[1]<=100 && m->blur[2]>=0 && m->blur[2]<=32;
+        valid=valid && (m->blur[3]==0 || (m->blur[3]==1 && m->blur[0]<m->blur[1] && m->blur[1]<=1))
+            && m->blur[0]>=0 && m->blur[0]<=32 && m->blur[1]>=0 && m->blur[1]<=100 && m->blur[2]>=0 && m->blur[2]<=32;
         valid=valid && (m->lighting[0]==0 || m->lighting[0]==1) && m->center_radius[3]>=0 && m->scattering[3]>=0 && m->scattering[3]<=1;
     }
     for (uint32_t axis=0;axis<3;++axis)
@@ -121,6 +122,12 @@ bool render_scene_write(const RenderScene* scene,const char* path)
                 const GpuTriangle& triangle=scene->geometry.triangles[t];
                 fprintf(file,"%s[%u,%u,%u,%u]",t>m->first ? "," : "",triangle.index[0]-m->first_vertex,triangle.index[1]-m->first_vertex,triangle.index[2]-m->first_vertex,triangle.index[3]);
             }
+            fprintf(file,"],\"wall_colors\":[");
+            for (uint32_t v=0;v<m->vertex_count;++v)
+            {
+                const GpuVertex& vertex=scene->geometry.vertices[m->first_vertex+v];
+                fprintf(file,"%s[%.6f,%.6f,%.6f]",v ? "," : "",vertex.color[0],vertex.color[1],vertex.color[2]);
+            }
             fprintf(file,"]}");
         }
         fprintf(file,"}");
@@ -144,6 +151,8 @@ bool render_scene_write(const RenderScene* scene,const char* path)
     }
     fprintf(file,"],\"membrane_fade\":[%.6f,%.6f],\"wall_blur_radius\":%.6f,\"medium_blur\":[",scene->thin_edge_strength,scene->thin_edge_power,scene->thin_blur_radius);
     for (uint32_t i=0;i<scene->media.size();++i) fprintf(file,"%s[%.6f,%.6f,%.6f]",i ? "," : "",scene->media[i].blur[0],scene->media[i].blur[1],scene->media[i].blur[2]);
+    fprintf(file,"],\"medium_blur_fractional\":[");
+    for (uint32_t i=0;i<scene->media.size();++i) fprintf(file,"%s%s",i ? "," : "",scene->media[i].blur[3]>0 ? "true" : "false");
     fprintf(file,"],\"medium_shadows\":[");
     for (uint32_t i=0;i<scene->media.size();++i) fprintf(file,"%s%s",i ? "," : "",scene->media[i].lighting[0]>0 ? "true" : "false");
     fprintf(file,"],\"fog\":{\"blur_radius\":%.6f,\"sight_feather\":%.6f,\"plane_z\":%.6f,\"tint\":[%.6f,%.6f,%.6f],\"sight\":[",scene->fog_blur,scene->fog_feather,scene->fog_plane_z,scene->fog_tint.r,scene->fog_tint.g,scene->fog_tint.b);

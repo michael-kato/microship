@@ -150,14 +150,64 @@
                     "type": "number",
                     "minimum": 0,
                     "maximum": 32
+                  },
+                  "start_fraction": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "full_fraction": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
                   }
                 },
                 "required": [
-                  "pixels_per_unit",
-                  "sharp_distance",
                   "max_radius"
                 ],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "oneOf": [
+                  {
+                    "required": [
+                      "pixels_per_unit",
+                      "sharp_distance"
+                    ],
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "start_fraction"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "full_fraction"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "required": [
+                      "start_fraction",
+                      "full_fraction"
+                    ],
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "pixels_per_unit"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "sharp_distance"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             },
             "required": [

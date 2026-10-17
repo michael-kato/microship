@@ -107,7 +107,15 @@ static bool load_bodies(Content* c,Json root,const char* path)
         Json variation=json_find(j,"variation");
         if (json_present(variation))
         {
-            json_object(variation,"parts|shape|interior");
+            json_object(variation,"parts|shape|interior|wall_noise");
+            Json noise=json_find(variation,"wall_noise");
+            if (json_present(noise))
+            {
+                json_object(noise,"strength|frequency|warm|cool");
+                b.wall_noise_strength=json_float(json_get(noise,"strength"),0,1);
+                b.wall_noise_frequency=json_positive(json_get(noise,"frequency"),32);
+                b.wall_noise_warm=json_color(json_get(noise,"warm"));b.wall_noise_cool=json_color(json_get(noise,"cool"));
+            }
             json_path(json_get(variation,"parts"),path,b.parts_path);
             b.shape_variation=json_float(json_get(variation,"shape"),0,MAX_CELL_SHAPE_VARIATION);
             b.part_variation=json_float(json_get(variation,"interior"),0,MAX_CELL_INTERIOR_VARIATION);
@@ -127,8 +135,10 @@ static bool load_factions(Content* c,Json root)
         Json appearance=json_find(j,"cell_appearance");
         if (json_present(appearance))
         {
-            json_object(appearance,"tint|strength|seconds|roughness|displacement");f.cell_tint=json_color(json_get(appearance,"tint"));
+            json_object(appearance,"tint|strength|seconds|morph_seconds|roughness|displacement");f.cell_tint=json_color(json_get(appearance,"tint"));
             f.cell_strength=json_float(json_get(appearance,"strength"),0,1);f.transform_seconds=json_positive(json_get(appearance,"seconds"),MAX_CELL_TINT_SECONDS);
+            f.morph_seconds=f.transform_seconds;
+            Json morph=json_find(appearance,"morph_seconds");if (json_present(morph)) f.morph_seconds=json_positive(morph,MAX_CELL_TINT_SECONDS);
             Json roughness=json_find(appearance,"roughness");
             if (json_present(roughness)) { f.cell_roughness=json_float(roughness,.02f,1);f.cell_material=true; }
             Json displacement=json_find(appearance,"displacement");

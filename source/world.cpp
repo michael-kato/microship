@@ -348,9 +348,20 @@ static bool load_placements(World* w,Json root)
             Json blur=json_find(medium,"depth_blur");
             if (json_present(blur))
             {
-                json_object(blur,"pixels_per_unit|sharp_distance|max_radius");
-                b.interior_blur_rate=json_float(json_get(blur,"pixels_per_unit"),0,32);
-                b.interior_blur_sharp=json_float(json_get(blur,"sharp_distance"),0,100);
+                json_object(blur,"pixels_per_unit|sharp_distance|max_radius|start_fraction|full_fraction");
+                b.interior_blur_fraction=json_present(json_find(blur,"start_fraction")) || json_present(json_find(blur,"full_fraction"));
+                if (b.interior_blur_fraction)
+                {
+                    b.interior_blur_rate=json_float(json_get(blur,"start_fraction"),0,1);
+                    b.interior_blur_sharp=json_float(json_get(blur,"full_fraction"),0,1);
+                    if (b.interior_blur_sharp<=b.interior_blur_rate || json_present(json_find(blur,"pixels_per_unit")) || json_present(json_find(blur,"sharp_distance")))
+                        json_error(blur,"fractional blur requires start < full and no distance fields");
+                }
+                else
+                {
+                    b.interior_blur_rate=json_float(json_get(blur,"pixels_per_unit"),0,32);
+                    b.interior_blur_sharp=json_float(json_get(blur,"sharp_distance"),0,100);
+                }
                 b.interior_blur_max=json_float(json_get(blur,"max_radius"),0,32);
             }
             b.interior_radius=json_positive(json_get(medium,"radius_fraction"),1);

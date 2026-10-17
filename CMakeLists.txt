@@ -51,7 +51,7 @@ set(focus_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/focus.comp.spv")
 add_custom_command(OUTPUT "${focus_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/focus.comp" -o "${focus_output}"
-    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/render_uniform.glsl assets/shaders/focus.comp VERBATIM)
+    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/render_uniform.glsl assets/shaders/debug_buffers.glsl assets/shaders/focus.comp VERBATIM)
 set(medium_blur_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/medium_blur.comp.spv")
 add_custom_command(OUTPUT "${medium_blur_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"

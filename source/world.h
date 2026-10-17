@@ -24,6 +24,7 @@ struct Body
     Color interior_scattering;
     float interior_absorption, interior_anisotropy;
     float interior_blur_rate,interior_blur_sharp,interior_blur_max;
+    bool interior_blur_fraction;
 };
 
 struct Spawn

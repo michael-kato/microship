@@ -17,7 +17,7 @@ struct RenderInstance
 };
 struct RenderMedium
 {
-    float center_radius[4], scattering[4], absorption_phase[4],lighting[4],blur[4]; // lighting.x enables geometry shadows.
+    float center_radius[4], scattering[4], absorption_phase[4],lighting[4],blur[4]; // Lighting: shadow enabled, grid eligible, grid active, full cell radius.
 };
 enum { MAX_RENDER_SIGHT=272 };
 struct RenderSight { float center_radius[4]; };

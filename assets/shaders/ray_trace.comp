@@ -4,7 +4,7 @@
 #include "render_bindings.glsl"
 #ifdef NANOVA_DEBUG_BUFFERS
 #include "debug_buffers.glsl"
-vec3 debug_direct = vec3(0.0);
+vec3 debug_direct = vec3(0.0),debug_sss=vec3(0.0);
 vec4 debug_vertex_hit = vec4(0.0), debug_normal_depth = vec4(0.0);
 uint debug_closest_queries = 0u, debug_shadow_queries = 0u, debug_primary_hits = 0u;
 #endif
@@ -180,9 +180,18 @@ float medium_blur_radius(vec3 direction,float distance)
     float radius=0;
     for (uint i=0u;i<render.scene.y;++i)
     {
-        Medium m=media[i];if (m.blur.x<=0.0 || m.blur.z<=0.0) continue;
+        Medium m=media[i];if (m.blur.z<=0.0) continue;
         float begin,end;
-        if (medium_interval(m,render.camera_position.xyz,direction,distance,begin,end))
+        if (m.blur.w>0.0)
+        {
+            if (m.lighting.w>0.0) m.center_radius.w=m.lighting.w;
+            if (medium_interval(m,render.camera_position.xyz,direction,RAY_MAX,begin,end))
+            {
+                float depth=(distance-begin)/max(end-begin,MIN_SHADING_DENOMINATOR);
+                radius=max(radius,m.blur.z*smoothstep(m.blur.x,m.blur.y,depth));
+            }
+        }
+        else if (medium_interval(m,render.camera_position.xyz,direction,distance,begin,end))
             radius=max(radius,min(m.blur.z,max(0.0,end-begin-m.blur.y)*m.blur.x));
     }
     return radius;
@@ -251,9 +260,10 @@ vec3 volume_light(vec3 point,vec3 view_direction,Medium medium)
     return medium.scattering.rgb*incident;
 }
 
-vec3 single_scattering(vec3 origin,vec3 direction,float distance)
+vec3 single_scattering(vec3 origin,vec3 direction,float distance,out vec3 sharp)
 {
-    vec3 radiance=vec3(0);
+    vec3 radiance=vec3(0);sharp=vec3(0);
+    float path_offset=dot(origin-render.camera_position.xyz,direction);
     uint steps=uint(render.display.w);
     for (uint i=0u;i<render.scene.y;++i)
     {
@@ -265,8 +275,9 @@ vec3 single_scattering(vec3 origin,vec3 direction,float distance)
         {
             float d=begin+(float(step)+.5)*stride;
             vec3 point=origin+direction*d;
-            radiance+=transmittance(origin,direction,d)*medium_density(medium,point)*
-                volume_light(point,direction,medium)*stride;
+            vec3 contribution=transmittance(origin,direction,d)*medium_density(medium,point)*volume_light(point,direction,medium)*stride;
+            radiance+=contribution;
+            if (medium_blur_radius(direction,path_offset+d)<=0.0) sharp+=contribution;
         }
     }
     return radiance;
@@ -458,8 +469,9 @@ float scattering_weight(Surface s)
     return s.metal || s.unshadowed ? 0.0 : s.subsurface.a*render.subsurface.x;
 }
 
-vec3 evaluate_studio(Surface s,vec3 outgoing,int selected)
+vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
 {
+    sss=vec3(0);
     if (render.studio_direction[selected].w<=0.0) return vec3(0);
     vec3 direction=render.studio_direction[selected].xyz;
     float cosine=dot(s.normal,direction),geometric_cosine=dot(s.geometric_normal,direction);
@@ -477,16 +489,19 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected)
             float f=0.0;
             if (cosine>0.0 && s.roughness<DIFFUSE_ROUGHNESS_THRESHOLD && s.ior>1.0)
                 f=fresnel(max(MIN_SHADING_DENOMINATOR,dot(outgoing,normalize(direction+outgoing))),s.ior);
-            reflected+=s.color*((1.0-f)*scatter*(1.0-render.subsurface.z)*diffuse/PI);
+            sss=s.color*((1.0-f)*scatter*(1.0-render.subsurface.z)*diffuse/PI);
+            reflected+=sss;
         }
         weighted=(1.0-transmission)*reflected*render.studio_color[selected].rgb;
     }
     else if (cosine<0.0 && geometric_cosine<0.0 && transmission>0.0)
         weighted=s.color*((1.0-scatter)*transmission*(1.0-render.thin_material.w)*(-cosine)/PI)*
             exp(-render.thin_material.y/max(MIN_MEMBRANE_DIRECTION_COSINE,-cosine))*render.studio_color[selected].rgb;
-    if (max(weighted.r,max(weighted.g,weighted.b))<=0.0) return vec3(0);
+    if (max(weighted.r,max(weighted.g,weighted.b))<=0.0) { sss=vec3(0);return vec3(0); }
     vec3 origin=s.point+s.geometric_normal*(geometric_cosine>0.0 ? point_epsilon(s.point) : -point_epsilon(s.point));
-    return weighted*(s.unshadowed ? vec3(1) : sampled_visibility(origin,s.geometric_normal*(geometric_cosine>0.0 ? 1.0 : -1.0),selected));
+    vec3 visibility=s.unshadowed ? vec3(1) : sampled_visibility(origin,s.geometric_normal*(geometric_cosine>0.0 ? 1.0 : -1.0),selected);
+    sss*=(1.0-transmission)*render.studio_color[selected].rgb*visibility;
+    return weighted*visibility;
 }
 
 bool subsurface_exit(Surface s,vec3 direction,float limit,out vec3 exit_point,out float thickness)
@@ -617,15 +632,18 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
         }
 #endif
         vec3 direct=s.color*s.emission;
-        for (int light=0;light<3;++light) direct+=evaluate_studio(s,-direction,light);
-        if (subsurface_sample_weight>0.0) direct+=subsurface_sample_weight*evaluate_subsurface(s,-direction);
+        vec3 sss=vec3(0);
+        for (int light=0;light<3;++light)
+        { vec3 contribution;direct+=evaluate_studio(s,-direction,light,contribution);sss+=contribution; }
+        if (subsurface_sample_weight>0.0)
+        { vec3 contribution=subsurface_sample_weight*evaluate_subsurface(s,-direction);direct+=contribution;sss+=contribution; }
         float view_cosine=abs(dot(s.normal,direction));
         float opacity=s.translucent ? membrane_opacity(view_cosine) : 1.0;
         vec3 contribution=weight*(direct+ambient_surface(s,-direction))*opacity;
         radiance+=contribution;
         if (blur_radius<=0.0) film_sharp_sum+=contribution;
 #ifdef NANOVA_DEBUG_BUFFERS
-        debug_direct+=weight*direct*opacity;
+        debug_direct+=weight*direct*opacity;debug_sss+=weight*sss*opacity;
 #endif
         float clear=s.translucent ? membrane_clear(view_cosine) : 0.0;
         if (clear<=0.0 || layer==render.settings.w) break;
@@ -736,7 +754,7 @@ void main()
         vec3 background=texelFetch(soft_backdrop,ivec2(pixel),0).rgb;
 #ifdef NANOVA_DEBUG_BUFFERS
         debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(vec4(0),vec4(0),
-            vec4(background,0),vec4(background,0),vec4(0));
+            vec4(background,0),vec4(background,0),vec4(0),vec4(0));
 #endif
         imageStore(output_image,ivec2(pixel),vec4(background,0.0));
         return;
@@ -766,8 +784,8 @@ void main()
 #ifdef NANOVA_DEBUG_BUFFERS
     debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(debug_vertex_hit,debug_normal_depth,
         vec4(debug_direct/float(sample_count),float(debug_primary_hits)/float(sample_count)),
-        vec4(radiance,float(debug_closest_queries)),
-        vec4(0,0,0,float(debug_shadow_queries)));
+        vec4(sum/float(sample_count),float(debug_closest_queries)),
+        vec4(0,0,0,float(debug_shadow_queries)),vec4(debug_sss/float(sample_count),film_blur_max));
 #endif
 #else
     // The surface pass overwrites HDR before this pass. Skip empty-space pixels
@@ -781,20 +799,20 @@ void main()
     for (uint sample_index = 0u; sample_index < volume_count; ++sample_index)
     {
         vec3 direction=film_direction(pixel,film_sample(sample_index,volume_count));
-        vec3 origin=render.camera_position.xyz,weight=vec3(1);bool through_wall=false;
+        vec3 origin=render.camera_position.xyz,weight=vec3(1);
         for (uint depth=0u;depth<=render.settings.w;++depth)
         {
             uint triangle;vec2 barycentric;float distance;
             bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
             if (!hit && render.backdrop_style.x>0.0)
                 distance=backdrop_remaining(origin,direction,pixel);
-            vec3 scattering=weight*single_scattering(origin,direction,distance);
-            volume_sum+=scattering;if (!through_wall) sharp_volume_sum+=scattering;
+            vec3 sharp;
+            vec3 scattering=weight*single_scattering(origin,direction,distance,sharp);
+            volume_sum+=scattering;sharp_volume_sum+=weight*sharp;
             if (!hit || depth==render.settings.w) break;
             Surface s;if (!surface_at(triangle,barycentric,direction,s) || !s.translucent) break;
             float view_cosine=abs(dot(s.normal,direction)),opacity=membrane_opacity(view_cosine);
             float clear=membrane_clear(view_cosine);if (clear<=0.0) break;
-            through_wall=true;
             weight*=transmittance(origin,direction,distance)*clear*mix(vec3(1),s.color,CLEAR_MEMBRANE_PIGMENT_WEIGHT*opacity)
                 *exp(-render.thin_material.y*opacity/max(MIN_MEMBRANE_DIRECTION_COSINE,view_cosine));
             origin=s.point-s.geometric_normal*point_epsilon(s.point);

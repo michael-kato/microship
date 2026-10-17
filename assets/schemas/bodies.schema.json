@@ -44,6 +44,34 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 0.15
+              },
+              "wall_noise": {
+                "type": "object",
+                "properties": {
+                  "strength": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "frequency": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 32
+                  },
+                  "warm": {
+                    "$ref": "shared.schema.json#/$defs/color"
+                  },
+                  "cool": {
+                    "$ref": "shared.schema.json#/$defs/color"
+                  }
+                },
+                "required": [
+                  "strength",
+                  "frequency",
+                  "warm",
+                  "cool"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [

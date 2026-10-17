@@ -35,7 +35,7 @@ static const float LUMINANCE_RED_WEIGHT = .2126f;
 static const float LUMINANCE_GREEN_WEIGHT = .7152f;
 static const float LUMINANCE_BLUE_WEIGHT = .0722f;
 static const double BACKDROP_TIME_WRAP_SECONDS = 10000.0;
-static const int GPU_DEBUG_PIXEL_BYTES = 80;
+static const int GPU_DEBUG_PIXEL_BYTES = 96;
 static const int COMPANION_SHADER_PATH_CAPACITY = 1024;
 static const double NANOSECONDS_PER_MILLISECOND = 1000000.0;
 static const int RENDER_STORAGE_BUFFER_BINDINGS = 10;
@@ -678,7 +678,7 @@ static void scene_uniform(RenderUniform* uniform,const RenderScene* scene)
     memcpy(uniform->scene_min,scene->bounds_min,3*sizeof(float));memcpy(uniform->scene_max,scene->bounds_max,3*sizeof(float));
     memcpy(uniform->foreground_min,scene->foreground_min,3*sizeof(float));memcpy(uniform->foreground_max,scene->foreground_max,3*sizeof(float));
     uniform->quality[3]=scene->thin_blur_radius>0 ? 1 : 0;
-    for (uint32_t i=0;i<scene->media.size();++i) if (scene->media[i].blur[0]>0 && scene->media[i].blur[2]>0) uniform->quality[3]=1;
+    for (uint32_t i=0;i<scene->media.size();++i) if ((scene->media[i].blur[0]>0 || scene->media[i].blur[3]>0) && scene->media[i].blur[2]>0) uniform->quality[3]=1;
     uniform->scene[1]=(uint32_t)scene->media.size();uniform->scene[2]=scene->sight_count;
     uniform->fog_grid[0]=scene->fog_field.low_x;uniform->fog_grid[1]=scene->fog_field.low_y;
     uniform->fog_grid[2]=scene->fog_field.spacing;uniform->fog_grid[3]=SIGHT_FIELD_SIDE;
@@ -1435,7 +1435,7 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
     state->config = *config;
     state->headless = headless;
     state->no_activate = no_activate;
-    state->debug_available = !headless || debug_views || scene->guides_required;
+    state->debug_available = !headless || debug_views || scene->guides_required || config->focus_radius>0;
     state->custom_shader = strcmp(shader_path,builtin_shader_path) != 0;
     if (state->custom_shader && scene->guides_required)
     {
@@ -1649,7 +1649,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
         }
     }
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_BACKDROP_END);
-    if (renderer->debug_views || scene->guides_required || uniform->quality[3]) shader_buffer_barrier(state->command);
+    if (renderer->debug_views || scene->guides_required || uniform->quality[3] || state->config.focus_radius>0) shader_buffer_barrier(state->command);
 
     shader_buffer_barrier(state->command);
     vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->pipeline_layout,0,1,&state->descriptors,0,0);
@@ -1668,12 +1668,12 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_GRID_END);
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_SURFACE_BEGIN);
     vkCmdBindPipeline(state->command, VK_PIPELINE_BIND_POINT_COMPUTE,
-        renderer->debug_views ? state->debug_surface_pipeline : scene->guides_required ? state->guide_surface_pipeline : state->pipeline);
+        renderer->debug_views ? state->debug_surface_pipeline : (scene->guides_required || state->config.focus_radius>0) ? state->guide_surface_pipeline : state->pipeline);
     vkCmdBindDescriptorSets(state->command, VK_PIPELINE_BIND_POINT_COMPUTE, state->pipeline_layout,
         0, 1, &state->descriptors, 0, 0);
     vkCmdDispatch(state->command, (state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, (state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, 1);
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_SURFACE_END);
-    if (renderer->debug_views || scene->guides_required || uniform->quality[3]) shader_buffer_barrier(state->command);
+    if (renderer->debug_views || scene->guides_required || uniform->quality[3] || state->config.focus_radius>0) shader_buffer_barrier(state->command);
     if (uniform->quality[0] && uniform->scene[1])
     {
         image_barrier(state->command,state->hdr,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
@@ -1684,7 +1684,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
         vkCmdDispatch(state->command,(state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,(state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,1);
     }
     vkCmdWriteTimestamp(state->command, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, state->queries, GPU_TIME_VOLUME_END);
-    if (renderer->debug_views || scene->guides_required || uniform->quality[3]) shader_buffer_barrier(state->command);
+    if (renderer->debug_views || scene->guides_required || uniform->quality[3] || state->config.focus_radius>0) shader_buffer_barrier(state->command);
     image_barrier(state->command, state->hdr, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
         VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);

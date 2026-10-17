@@ -10,7 +10,21 @@
       "variation": {
         "parts": "../models/cell_infected.parts.json",
         "shape": 0.065,
-        "interior": 0.105
+        "interior": 0.105,
+        "wall_noise": {
+          "strength": 0.32,
+          "frequency": 5.5,
+          "warm": [
+            0.94,
+            0.54,
+            0.69
+          ],
+          "cool": [
+            0.45,
+            0.78,
+            0.86
+          ]
+        }
       }
     },
     {
@@ -22,7 +36,21 @@
       "variation": {
         "parts": "../models/cell_healthy.parts.json",
         "shape": 0.065,
-        "interior": 0.105
+        "interior": 0.105,
+        "wall_noise": {
+          "strength": 0.32,
+          "frequency": 5.5,
+          "warm": [
+            0.94,
+            0.54,
+            0.69
+          ],
+          "cool": [
+            0.45,
+            0.78,
+            0.86
+          ]
+        }
       }
     },
     {
@@ -34,7 +62,21 @@
       "variation": {
         "parts": "../models/cell_neutral.parts.json",
         "shape": 0.065,
-        "interior": 0.105
+        "interior": 0.105,
+        "wall_noise": {
+          "strength": 0.32,
+          "frequency": 5.5,
+          "warm": [
+            0.94,
+            0.54,
+            0.69
+          ],
+          "cool": [
+            0.45,
+            0.78,
+            0.86
+          ]
+        }
       }
     }
   ]

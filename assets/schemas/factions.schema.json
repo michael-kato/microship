@@ -110,6 +110,11 @@
                   "seed"
                 ],
                 "additionalProperties": false
+              },
+              "morph_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 3600
               }
             },
             "required": [

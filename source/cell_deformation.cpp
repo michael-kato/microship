@@ -31,10 +31,28 @@ static Vec3 target_displacement(Vec3 point,const Body& body,const FactionDefinit
     return scale(radial,height*body.radius*profile.displacement_height);
 }
 
+static void wall_pigment(GpuVertex* v,const Body& body,const BodyDefinition& d)
+{
+    if (d.wall_noise_strength<=0) return;
+    Vec3 q=scale(subtract(Vec3{v->position[0],v->position[1],v->position[2]},body.position),d.wall_noise_frequency/body.radius);
+    float phase=(body.seed%65536)*(2*PI_RADIANS/65536);
+    float noise=.5f+.25f*std::sin(q.x+1.7f*q.y+.7f*q.z+phase)*std::sin(1.3f*q.z-.6f*q.y+phase)
+        +.15f*std::sin(2.1f*q.x-.8f*q.z+phase)*std::cos(1.6f*q.y+.9f*q.z);
+    float brightness=1+.12f*std::sin(1.9f*q.x+1.3f*q.y-q.z+phase);
+    const float warm[3]={d.wall_noise_warm.r,d.wall_noise_warm.g,d.wall_noise_warm.b};
+    const float cool[3]={d.wall_noise_cool.r,d.wall_noise_cool.g,d.wall_noise_cool.b};
+    for (uint32_t c=0;c<3;++c)
+    {
+        float pigment=warm[c]+(cool[c]-warm[c])*noise;
+        v->color[c]=std::fmax(0.0f,std::fmin(1.0f,v->color[c]*brightness*(1-d.wall_noise_strength)+pigment*d.wall_noise_strength));
+    }
+}
+
 bool presentation_prepare_membranes(Presentation* p,const Simulation* s)
 {
     bool enabled=false;
     for (uint32_t f=1;f<MAX_FACTIONS;++f) enabled=enabled || s->world.content.factions[f].displacement_features>0;
+    for (uint32_t b=0;b<s->world.content.body_count;++b) enabled=enabled || s->world.content.bodies[b].wall_noise_strength>0;
     if (!enabled) return true;
     Geometry& g=p->scene.geometry;p->membrane_groups.resize(g.vertices.size(),NO_MEMBRANE_GROUP);
     for (uint32_t body=0;body<s->world.body_count;++body)
@@ -52,6 +70,8 @@ bool presentation_prepare_membranes(Presentation* p,const Simulation* s)
         {
             if (!wall[v]) continue;
             MembraneVertex record={};record.index=mesh.first_vertex+v;record.neutral=g.vertices[record.index];
+            wall_pigment(&record.neutral,s->world.bodies[body],s->world.content.bodies[s->world.bodies[body].type]);
+            g.vertices[record.index]=record.neutral;
             Vec3 point={record.neutral.position[0],record.neutral.position[1],record.neutral.position[2]};
             std::array<float,3> key={{point.x,point.y,point.z}};
             auto inserted=groups.insert(std::make_pair(key,(uint32_t)p->membrane_normals.size()));

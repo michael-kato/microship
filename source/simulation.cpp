@@ -1386,8 +1386,8 @@ void simulation_step(Simulation* s)
             for (uint32_t faction=1;faction<MAX_FACTIONS;++faction)
             {
                 const FactionDefinition& profile=s->world.content.factions[faction];
-                if (profile.transform_seconds<=0) continue;
-                float target=s->world.bodies[p].owner==faction ? 1.0f : 0.0f,step=dt/profile.transform_seconds;
+                if (profile.morph_seconds<=0) continue;
+                float target=s->world.bodies[p].owner==faction ? 1.0f : 0.0f,step=dt/profile.morph_seconds;
                 float* blend=&appearance.factions[faction];*blend+=std::fmax(-step,std::fmin(step,target-*blend));
             }
             if (f.cell_strength>0)

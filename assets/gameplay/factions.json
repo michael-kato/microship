@@ -26,11 +26,12 @@
         "roughness": 0.18,
         "displacement": {
           "features": 28,
-          "height": 0.14,
+          "height": 0.19,
           "width_degrees": 20,
           "profile": "pointed",
           "seed": 7821
-        }
+        },
+        "morph_seconds": 24
       }
     },
     {
@@ -55,7 +56,8 @@
         ],
         "strength": 0.22,
         "seconds": 180,
-        "roughness": 0.6
+        "roughness": 0.6,
+        "morph_seconds": 24
       }
     },
     {
@@ -84,11 +86,12 @@
         "roughness": 0.94,
         "displacement": {
           "features": 18,
-          "height": 0.105,
+          "height": 0.18,
           "width_degrees": 38,
           "profile": "rounded",
           "seed": 1769
-        }
+        },
+        "morph_seconds": 24
       }
     }
   ]
