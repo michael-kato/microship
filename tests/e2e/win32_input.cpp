@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 // Feed the real game's Win32 input queue. No game state is accessed.
 static bool key(HWND window,WPARAM code,bool down,bool repeat=false)
 {
@@ -12,8 +13,27 @@ static bool key(HWND window,WPARAM code,bool down,bool repeat=false)
 static bool press(HWND window,WPARAM code)
 { return key(window,code,true) && key(window,code,true,true) && key(window,code,false); }
 
+static int menu_input(int argc,char** argv)
+{
+    bool close=argc==2 && !strcmp(argv[1],"--menu-close");
+    if (!close && (argc!=4 || strcmp(argv[1],"--menu-click"))) return 2;
+    HWND window=0;
+    for (unsigned attempt=0;!window && attempt<200;++attempt)
+    { window=FindWindowA("nanovaStartMenu","nanova - Choose faction");if (!window) Sleep(5); }
+    if (!window) { fprintf(stderr,"Nanova menu not found.\n");return 1; }
+    if (close) return PostMessageA(window,WM_CLOSE,0,0) ? 0 : 1;
+    char* end=0;long x=strtol(argv[2],&end,10);if (end==argv[2] || *end || x<0 || x>8191) return 2;
+    long y=strtol(argv[3],&end,10);if (end==argv[3] || *end || y<0 || y>8191) return 2;
+    RECT client;if (!GetClientRect(window,&client) || x>=client.right || y>=client.bottom) return 2;
+    LPARAM point=MAKELPARAM(x,y);
+    if (!PostMessageA(window,WM_LBUTTONDOWN,MK_LBUTTON,point)
+        || !PostMessageA(window,WM_LBUTTONUP,0,point)) return 1;
+    printf("Queued menu click at %ld %ld.\n",x,y);return 0;
+}
+
 int main(int argc,char** argv)
 {
+    if (argc>=2 && (!strcmp(argv[1],"--menu-click") || !strcmp(argv[1],"--menu-close"))) return menu_input(argc,argv);
     bool render=argc>=2 && !strcmp(argv[1],"--render-keys");
     HWND window=FindWindowA("nanovaWindow","Nanova");
     if (render) for (unsigned attempt=0;!window && attempt<100;++attempt)
