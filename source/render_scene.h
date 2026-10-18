@@ -12,7 +12,7 @@ struct RenderInstance
 {
     float transform[3][4];
     uint32_t mesh, mask;
-    bool background;
+    bool background,static_lighting; // Static light blockers can be baked until their inputs change.
     float style[INSTANCE_STYLE_FLOATS]; // RGB tint, weight; emission, target roughness, roughness weight, flags.
 };
 struct RenderMedium
@@ -21,6 +21,7 @@ struct RenderMedium
 };
 enum { MAX_RENDER_SIGHT=272 };
 struct RenderSight { float center_radius[4]; };
+struct RenderGridBounds { float low[4],high[4]; };
 struct RenderLight { Vec3 direction; Color color; float irradiance; };
 struct EffectSegment { float start[4],end[4],color[4]; };
 enum { EFFECT_TILE=16, MAX_EFFECT_SEGMENTS=8192, MAX_EFFECT_TILES_PER_SEGMENT=64, MAX_EFFECT_REFERENCES=MAX_EFFECT_SEGMENTS*MAX_EFFECT_TILES_PER_SEGMENT };
@@ -29,6 +30,7 @@ struct RenderScene
     Geometry geometry;
     std::vector<RenderInstance> instances;
     std::vector<RenderMedium> media;
+    std::vector<RenderGridBounds> lighting_bounds;
     std::vector<EffectSegment> effects;
     std::vector<uint32_t> effect_tiles;
     uint32_t effect_count, tile_count;

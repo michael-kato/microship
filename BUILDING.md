@@ -41,3 +41,47 @@ reprojection, temporal denoising, and progressive accumulation across game
 frames remain excluded. For each cache, check dependency changes against
 fresh application renders; report image error, GPU time, bake time, and
 memory.
+
+The biology config enables `lighting.static_lighting_cache`. The renderer
+bakes incoming light visibility and medium attenuation at thin cell
+surfaces and in interior shadow grids. It calculates material shading,
+view-dependent highlights, SSS thickness, and camera-path scattering from
+current input. Moving blockers use a separate current-frame shadow field.
+Static transport changes cause a rebuild before the next draw. These
+bakes stay in GPU memory; they are not saved as authored image maps.
+
+Set `lighting.static_lighting_cache` to `false` for the unbaked reference.
+Set `lighting.force_lighting_rebuild` to `true` to rebuild the same bake
+each frame for comparison. This retains the bake's spatial approximation.
+The GPU log separates static bake time from dynamic shadow work. F1 shows
+both in the `LIGHTING FIELDS` span and retains full GPU time accounting.
+
+To compare reuse with a fresh bake, run
+`python3 tests/e2e/static_lighting.py build/windows-cross/nanova.exe --run`.
+Add `--baseline build/static-lighting-baseline/nanova.exe --variants baseline cached refresh`
+for the saved pre-change executable and assets. For three alternating-order
+timing pairs, run
+`python3 tests/e2e/static_lighting_timing.py build/windows-cross/nanova.exe --baseline build/static-lighting-baseline/nanova.exe --run`.
+These scripts retain the GPU limits above. Without `--run`, they prepare
+inputs only. The older scattering and volume comparison scripts use the
+unbaked path for strict image-equivalence checks.
+
+The live invalidation check is
+`python3 tests/e2e/static_lighting_live.py build/windows-cross/nanova.exe --run`.
+It compares a changing cell with a fresh application at the same tick.
+The camera check is
+`python3 tests/e2e/static_lighting_camera.py build/windows-cross/nanova.exe --run`;
+first build `nanova_input_probe`. It sends Win32 pan messages to the real
+window. On Proton it disables host audio for this input-only check. Its
+250 ms pause permits input delivery and must not be used for timings.
+
+Three short close-view timing pairs at native 1080p and three film samples
+measured median GPU render time of 35.974 ms before and 26.864 ms after.
+All pairs saved 8.324 to 9.181 ms. Surface/SSS time fell from 18.472 to
+10.191 ms; volume time stayed near 13.3 ms. Median application time,
+including the final capture, fell from 43.144 to 35.155 ms. The bake adds
+about 34.1 MiB for the default world. Surface interpolation and lower
+resolution moving shadows change the image slightly: close-view mean
+channel error was 0.225 RGB8 levels, with a maximum of 8. Reused and fresh
+bakes matched exactly. These checks do not establish steady gameplay
+performance, shipping six-film performance, or native Windows results.

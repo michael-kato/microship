@@ -10,7 +10,7 @@ cases=[('normal',()),('near',('--camera-zoom','1000')),('buffers',('--debug-view
 if not a.run:print('Prepared three sequential native 1920x1080 two-frame profiler captures; three film samples, one volume ray, one backdrop query; 2s/process, 5s/batch. No GPU work started.');raise SystemExit(0)
 os.environ['NANOVA_VULKAN_VALIDATION']='1';out.mkdir(parents=True,exist_ok=True);report={};started=time.monotonic()
 parents={'CPU FRAME':['INPUT','SIMULATION','SCENE + AUDIO','RENDER'],'RENDER':['ACQUIRE','UPLOAD + AS RECORD','PASS RECORD','SUBMIT + GPU WAIT','QUERY + STATS','PRESENT WAIT','CAPTURE'],
- 'GPU FRAME':['SCENE','POST','OUTPUT'],'SCENE':['AS UPDATE','BACKDROP','SHADOW GRID','SURFACE + SSS','VOLUME'],'POST':['EFFECTS','CELL BLUR','FOG','TILT SHIFT','BLOOM + DISPLAY'],'OUTPUT':['HUD + PROFILER','OUTPUT COPY']}
+ 'GPU FRAME':['SCENE','POST','OUTPUT'],'SCENE':['AS UPDATE','BACKDROP','LIGHTING FIELDS','SURFACE + SSS','VOLUME'],'POST':['EFFECTS','CELL BLUR','FOG','TILT SHIFT','BLOOM + DISPLAY'],'OUTPUT':['HUD + PROFILER','OUTPUT COPY']}
 for name,extra in cases:
  remaining=5-(time.monotonic()-started);assert remaining>0,'GPU batch budget expired'
  cmd=[*command,'--headless','--frames','2','--samples','3','--stats','--world-seed','1234','--ticks','600','--time','10','--step-seconds','0','--capture',str(out/(name+'.ppm')),*extra]

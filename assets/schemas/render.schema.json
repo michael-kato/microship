@@ -138,6 +138,12 @@
               "maximum": 64
             }
           ]
+        },
+        "static_lighting_cache": {
+          "type": "boolean"
+        },
+        "force_lighting_rebuild": {
+          "type": "boolean"
         }
       },
       "required": [

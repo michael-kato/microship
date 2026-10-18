@@ -14,6 +14,8 @@ world=stage_world(root/'assets/levels/biology-virus.json',out);config=json.loads
 assert config['output']['width']==1920 and config['output']['height']==1080
 assert config['volume']==dict(rays_per_pixel=1,integration_steps=8)
 config['volume']['integration_steps']=a.steps;config['lighting']['shadow_grid_resolution']=a.shadow_grid
+# Static bakes use a different spatial approximation; compare them with static_lighting.py.
+config['lighting'].pop('static_lighting_cache',None);config['lighting'].pop('force_lighting_rebuild',None)
 if a.external:
  world.pop('effects',None);world.pop('rules',None);world['match']={'player':'virus','opponent':'immune'};config.pop('tilt_shift',None)
  target=world['bodies'][0]['position'];offset=[x-y for x,y in zip(config['camera']['position'],config['camera']['target'])]

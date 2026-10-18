@@ -1,5 +1,5 @@
 #include "render_bindings.glsl"
-// Append-only layout shared with C++ RenderUniform. No sampled lighting history.
+// Append-only layout shared with C++ RenderUniform. No previous-frame image samples.
 layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
 {
     vec4 camera_position;
@@ -8,7 +8,7 @@ layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
     vec4 camera_up;
     vec4 background;
     uvec4 settings;   // Width, height, film samples per pixel, max transparent crossings.
-    uvec4 scene;      // Fixed film seed, media count, two padding words.
+    uvec4 scene;      // Fixed film seed, media count, sight count, static lighting cache enabled.
     vec4 display;     // Exposure, tan(vertical FOV / 2), aspect, volume integration steps.
     uvec4 quality;    // Volume film rays, visibility grid size, conductor compensation, medium blur enabled.
     vec4 scene_min;   // Conservative bounds of actual stationary mesh vertices.

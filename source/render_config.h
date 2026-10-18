@@ -26,6 +26,7 @@ struct RenderConfig
     uint32_t volume_steps;
     uint32_t volume_rays_per_pixel;
     uint32_t microfacet_energy_compensation,shadow_grid_resolution;
+    bool static_lighting_cache,force_lighting_rebuild;
     uint32_t bloom_radius;
     float bloom_strength;
     float bloom_threshold;

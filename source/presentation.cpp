@@ -124,6 +124,7 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
             { p->medium_bodies[scene->media.size()]=(int32_t)i;scene->media.push_back(RenderMedium{}); }
         if (w->atmosphere_enabled)
         { p->medium_bodies[scene->media.size()]=-1;scene->media.push_back(RenderMedium{}); }
+        scene->lighting_bounds.resize(scene->media.size());
     }
     catch (const std::bad_alloc&) { fprintf(stderr,"Cannot allocate game presentation storage.\n");return false; }
     scene->ambient=w->ambient;scene->ambient_top=w->ambient_top;scene->ambient_bottom=w->ambient_bottom;
@@ -365,9 +366,15 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
     for (uint32_t i=0;i<scene->instances.size();++i)
         for (uint32_t axis=0;axis<3;++axis) scene->instances[i].transform[axis][axis]=1;
     for (uint32_t i=0;i<w->body_count;++i)
+    {
+        RenderInstance& instance=scene->instances[p->body_base+i];
+        instance.mesh=p->body_meshes[i];instance.static_lighting=true;
+    }
+    for (uint32_t i=0;i<w->body_count;++i)
         if (simulation_body_known(s,i) || scene->fog_blur>0)
         {
             set_instance(p,p->body_base+i,p->body_meshes[i],Vec3{},Vec3{1,0,0},Vec3{0,1,0},Vec3{0,0,1});
+            scene->instances[p->body_base+i].static_lighting=true;
             const CellAppearance& a=s->cell_appearance[i];float* style=scene->instances[p->body_base+i].style;
             style[0]=a.tint.r;style[1]=a.tint.g;style[2]=a.tint.b;style[3]=s->visible_bodies[i] ? a.strength : 0;style[7]=INSTANCE_TINT_THIN_ONLY;
             float weight=0,roughness=0;
@@ -380,6 +387,7 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
     for (uint32_t i=0;i<scene->media.size();++i)
     {
         RenderMedium* medium=&scene->media[i];*medium=RenderMedium();
+        RenderGridBounds& bounds=scene->lighting_bounds[i];bounds=RenderGridBounds();
         if (p->medium_bodies[i]<0)
         {
             medium->center_radius[0]=w->atmosphere_center.x;medium->center_radius[1]=w->atmosphere_center.y;medium->center_radius[2]=w->atmosphere_center.z;medium->center_radius[3]=w->atmosphere_radius;
@@ -396,6 +404,14 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
         medium->blur[0]=c->interior_blur_rate;medium->blur[1]=c->interior_blur_sharp;medium->blur[2]=c->interior_blur_max;
         medium->blur[3]=c->interior_blur_fraction ? 1.0f : 0.0f;medium->lighting[3]=c->radius;
         medium->absorption_phase[3]=c->interior_anisotropy;medium->lighting[0]=1;medium->lighting[1]=1;
+        const MeshRange& mesh=scene->geometry.meshes[p->body_meshes[p->medium_bodies[i]]];
+        uint32_t resolution=config->shadow_grid_resolution;
+        for (uint32_t axis=0;axis<3;++axis)
+        {
+            float padding=resolution>3 ? (mesh.high[axis]-mesh.low[axis])/(resolution-3) : 0;
+            bounds.low[axis]=mesh.low[axis]-padding;bounds.high[axis]=mesh.high[axis]+padding;
+        }
+
     }
     if (w->gameplay.enabled) update_gameplay_instances(p,s);
     else

@@ -42,6 +42,7 @@ void render_scene_bounds(RenderScene* scene)
 bool render_scene_validate(const RenderScene* scene)
 {
     bool valid=!scene->geometry.meshes.empty() && !scene->instances.empty()
+        && scene->lighting_bounds.size()==scene->media.size()
         && scene->effect_count<=scene->effects.size() && scene->effects.size()<=MAX_EFFECT_SEGMENTS
         && scene->effect_tiles.size()==2*scene->tile_count+1+MAX_EFFECT_REFERENCES
         && std::isfinite(scene->time_seconds) && scene->sight_count<=MAX_RENDER_SIGHT
@@ -73,6 +74,10 @@ bool render_scene_validate(const RenderScene* scene)
     for (uint32_t i=0;valid && i<scene->media.size();++i)
     {
         const RenderMedium* m=&scene->media[i];
+        const RenderGridBounds& bounds=scene->lighting_bounds[i];
+        for (uint32_t axis=0;axis<3;++axis)
+            valid=valid && std::isfinite(bounds.low[axis]) && std::isfinite(bounds.high[axis])
+                && (m->lighting[1]<=0 || bounds.high[axis]>bounds.low[axis]);
         for (uint32_t j=0;j<4;++j)
             valid=valid && std::isfinite(m->center_radius[j]) && std::isfinite(m->scattering[j])
                 && std::isfinite(m->absorption_phase[j]) && std::isfinite(m->lighting[j]) && std::isfinite(m->blur[j]);
@@ -158,7 +163,7 @@ bool render_scene_write(const RenderScene* scene,const char* path)
             fprintf(file,"%s%.6f",row || column ? "," : "",instance->transform[row][column]);
         fprintf(file,"],\"style\":[");
         for (uint32_t j=0;j<INSTANCE_STYLE_VALUE_COUNT;++j) fprintf(file,"%s%.6f",j ? "," : "",instance->style[j]);
-        fprintf(file,"]}");
+        fprintf(file,"],\"static_lighting\":%s}",instance->static_lighting ? "true" : "false");
     }
     fprintf(file,"],\"media\":[");
     for (uint32_t i=0;i<scene->media.size();++i)

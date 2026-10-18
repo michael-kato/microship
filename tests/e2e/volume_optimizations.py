@@ -43,6 +43,8 @@ for body in data['bodies']:
     if args.depth_blur=='off':body['medium'].pop('depth_blur',None)
     if args.weak_medium:body['medium'].update(scattering=[.035,.045,.04],absorption=.012)
 config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3
+# Keep strict legacy comparisons on the unbaked path.
+config['lighting'].pop('static_lighting_cache',None);config['lighting'].pop('force_lighting_rebuild',None)
 if args.tilt_shift=='off':config.pop('tilt_shift',None)
 if args.subsurface=='off':config['subsurface']['strength']=0
 if args.subsurface=='wrap':config['subsurface']['transmission']=0
