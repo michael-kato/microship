@@ -27,7 +27,12 @@ static const int MAX_SOUND_COOLDOWN_SECONDS = 10;
 enum { WAV_RIFF_WORD=0, WAV_RIFF_BYTES_WORD=1, WAV_WAVE_WORD=2, WAV_FORMAT_WORD=3, WAV_FORMAT_BYTES_WORD=4, WAV_ENCODING_WORD=5, WAV_SAMPLE_RATE_WORD=6, WAV_BYTE_RATE_WORD=7, WAV_BLOCK_FORMAT_WORD=8, WAV_DATA_WORD=9, WAV_DATA_BYTES_WORD=10 };
 
 Audio::Audio():device(0),capture(0),captured(0),distance(1),valid(true)
-{ memset(voices,0,sizeof(voices));memset(cooldown,0,sizeof(cooldown));memset(headers,0,sizeof(headers)); }
+{
+    memset(voices,0,sizeof(voices));memset(cooldown,0,sizeof(cooldown));
+#ifdef _WIN32
+    memset(headers,0,sizeof(headers));
+#endif
+}
 Audio::~Audio() { audio_close(this); }
 static bool wav_header(FILE* f,uint32_t bytes)
 {
@@ -70,6 +75,7 @@ bool audio_load(Audio* a,const char* manifest,const char* capture)
 }
 bool audio_open(Audio* a)
 {
+#ifdef _WIN32
     WAVEFORMATEX format={WAVE_FORMAT_PCM,1,AUDIO_SAMPLE_RATE,WAV_BYTES_PER_SECOND,AUDIO_SAMPLE_BYTES,AUDIO_SAMPLE_BITS,0};
     if (waveOutOpen(&a->device,WAVE_MAPPER,&format,0,0,CALLBACK_NULL)!=MMSYSERR_NOERROR)
     { a->device=0;fprintf(stderr,"Audio output unavailable; sound is muted.\n");return true; }
@@ -79,6 +85,9 @@ bool audio_open(Audio* a)
         if (waveOutPrepareHeader(a->device,h,sizeof(*h))!=MMSYSERR_NOERROR) return false;
     }
     printf("Audio output: mono 48 kHz PCM; 16 voices.\n");return true;
+#else
+    (void)a;fprintf(stderr,"Native diagnostic has no live audio output.\n");return true;
+#endif
 }
 void audio_events(Audio* a,Simulation* s,Vec3 listener)
 {
@@ -118,6 +127,7 @@ bool audio_tick(Audio* a)
 }
 bool audio_pump(Audio* a)
 {
+#ifdef _WIN32
     if (!a->device) return true;
     for (uint32_t i=0;i<AUDIO_OUTPUT_BUFFER_COUNT;++i) if (!(a->headers[i].dwFlags&WHDR_INQUEUE))
     {
@@ -125,9 +135,13 @@ bool audio_pump(Audio* a)
         if (waveOutWrite(a->device,&a->headers[i],sizeof(WAVEHDR))!=MMSYSERR_NOERROR) return false;
     }
     return true;
+#else
+    (void)a;return true;
+#endif
 }
 bool audio_close(Audio* a)
 {
+#ifdef _WIN32
     if (a->device)
     {
         if (waveOutReset(a->device)!=MMSYSERR_NOERROR) a->valid=false;
@@ -136,6 +150,7 @@ bool audio_close(Audio* a)
         if (waveOutClose(a->device)!=MMSYSERR_NOERROR) a->valid=false;
         a->device=0;
     }
+    #endif
     if (a->capture)
     {
         if (fseek(a->capture,0,SEEK_SET)!=0 || !wav_header(a->capture,a->captured)) a->valid=false;

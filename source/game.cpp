@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <stdio.h>
 #include <string.h>
+#ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -20,6 +21,10 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#else
+#include <chrono>
+#include <thread>
+#endif
 #include "../assets/shaders/hud_layout.glsl"
 
 static const float PICK_MISS_DISTANCE = 1e30f;
@@ -46,10 +51,7 @@ struct Game
 
 static double monotonic_seconds()
 {
-    LARGE_INTEGER count, frequency;
-    QueryPerformanceFrequency(&frequency);
-    QueryPerformanceCounter(&count);
-    return (double)count.QuadPart / frequency.QuadPart;
+    return profiler_clock_ms()/MILLISECONDS_PER_SECOND;
 }
 
 static void print_world(const Simulation* simulation, const char* path)
@@ -356,7 +358,14 @@ int game_run(const GameOptions* options)
     std::unique_ptr<Presentation> presentation(new (std::nothrow) Presentation());
     if (!presentation) return 1;
     uint32_t seed=options->world_seed;
-    if (!options->world_seed_set && !options->smoke && !options->headless && !options->ticks && !options->capture_path) seed=GetTickCount()|1u;
+    if (!options->world_seed_set && !options->smoke && !options->headless && !options->ticks && !options->capture_path)
+    {
+#ifdef _WIN32
+        seed=GetTickCount()|1u;
+#else
+        seed=(uint32_t)std::chrono::steady_clock::now().time_since_epoch().count()|1u;
+#endif
+    }
     printf("World variation seed: %u. Restart keeps this layout.\n",seed);
     if (!simulation_initialize(&game.simulation, options->world_path,seed))
         return 1;
@@ -407,7 +416,14 @@ int game_run(const GameOptions* options)
     PointerInput input = {};
     while (!options->frames || frames < options->frames)
     {
-        if (frames && options->frame_delay_ms) Sleep(options->frame_delay_ms);
+        if (frames && options->frame_delay_ms)
+        {
+#ifdef _WIN32
+            Sleep(options->frame_delay_ms);
+#else
+            std::this_thread::sleep_for(std::chrono::milliseconds(options->frame_delay_ms));
+#endif
+        }
         double start = monotonic_seconds();
         Profiler* profile=&game.renderer.profiler;profiler_begin(profile,start*MILLISECONDS_PER_SECOND);
         if (!renderer_poll(&game.renderer,&input)) break;

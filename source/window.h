@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "camera.h"
+#ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -10,11 +11,14 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#endif
 
 struct Window
 {
+#ifdef _WIN32
     HINSTANCE instance;
     HWND handle;
+#endif
     bool open;
     bool dragging,panning;
     bool stats_held,buffers_held;

@@ -1,6 +1,8 @@
+#ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
+#endif
 #include <vulkan/vulkan.h>
 
 #include "renderer.h"
@@ -260,8 +262,7 @@ struct RendererState
 
 static double renderer_ms()
 {
-    LARGE_INTEGER ticks,frequency;QueryPerformanceCounter(&ticks);QueryPerformanceFrequency(&frequency);
-    return MILLISECONDS_PER_SECOND*(double)ticks.QuadPart/(double)frequency.QuadPart;
+    return profiler_clock_ms();
 }
 
 static bool vk_ok(VkResult result, const char* operation)
@@ -295,8 +296,10 @@ static bool create_instance(RendererState* state)
     const char* layer = "VK_LAYER_KHRONOS_validation";
     state->validation_layer = validation;
     const char* extensions[] = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-        VK_KHR_SURFACE_EXTENSION_NAME,
-        VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+        VK_KHR_SURFACE_EXTENSION_NAME
+#ifdef _WIN32
+        ,VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+#endif
     };
     VkApplicationInfo application = {};
     application.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -328,6 +331,9 @@ static bool create_instance(RendererState* state)
         return false;
     if (state->headless)
         return true;
+#ifndef _WIN32
+    fprintf(stderr,"Native diagnostic requires --headless.\n");return false;
+#else
     printf("Window startup: open Win32 window.\n");
     if (!window_open(&state->window, state->config.width, state->config.height, !state->no_activate))
         return false;
@@ -337,6 +343,7 @@ static bool create_instance(RendererState* state)
     surface.hwnd = state->window.handle;
     printf("Window startup: create Vulkan surface.\n");
     return vk_ok(vkCreateWin32SurfaceKHR(state->instance, &surface, 0, &state->surface), "Create window surface");
+#endif
 }
 
 static bool supports_device(RendererState* state, VkPhysicalDevice physical, uint32_t* family)

@@ -1,5 +1,9 @@
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include <chrono>
+#endif
 #include "profiler.h"
 #include <stdio.h>
 #include <string.h>
@@ -12,8 +16,12 @@ const ProfileDefinition profile_definitions[PROFILE_NODE_COUNT]={
 };
 double profiler_clock_ms()
 {
+#ifdef _WIN32
     LARGE_INTEGER count,frequency;QueryPerformanceCounter(&count);QueryPerformanceFrequency(&frequency);
     return (double)count.QuadPart*1000.0/(double)frequency.QuadPart;
+#else
+    return std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+#endif
 }
 void profiler_begin(Profiler* p,double origin_ms)
 { p->origin_ms=origin_ms;memset(p->current,0,sizeof(p->current)); }

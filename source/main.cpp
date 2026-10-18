@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <cmath>
+#ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -14,6 +15,9 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 static const int MAX_CAMERA_PAN_SECONDS = 60;
 static const int MAX_FRAME_DELAY_MS = 250;
@@ -29,7 +33,12 @@ static const int MAX_AUDIO_CAPTURE_TICKS = 3600;
 static bool asset_paths(char* world, char* config, char* shader,char* audio,char* menu,size_t capacity)
 {
     char executable[EXECUTABLE_PATH_CAPACITY];
-    DWORD count = GetModuleFileNameA(0, executable, sizeof(executable));
+#ifdef _WIN32
+    size_t count=GetModuleFileNameA(0,executable,sizeof(executable));
+#else
+    ssize_t size=readlink("/proc/self/exe",executable,sizeof(executable));
+    size_t count=size>0 ? (size_t)size : 0;
+#endif
     if (!count || count >= sizeof(executable))
         return false;
     executable[count] = 0;

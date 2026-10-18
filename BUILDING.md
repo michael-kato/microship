@@ -1,8 +1,8 @@
 # Build and run
 
-The target is Windows. Linux cross-compiles with MinGW and `glslc`. Application checks run the Windows executable through Steam Proton 10. There is no native Linux target.
+The target is Windows. Linux cross-compiles with MinGW and `glslc`. Application checks run the Windows executable through Steam Proton 11. An explicit headless Linux target is available for performance diagnosis.
 
-A clean build needs the compiler, Vulkan headers and import library, `glslc`, and an initialized Proton prefix. Local tools are in `build/toolchains/`. Set `NANOVA_PROTON` and `STEAM_COMPAT_DATA_PATH` to use another Proton installation and prefix. The prefix must contain `pfx/system.reg`. A normal Proton `run` command initializes it.
+A clean build needs the compiler, Vulkan headers and import library, `glslc`, and an initialized Proton prefix. Local tools are in `build/toolchains/`. Set `NANOVA_PROTON` and `STEAM_COMPAT_DATA_PATH` to use another Proton installation and prefix. The default prefix is `build/proton11-prefix`; it must contain `pfx/system.reg`. A normal Proton `run` command initializes it.
 
 ```sh
 bash scripts/check.sh --cpu
@@ -294,3 +294,39 @@ after, with paired savings of 1.697 to 1.808 ms. Near-view RGB8 error was
 at most 2 in 12 color channels out of 6,220,800. Interior, overlap,
 linear-blur and blur-disabled comparisons matched exactly. Differences
 come from floating-point evaluation at the blur-start boundary.
+
+
+## Native Linux comparison
+
+The user authorized a native comparison. It uses the same C++ simulation,
+scene build, Vulkan renderer and SPIR-V as the Windows game. It has no
+native menu, window or live audio; use `--headless` or `--smoke`. The
+Windows game remains the interactive target.
+
+```sh
+cmake -S . -B build/linux-diagnostic -G Ninja -DCMAKE_BUILD_TYPE=Release -DNANOVA_NATIVE_DIAGNOSTIC=ON
+cmake --build build/linux-diagnostic --parallel
+ctest --test-dir build/linux-diagnostic --output-on-failure
+```
+
+`tests/e2e/platform_perf.py --run` compares Proton 10, Proton 11 and native
+Linux at the same native 1080p settings. It requires separate initialized
+prefixes at `build/proton-prefix` and `build/proton11-prefix`. It does not
+upgrade the old prefix. For uncaptured timings, add
+`--pairs 3 --timing --no-capture`. Runs remain bounded to two frames and
+two seconds per process, five seconds per sequential GPU batch. The
+report keeps native state differences rather than assuming exact
+cross-platform floating-point results. Native and Proton shader binaries
+can be compared directly. RenderDoc accepts either executable.
+
+The installed default is Proton 11.0-2e-x86_64. A copied-prefix CPU check,
+headless GPU validation and a window control check passed. Proton 10 and
+11 images were identical. The native image differed by at most one RGB8
+level in 114 channels out of 6,220,800. Native state has four small unit
+float differences after 600 ticks; native scene data also has small
+floating-point differences. This is not cross-platform determinism proof.
+Three uncaptured timing runs measured median GPU time of 25.133 ms under
+Proton 10, 25.126 ms under Proton 11 and 25.793 ms natively. Median app time
+was 29.537, 29.502 and 27.408 ms. These are short frozen-scene comparisons.
+Native startup and live platform behavior are separate from steady GPU
+cost. The 10 ms target is still unmet.

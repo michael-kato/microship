@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(nanova LANGUAGES CXX)
 
-if(NOT WIN32)
-    message(FATAL_ERROR "nanova builds only for Windows. On Linux, use scripts/check.sh to cross-build and test through Proton.")
+option(NANOVA_NATIVE_DIAGNOSTIC "Build the native headless Vulkan comparison" OFF)
+if(NOT WIN32 AND NOT NANOVA_NATIVE_DIAGNOSTIC)
+    message(FATAL_ERROR "Use the Windows toolchain, or explicitly enable NANOVA_NATIVE_DIAGNOSTIC for a headless Linux comparison.")
 endif()
 find_package(Vulkan REQUIRED)
 find_program(GLSLC glslc HINTS "$ENV{VULKAN_SDK}/Bin" "$ENV{VULKAN_SDK}/bin")
@@ -129,17 +130,22 @@ foreach(model IN LISTS model_files)
 endforeach()
 add_custom_target(nanova_assets DEPENDS "${focus_output}" "${medium_blur_output}" "${shadow_grid_output}" "${fog_output}" "${effects_output}" "${backdrop_output}" "${json_license}" "${shader_output}" "${bloom_output}" "${volume_output}" "${debug_overlay}" ${debug_outputs} ${model_outputs} ${asset_outputs})
 
+if(WIN32)
+    set(platform_sources source/window.cpp source/start_menu.cpp)
+else()
+    set(platform_sources source/native_headless.cpp)
+endif()
 add_executable(nanova
+    ${platform_sources}
     source/content.cpp source/asset_json.cpp
     source/effects.cpp source/audio.cpp
-    source/main.cpp source/start_menu.cpp
+    source/main.cpp
     source/microfacet.cpp
     source/camera.cpp
     source/world.cpp
     source/render_config.cpp
     source/presentation.cpp source/cell_deformation.cpp source/render_scene.cpp
     source/geometry.cpp source/geometry_variation.cpp
-    source/window.cpp
     source/simulation.cpp
     source/flight.cpp source/fog.cpp
     source/orders.cpp
@@ -147,8 +153,11 @@ add_executable(nanova
     source/game.cpp
 )
 add_dependencies(nanova nanova_assets)
-target_link_libraries(nanova PRIVATE Vulkan::Vulkan user32 gdi32 winmm)
-target_compile_definitions(nanova PRIVATE _WIN32_WINNT=0x0A00 _CRT_SECURE_NO_WARNINGS)
+target_link_libraries(nanova PRIVATE Vulkan::Vulkan)
+if(WIN32)
+    target_link_libraries(nanova PRIVATE user32 gdi32 winmm)
+    target_compile_definitions(nanova PRIVATE _WIN32_WINNT=0x0A00 _CRT_SECURE_NO_WARNINGS)
+endif()
 
 set_target_properties(nanova PROPERTIES
     CXX_STANDARD 11
@@ -169,6 +178,10 @@ enable_testing()
 add_test(NAME smoke COMMAND nanova --smoke)
 set_tests_properties(smoke PROPERTIES TIMEOUT 5)
 
+if(NOT WIN32)
+    # Existing window-input suites use the Windows application through Proton.
+    return()
+endif()
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 add_test(NAME world_files COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/world_files.py $<TARGET_FILE:nanova>)

@@ -8,7 +8,7 @@ Seeded membranes, organelles, branching factories, and wet anatomical background
 
 Simulation rules remain separate from rendering. The project uses direct functions and contiguous data, with real application checks.
 
-C++ and Vulkan target Windows. Linux builds use MinGW, `glslc`, and an initialized Steam Proton prefix:
+C++ and Vulkan target Windows. Linux builds use MinGW, `glslc`, and an initialized Steam Proton 11 prefix:
 
 ```sh
 bash scripts/check.sh --cpu

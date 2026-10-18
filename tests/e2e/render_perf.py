@@ -14,6 +14,7 @@ p.add_argument('--blur-profile',choices=('authored','linear','off'),default='aut
 p.add_argument('--subgroup-size',type=int,choices=(0,32,64),default=32)
 p.add_argument('--baseline-subgroup-size',type=int,choices=(0,32,64))
 p.add_argument('--pairs',type=int,choices=(1,3),default=1)
+p.add_argument('--reverse',action='store_true')
 p.add_argument('--timing',action='store_true');p.add_argument('--run',action='store_true')
 p.add_argument('--output',type=Path,default=root/'build/render-perf');a=p.parse_args()
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
@@ -29,7 +30,7 @@ if a.blur_profile!='authored':
 settings=json.loads(Path(base[base.index('--config')+1]).read_text());settings['sampling']['samples_per_pixel']=a.samples
 commands=[]
 for pair in range(a.pairs):
- for variant in ('baseline','current') if pair%2==0 else ('current','baseline'):
+ for variant in ('baseline','current') if (pair+int(a.reverse))%2==0 else ('current','baseline'):
   name=str(pair)+'-'+variant;config=deepcopy(settings)
   config['lighting'].pop('subgroup_size',None)
   if variant=='current':config['lighting']['subgroup_size']=a.subgroup_size
@@ -62,7 +63,7 @@ for name,command in commands:
  assert process.returncode==0,(name,output,errors)
  expected='Vulkan validation: not reported by loader/tooling.' if a.timing else 'Vulkan validation: enabled.'
  assert expected in output
- labels={'surface':'GPU surface','volume':'GPU volumes','grid':'GPU shadow grid','bake':'GPU static lighting bake','gpu':'total render','app':'Application frame'}
+ labels={'surface':'GPU surface','volume':'GPU volumes','grid':'GPU shadow grid','bake':'GPU static lighting bake','gpu':'total render','app':'Application frame','fog_focus_display':'GPU fog/bloom/display','cell_blur':'GPU medium blur','backdrop':'GPU backdrop'}
  frames={key:list(map(float,re.findall(re.escape(label)+r': ([0-9.]+) ms',output))) for key,label in labels.items()}
  assert all(len(v)==2 for v in frames.values()),frames
  if name.endswith('current'):assert 'Compute subgroups: '+str(a.subgroup_size)+' ' in output
@@ -90,6 +91,6 @@ for key in report['runs']['0-baseline']['frames_ms']:
  report['summary'][key]=dict(values_ms=values,median_ms={v:statistics.median(values[v]) for v in values},paired_savings_ms=[x-y for x,y in zip(values['baseline'],values['current'])])
 (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
 print('Image difference:',report['image_difference'])
-for key in ('surface','volume','gpu','app'):print(key,report['summary'][key])
+for key in ('surface','volume','fog_focus_display','gpu','app'):print(key,report['summary'][key])
 print('Batch seconds:',report['batch_seconds'])
 assert report['image_difference']['mean_rgb8']<.02 and report['image_difference']['max_rgb8']<=2,'Image difference exceeds the comparison limit'

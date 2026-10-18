@@ -17,8 +17,8 @@ def main():
     check_gpu_environment()
     repo = Path(__file__).resolve().parents[1]
     steam = Path(os.environ.get("STEAM_COMPAT_CLIENT_INSTALL_PATH", Path.home() / ".local/share/Steam"))
-    proton = Path(os.environ.get("NANOVA_PROTON", steam / "steamapps/common/Proton 10.0/proton"))
-    prefix = Path(os.environ.get("STEAM_COMPAT_DATA_PATH", repo / "build/proton-prefix"))
+    proton = Path(os.environ.get("NANOVA_PROTON", steam / "steamapps/common/Proton 11.0/proton"))
+    prefix = Path(os.environ.get("STEAM_COMPAT_DATA_PATH", repo / "build/proton11-prefix"))
     if not proton.is_file() or not (prefix / "pfx/system.reg").is_file():
         print("Proton installation or initialized prefix missing. Set NANOVA_PROTON "
               "and STEAM_COMPAT_DATA_PATH; see README.md for initialization.", file=sys.stderr)

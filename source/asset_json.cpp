@@ -5,7 +5,11 @@
 #include <string.h>
 #include <errno.h>
 #include <cmath>
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include <iconv.h>
+#endif
 #include "asset_limits.h"
 
 static const int MAX_JSON_FILE_BYTES = 1024*1024;
@@ -46,7 +50,20 @@ static bool bounded_text(const char* text,size_t size)
         else if (c=='{' || c=='[') { if (++depth>MAX_JSON_DEPTH) return false; }
         else if (c=='}' || c==']') { if (!depth) return false;--depth; }
     }
+#ifdef _WIN32
     return MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,text,(int)size,0,0)>0;
+#else
+    iconv_t converter=iconv_open("UTF-8","UTF-8");
+    if (converter==(iconv_t)-1) return false;
+    char* input=const_cast<char*>(text);size_t left=size;bool valid=true;
+    while (left)
+    {
+        char output[1024];char* target=output;size_t space=sizeof(output);
+        if (iconv(converter,&input,&left,&target,&space)==(size_t)-1 && errno!=E2BIG)
+        { valid=false;break; }
+    }
+    iconv_close(converter);return valid;
+#endif
 }
 
 static bool check_tree(Json j)

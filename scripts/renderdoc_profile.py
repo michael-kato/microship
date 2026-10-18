@@ -33,7 +33,7 @@ if a.sss=='off':config['subsurface']['strength']=0
 if a.subgroup_size==0:config['lighting'].pop('subgroup_size',None)
 elif a.subgroup_size is not None:config['lighting']['subgroup_size']=a.subgroup_size
 cp=out/'render.json';cp.write_text(json.dumps(config,indent=2)+'\n')
-command=[sys.executable,str(root/'scripts/proton_run.py'),str(binary),'--world',str(wp),'--config',str(cp),
+command=([sys.executable,str(root/'scripts/proton_run.py'),str(binary)] if binary.suffix.lower()=='.exe' else [str(binary)])+['--world',str(wp),'--config',str(cp),
     '--headless','--frames','2','--no-stats','--ticks','600','--world-seed','1234','--time','10','--step-seconds','0',
     '--camera-zoom','1000','--capture',str(out/'display.ppm'),'--state',str(out/'state.json')]
 (out/'command.json').write_text(json.dumps(command,indent=2)+'\n')
