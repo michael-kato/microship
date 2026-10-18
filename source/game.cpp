@@ -477,6 +477,7 @@ int game_run(const GameOptions* options)
         frame_total += frame_ms;
         ++frames;
         printf("Application frame: %.3f ms.\n", frame_ms);
+        printf("Application cadence: %.3f ms.\n",game.renderer.previous_frame_ms);
         printf("Application work: %.3f ms; explicit acquire/present waits: %.3f ms.\n",game.renderer.work_frame_ms,game.renderer.acquire_ms+game.renderer.present_ms);
     }
     if (!renderer_shutdown(&game.renderer)) success = false;

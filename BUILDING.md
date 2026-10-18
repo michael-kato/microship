@@ -395,3 +395,13 @@ mode for live geometry, growth and bake comparisons. The benchmark's
 Two host-validated game windows ended at tick 602 with identical state
 and images. Earlier wall-clock window comparisons ended at different
 ticks and are not controlled before/after results.
+
+The normal guide shader writes only first-hit color and normal/depth.
+F2 keeps its full diagnostic light buffers. A live grown-factory image
+check found three color channels different by one level. The measured
+GPU change was small (9.110 to 9.053 ms median), and it does not meet the
+frame target by itself. The F1 label identifies combined surface, SSS and
+volume work. Diagnostic output also reports start-to-start frame cadence.
+An extra one-film constant-folding trial did not improve timing and was
+removed. Reusable command lists also showed no useful median gain and
+were removed.

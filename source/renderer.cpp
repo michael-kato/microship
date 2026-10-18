@@ -1682,6 +1682,14 @@ static uint32_t available_features(const RendererState* state,const RenderScene*
     return mask;
 }
 
+static const char* profile_name(const RendererState* state,uint32_t node)
+{
+    bool combined=!state->custom_shader && state->config.samples_per_pixel==1 && state->config.volume_rays_per_pixel==1;
+    if (combined && node==PROFILE_SURFACE) return "SURFACE + SSS + VOLUME";
+    if (combined && node==PROFILE_VOLUME) return "VOLUME PASS UNUSED";
+    return profile_definitions[node].name;
+}
+
 static void profile_overlay(RendererState* state,const Renderer* renderer,ProfileBars* bars)
 {
     const Profiler* p=&renderer->profiler;char line[160];
@@ -1716,12 +1724,12 @@ static void profile_overlay(RendererState* state,const Renderer* renderer,Profil
         r[1]=(i<PROFILE_GPU_FRAME ? 84 : 176)+definition.depth*22;
         r[2]=std::min(STATS_TEXT_WIDTH-8,std::max(r[0]+1,8+(int)((sample.start_ms+sample.duration_ms)/range*(STATS_TEXT_WIDTH-16))));r[3]=r[1]+20;
         memcpy(bars->colors[i],palette[i%8],3*sizeof(float));bars->colors[i][3]=1;
-        snprintf(line,sizeof(line),"%s %.2F",definition.name,sample.duration_ms);
+        snprintf(line,sizeof(line),"%s %.2F",profile_name(state,i),sample.duration_ms);
         profile_text(state,line,r[0]+4,r[1]+3,r[2]-3);
         if (p->pointer_x>=r[0] && p->pointer_x<r[2] && p->pointer_y>=r[1] && p->pointer_y<r[3]) hover=(int)i;
     }
     if (hover>=0)
-        snprintf(line,sizeof(line),"%s / LAST %.3F MS / MEAN %.3F MS",profile_definitions[hover].name,p->latest[hover].duration_ms,p->mean[hover].duration_ms);
+        snprintf(line,sizeof(line),"%s / LAST %.3F MS / MEAN %.3F MS",profile_name(state,(uint32_t)hover),p->latest[hover].duration_ms,p->mean[hover].duration_ms);
     else
     {
         int top[3]={PROFILE_SURFACE,PROFILE_VOLUME,PROFILE_CELL_BLUR};
@@ -1735,8 +1743,8 @@ static void profile_overlay(RendererState* state,const Renderer* renderer,Profil
                 if (!used && (top[rank]<0 || p->mean[i].duration_ms>p->mean[top[rank]].duration_ms)) top[rank]=i;
             }
         }
-        snprintf(line,sizeof(line),"TOP GPU: %s %.2F / %s %.2F / %s %.2F MS",profile_definitions[top[0]].name,p->mean[top[0]].duration_ms,
-            profile_definitions[top[1]].name,p->mean[top[1]].duration_ms,profile_definitions[top[2]].name,p->mean[top[2]].duration_ms);
+        snprintf(line,sizeof(line),"TOP GPU: %s %.2F / %s %.2F / %s %.2F MS",profile_name(state,(uint32_t)top[0]),p->mean[top[0]].duration_ms,
+            profile_name(state,(uint32_t)top[1]),p->mean[top[1]].duration_ms,profile_name(state,(uint32_t)top[2]),p->mean[top[2]].duration_ms);
     }
     profile_text(state,line,8,250,STATS_TEXT_WIDTH-8);
 }
@@ -1941,6 +1949,9 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
     printf("Renderer: direct ray tracing; %ux%u native; %u film samples; %u transmission layers; %u triangles.\n",
         config->width,config->height,config->samples_per_pixel,config->max_transmission_layers,state->triangle_count);
     printf("Sampling: fixed mirrored film points; no stochastic surface transport, denoising, or temporal history.\n");
+    printf("Spatial antialiasing: %s; current native pixels; HUD drawn afterward.\n",config->spatial_antialiasing ? "ON" : "OFF");
+    if (!state->custom_shader && config->samples_per_pixel==1 && config->volume_rays_per_pixel==1)
+        printf("Camera traversal: combined surface/SSS/volume; GPU surface includes volume work.\n");
     printf("Subsurface: %.2f strength; %u existing film samples; one strongest back light; current geometry.\n",config->subsurface_strength,config->subsurface_samples);
     printf("Volumes: %u film rays; %u %s integration steps; analytic ambient fill; ray-traced studio shadows.\n",
         config->volume_rays_per_pixel,config->volume_steps,config->volume_gauss ? "Gauss-Legendre" : "midpoint");

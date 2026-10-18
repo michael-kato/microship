@@ -14,6 +14,7 @@ p.add_argument('--baseline-samples',type=int,choices=(1,2,3,6))
 p.add_argument('--baseline-shadow-grid',type=int,choices=(8,16,32,64))
 p.add_argument('--baseline-quadrature',choices=('midpoint','gauss_legendre'))
 p.add_argument('--shadow-grid',type=int,choices=(8,16,32,64))
+p.add_argument('--baseline-spatial-aa',action='store_true')
 p.add_argument('--spatial-aa',action='store_true')
 p.add_argument('--quadrature',choices=('midpoint','gauss_legendre'),default='midpoint')
 p.add_argument('--volume-steps',type=int,choices=(2,3,4,8,32),default=8)
@@ -58,6 +59,7 @@ for pair in range(a.pairs):
    if a.baseline_volume_steps is not None:config['volume']['integration_steps']=a.baseline_volume_steps
    if a.baseline_quadrature is not None:config['volume']['quadrature']=a.baseline_quadrature
    if a.baseline_shadow_grid is not None:config['lighting']['shadow_grid_resolution']=a.baseline_shadow_grid
+   if a.baseline_spatial_aa:config['sampling']['spatial_antialiasing']=True
   config['lighting'].pop('subgroup_size',None)
   if variant=='current':config['lighting']['subgroup_size']=a.subgroup_size
   elif a.baseline_subgroup_size is not None:config['lighting']['subgroup_size']=a.baseline_subgroup_size
@@ -100,9 +102,10 @@ for name,command in commands:
  assert process.returncode==0,(name,output,errors)
  expected='Vulkan validation: not reported by loader/tooling.' if a.timing else 'Vulkan validation: enabled.'
  assert expected in output
- labels={'surface':'GPU surface','volume':'GPU volumes','grid':'GPU shadow grid','bake':'GPU static lighting bake','gpu':'total render','app':'Application frame','fog_focus_display':'GPU fog/bloom/display','cell_blur':'GPU medium blur','backdrop':'GPU backdrop'}
+ labels={'surface':'GPU surface','volume':'GPU volumes','grid':'GPU shadow grid','bake':'GPU static lighting bake','gpu':'total render','app':'Application frame','cadence':'Application cadence','fog_focus_display':'GPU fog/bloom/display','cell_blur':'GPU medium blur','backdrop':'GPU backdrop'}
  frames={key:list(map(float,re.findall(re.escape(label)+r': ([0-9.]+) ms',output))) for key,label in labels.items()}
- assert all(len(v)==a.frames for v in frames.values()),frames
+ assert all(len(v)==a.frames for k,v in frames.items() if k!='cadence'),frames
+ if not frames['cadence']:del frames['cadence']
  if name.endswith('current'):assert 'Compute subgroups: '+str(a.subgroup_size)+' ' in output
  cache=re.findall(r'Static lighting: (\d+) baked, (\d+) reused;',output)
  assert len(cache)==a.frames,cache
@@ -130,12 +133,13 @@ if not a.no_capture:
  report['image_difference']=dict(mean_rgb8=sum(error)/len(error),rmse_rgb8=rmse,psnr_db=20*math.log10(255/rmse) if rmse else None,max_rgb8=max(error),changed_channels=sum(d!=0 for d in error))
 report['summary']={}
 for key in report['runs']['0-baseline']['frames_ms']:
+ if key not in report['runs']['0-current']['frames_ms']:continue
  values={variant:[report['runs'][str(pair)+'-'+variant]['frames_ms'][key][-1] for pair in range(a.pairs)] for variant in ('baseline','current')}
  report['summary'][key]=dict(values_ms=values,median_ms={v:statistics.median(values[v]) for v in values},paired_savings_ms=[x-y for x,y in zip(values['baseline'],values['current'])])
 if a.frames>2:
  report['steady']={}
  for variant in ('baseline','current'):
-  samples={key:[v for pair in range(a.pairs) for v in report['runs'][str(pair)+'-'+variant]['frames_ms'][key][20:]] for key in ('surface','volume','gpu','app')}
+  samples={key:[v for pair in range(a.pairs) for v in report['runs'][str(pair)+'-'+variant]['frames_ms'][key][20:]] for key in report['runs']['0-'+variant]['frames_ms'] if key in ('surface','volume','gpu','app','cadence')}
   report['steady'][variant]={key:dict(count=len(v),median_ms=statistics.median(v),p95_ms=sorted(v)[int(.95*(len(v)-1))],max_ms=max(v)) for key,v in samples.items()}
  print('Steady:',report['steady'])
 (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
