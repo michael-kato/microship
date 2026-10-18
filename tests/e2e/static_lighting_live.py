@@ -15,7 +15,7 @@ out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 world=stage_world(root/'assets/levels/biology-virus.json',out);wp=out/'world.json';write_world(wp,world)
 cfg=json.loads((root/'assets/rendering/biology.json').read_text());cfg['sampling']['samples_per_pixel']=3
 assert cfg['output']['width']==1920 and cfg['output']['height']==1080
-assert cfg['volume']==dict(rays_per_pixel=1,integration_steps=8)
+assert all(cfg['volume'][k]==v for k,v in dict(rays_per_pixel=1,integration_steps=8).items())
 cfg['lighting']['static_lighting_cache']=True
 cp=out/'render.json';cp.write_text(json.dumps(cfg,indent=2)+'\n')
 prefix=[str(a.binary.resolve())] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(a.binary.resolve())]

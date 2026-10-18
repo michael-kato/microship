@@ -44,6 +44,9 @@ layout(constant_id=VOLUME_STEPS_SPECIALIZATION_ID) const uint specialized_volume
 layout(constant_id=LIGHTING_CACHE_SPECIALIZATION_ID) const uint specialized_lighting_cache=2u;
 bool lighting_cached()
 { return specialized_lighting_cache==2u ? render.scene.w>0u : specialized_lighting_cache>0u; }
+layout(constant_id=OPTICAL_DEPTH_SPECIALIZATION_ID) const bool optical_depth_cached=false;
+layout(set=0,binding=RENDER_BINDING_OPTICAL_DEPTH) uniform sampler2DArray optical_depth_table;
+
 uint integration_steps()
 { return specialized_volume_steps>0u ? specialized_volume_steps : uint(render.display.w); }
 
@@ -209,6 +212,26 @@ vec3 film_sharp_sum=vec3(0);
 float film_blur_max=0.0;
 layout(set=0,binding=RENDER_BINDING_SHARP_LAYER,std430) buffer SharpLayer { vec4 sharp_pixels[]; };
 
+// The table stores the integral from a chord's midpoint to a positive distance.
+// Half-chord and position are normalized by radius. Signed differences cover
+// inside/outside origins and both halves without subtracting transmittances.
+float cached_density_integral(uint index,vec3 origin,vec3 direction,float begin,float end)
+{
+    Medium medium=media[index];float radius=medium.center_radius.w;
+    vec3 offset=(origin-medium.center_radius.xyz)/radius;
+    float center=dot(offset,direction);
+    vec3 closest=offset-direction*center;
+    float half_chord=sqrt(max(0.0,1.0-dot(closest,closest)));
+    if (half_chord<=0.0) return 0.0;
+    vec2 along=clamp((vec2(begin,end)/radius+center)/half_chord,vec2(-1),vec2(1));
+    const float size=float(OPTICAL_DEPTH_TABLE_SIZE);
+    float u=(half_chord*(size-1.0)+.5)/size;
+    vec2 v=(abs(along)*(size-1.0)+.5)/size;
+    float low=textureLod(optical_depth_table,vec3(u,v.x,float(index)),0).r*sign(along.x);
+    float high=textureLod(optical_depth_table,vec3(u,v.y,float(index)),0).r*sign(along.y);
+    return max(0.0,high-low)*radius;
+}
+
 vec3 transmittance(vec3 origin, vec3 direction, float distance)
 {
     vec3 optical_depth = vec3(0.0);
@@ -220,11 +243,15 @@ vec3 transmittance(vec3 origin, vec3 direction, float distance)
         float density_integral = end - begin;
         if (medium.scattering.w>0.0)
         {
-            uint steps = integration_steps();
-            float stride = (end - begin) / float(steps);
-            density_integral = 0.0;
-            for (uint j = 0u; j < steps; ++j)
-                density_integral += stride * medium_density(medium, origin + direction * (begin + (float(j) + 0.5) * stride));
+            if (optical_depth_cached) density_integral=cached_density_integral(i,origin,direction,begin,end);
+            else
+            {
+                uint steps = integration_steps();
+                float stride = (end - begin) / float(steps);
+                density_integral = 0.0;
+                for (uint j = 0u; j < steps; ++j)
+                    density_integral += stride * medium_density(medium, origin + direction * (begin + (float(j) + 0.5) * stride));
+            }
         }
         vec3 extinction = medium.scattering.rgb + medium.absorption_phase.rgb;
         optical_depth += extinction * density_integral;

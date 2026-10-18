@@ -189,6 +189,9 @@
           "type": "integer",
           "minimum": 2,
           "maximum": 64
+        },
+        "optical_depth_lut": {
+          "type": "boolean"
         }
       },
       "required": [

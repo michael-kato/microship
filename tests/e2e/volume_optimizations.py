@@ -51,6 +51,7 @@ if args.subsurface=='wrap':config['subsurface']['transmission']=0
 if args.subsurface_samples is not None:config['subsurface']['samples_per_pixel']=args.subsurface_samples
 if args.shadow_grid is not None:config['lighting']['shadow_grid_resolution']=args.shadow_grid
 assert config['output']['width']==1920 and config['output']['height']==1080
+config['volume'].pop('optical_depth_lut',None)
 assert config['volume']==dict(rays_per_pixel=1,integration_steps=8)
 if args.atmosphere_shadows:data['appearance']['atmosphere']['shadows']=args.atmosphere_shadows=='on'
 if args.case=='solid':

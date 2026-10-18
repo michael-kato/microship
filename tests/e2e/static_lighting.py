@@ -31,7 +31,7 @@ world=stage_world(a.world.resolve(),out)
 settings=json.loads((root/'assets/rendering/biology.json').read_text())
 settings['sampling']['samples_per_pixel']=3
 assert settings['output']['width']==1920 and settings['output']['height']==1080
-assert settings['volume']==dict(rays_per_pixel=1,integration_steps=8)
+assert all(settings['volume'][k]==v for k,v in dict(rays_per_pixel=1,integration_steps=8).items())
 if a.case=='inside':
  settings['camera']['min_distance']=1
  settings['camera']['position']=[x+y for x,y in zip(settings['camera']['target'],(0,.6,2))]
@@ -46,6 +46,7 @@ prepared=[]
 for variant in reversed(a.variants) if a.reverse else a.variants:
  cfg=deepcopy(settings)
  if variant=='baseline':
+  cfg['volume'].pop('optical_depth_lut',None)
   cfg['lighting'].pop('static_lighting_cache',None);cfg['lighting'].pop('force_lighting_rebuild',None)
  else:
   cfg['lighting']['static_lighting_cache']=variant!='off';cfg['lighting']['force_lighting_rebuild']=variant=='refresh'

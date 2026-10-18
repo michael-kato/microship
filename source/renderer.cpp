@@ -41,7 +41,8 @@ static const double NANOSECONDS_PER_MILLISECOND = 1000000.0;
 static const int RENDER_STORAGE_BUFFER_BINDINGS = 15;
 static const int RENDER_DESCRIPTOR_SET_COUNT = 3;
 static const int RENDER_STORAGE_IMAGE_BINDINGS = 3;
-static const int RENDER_SAMPLER_BINDINGS = 2;
+static const int RENDER_SAMPLER_BINDINGS = 3;
+static const uint32_t OPTICAL_DEPTH_SUBSTEPS = 4;
 static const int POOL_STORAGE_BUFFER_DESCRIPTORS = RENDER_DESCRIPTOR_SET_COUNT*RENDER_STORAGE_BUFFER_BINDINGS;
 static const int POOL_BACKGROUND_SAMPLER_DESCRIPTORS = RENDER_DESCRIPTOR_SET_COUNT*RENDER_SAMPLER_BINDINGS;
 static const int DESCRIPTOR_POOL_TYPE_COUNT = 5;
@@ -182,6 +183,14 @@ struct RendererState
     uint32_t lighting_bakes,lighting_reuses,lighting_surface_bakes;
     std::vector<uint32_t> surface_cache_meshes;
     uint32_t medium_count;
+    PFN_vkCmdCopyBufferToImage copy_buffer_to_image;
+    VkImage optical_depth_image;
+    VkDeviceMemory optical_depth_memory;
+    VkImageView optical_depth_view;
+    GpuBuffer optical_depth_upload;
+    std::vector<float> optical_depth_fades;
+    bool optical_depth_initialized;
+    uint32_t optical_depth_size,optical_depth_layers,optical_depth_bakes;
     GpuBuffer energy;
     GpuBuffer debug_pixels;
     GpuBuffer debug_text;
@@ -917,6 +926,100 @@ static bool create_render_image(RendererState* state, VkFormat format, VkImage* 
     return true;
 }
 
+static bool create_optical_depth(RendererState* state)
+{
+    state->copy_buffer_to_image=(PFN_vkCmdCopyBufferToImage)vkGetDeviceProcAddr(state->device,"vkCmdCopyBufferToImage");
+    if (!state->copy_buffer_to_image) return false;
+    bool enabled=state->config.optical_depth_lut && !state->custom_shader;
+    state->optical_depth_size=enabled ? OPTICAL_DEPTH_TABLE_SIZE : 1;
+    state->optical_depth_layers=enabled && state->medium_count ? state->medium_count : 1;
+    VkFormatProperties format;vkGetPhysicalDeviceFormatProperties(state->physical,VK_FORMAT_R32_SFLOAT,&format);
+    if (!(format.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
+    { fprintf(stderr,"Optical depth requires linearly filterable R32F.\n");return false; }
+    VkImageCreateInfo image={};image.sType=VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image.imageType=VK_IMAGE_TYPE_2D;image.format=VK_FORMAT_R32_SFLOAT;
+    image.extent=VkExtent3D{state->optical_depth_size,state->optical_depth_size,1};
+    image.mipLevels=1;image.arrayLayers=state->optical_depth_layers;image.samples=VK_SAMPLE_COUNT_1_BIT;
+    image.tiling=VK_IMAGE_TILING_OPTIMAL;image.usage=VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    if (!vk_ok(vkCreateImage(state->device,&image,0,&state->optical_depth_image),"Create optical depth image")) return false;
+    VkMemoryRequirements requirements;vkGetImageMemoryRequirements(state->device,state->optical_depth_image,&requirements);
+    VkMemoryAllocateInfo allocation={};allocation.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocation.allocationSize=requirements.size;
+    allocation.memoryTypeIndex=memory_type(state,requirements.memoryTypeBits,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    if (allocation.memoryTypeIndex==UINT32_MAX
+        || !vk_ok(vkAllocateMemory(state->device,&allocation,0,&state->optical_depth_memory),"Allocate optical depth image")
+        || !vk_ok(vkBindImageMemory(state->device,state->optical_depth_image,state->optical_depth_memory,0),"Bind optical depth image")) return false;
+    VkImageViewCreateInfo view={};view.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view.image=state->optical_depth_image;view.viewType=VK_IMAGE_VIEW_TYPE_2D_ARRAY;view.format=image.format;
+    view.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;view.subresourceRange.levelCount=1;
+    view.subresourceRange.layerCount=state->optical_depth_layers;
+    if (!vk_ok(vkCreateImageView(state->device,&view,0,&state->optical_depth_view),"Create optical depth view")) return false;
+    state->optical_depth_fades.resize(state->optical_depth_layers,-1.0f);
+    VkDeviceSize bytes=(VkDeviceSize)state->optical_depth_size*state->optical_depth_size*state->optical_depth_layers*sizeof(float);
+    return create_buffer(state,&state->optical_depth_upload,bytes,VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+}
+
+// Each column is one unit-sphere half-chord. The cumulative integral has an
+// exact zero endpoint and no Earth-atmosphere assumptions. Only density fade
+// changes the table; radius, position and extinction remain current shader input.
+static void bake_optical_depth(float* output,uint32_t size,float fade)
+{
+    if (size==1) { output[0]=0;return; }
+    double step=1.0/(size-1),substep=step/OPTICAL_DEPTH_SUBSTEPS;
+    for (uint32_t x=0;x<size;++x)
+    {
+        double chord=x*step,integral=0;output[x]=0;
+        for (uint32_t y=1;y<size;++y)
+        {
+            for (uint32_t sub=0;sub<OPTICAL_DEPTH_SUBSTEPS;++sub)
+            {
+                double t=(y-1)*step+(sub+.5)*substep;
+                double radius=std::sqrt(1.0-chord*chord*(1.0-t*t));
+                double density=fade>0 ? (1.0-radius)/fade : 1.0;
+                if (density>1) density=1;
+                integral+=chord*substep*density*density*(3.0-2.0*density);
+            }
+            output[y*size+x]=(float)integral;
+        }
+    }
+}
+
+static void record_optical_depth(RendererState* state)
+{
+    state->optical_depth_bakes=0;
+    uint32_t size=state->optical_depth_size;
+    const RenderMedium* media=(const RenderMedium*)state->media.mapped;
+    // A completed frame fence protects the persistent upload buffer.
+    for (uint32_t i=0;i<state->optical_depth_layers;++i)
+    {
+        float fade=size>1 && i<state->medium_count ? media[i].scattering[3] : 0;
+        if (state->optical_depth_fades[i]==fade && !state->config.force_lighting_rebuild) continue;
+        float* output=(float*)state->optical_depth_upload.mapped+(size_t)i*size*size;
+        bake_optical_depth(output,size,fade);state->optical_depth_fades[i]=fade;++state->optical_depth_bakes;
+    }
+    if (!state->optical_depth_bakes && state->optical_depth_initialized) return;
+    VkImageMemoryBarrier barrier={};barrier.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout=state->optical_depth_initialized ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.srcAccessMask=state->optical_depth_initialized ? VK_ACCESS_SHADER_READ_BIT : 0;
+    barrier.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.srcQueueFamilyIndex=barrier.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
+    barrier.image=state->optical_depth_image;
+    barrier.subresourceRange=VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,state->optical_depth_layers};
+    VkMemoryBarrier host={};host.sType=VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    host.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT;host.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT;
+    vkCmdPipelineBarrier(state->command,VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,0,1,&host,0,0,1,&barrier);
+    VkBufferImageCopy copy={};copy.imageSubresource=VkImageSubresourceLayers{VK_IMAGE_ASPECT_COLOR_BIT,0,0,state->optical_depth_layers};
+    copy.imageExtent=VkExtent3D{size,size,1};
+    state->copy_buffer_to_image(state->command,state->optical_depth_upload.handle,state->optical_depth_image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&copy);
+    barrier.oldLayout=barrier.newLayout;barrier.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;barrier.dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
+    vkCmdPipelineBarrier(state->command,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,0,0,0,0,0,1,&barrier);
+    state->optical_depth_initialized=true;
+}
+
 static bool create_output(RendererState* state)
 {
     // Five vec4 records per native pixel, only for interactive/buffer-view runs.
@@ -975,6 +1078,7 @@ static bool create_output(RendererState* state)
     if (!create_buffer(state,&state->sharp_layer,sharp_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
     state->capture_row.resize(state->config.width*3);
     state->capture_hdr_row.resize(state->config.width*3);
+    if (!create_optical_depth(state)) return false;
     return create_buffer(state, &state->readback, (VkDeviceSize)state->config.width*state->config.height*4*sizeof(float),
         VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 }
@@ -1087,11 +1191,12 @@ static bool load_compute_pipeline(RendererState* state, const char* shader_path,
     pipeline.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     pipeline.stage.module = shader;
     pipeline.stage.pName = "main";
-    uint32_t constants[]={state->config.volume_steps,state->uniform_data.scene[3]};
+    uint32_t constants[]={state->config.volume_steps,state->uniform_data.scene[3],state->config.optical_depth_lut ? 1u : 0u};
     VkSpecializationMapEntry entries[]={
         {VOLUME_STEPS_SPECIALIZATION_ID,0,sizeof(uint32_t)},
-        {LIGHTING_CACHE_SPECIALIZATION_ID,sizeof(uint32_t),sizeof(uint32_t)}};
-    VkSpecializationInfo specialization={2,entries,sizeof(constants),constants};
+        {LIGHTING_CACHE_SPECIALIZATION_ID,sizeof(uint32_t),sizeof(uint32_t)},
+        {OPTICAL_DEPTH_SPECIALIZATION_ID,2*sizeof(uint32_t),sizeof(uint32_t)}};
+    VkSpecializationInfo specialization={3,entries,sizeof(constants),constants};
     // Built-in pipelines use the startup count. External shaders keep their own contract.
     pipeline.stage.pSpecializationInfo=state->custom_shader ? 0 : &specialization;
     bool success = vk_ok(vkCreateComputePipelines(state->device, VK_NULL_HANDLE, 1, &pipeline, 0, output_pipeline), "Create compute pipeline");
@@ -1118,7 +1223,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
     for (uint32_t i = 0; i < RENDER_DESCRIPTOR_COUNT; ++i)
     {
         bindings[i].binding = i;
@@ -1206,6 +1311,8 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
     VkDescriptorBufferInfo dynamic_buffer={state->dynamic_lighting.handle,0,state->dynamic_lighting.size};
     writes[RENDER_BINDING_LIGHTING_BOUNDS].pBufferInfo=&bounds_buffer;
     writes[RENDER_BINDING_DYNAMIC_LIGHTING].pBufferInfo=&dynamic_buffer;
+    VkDescriptorImageInfo optical={state->backdrop_sampler,state->optical_depth_view,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+    writes[RENDER_BINDING_OPTICAL_DEPTH].pImageInfo=&optical;
     vkUpdateDescriptorSets(state->device, RENDER_DESCRIPTOR_COUNT, writes, 0, 0);
     if (!vk_ok(vkAllocateDescriptorSets(state->device,&allocate,&state->effect_descriptors),"Allocate effects descriptors")) return false;
     image.imageView=state->hdr_view;
@@ -1669,6 +1776,9 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
     printf("Subsurface: %.2f strength; %u existing film samples; one strongest back light; current geometry.\n",config->subsurface_strength,config->subsurface_samples);
     printf("Volumes: %u film rays; %u midpoint integration steps; analytic ambient fill; ray-traced studio shadows.\n",
         config->volume_rays_per_pixel,config->volume_steps);
+    printf("Optical depth: %s; %ux%u x %u R32F layers; %llu bytes plus upload storage.\n",
+        config->optical_depth_lut && !state->custom_shader ? "lookup" : "midpoint",state->optical_depth_size,state->optical_depth_size,state->optical_depth_layers,
+        (unsigned long long)state->optical_depth_upload.size);
     printf("Current-frame guides: %llu bytes; no history or upscaling.\n",(unsigned long long)state->debug_pixels.size);
     return true;
 }
@@ -1781,6 +1891,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     if (state->medium_count) memcpy(state->media.mapped,scene->media.data(),state->medium_count*sizeof(RenderMedium));
     memcpy(state->lighting_instances.mapped,state->lighting_input.data(),state->lighting_input.size()*sizeof(LightingInstance));
     if (state->medium_count) memcpy(state->lighting_bounds.mapped,scene->lighting_bounds.data(),state->medium_count*sizeof(RenderGridBounds));
+    record_optical_depth(state);
     update_lighting_dependencies(state,scene);
     update_grid_activity(state);
     if (scene->fog_blur>0) memcpy(state->sight.mapped,scene->fog_field.reveal,sizeof(scene->fog_field.reveal));
@@ -2033,6 +2144,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     uint64_t dynamic_ticks=timestamps[GPU_TIME_GRID_END]-timestamps[GPU_TIME_BAKE_END];
     if (state->timestamp_bits<TIMESTAMP_WORD_BITS)
     { bake_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1;dynamic_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1; }
+    if (state->config.optical_depth_lut) printf("Optical depth tables: %u rebuilt.\n",state->optical_depth_bakes);
     printf("GPU static lighting bake: %.3f ms; GPU dynamic lighting: %.3f ms.\n",
         bake_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND,
         dynamic_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND);
@@ -2124,6 +2236,9 @@ bool renderer_shutdown(Renderer* renderer)
     if (state->device)
     {
         vkDeviceWaitIdle(state->device);
+        if (state->optical_depth_view) vkDestroyImageView(state->device,state->optical_depth_view,0);
+        if (state->optical_depth_image) vkDestroyImage(state->device,state->optical_depth_image,0);
+        if (state->optical_depth_memory) vkFreeMemory(state->device,state->optical_depth_memory,0);
         if (state->effects_pipeline) vkDestroyPipeline(state->device,state->effects_pipeline,0);
         if (state->backdrop_pipeline) vkDestroyPipeline(state->device,state->backdrop_pipeline,0);
         if (state->backdrop_sampler) vkDestroySampler(state->device,state->backdrop_sampler,0);
@@ -2170,7 +2285,7 @@ bool renderer_shutdown(Renderer* renderer)
         if (state->tlas) state->destroy_as(state->device, state->tlas, 0);
         GpuBuffer* buffers[] = { &state->vertices, &state->triangles, &state->indices, &state->instances,
             &state->tlas_buffer, &state->tlas_scratch,
-            &state->uniform, &state->readback, &state->media, &state->shadow_grid, &state->static_lighting, &state->lighting_instances, &state->surface_lighting, &state->lighting_bounds, &state->dynamic_lighting, &state->sharp_layer, &state->energy, &state->sight,
+            &state->uniform, &state->readback, &state->optical_depth_upload, &state->media, &state->shadow_grid, &state->static_lighting, &state->lighting_instances, &state->surface_lighting, &state->lighting_bounds, &state->dynamic_lighting, &state->sharp_layer, &state->energy, &state->sight,
             &state->debug_pixels, &state->debug_text, &state->effects, &state->effect_tiles, &state->instance_styles };
         for (uint32_t i = 0; i < sizeof(buffers)/sizeof(buffers[0]); ++i) destroy_buffer(state, buffers[i]);
         if (state->output_view) vkDestroyImageView(state->device, state->output_view, 0);

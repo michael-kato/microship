@@ -47,7 +47,8 @@
   },
   "volume": {
     "rays_per_pixel": 1,
-    "integration_steps": 8
+    "integration_steps": 8,
+    "optical_depth_lut": true
   },
   "tilt_shift": {
     "focus_center": 0.52,

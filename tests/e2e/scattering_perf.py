@@ -12,6 +12,7 @@ if a.diagnose and a.baseline:p.error('Use diagnosis or before/after comparison')
 if not a.diagnose and not a.baseline:p.error('Comparison requires --baseline')
 world=stage_world(root/'assets/levels/biology-virus.json',out);config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3
 assert config['output']['width']==1920 and config['output']['height']==1080
+config['volume'].pop('optical_depth_lut',None)
 assert config['volume']==dict(rays_per_pixel=1,integration_steps=8)
 config['volume']['integration_steps']=a.steps;config['lighting']['shadow_grid_resolution']=a.shadow_grid
 # Static bakes use a different spatial approximation; compare them with static_lighting.py.

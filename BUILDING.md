@@ -85,3 +85,30 @@ resolution moving shadows change the image slightly: close-view mean
 channel error was 0.225 RGB8 levels, with a maximum of 8. Reused and fresh
 bakes matched exactly. These checks do not establish steady gameplay
 performance, shipping six-film performance, or native Windows results.
+
+## Optical-depth textures
+
+`volume.optical_depth_lut` enables generated R32F lookup textures for the
+radial density integral. The biology config enables it. Missing or false
+uses the original midpoint calculation. Film samples and scattering
+integration points are unchanged. No previous-frame image data is used.
+
+Each medium has a 256 by 256 layer. Tables depend only on density fade.
+A fade change rebuilds the table before use. Radius, position and RGB
+extinction use current input and do not require new table values.
+`lighting.force_lighting_rebuild` also rebuilds these tables for checks.
+The default world uses 1.5 MiB of texel data plus 1.5 MiB of upload data;
+actual Vulkan allocation sizes can be larger.
+
+Run `python3 tests/e2e/optical_depth.py build/windows-cross/nanova.exe --run`
+for the bounded application comparison. Add `--pairs 3 --timing` for three
+alternating timing pairs. `--variants lookup refresh` checks reuse against
+a new bake. `--case` selects near, normal, grown, inside, far, overlap,
+boundary or opaque. All retain the GPU limits above.
+
+Three close-view pairs measured median volume time of 13.207 ms with the
+midpoint path and 10.999 ms with the lookup. Median GPU render time was
+26.888 ms and 24.555 ms. Close-view differences were at most one RGB8 level;
+the mean was 0.00985. These short three-film checks do not establish
+shipping six-film or sustained frame time. The lookup alone does not meet
+the 10 ms target.
