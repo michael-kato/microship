@@ -46,7 +46,8 @@ prepared=[]
 for variant in reversed(a.variants) if a.reverse else a.variants:
  cfg=deepcopy(settings)
  if variant=='baseline':
-  cfg['volume'].pop('optical_depth_lut',None)
+  cfg['volume'].pop('optical_depth_lut',None);cfg['volume'].pop('lighting_grid',None)
+  cfg['lighting'].pop('texture_grid',None);cfg['lighting'].pop('organelle_cache',None)
   cfg['lighting'].pop('static_lighting_cache',None);cfg['lighting'].pop('force_lighting_rebuild',None)
  else:
   cfg['lighting']['static_lighting_cache']=variant!='off';cfg['lighting']['force_lighting_rebuild']=variant=='refresh'

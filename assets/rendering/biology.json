@@ -38,7 +38,8 @@
   "lighting": {
     "microfacet_energy_compensation": true,
     "shadow_grid_resolution": 32,
-    "static_lighting_cache": true
+    "static_lighting_cache": true,
+    "texture_grid": true
   },
   "bloom": {
     "radius": 32,
@@ -48,7 +49,8 @@
   "volume": {
     "rays_per_pixel": 1,
     "integration_steps": 8,
-    "optical_depth_lut": true
+    "optical_depth_lut": true,
+    "lighting_grid": true
   },
   "tilt_shift": {
     "focus_center": 0.52,

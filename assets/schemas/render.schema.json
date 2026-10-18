@@ -144,6 +144,12 @@
         },
         "force_lighting_rebuild": {
           "type": "boolean"
+        },
+        "texture_grid": {
+          "type": "boolean"
+        },
+        "organelle_cache": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -191,6 +197,9 @@
           "maximum": 64
         },
         "optical_depth_lut": {
+          "type": "boolean"
+        },
+        "lighting_grid": {
           "type": "boolean"
         }
       },

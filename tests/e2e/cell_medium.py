@@ -50,6 +50,12 @@ with tempfile.TemporaryDirectory(prefix='nanova-medium-') as directory:
         config=deepcopy(settings);config['lighting']['shadow_grid_resolution']=n
         s,_=run('grid-'+str(n),data,4800,orders,config)
         assert s==baseline,'Shadow quality changed the simulation'
+    for section,field in [('volume','optical_depth_lut'),('volume','lighting_grid'),('lighting','texture_grid'),('lighting','organelle_cache')]:
+        for value in (False,True):
+            config=deepcopy(settings);config[section][field]=value
+            assert run('optical-'+section+'-'+field+str(value),data,4800,orders,config)[0]==baseline
+        config=deepcopy(settings);config[section][field]=1
+        run('bad-optical-'+field,data,config=config,expected=1)
     # Optional focus settings must not affect simulation or geometry.
     config=deepcopy(settings);config.pop('tilt_shift')
     s,_=run('focus-off',data,4800,orders,config);assert s==baseline

@@ -44,14 +44,14 @@ for body in data['bodies']:
     if args.weak_medium:body['medium'].update(scattering=[.035,.045,.04],absorption=.012)
 config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3
 # Keep strict legacy comparisons on the unbaked path.
-config['lighting'].pop('static_lighting_cache',None);config['lighting'].pop('force_lighting_rebuild',None)
+config['lighting'].pop('texture_grid',None);config['lighting'].pop('static_lighting_cache',None);config['lighting'].pop('force_lighting_rebuild',None)
 if args.tilt_shift=='off':config.pop('tilt_shift',None)
 if args.subsurface=='off':config['subsurface']['strength']=0
 if args.subsurface=='wrap':config['subsurface']['transmission']=0
 if args.subsurface_samples is not None:config['subsurface']['samples_per_pixel']=args.subsurface_samples
 if args.shadow_grid is not None:config['lighting']['shadow_grid_resolution']=args.shadow_grid
 assert config['output']['width']==1920 and config['output']['height']==1080
-config['volume'].pop('optical_depth_lut',None)
+config['volume'].pop('optical_depth_lut',None);config['volume'].pop('lighting_grid',None)
 assert config['volume']==dict(rays_per_pixel=1,integration_steps=8)
 if args.atmosphere_shadows:data['appearance']['atmosphere']['shadows']=args.atmosphere_shadows=='on'
 if args.case=='solid':

@@ -107,7 +107,9 @@ bool render_config_load(RenderConfig* config,const char* path)
         loaded.seed=json_uint(json_get(j,"seed"),0,UINT32_MAX);
     }
     {
-        Json j=json_get(root,"volume");json_object(j,"rays_per_pixel|integration_steps|optical_depth_lut");
+        Json j=json_get(root,"volume");json_object(j,"rays_per_pixel|integration_steps|optical_depth_lut|lighting_grid");
+        Json grid=json_find(j,"lighting_grid");
+        if (json_present(grid)) loaded.volume_lighting_grid=json_bool(grid);
         Json optical=json_find(j,"optical_depth_lut");
         if (json_present(optical)) loaded.optical_depth_lut=json_bool(optical);
         loaded.volume_steps=json_uint(json_get(j,"integration_steps"),MIN_RENDER_INTEGRATION_STEPS,MAX_RENDER_INTEGRATION_STEPS);
@@ -130,7 +132,11 @@ bool render_config_load(RenderConfig* config,const char* path)
         loaded.vertical_fov_degrees=json_float(json_get(j,"vertical_fov_degrees"),1,MAX_RENDER_VERTICAL_FOV_DEGREES);
     }
     {
-        Json j=json_get(root,"lighting");json_object(j,"microfacet_energy_compensation|shadow_grid_resolution|static_lighting_cache|force_lighting_rebuild");
+        Json j=json_get(root,"lighting");json_object(j,"microfacet_energy_compensation|shadow_grid_resolution|static_lighting_cache|force_lighting_rebuild|texture_grid|organelle_cache");
+        Json organelle=json_find(j,"organelle_cache");
+        if (json_present(organelle)) loaded.organelle_lighting_cache=json_bool(organelle);
+        Json texture=json_find(j,"texture_grid");
+        if (json_present(texture)) loaded.texture_lighting_grid=json_bool(texture);
         Json cache=json_find(j,"static_lighting_cache"),refresh=json_find(j,"force_lighting_rebuild");
         loaded.static_lighting_cache=json_present(cache) && json_bool(cache);
         loaded.force_lighting_rebuild=json_present(refresh) && json_bool(refresh);

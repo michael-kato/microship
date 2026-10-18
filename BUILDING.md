@@ -22,7 +22,7 @@ python3 scripts/proton_run.py build/windows-cross/nanova.exe --world assets/leve
 All checks use the real application. Keep native 1920×1080, three film samples, one volume film ray, and one backdrop query. Each GPU process can use at most two frames and 2 seconds; a sequential batch can use at most 5 seconds. See [PROFILING.md](PROFILING.md) for commands and validation limits.
 
 To record flight paths, run `python3 tests/e2e/navigation.py build/windows-cross/nanova.exe --output build/navigation`. With Matplotlib installed, run `python3 scripts/plot_flight.py build/navigation/paths.json --output build/navigation/flight-paths.svg`. The plot joins measured half-second positions.
- s
+
 For the frame profiler checks, build the small Win32 input driver with `cmake --build build/windows-cross --target nanova_input_probe`. Run `python3 tests/e2e/profiler_window.py build/windows-cross/nanova.exe --run` for F1 messages and OS middle-button input. Run `python3 tests/e2e/profiler_render.py build/windows-cross/nanova.exe --run` for normal zoom, close zoom, and F2 compatibility. Without `--run`, these scripts start no GPU work. The input check uses `--frame-delay-ms 250` between its two frames to allow input delivery. This diagnostic delay requires a bounded `--frames` run, has a 250 ms limit, and is outside measured CPU work. It changes frame cadence and must not be used for performance measurements.
 
 To compare SSS and volume changes, preserve the old executable and its `assets/` folder before rebuilding. Then run `python3 tests/e2e/scattering_perf.py build/windows-cross/nanova.exe --baseline build/scattering-baseline/nanova.exe --cases near grown --run`. Without `--run`, the script prepares inputs only. Add `--timing` to disable host validation for timing comparisons. Use `--diagnose` instead of `--baseline` to measure SSS and volume controls. The script keeps the GPU limits above and checks full-image differences and simulation state for comparisons.
@@ -45,8 +45,8 @@ memory.
 The biology config enables `lighting.static_lighting_cache`. The renderer
 bakes incoming light visibility and medium attenuation at thin cell
 surfaces and in interior shadow grids. It calculates material shading,
-view-dependent highlights, SSS thickness, and camera-path scattering from
-current input. Moving blockers use a separate current-frame shadow field.
+view-dependent highlights and camera-path scattering from current input.
+SSS thickness uses live queries unless the optional thickness bake is on. Moving blockers use a separate current-frame shadow field.
 Static transport changes cause a rebuild before the next draw. These
 bakes stay in GPU memory; they are not saved as authored image maps.
 
@@ -112,3 +112,100 @@ midpoint path and 10.999 ms with the lookup. Median GPU render time was
 the mean was 0.00985. These short three-film checks do not establish
 shipping six-film or sustained frame time. The lookup alone does not meet
 the 10 ms target.
+
+
+## Volume lighting textures and static thickness
+
+The biology config enables `volume.lighting_grid` and
+`lighting.texture_grid`. The first adds a 32 by 32 by 32 incoming-light
+field for the unshadowed atmosphere. It stores light-path attenuation;
+it does not add geometry shadows to the background. Cell fields retain
+static and current moving shadows. The second copies current volume
+lighting into a filtered RGBA32F 3D texture. Surface shadows keep buffer
+interpolation. Phase evaluation and camera-ray integration still use the
+current camera at full resolution. This is not a lower-resolution final
+image or a camera-aligned volume integration pass.
+
+Missing controls default to false. Set `volume.optical_depth_lut`,
+`volume.lighting_grid` and `lighting.texture_grid` to false for the
+original volume path. Set only `lighting.texture_grid` to false to compare
+hardware texture filtering with buffer interpolation. The default texture
+uses 9 MiB of texel data. With the optical-depth tables and upload buffer,
+the added storage is about 12 MiB, before allocation padding.
+
+`lighting.organelle_cache` is optional and defaults to false. With static
+lighting enabled, it bakes solid thickness and light-entry positions at
+triangle corners. Missing valid corner exits use live queries. Moving
+shadows and material response remain current. The bake reuses the
+existing surface atlas. Close-view reuse saved about 0.3 ms, but its added
+rebuild cost was about 0.5 ms. It remains off in the biology config.
+
+For three alternating volume timing pairs, run:
+
+```sh
+python3 tests/e2e/optical_depth.py build/windows-cross/nanova.exe --variants off texture --pairs 3 --timing --run
+```
+
+Use `--variants texture texture-refresh` for cache reuse, or
+`--variants organelle organelle-refresh` for the optional thickness bake.
+`--shadow-grid 0` checks the live fallback. `--no-static-cache` checks the
+unbaked path. The live and camera checks above accept `--thickness-cache`.
+All retain the normal bounded GPU limits.
+
+Three close-view, three-film pairs measured median volume time of
+13.226 ms before these volume changes and 6.842 ms after them. Paired
+volume savings were 6.362 to 6.710 ms. Median GPU render time was 27.769 ms
+and 20.708 ms. One optimized surface measurement was 13.612 ms; the other
+two were about 10.2 ms. Close-view mean image error was 0.111 RGB8 levels,
+with a maximum of 2. These short checks do not establish steady gameplay
+performance or a total frame time below 10 ms.
+
+## RenderDoc diagnosis
+
+The local capture tool uses RenderDoc 1.44 from `/opt/renderdoc_1.44`.
+It needs its SDK header, `cc`, Vulkan headers, the existing Proton setup,
+and an available GPU. The small native Vulkan layer is a diagnostic tool;
+the game remains a Windows target. The tool creates a local layer manifest
+and does not change system Vulkan registration.
+
+Prepare the close-view capture with:
+
+```sh
+python3 scripts/renderdoc_profile.py build/windows-cross/nanova.exe --output build/renderdoc-on
+```
+
+Add `--run` to start GPU work. The default uses native 1920 by 1080,
+six film samples, one volume ray and one backdrop query. It runs two game
+frames, captures the second headless frame, then runs one bounded replay
+process. Each process has a two-second limit; the batch has a five-second
+limit. Hardware tracing remains disabled. The user authorized RenderDoc
+for this diagnosis. Replay uses Khronos host validation; capture does not.
+
+Use `--sss off --output build/renderdoc-off --run` for the matching SSS-off
+case. When `subsurface.strength` is zero, built-in shaders now compile out
+SSS. The default keeps SSS enabled. External shaders keep their own
+specialization contract.
+
+The output contains an `.rdc` capture, `report.json`, pipeline compiler
+reports, logs and the frozen scene inputs. Display images are also saved
+in `screenshots/`. The analysis identifies shader programs by captured
+SPIR-V hashes. It reports event duration and compute invocations, plus
+register counts and code statistics from
+`KHR_pipeline_executable_properties`. Compiler subgroup limits are not
+measured occupancy. This setup exposes no AMD hardware stall counters.
+
+In the final six-film close-view captures, the surface pass took
+20.252 ms with SSS and 15.205 ms with SSS compiled out. Volume took
+7.277 ms and 7.101 ms. The surface program used 216 and 168 vector
+registers. An earlier runtime-only SSS-off test retained the 216-register
+program and took 19.324 ms. The compiled-off image matches that earlier
+SSS-off image exactly; the default SSS-on image also stays unchanged.
+These are short instrumented captures, not steady frame-time statistics.
+The report's event-duration sum excludes gaps and waits. It is not
+application frame time or FPS. Even the SSS-off surface pass exceeds the
+10 ms total target.
+
+The window capture recorded, but replay failed with
+`VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS`. The headless capture and replay
+work. The failure does not establish a driver cause. Native Windows and
+the reported 100 ms gameplay case remain unverified.

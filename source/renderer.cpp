@@ -41,10 +41,10 @@ static const double NANOSECONDS_PER_MILLISECOND = 1000000.0;
 static const int RENDER_STORAGE_BUFFER_BINDINGS = 15;
 static const int RENDER_DESCRIPTOR_SET_COUNT = 3;
 static const int RENDER_STORAGE_IMAGE_BINDINGS = 3;
-static const int RENDER_SAMPLER_BINDINGS = 3;
+static const int RENDER_SAMPLER_BINDINGS = 4;
 static const uint32_t OPTICAL_DEPTH_SUBSTEPS = 4;
 static const int POOL_STORAGE_BUFFER_DESCRIPTORS = RENDER_DESCRIPTOR_SET_COUNT*RENDER_STORAGE_BUFFER_BINDINGS;
-static const int POOL_BACKGROUND_SAMPLER_DESCRIPTORS = RENDER_DESCRIPTOR_SET_COUNT*RENDER_SAMPLER_BINDINGS;
+static const int POOL_SAMPLER_DESCRIPTORS = RENDER_DESCRIPTOR_SET_COUNT*RENDER_SAMPLER_BINDINGS;
 static const int DESCRIPTOR_POOL_TYPE_COUNT = 5;
 static const int BACKDROP_PUSH_BYTES = 16;
 static const int GPU_TRIANGLE_BYTES = 16;
@@ -184,6 +184,12 @@ struct RendererState
     std::vector<uint32_t> surface_cache_meshes;
     uint32_t medium_count;
     PFN_vkCmdCopyBufferToImage copy_buffer_to_image;
+    VkImage lighting_image;
+    VkDeviceMemory lighting_memory;
+    VkImageView lighting_view;
+    VkExtent3D lighting_extent;
+    std::vector<VkBufferImageCopy> lighting_copies;
+    bool lighting_image_initialized;
     VkImage optical_depth_image;
     VkDeviceMemory optical_depth_memory;
     VkImageView optical_depth_view;
@@ -768,7 +774,8 @@ static void update_grid_activity(RendererState* state)
         float r=m.center_radius[3];
         bool visible=z+r>0 && std::fabs(x)<=z*horizontal+r*std::sqrt(1+horizontal*horizontal)
             && std::fabs(y)<=z*vertical+r*std::sqrt(1+vertical*vertical);
-        m.lighting[2]=state->config.shadow_grid_resolution && m.lighting[0]>0 && m.lighting[1]>0 && r>0 && visible ? 1.0f : 0.0f;
+        m.lighting[2]=state->config.shadow_grid_resolution && ((m.lighting[0]>0 && m.lighting[1]>0)
+            || (state->config.volume_lighting_grid && m.lighting[0]<=0 && !state->custom_shader)) && r>0 && visible ? 1.0f : 0.0f;
     }
 }
 
@@ -1020,6 +1027,44 @@ static void record_optical_depth(RendererState* state)
     state->optical_depth_initialized=true;
 }
 
+static bool create_lighting_texture(RendererState* state)
+{
+    uint32_t n=state->config.texture_lighting_grid && !state->custom_shader ? state->config.shadow_grid_resolution : 0;
+    uint32_t count=state->medium_count ? state->medium_count : 1;
+    state->lighting_extent=n ? VkExtent3D{3*n,n,count*n} : VkExtent3D{1,1,1};
+    uint32_t limit=state->properties.limits.maxImageDimension3D;
+    if (state->lighting_extent.width>limit || state->lighting_extent.height>limit || state->lighting_extent.depth>limit)
+    { fprintf(stderr,"Lighting texture exceeds the 3D image limit.\n");return false; }
+    VkFormatProperties format;vkGetPhysicalDeviceFormatProperties(state->physical,VK_FORMAT_R32G32B32A32_SFLOAT,&format);
+    if (!(format.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
+    { fprintf(stderr,"Lighting texture requires linearly filterable RGBA32F.\n");return false; }
+    VkImageCreateInfo image={};image.sType=VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image.imageType=VK_IMAGE_TYPE_3D;image.format=VK_FORMAT_R32G32B32A32_SFLOAT;image.extent=state->lighting_extent;
+    image.mipLevels=image.arrayLayers=1;image.samples=VK_SAMPLE_COUNT_1_BIT;image.tiling=VK_IMAGE_TILING_OPTIMAL;
+    image.usage=VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    if (!vk_ok(vkCreateImage(state->device,&image,0,&state->lighting_image),"Create lighting texture")) return false;
+    VkMemoryRequirements requirements;vkGetImageMemoryRequirements(state->device,state->lighting_image,&requirements);
+    VkMemoryAllocateInfo allocation={};allocation.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;allocation.allocationSize=requirements.size;
+    allocation.memoryTypeIndex=memory_type(state,requirements.memoryTypeBits,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    if (allocation.memoryTypeIndex==UINT32_MAX
+        || !vk_ok(vkAllocateMemory(state->device,&allocation,0,&state->lighting_memory),"Allocate lighting texture")
+        || !vk_ok(vkBindImageMemory(state->device,state->lighting_image,state->lighting_memory,0),"Bind lighting texture")) return false;
+    VkImageViewCreateInfo view={};view.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view.image=state->lighting_image;view.viewType=VK_IMAGE_VIEW_TYPE_3D;view.format=image.format;
+    view.subresourceRange=VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
+    if (!vk_ok(vkCreateImageView(state->device,&view,0,&state->lighting_view),"Create lighting texture view")) return false;
+    state->lighting_copies.resize(count*3);
+    for (uint32_t medium=0;medium<count;++medium) for (uint32_t light=0;light<3;++light)
+    {
+        VkBufferImageCopy& copy=state->lighting_copies[medium*3+light];
+        copy.bufferOffset=(VkDeviceSize)(medium*3+light)*n*n*n*4*sizeof(float);
+        copy.imageSubresource=VkImageSubresourceLayers{VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
+        copy.imageOffset=VkOffset3D{(int32_t)(light*n),0,(int32_t)(medium*n)};
+        copy.imageExtent=VkExtent3D{n,n,n};
+    }
+    return true;
+}
+
 static bool create_output(RendererState* state)
 {
     // Five vec4 records per native pixel, only for interactive/buffer-view runs.
@@ -1061,7 +1106,7 @@ static bool create_output(RendererState* state)
     VkDeviceSize grid_bytes=n ? n*n*n*3*(state->medium_count ? state->medium_count : 1)*4*sizeof(float) : 4*sizeof(float);
     if (grid_bytes>state->properties.limits.maxStorageBufferRange)
     { fprintf(stderr,"Shadow grid exceeds the storage-buffer range.\n");return false; }
-    if (!create_buffer(state,&state->shadow_grid,grid_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
+    if (!create_buffer(state,&state->shadow_grid,grid_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
     VkDeviceSize static_bytes=state->uniform_data.scene[3] ? grid_bytes : 4*sizeof(float);
     VkDeviceSize surface_bytes=state->uniform_data.scene[3] ? (VkDeviceSize)state->surface_cache_triangles*SURFACE_LIGHTING_RECORDS_PER_TRIANGLE*4*sizeof(float) : 4*sizeof(float);
     if (!surface_bytes) surface_bytes=4*sizeof(float);
@@ -1078,7 +1123,7 @@ static bool create_output(RendererState* state)
     if (!create_buffer(state,&state->sharp_layer,sharp_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
     state->capture_row.resize(state->config.width*3);
     state->capture_hdr_row.resize(state->config.width*3);
-    if (!create_optical_depth(state)) return false;
+    if (!create_optical_depth(state) || !create_lighting_texture(state)) return false;
     return create_buffer(state, &state->readback, (VkDeviceSize)state->config.width*state->config.height*4*sizeof(float),
         VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 }
@@ -1191,12 +1236,16 @@ static bool load_compute_pipeline(RendererState* state, const char* shader_path,
     pipeline.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     pipeline.stage.module = shader;
     pipeline.stage.pName = "main";
-    uint32_t constants[]={state->config.volume_steps,state->uniform_data.scene[3],state->config.optical_depth_lut ? 1u : 0u};
+    uint32_t constants[]={state->config.volume_steps,state->uniform_data.scene[3],state->config.optical_depth_lut ? 1u : 0u,state->config.volume_lighting_grid ? 1u : 0u,state->config.texture_lighting_grid && state->config.shadow_grid_resolution ? 1u : 0u,state->config.organelle_lighting_cache && state->uniform_data.scene[3] ? 1u : 0u,state->config.subsurface_strength>0.0f ? 1u : 0u};
     VkSpecializationMapEntry entries[]={
         {VOLUME_STEPS_SPECIALIZATION_ID,0,sizeof(uint32_t)},
         {LIGHTING_CACHE_SPECIALIZATION_ID,sizeof(uint32_t),sizeof(uint32_t)},
-        {OPTICAL_DEPTH_SPECIALIZATION_ID,2*sizeof(uint32_t),sizeof(uint32_t)}};
-    VkSpecializationInfo specialization={3,entries,sizeof(constants),constants};
+        {OPTICAL_DEPTH_SPECIALIZATION_ID,2*sizeof(uint32_t),sizeof(uint32_t)},
+        {VOLUME_LIGHTING_GRID_SPECIALIZATION_ID,3*sizeof(uint32_t),sizeof(uint32_t)},
+        {LIGHTING_TEXTURE_SPECIALIZATION_ID,4*sizeof(uint32_t),sizeof(uint32_t)},
+        {ORGANELLE_CACHE_SPECIALIZATION_ID,5*sizeof(uint32_t),sizeof(uint32_t)},
+        {SUBSURFACE_ENABLED_SPECIALIZATION_ID,6*sizeof(uint32_t),sizeof(uint32_t)}};
+    VkSpecializationInfo specialization={7,entries,sizeof(constants),constants};
     // Built-in pipelines use the startup count. External shaders keep their own contract.
     pipeline.stage.pSpecializationInfo=state->custom_shader ? 0 : &specialization;
     bool success = vk_ok(vkCreateComputePipelines(state->device, VK_NULL_HANDLE, 1, &pipeline, 0, output_pipeline), "Create compute pipeline");
@@ -1223,7 +1272,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
     for (uint32_t i = 0; i < RENDER_DESCRIPTOR_COUNT; ++i)
     {
         bindings[i].binding = i;
@@ -1237,7 +1286,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
     layout.pBindings = bindings;
     if (!vk_ok(vkCreateDescriptorSetLayout(state->device, &layout, 0, &state->descriptor_layout), "Create descriptor layout"))
         return false;
-    VkDescriptorPoolSize pool_sizes[] = { { types[RENDER_BINDING_ACCELERATION], RENDER_DESCRIPTOR_SET_COUNT }, { types[RENDER_BINDING_BEAUTY], RENDER_DESCRIPTOR_SET_COUNT*RENDER_STORAGE_IMAGE_BINDINGS }, { types[RENDER_BINDING_VERTICES], POOL_STORAGE_BUFFER_DESCRIPTORS }, { types[RENDER_BINDING_UNIFORM], RENDER_DESCRIPTOR_SET_COUNT }, {types[RENDER_BINDING_SOURCE_A],POOL_BACKGROUND_SAMPLER_DESCRIPTORS} };
+    VkDescriptorPoolSize pool_sizes[] = { { types[RENDER_BINDING_ACCELERATION], RENDER_DESCRIPTOR_SET_COUNT }, { types[RENDER_BINDING_BEAUTY], RENDER_DESCRIPTOR_SET_COUNT*RENDER_STORAGE_IMAGE_BINDINGS }, { types[RENDER_BINDING_VERTICES], POOL_STORAGE_BUFFER_DESCRIPTORS }, { types[RENDER_BINDING_UNIFORM], RENDER_DESCRIPTOR_SET_COUNT }, {types[RENDER_BINDING_SOURCE_A],POOL_SAMPLER_DESCRIPTORS} };
     VkDescriptorPoolCreateInfo pool = {};
     pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool.maxSets = RENDER_DESCRIPTOR_SET_COUNT;
@@ -1313,6 +1362,8 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
     writes[RENDER_BINDING_DYNAMIC_LIGHTING].pBufferInfo=&dynamic_buffer;
     VkDescriptorImageInfo optical={state->backdrop_sampler,state->optical_depth_view,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
     writes[RENDER_BINDING_OPTICAL_DEPTH].pImageInfo=&optical;
+    VkDescriptorImageInfo lighting={state->backdrop_sampler,state->lighting_view,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+    writes[RENDER_BINDING_LIGHTING_TEXTURE].pImageInfo=&lighting;
     vkUpdateDescriptorSets(state->device, RENDER_DESCRIPTOR_COUNT, writes, 0, 0);
     if (!vk_ok(vkAllocateDescriptorSets(state->device,&allocate,&state->effect_descriptors),"Allocate effects descriptors")) return false;
     image.imageView=state->hdr_view;
@@ -1490,7 +1541,7 @@ static void record_lighting_fields(RendererState* state)
     {
         for (uint32_t i=0;i<state->medium_count;++i) if (media[i].lighting[2]>0)
         {
-            if (state->uniform_data.scene[3])
+            if (state->uniform_data.scene[3] && media[i].lighting[0]>0)
             {
                 uint32_t parameters[4]={i,LIGHTING_PASS_DYNAMIC,0,0};
                 vkCmdPushConstants(state->command,state->pipeline_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,BACKDROP_PUSH_BYTES,parameters);
@@ -1502,6 +1553,32 @@ static void record_lighting_fields(RendererState* state)
         }
         shader_buffer_barrier(state->command);
     }
+}
+
+// Copy current lighting fields to a spatially filtered texture. This is a
+// representation change, not a previous-frame lighting or image dependency.
+static void record_lighting_texture(RendererState* state)
+{
+    if (!state->config.texture_lighting_grid || !state->config.shadow_grid_resolution || state->custom_shader) return;
+    uint32_t n=state->config.shadow_grid_resolution;
+    VkImageMemoryBarrier barrier={};barrier.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout=state->lighting_image_initialized ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.srcAccessMask=state->lighting_image_initialized ? VK_ACCESS_SHADER_READ_BIT : 0;
+    barrier.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.srcQueueFamilyIndex=barrier.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
+    barrier.image=state->lighting_image;barrier.subresourceRange=VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
+    VkMemoryBarrier fields={};fields.sType=VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    fields.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT;fields.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT;
+    vkCmdPipelineBarrier(state->command,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,1,&fields,0,0,1,&barrier);
+    // Inactive blocks may contain unspecified data. They are never sampled.
+    for (uint32_t i=0;i<state->lighting_copies.size();++i) state->lighting_copies[i].imageOffset.x=(int32_t)((i%3)*n);
+    state->copy_buffer_to_image(state->command,state->shadow_grid.handle,state->lighting_image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        (uint32_t)state->lighting_copies.size(),state->lighting_copies.data());
+    barrier.oldLayout=barrier.newLayout;barrier.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;barrier.dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
+    vkCmdPipelineBarrier(state->command,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,0,0,0,0,0,1,&barrier);
+    state->lighting_image_initialized=true;
 }
 
 // A fixed bit mask holds debug text. It is separate from all scene images.
@@ -1779,6 +1856,11 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
     printf("Optical depth: %s; %ux%u x %u R32F layers; %llu bytes plus upload storage.\n",
         config->optical_depth_lut && !state->custom_shader ? "lookup" : "midpoint",state->optical_depth_size,state->optical_depth_size,state->optical_depth_layers,
         (unsigned long long)state->optical_depth_upload.size);
+    printf("Lighting field: %s; texture %ux%ux%u RGBA32F; %llu texel bytes; static thickness %s.\n",
+        config->volume_lighting_grid && !state->custom_shader ? "atmosphere grid" : "per-point atmosphere",
+        state->lighting_extent.width,state->lighting_extent.height,state->lighting_extent.depth,
+        (unsigned long long)state->lighting_extent.width*state->lighting_extent.height*state->lighting_extent.depth*4*sizeof(float),
+        config->organelle_lighting_cache && state->uniform_data.scene[3] ? "baked with live fallback" : "live");
     printf("Current-frame guides: %llu bytes; no history or upscaling.\n",(unsigned long long)state->debug_pixels.size);
     return true;
 }
@@ -1980,6 +2062,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     shader_buffer_barrier(state->command);
     vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->pipeline_layout,0,1,&state->descriptors,0,0);
     record_lighting_fields(state);
+    record_lighting_texture(state);
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_GRID_END);
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_SURFACE_BEGIN);
     vkCmdBindPipeline(state->command, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -2236,6 +2319,9 @@ bool renderer_shutdown(Renderer* renderer)
     if (state->device)
     {
         vkDeviceWaitIdle(state->device);
+        if (state->lighting_view) vkDestroyImageView(state->device,state->lighting_view,0);
+        if (state->lighting_image) vkDestroyImage(state->device,state->lighting_image,0);
+        if (state->lighting_memory) vkFreeMemory(state->device,state->lighting_memory,0);
         if (state->optical_depth_view) vkDestroyImageView(state->device,state->optical_depth_view,0);
         if (state->optical_depth_image) vkDestroyImage(state->device,state->optical_depth_image,0);
         if (state->optical_depth_memory) vkFreeMemory(state->device,state->optical_depth_memory,0);

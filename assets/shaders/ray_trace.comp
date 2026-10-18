@@ -45,6 +45,11 @@ layout(constant_id=LIGHTING_CACHE_SPECIALIZATION_ID) const uint specialized_ligh
 bool lighting_cached()
 { return specialized_lighting_cache==2u ? render.scene.w>0u : specialized_lighting_cache>0u; }
 layout(constant_id=OPTICAL_DEPTH_SPECIALIZATION_ID) const bool optical_depth_cached=false;
+layout(constant_id=VOLUME_LIGHTING_GRID_SPECIALIZATION_ID) const bool volume_lighting_grid=false;
+layout(constant_id=LIGHTING_TEXTURE_SPECIALIZATION_ID) const bool texture_lighting_grid=false;
+layout(constant_id=ORGANELLE_CACHE_SPECIALIZATION_ID) const bool organelle_lighting_cache=false;
+layout(constant_id=SUBSURFACE_ENABLED_SPECIALIZATION_ID) const bool subsurface_enabled=true;
+layout(set=0,binding=RENDER_BINDING_LIGHTING_TEXTURE) uniform sampler3D lighting_texture;
 layout(set=0,binding=RENDER_BINDING_OPTICAL_DEPTH) uniform sampler2DArray optical_depth_table;
 
 uint integration_steps()
@@ -279,7 +284,7 @@ float membrane_clear(float cosine)
 vec3 studio_visibility(vec3 origin,vec3 direction);
 vec3 sampled_visibility(vec3 point,vec3 normal,int light);
 
-vec3 volume_incident(vec3 point,Medium medium,vec3 ambient,vec3 phases);
+vec3 volume_incident(vec3 point,uint medium_index,vec3 ambient,vec3 phases);
 
 vec3 single_scattering(vec3 origin,vec3 direction,float distance,out vec3 sharp)
 {
@@ -303,7 +308,7 @@ vec3 single_scattering(vec3 origin,vec3 direction,float distance,out vec3 sharp)
         {
             float d=begin+(float(step)+.5)*stride;
             vec3 point=origin+direction*d;
-            vec3 contribution=transmittance(origin,direction,d)*medium_density(medium,point)*(medium.scattering.rgb*volume_incident(point,medium,ambient,phases))*stride;
+            vec3 contribution=transmittance(origin,direction,d)*medium_density(medium,point)*(medium.scattering.rgb*volume_incident(point,i,ambient,phases))*stride;
             radiance+=contribution;
             if (medium_blur_radius(direction,path_offset+d)<=0.0) sharp+=contribution;
         }
@@ -488,7 +493,7 @@ vec3 transformed_point(LightingInstance instance,vec3 point)
 bool grid_coordinates(uint i,vec3 point,vec3 normal,out vec3 q)
 {
     Medium m=media[i];uint n=render.quality.y;float radius=m.center_radius.w;
-    if (m.lighting.z<=0.0 || length(point-m.center_radius.xyz)>=radius) return false;
+    if (m.lighting.z<=0.0 || m.lighting.x<=0.0 || length(point-m.center_radius.xyz)>=radius) return false;
     vec3 shifted=point+normal*(2.0*radius/float(n-1u));
     q=clamp((shifted-m.center_radius.xyz+radius)/(2.0*radius)*float(n-1u),vec3(0),vec3(n-1u));
     return true;
@@ -497,12 +502,19 @@ struct GridBounds { vec4 low,high; };
 layout(set=0,binding=RENDER_BINDING_LIGHTING_BOUNDS,std430) readonly buffer LightingBounds { GridBounds lighting_bounds[]; };
 layout(set=0,binding=RENDER_BINDING_DYNAMIC_LIGHTING,std430) buffer DynamicLighting { vec4 dynamic_visibility[]; };
 uint grid_index(uint medium,uint light,uvec3 p,uint n);
+vec3 texture_visibility(uint medium,int light,vec3 q)
+{
+    float n=float(render.quality.y);
+    vec3 offset=vec3(float(light),0,float(medium))*n;
+    vec3 extent=vec3(3.0*n,n,n*float(max(1u,render.scene.y)));
+    return textureLod(lighting_texture,(q+offset+.5)/extent,0).rgb;
+}
 vec3 current_dynamic_visibility(vec3 point,int light)
 {
     uint n=render.quality.y;
     for (uint i=0u;i<render.scene.y;++i)
     {
-        if (media[i].lighting.z<=0.0) continue;
+        if (media[i].lighting.z<=0.0 || media[i].lighting.x<=0.0) continue;
         vec3 low=lighting_bounds[i].low.xyz,high=lighting_bounds[i].high.xyz;
         if (any(lessThan(point,low)) || any(greaterThan(point,high))) continue;
         vec3 q=clamp((point-low)/(high-low)*float(n-1u),vec3(0),vec3(n-1u));
@@ -549,30 +561,42 @@ vec3 sampled_visibility(vec3 point,vec3 normal,int light)
     return studio_visibility(point,render.studio_direction[light].xyz);
 }
 
-// All three volume lights use the same point and interpolation weights.
-vec3 volume_incident(vec3 point,Medium medium,vec3 ambient,vec3 phases)
+// The incoming field is view-independent. Phase and outgoing integration stay
+// current and at full resolution. Unshadowed atmosphere never receives geometry
+// shadows from the cell grids, even when their volumes overlap.
+vec3 interpolated_volume_lighting(uint index,vec3 q,vec3 ambient,vec3 phases)
 {
     uint n=render.quality.y;
-    // Sparse light sets keep the per-light path and do not fetch unused grid channels.
+    if (texture_lighting_grid)
+        return ambient+phases[0]*render.studio_color[0].rgb*texture_visibility(index,0,q)
+            +phases[1]*render.studio_color[1].rgb*texture_visibility(index,1,q)
+            +phases[2]*render.studio_color[2].rgb*texture_visibility(index,2,q);
+    uvec3 low=min(uvec3(floor(q)),uvec3(n-2u));vec3 f=q-vec3(low);
+    vec3 key=vec3(0),fill=vec3(0),rim=vec3(0);
+    for (uint z=0u;z<2u;++z) for (uint y=0u;y<2u;++y) for (uint x=0u;x<2u;++x)
+    {
+        vec3 w=mix(1.0-f,f,vec3(x,y,z));uvec3 p=low+uvec3(x,y,z);float weight=w.x*w.y*w.z;
+        key+=grid_visibility[grid_index(index,0u,p,n)].rgb*weight;
+        fill+=grid_visibility[grid_index(index,1u,p,n)].rgb*weight;
+        rim+=grid_visibility[grid_index(index,2u,p,n)].rgb*weight;
+    }
+    return ambient+phases[0]*render.studio_color[0].rgb*key
+        +phases[1]*render.studio_color[1].rgb*fill+phases[2]*render.studio_color[2].rgb*rim;
+}
+vec3 volume_incident(vec3 point,uint medium_index,vec3 ambient,vec3 phases)
+{
+    Medium medium=media[medium_index];uint n=render.quality.y;
+    if (volume_lighting_grid && n>0u && medium.lighting.x<=0.0 && medium.lighting.z>0.0)
+    {
+        vec3 q=clamp((point-medium.center_radius.xyz+medium.center_radius.w)/(2.0*medium.center_radius.w)*float(n-1u),vec3(0),vec3(n-1u));
+        return interpolated_volume_lighting(medium_index,q,ambient,phases);
+    }
     bool shared_grid=n>0u && render.studio_direction[0].w>0.0 && render.studio_direction[1].w>0.0 && render.studio_direction[2].w>0.0;
     if (medium.lighting.x>0.0 && shared_grid)
         for (uint i=0u;i<render.scene.y;++i)
         {
-            vec3 q;if (!grid_coordinates(i,point,vec3(0),q)) continue;
-            uvec3 low=min(uvec3(floor(q)),uvec3(n-2u));vec3 f=q-vec3(low);
-            vec3 key=vec3(0),fill=vec3(0),rim=vec3(0);
-            for (uint z=0u;z<2u;++z) for (uint y=0u;y<2u;++y) for (uint x=0u;x<2u;++x)
-            {
-                vec3 w=mix(1.0-f,f,vec3(x,y,z));uvec3 p=low+uvec3(x,y,z);float weight=w.x*w.y*w.z;
-                key+=grid_visibility[grid_index(i,0u,p,n)].rgb*weight;
-                fill+=grid_visibility[grid_index(i,1u,p,n)].rgb*weight;
-                rim+=grid_visibility[grid_index(i,2u,p,n)].rgb*weight;
-            }
-            vec3 incident=ambient;
-            incident+=phases[0]*render.studio_color[0].rgb*key;
-            incident+=phases[1]*render.studio_color[1].rgb*fill;
-            incident+=phases[2]*render.studio_color[2].rgb*rim;
-            return incident;
+            vec3 q;if (grid_coordinates(i,point,vec3(0),q))
+                return interpolated_volume_lighting(i,q,ambient,phases);
         }
     vec3 incident=ambient;
     for (int light=0;light<3;++light)
@@ -587,7 +611,7 @@ vec3 volume_incident(vec3 point,Medium medium,vec3 ambient,vec3 phases)
 
 float scattering_weight(Surface s)
 {
-    return s.metal || s.unshadowed ? 0.0 : s.subsurface.a*render.subsurface.x;
+    return !subsurface_enabled || s.metal || s.unshadowed ? 0.0 : s.subsurface.a*render.subsurface.x;
 }
 
 vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
@@ -648,6 +672,20 @@ bool subsurface_exit(Surface s,vec3 direction,float limit,out vec3 exit_point,ou
     return true;
 }
 
+bool baked_subsurface_exit(Surface s,int light,out vec3 entry,out float thickness)
+{
+    if (!organelle_lighting_cache || !lighting_cached()) return false;
+    LightingInstance instance=lighting_instances[s.instance];
+    if (instance.range.w==0u) return false;
+    uint first=(s.triangle-instance.range.x+instance.range.z)*SURFACE_LIGHTING_RECORDS_PER_TRIANGLE
+        +(s.front_face ? 0u : 9u)+uint(light);
+    vec4 a=surface_visibility[first],b=surface_visibility[first+3u],c=surface_visibility[first+6u];
+    // A missing corner exit cannot be interpolated across a topology boundary.
+    if (min(a.w,min(b.w,c.w))<=0.0) return false;
+    vec4 sample_value=a*s.barycentric.x+b*s.barycentric.y+c*s.barycentric.z;
+    entry=sample_value.xyz;thickness=sample_value.w;return true;
+}
+
 vec3 evaluate_subsurface(Surface s,vec3 outgoing)
 {
     float scatter=scattering_weight(s);
@@ -671,7 +709,12 @@ vec3 evaluate_subsurface(Surface s,vec3 outgoing)
         thickness=render.subsurface.w/max(MIN_MEMBRANE_DIRECTION_COSINE,cosine);
         entry=s.point+direction*point_epsilon(s.point);
     }
-    else if (!subsurface_exit(s,direction,8.0*radius,entry,thickness)) return vec3(0);
+    else
+    {
+        bool cached=false;
+        if (organelle_lighting_cache) cached=baked_subsurface_exit(s,selected,entry,thickness);
+        if (!cached && !subsurface_exit(s,direction,8.0*radius,entry,thickness)) return vec3(0);
+    }
     vec3 attenuation=exp(-thickness/max(s.subsurface.rgb,vec3(MIN_SHADING_DENOMINATOR)));
     float exit_transmission=1.0-fresnel(max(0.0,dot(s.normal,outgoing)),s.ior);
     float entry_transmission=1.0-fresnel(cosine,s.ior);
@@ -857,7 +900,7 @@ void main()
         if (local>=grid_pass.triangle_count || corner>=6u) return;
         LightingInstance instance=lighting_instances[grid_pass.instance];
         uint triangle_index=instance.range.x+local;uvec4 triangle=triangles[triangle_index];
-        if (triangle.w!=THIN_MEMBRANE_MATERIAL) return;
+        if (triangle.w!=THIN_MEMBRANE_MATERIAL && !organelle_lighting_cache) return;
         vec3 a=transformed_point(instance,vertices[triangle.x].position.xyz);
         vec3 b=transformed_point(instance,vertices[triangle.y].position.xyz);
         vec3 c=transformed_point(instance,vertices[triangle.z].position.xyz);
@@ -867,8 +910,27 @@ void main()
         vec3 origin=point+normal*(corner<3u ? point_epsilon(point) : -point_epsilon(point));
         uint index=(instance.range.z+local)*SURFACE_LIGHTING_RECORDS_PER_TRIANGLE+corner*3u;
         for (uint light=0u;light<3u;++light)
-            surface_visibility[index+light]=vec4(render.studio_direction[light].w>0.0 && area>0.0
-                ? light_visibility(origin,render.studio_direction[light].xyz,LIGHTING_STATIC_ONLY,true) : vec3(0),1);
+        {
+            if (triangle.w==THIN_MEMBRANE_MATERIAL)
+                surface_visibility[index+light]=vec4(render.studio_direction[light].w>0.0 && area>0.0
+                    ? light_visibility(origin,render.studio_direction[light].xyz,LIGHTING_STATIC_ONLY,true) : vec3(0),1);
+            if (organelle_lighting_cache && triangle.w==0u)
+            {
+                Surface sample_value;sample_value.point=point;sample_value.geometric_normal=corner<3u ? normal : -normal;
+                sample_value.front_face=corner<3u;sample_value.instance=grid_pass.instance;
+                uint vertex=corner%3u==0u ? triangle.x : corner%3u==1u ? triangle.y : triangle.z;
+                vec4 material=vertices[vertex].subsurface;
+                float scale=min(length(vec3(instance.row0.x,instance.row1.x,instance.row2.x)),
+                    min(length(vec3(instance.row0.y,instance.row1.y,instance.row2.y)),length(vec3(instance.row0.z,instance.row1.z,instance.row2.z))));
+                float radius=max(material.r,max(material.g,material.b))*scale;
+                vec3 entry;float thickness;vec4 record=vec4(0,0,0,-1);
+                vec3 direction=render.studio_direction[light].xyz;
+                if (area>0.0 && material.a>0.0 && radius>0.0 && render.studio_direction[light].w>0.0
+                    && dot(sample_value.geometric_normal,direction)<0.0
+                    && subsurface_exit(sample_value,direction,8.0*radius,entry,thickness)) record=vec4(entry,thickness);
+                surface_visibility[index+light]=record;
+            }
+        }
         return;
     }
     uint n=render.quality.y;uvec3 p=uvec3(gl_GlobalInvocationID.x,gl_GlobalInvocationID.y%n,gl_GlobalInvocationID.y/n);
@@ -883,7 +945,8 @@ void main()
         if (render.studio_direction[light].w>0.0)
         {
             vec3 direction=render.studio_direction[light].xyz;
-            if (!lighting_cached()) value=studio_visibility(point,direction);
+            if (m.lighting.x<=0.0) value=lighting_cached() && grid_pass.pass==LIGHTING_PASS_CURRENT ? static_visibility[index].rgb : transmittance(point,direction,RAY_MAX);
+            else if (!lighting_cached()) value=studio_visibility(point,direction);
             else if (grid_pass.pass==LIGHTING_PASS_DYNAMIC) value=light_visibility(point,direction,LIGHTING_DYNAMIC_ONLY,false);
             else if (grid_pass.pass==LIGHTING_PASS_STATIC) value=light_visibility(point,direction,LIGHTING_STATIC_ONLY,true);
             else
