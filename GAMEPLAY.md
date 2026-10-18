@@ -54,6 +54,11 @@ Audio uses twelve generated PCM effects and a fixed sixteen-voice mixer. Off-scr
 | Home | Focus the selected cell or starting cell |
 | Space / R | Pause / restart |
 | F1 / F2 | Toggle the frame profiler / current render buffers |
+| F5 | Toggle subsurface scattering (SSS) |
+| F6 | Toggle volume scattering; keep absorption |
+| F7 | Toggle cell depth and membrane blur |
+| F8 | Toggle tilt shift |
+| F9 | Toggle the fog-of-war blur and tint |
 
 Both sides start with craft at neutral cells. Select craft and right-click your starting cell to establish the first factory. One craft is consumed. The enemy establishes its first site automatically. The fungal trial uses an automatic founder.
 
@@ -76,3 +81,21 @@ Keyboard camera speed is twenty-four world units per second, set by `camera.keyb
 F1 opens the frame profiler. CPU and GPU icicle graphs show a rolling mean of up to 120 completed frames. Child bars are below their parent. Both graphs use the same millisecond scale, but their clocks are not aligned. Hover over a bar to see its latest duration and mean. The top three GPU costs are shown below the graphs. The panel starts closed; `--stats` opens it at launch.
 
 CPU spans cover input, simulation, scene and audio preparation, render command recording, GPU submission and wait, presentation wait, and capture. CPU wall time includes time blocked on the GPU. GPU spans cover acceleration updates, backdrop, shadow grid, surface lighting and SSS, volume scattering, effects, cell blur, fog, tilt shift, bloom and display, the HUD, and output copy. Surface lighting and SSS share one shader and one timing span. Timings include stage barriers. The header shows both latest and mean durations. The panel uses the previous completed frame; no extra GPU wait is added for profiling. Timing history contains numbers only, with no image or lighting history. Bounded `--frames N --stats` runs also print each span and its mean.
+
+
+F5 through F9 change rendering during play. A second press restores the
+values from the loaded assets. A held key changes its feature once.
+These keys open the F1 profiler, which shows ON, OFF or N/A for each
+feature. N/A means that the loaded scene or config does not provide that
+feature. Each change clears the rolling timing averages. The next
+completed frame starts the new average. F1 can hide the panel again.
+
+F5 selects a surface shader with SSS compiled out when disabled. Both
+shader choices are prepared at startup. F6 skips the volume scattering
+pass but keeps medium attenuation on surface and light paths. F7 removes
+cell depth blur and transmitted membrane blur. F8 removes the miniature
+focus filter. F9 removes the fog blur and tint; enemy visibility and
+exploration rules still apply. F2 keeps its existing diagnostic behavior:
+it bypasses the tilt-shift and fog filters. Changes last for the current
+application session and do not edit assets. R restarts the match with the
+current render switches.

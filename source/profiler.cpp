@@ -21,6 +21,12 @@ void profiler_span(Profiler* p,ProfileNode node,double start_ms,double duration_
 { p->current[node]=ProfileSample{start_ms,duration_ms}; }
 void profiler_cpu(Profiler* p,ProfileNode node,double start_ms,double end_ms)
 { profiler_span(p,node,start_ms-p->origin_ms,end_ms-start_ms); }
+void profiler_clear_history(Profiler* p)
+{
+    memset(p->latest,0,sizeof(p->latest));memset(p->mean,0,sizeof(p->mean));
+    memset(p->sum,0,sizeof(p->sum));memset(p->history,0,sizeof(p->history));
+    p->count=0;p->cursor=0;
+}
 void profiler_finish(Profiler* p,bool print)
 {
     if (p->count<PROFILE_HISTORY) ++p->count;

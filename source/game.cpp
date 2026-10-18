@@ -397,7 +397,7 @@ int game_run(const GameOptions* options)
     game.renderer.debug_stats = options->stats_set ? options->show_stats : false;
     if (!options->headless && !audio_open(&audio)) { renderer_shutdown(&game.renderer);return 1; }
     game.renderer.debug_views = options->debug_views;
-    printf("Left-drag to select; middle-drag or WASD/arrows to pan; wheel to zoom. F1 profiler; F2 render buffers. Gameplay: F/B select fighters/bombers on screen; 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
+    printf("Left-drag to select; middle-drag or WASD/arrows to pan; wheel to zoom. F1 profiler; F2 render buffers; F5 SSS; F6 volume; F7 cell blur; F8 tilt shift; F9 fog blur. Gameplay: F/B select fighters/bombers on screen; 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
     const double tick_seconds = 1.0 / SIMULATION_TICKS_PER_SECOND_DOUBLE;
     double previous = monotonic_seconds();
     double accumulator = 0.0;
@@ -416,6 +416,7 @@ int game_run(const GameOptions* options)
         game.renderer.previous_frame_ms = frames ? elapsed*MILLISECONDS_PER_SECOND : 0.0;
         if (input.toggle_stats) game.renderer.debug_stats = !game.renderer.debug_stats;
         if (input.toggle_buffers) game.renderer.debug_views = !game.renderer.debug_views;
+        if (input.toggle_render_features) renderer_toggle_features(&game.renderer,input.toggle_render_features);
         if (input.restart && game.simulation.world.gameplay.enabled) { accumulator=0;elapsed=0; }
         input.pan_seconds=(float)std::fmin(elapsed,MAX_FRAME_CATCHUP_SECONDS);
         game.pointer=input;ratio_pointer(&game,&input,&config);selection_input(&game,&input,&config);

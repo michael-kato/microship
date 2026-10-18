@@ -231,6 +231,7 @@ struct RendererState
     VkPipelineLayout bloom_layout;
     VkPipeline bloom_pipeline,fog_pipeline,medium_blur_pipeline,focus_pipeline;
     VkPipeline guide_surface_pipeline;
+    VkPipeline no_sss_pipeline,no_sss_guide_pipeline,no_sss_debug_pipeline;
     VkImage output;
     VkDeviceMemory output_memory;
     VkImageView output_view;
@@ -1200,7 +1201,7 @@ static bool create_swapchain(RendererState* state)
 }
 
 static bool load_compute_pipeline(RendererState* state, const char* shader_path,
-    VkPipelineLayout pipeline_layout, VkPipeline* output_pipeline)
+    VkPipelineLayout pipeline_layout, VkPipeline* output_pipeline, bool no_subsurface=false)
 {
     FILE* file = fopen(shader_path, "rb");
     if (!file)
@@ -1236,7 +1237,7 @@ static bool load_compute_pipeline(RendererState* state, const char* shader_path,
     pipeline.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     pipeline.stage.module = shader;
     pipeline.stage.pName = "main";
-    uint32_t constants[]={state->config.volume_steps,state->uniform_data.scene[3],state->config.optical_depth_lut ? 1u : 0u,state->config.volume_lighting_grid ? 1u : 0u,state->config.texture_lighting_grid && state->config.shadow_grid_resolution ? 1u : 0u,state->config.organelle_lighting_cache && state->uniform_data.scene[3] ? 1u : 0u,state->config.subsurface_strength>0.0f ? 1u : 0u};
+    uint32_t constants[]={state->config.volume_steps,state->uniform_data.scene[3],state->config.optical_depth_lut ? 1u : 0u,state->config.volume_lighting_grid ? 1u : 0u,state->config.texture_lighting_grid && state->config.shadow_grid_resolution ? 1u : 0u,state->config.organelle_lighting_cache && state->uniform_data.scene[3] ? 1u : 0u,state->config.subsurface_strength>0.0f && !no_subsurface ? 1u : 0u};
     VkSpecializationMapEntry entries[]={
         {VOLUME_STEPS_SPECIALIZATION_ID,0,sizeof(uint32_t)},
         {LIGHTING_CACHE_SPECIALIZATION_ID,sizeof(uint32_t),sizeof(uint32_t)},
@@ -1387,7 +1388,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
 }
 
 static bool load_companion(RendererState* state, const char* ray_trace_path,
-    const char* filename, VkPipelineLayout layout, VkPipeline* pipeline)
+    const char* filename, VkPipelineLayout layout, VkPipeline* pipeline, bool no_subsurface=false)
 {
     const char* slash = strrchr(ray_trace_path,'/');
     const char* backslash = strrchr(ray_trace_path,'\\');
@@ -1397,7 +1398,7 @@ static bool load_companion(RendererState* state, const char* ray_trace_path,
     if (directory_length+strlen(filename)+1 > sizeof(path)) return false;
     memcpy(path,ray_trace_path,directory_length);
     strcpy(path+directory_length,filename);
-    return load_compute_pipeline(state,path,layout,pipeline);
+    return load_compute_pipeline(state,path,layout,pipeline,no_subsurface);
 }
 
 static bool create_bloom(RendererState* state, const char* ray_trace_path)
@@ -1492,6 +1493,14 @@ static bool create_debug(RendererState* state, const char* builtin_shader_path)
         state->pipeline_layout,&state->debug_surface_pipeline)
         && load_companion(state,builtin_shader_path,"debug_volume.comp.spv",state->pipeline_layout,&state->debug_volume_pipeline)
         && load_companion(state,builtin_shader_path,"debug_guide_surface.comp.spv",state->pipeline_layout,&state->guide_surface_pipeline);
+}
+
+static bool create_surface_toggles(RendererState* state,const char* shader_path)
+{
+    if (state->headless || state->custom_shader || state->config.subsurface_strength<=0) return true;
+    return load_compute_pipeline(state,shader_path,state->pipeline_layout,&state->no_sss_pipeline,true)
+        && load_companion(state,shader_path,"debug_guide_surface.comp.spv",state->pipeline_layout,&state->no_sss_guide_pipeline,true)
+        && load_companion(state,shader_path,"debug_surface.comp.spv",state->pipeline_layout,&state->no_sss_debug_pipeline,true);
 }
 
 static void shader_buffer_barrier(VkCommandBuffer command)
@@ -1598,11 +1607,45 @@ static void profile_text(RendererState* state,const char* text,int x,int y,int r
                 }
     }
 }
+static const char* feature_status(const Renderer* renderer,uint32_t feature)
+{
+    if (!(renderer->available_features&feature)) return "N/A";
+    return renderer->disabled_features&feature ? "OFF" : "ON";
+}
+
+void renderer_toggle_features(Renderer* renderer,uint32_t mask)
+{
+    mask&=renderer->available_features&RENDER_FEATURE_MASK;
+    if (!renderer->state->no_sss_pipeline) mask&=~RENDER_SSS;
+    if (!mask) return;
+    renderer->disabled_features^=mask;
+    profiler_clear_history(&renderer->profiler);
+    renderer->debug_stats=true;
+    printf("Render features: disabled %u; changed %u; profiler mean reset.\n",renderer->disabled_features,mask);
+}
+
+static uint32_t available_features(const RendererState* state,const RenderScene* scene)
+{
+    uint32_t mask=0;
+    if (!state->custom_shader && state->config.subsurface_strength>0) mask|=RENDER_SSS;
+    if (!state->custom_shader && state->config.volume_rays_per_pixel && !scene->media.empty()) mask|=RENDER_VOLUME;
+    if (!state->custom_shader && state->uniform_data.quality[3]) mask|=RENDER_CELL_BLUR;
+    if (state->config.focus_radius>0) mask|=RENDER_TILT_SHIFT;
+    if (scene->fog_blur>0) mask|=RENDER_FOG_BLUR;
+    return mask;
+}
+
 static void profile_overlay(RendererState* state,const Renderer* renderer,ProfileBars* bars)
 {
     const Profiler* p=&renderer->profiler;char line[160];
     snprintf(line,sizeof(line),"F1 FRAME PROFILER / ROLLING MEAN %u OF %u FRAMES",p->count,PROFILE_HISTORY);
     profile_text(state,line,8,8,STATS_TEXT_WIDTH-8);
+    snprintf(line,sizeof(line),"F5 SSS %s / F6 VOLUME %s / F7 CELL BLUR %s",
+        feature_status(renderer,RENDER_SSS),feature_status(renderer,RENDER_VOLUME),feature_status(renderer,RENDER_CELL_BLUR));
+    profile_text(state,line,8,268,STATS_TEXT_WIDTH-8);
+    snprintf(line,sizeof(line),"F8 TILT SHIFT %s / F9 FOG BLUR %s / MEAN RESETS ON CHANGE",
+        feature_status(renderer,RENDER_TILT_SHIFT),feature_status(renderer,RENDER_FOG_BLUR));
+    profile_text(state,line,8,286,STATS_TEXT_WIDTH-8);
     if (!p->count) { profile_text(state,"WAITING FOR THE FIRST COMPLETED FRAME",8,30,STATS_TEXT_WIDTH-8);return; }
     snprintf(line,sizeof(line),"MEAN CPU %.2F / GPU %.2F MS   LAST CPU %.2F / GPU %.2F MS   %.1F FPS",
         p->mean[PROFILE_CPU_FRAME].duration_ms,p->mean[PROFILE_GPU_FRAME].duration_ms,
@@ -1649,7 +1692,6 @@ static void profile_overlay(RendererState* state,const Renderer* renderer,Profil
             profile_definitions[top[1]].name,p->mean[top[1]].duration_ms,profile_definitions[top[2]].name,p->mean[top[2]].duration_ms);
     }
     profile_text(state,line,8,250,STATS_TEXT_WIDTH-8);
-    profile_text(state,"SURFACE INCLUDES LIGHTING + SSS / GPU WAIT IS CPU BLOCKING / TIMINGS INCLUDE BARRIERS",8,274,STATS_TEXT_WIDTH-8);
 }
 
 static void draw_debug(RendererState* state, const Renderer* renderer)
@@ -1837,6 +1879,7 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
         && load_companion(state,shader_path,"volume.comp.spv",state->pipeline_layout,&state->volume_pipeline)
         && load_companion(state,shader_path,"shadow_grid.comp.spv",state->pipeline_layout,&state->shadow_grid_pipeline)
         && create_bloom(state, shader_path) && create_debug(state,builtin_shader_path)
+        && create_surface_toggles(state,shader_path)
         && load_companion(state,builtin_shader_path,"effects.comp.spv",state->pipeline_layout,&state->effects_pipeline);
     if (success && (scene->background_blur>0))
         success=load_companion(state,builtin_shader_path,"backdrop.comp.spv",state->pipeline_layout,&state->backdrop_pipeline);
@@ -1847,6 +1890,7 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
         return false;
     }
     renderer->running = true;
+    renderer->available_features=available_features(state,scene);
     printf("Renderer: direct ray tracing; %ux%u native; %u film samples; %u transmission layers; %u triangles.\n",
         config->width,config->height,config->samples_per_pixel,config->max_transmission_layers,state->triangle_count);
     printf("Sampling: fixed mirrored film points; no stochastic surface transport, denoising, or temporal history.\n");
@@ -1960,7 +2004,14 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     store_vector(uniform->camera_right, right);
     store_vector(uniform->camera_up, cross(right, forward));
     scene_uniform(uniform,scene);
-    if (state->custom_shader) uniform->quality[3]=0;
+    renderer->available_features=available_features(state,scene);
+    // Restore authored values before applying this frame's diagnostic switches.
+    uniform->quality[0]=renderer->disabled_features&RENDER_VOLUME ? 0u : state->config.volume_rays_per_pixel;
+    uniform->subsurface[0]=renderer->disabled_features&RENDER_SSS ? 0.0f : state->config.subsurface_strength;
+    uniform->focus_band[3]=renderer->disabled_features&RENDER_TILT_SHIFT ? 0.0f : state->config.focus_radius;
+    if (renderer->disabled_features&RENDER_FOG_BLUR) uniform->fog[0]=0;
+    if (state->custom_shader || (renderer->disabled_features&RENDER_CELL_BLUR))
+    { uniform->quality[3]=0;uniform->membrane_fade[2]=0; }
     if (scene->instances.size()!=state->instance_count || scene->media.size()!=state->medium_count
         || scene->geometry.meshes.size()!=state->mesh_count || scene->effect_tiles.size()!=state->effect_tile_size
         || scene->lighting_bounds.size()!=state->medium_count)
@@ -2065,8 +2116,11 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     record_lighting_texture(state);
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_GRID_END);
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_SURFACE_BEGIN);
-    vkCmdBindPipeline(state->command, VK_PIPELINE_BIND_POINT_COMPUTE,
-        renderer->debug_views ? state->debug_surface_pipeline : (scene->guides_required || state->config.focus_radius>0) ? state->guide_surface_pipeline : state->pipeline);
+    bool no_sss=(renderer->disabled_features&RENDER_SSS)!=0;
+    VkPipeline surface=renderer->debug_views ? (no_sss ? state->no_sss_debug_pipeline : state->debug_surface_pipeline)
+        : (scene->guides_required || uniform->focus_band[3]>0) ? (no_sss ? state->no_sss_guide_pipeline : state->guide_surface_pipeline)
+        : (no_sss ? state->no_sss_pipeline : state->pipeline);
+    vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,surface);
     vkCmdBindDescriptorSets(state->command, VK_PIPELINE_BIND_POINT_COMPUTE, state->pipeline_layout,
         0, 1, &state->descriptors, 0, 0);
     vkCmdDispatch(state->command, (state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, (state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, 1);
@@ -2127,7 +2181,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     bloom.strength = state->config.bloom_strength;
     bloom.exposure = state->config.exposure;
     bloom.debug_views = renderer->debug_views ? 1.0f : 0.0f;
-    if (scene->fog_blur>0 && !renderer->debug_views)
+    if (uniform->fog[0]>0 && !renderer->debug_views)
     {
         image_barrier(state->command,state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
             VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_WRITE_BIT,
@@ -2150,7 +2204,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
         bloom.pass=0;
     }
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_FOG_END);
-    if (state->config.focus_radius>0 && !renderer->debug_views)
+    if (uniform->focus_band[3]>0 && !renderer->debug_views)
     {
         vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->focus_pipeline);
         vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->bloom_layout,0,1,&state->bloom_descriptors,0,0);
@@ -2255,6 +2309,8 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     printf("GPU fog/bloom/display: %.3f ms; total render: %.3f ms\n",bloom_ms,renderer->gpu_frame_ms);
     printf("GPU debug overlay: %.3f ms; buffer views %u; FPS stats %u.\n",debug_ms,
         renderer->debug_views ? 1u : 0u,renderer->debug_stats ? 1u : 0u);
+    printf("Render settings: disabled %u; SSS %s; volume rays %u; cell blur %u; tilt radius %.1f; fog radius %.1f.\n",
+        renderer->disabled_features,feature_status(renderer,RENDER_SSS),uniform->quality[0],uniform->quality[3],uniform->focus_band[3],uniform->fog[0]);
     static const struct { ProfileNode node;int begin,end; } spans[]={
         {PROFILE_GPU_FRAME,GPU_TIME_FRAME_BEGIN,GPU_TIME_COPY_END},
         {PROFILE_GPU_SCENE,GPU_TIME_FRAME_BEGIN,GPU_TIME_VOLUME_END},
@@ -2334,6 +2390,9 @@ bool renderer_shutdown(Renderer* renderer)
             if (state->backdrop_images[i]) vkDestroyImage(state->device,state->backdrop_images[i],0);
             if (state->backdrop_memory[i]) vkFreeMemory(state->device,state->backdrop_memory[i],0);
         }
+        if (state->no_sss_pipeline) vkDestroyPipeline(state->device,state->no_sss_pipeline,0);
+        if (state->no_sss_guide_pipeline) vkDestroyPipeline(state->device,state->no_sss_guide_pipeline,0);
+        if (state->no_sss_debug_pipeline) vkDestroyPipeline(state->device,state->no_sss_debug_pipeline,0);
         if (state->guide_surface_pipeline) vkDestroyPipeline(state->device,state->guide_surface_pipeline,0);
         if (state->focus_pipeline) vkDestroyPipeline(state->device,state->focus_pipeline,0);
         if (state->medium_blur_pipeline) vkDestroyPipeline(state->device,state->medium_blur_pipeline,0);

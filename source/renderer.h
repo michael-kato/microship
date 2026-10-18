@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "profiler.h"
+#include "render_features.h"
 #include "../assets/shaders/hud_layout.glsl"
 
 struct RenderScene;
@@ -20,6 +21,7 @@ struct Renderer
     uint32_t scene_submissions;
     bool debug_stats;
     bool debug_views;
+    uint32_t disabled_features,available_features;
     double previous_frame_ms;
     double gpu_frame_ms, work_frame_ms, acquire_ms, present_ms;
     bool overlay_enabled;
@@ -34,6 +36,7 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene,
                          const RenderConfig* config, const char* shader_path, const char* builtin_shader_path,
                          bool headless, bool debug_views, bool no_activate);
 bool renderer_poll(Renderer* renderer, PointerInput* input);
+void renderer_toggle_features(Renderer* renderer, uint32_t mask);
 bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera* camera, const char* capture_path);
 bool renderer_shutdown(Renderer* renderer);
 

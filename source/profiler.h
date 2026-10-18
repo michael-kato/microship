@@ -25,4 +25,5 @@ void profiler_begin(Profiler*,double origin_ms);
 void profiler_cpu(Profiler*,ProfileNode,double start_ms,double end_ms);
 void profiler_span(Profiler*,ProfileNode,double start_ms,double duration_ms);
 void profiler_finish(Profiler*,bool print);
+void profiler_clear_history(Profiler*);
 #endif

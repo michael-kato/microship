@@ -209,3 +209,33 @@ The window capture recorded, but replay failed with
 `VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS`. The headless capture and replay
 work. The failure does not establish a driver cause. Native Windows and
 the reported 100 ms gameplay case remain unverified.
+
+
+## Live render controls
+
+F5 toggles SSS, F6 volume scattering, F7 cell blur, F8 tilt shift, and F9
+the fog-of-war filter. The keys open F1 and clear its timing averages.
+The normal window prepares SSS-on and SSS-off surface programs at startup;
+key presses do not compile shaders or replace Vulkan resources.
+
+Build `nanova_input_probe`, then prepare or run one check:
+
+```sh
+python3 tests/e2e/render_toggles.py build/windows-cross/nanova.exe --case off --run
+```
+
+Cases are `baseline`, `off`, `restore`, `repeat`, and `buffers`. Each uses
+one native 1080p window, two frames, three film samples, one volume ray,
+one backdrop query, Khronos host validation, and a two-second process
+limit. There is no hardware tracing. The 250 ms input pause is outside CPU
+work timing; these input runs are not performance benchmarks. The
+resident Win32 input driver sends key presses, held repeats and releases.
+The repeat case also checks focus loss and two presses before a poll.
+These are posted Win32 messages, not a physical keyboard check.
+
+Use separate output folders. After a baseline run, pass its folder with
+`--reference` to the restore case. This checks identical simulation state
+and exact display pixels below the profiler. The timing panel is excluded
+because its measured numbers change between runs. The checks also verify
+that skipped pass timings fall near zero, profiler means restart, and
+valid static lighting is reused. See GAMEPLAY.md for the control details.

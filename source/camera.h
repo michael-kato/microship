@@ -15,6 +15,7 @@ struct PointerInput
     bool pointer_valid;
     bool pointer_pressed,pointer_held,pointer_released,pointer_cancelled,pointer_moved;
     int32_t press_x,press_y;
+    uint32_t toggle_render_features; // F5 through F9, one bit per feature.
     uint32_t group; // 1 fighters, 2 bombers, 3 all; zero keeps the selection.
     uint32_t screen_group; // 1 fighters, 2 bombers in the current view.
 };

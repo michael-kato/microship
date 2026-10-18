@@ -108,7 +108,7 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
     { window->input.command=true;window->input.command_x=(short)LOWORD(lparam);window->input.command_y=(short)HIWORD(lparam);return 0; }
     if (window && (message==WM_KILLFOCUS || (message==WM_ACTIVATEAPP && !wparam)))
     {
-        window->camera_keys=0;window->panning=false;window->stats_held=false;window->buffers_held=false;
+        window->camera_keys=0;window->render_keys=0;window->panning=false;window->stats_held=false;window->buffers_held=false;
         if (GetCapture()==handle) ReleaseCapture();
     }
     if (window && (message==WM_KEYDOWN || message==WM_KEYUP))
@@ -119,6 +119,18 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
             bool* toggle=wparam==VK_F1 ? &window->input.toggle_stats : &window->input.toggle_buffers;
             if (message==WM_KEYUP) *held=false;
             else { if (!*held) *toggle=!*toggle;*held=true; }
+            return 0;
+        }
+        if (wparam>=VK_F5 && wparam<=VK_F9)
+        {
+            uint32_t bit=1u<<(wparam-VK_F5);
+            if (message==WM_KEYUP) window->render_keys&=~bit;
+            else
+            {
+                if (!(window->render_keys&bit) && !(lparam&(1L<<KEY_WAS_DOWN_BIT)))
+                    window->input.toggle_render_features^=bit;
+                window->render_keys|=bit;
+            }
             return 0;
         }
         uint32_t key=camera_key(wparam);
