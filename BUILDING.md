@@ -386,3 +386,12 @@ the original filter. A host-validated close-view capture differed in
 2,445 color channels by one RGB8 level at most. All three backdrop lights
 remain active. An image check caught an accidental light-loop edit during
 the trial; it was corrected before this result.
+
+`--frame-ticks 1..4` advances that many normal simulation ticks before
+each bounded diagnostic frame. It requires `--frames` and rejects a
+`--time` override. Normal play retains wall-clock simulation. Use this
+mode for live geometry, growth and bake comparisons. The benchmark's
+`--live` option uses one tick per frame and checks the final tick count.
+Two host-validated game windows ended at tick 602 with identical state
+and images. Earlier wall-clock window comparisons ended at different
+ticks and are not controlled before/after results.

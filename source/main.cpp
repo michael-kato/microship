@@ -65,7 +65,7 @@ static bool asset_paths(char* world, char* config, char* shader,char* audio,char
 static void print_usage(FILE* output)
 {
     fprintf(output, "Usage: nanova [--world PATH] [--config PATH] [--shader PATH] [--headless]\n"
-        "              [--frames N] [--frame-delay-ms 0..250] [--capture PATH.ppm|PATH.pfm] [--samples N] [--seed N]\n"
+        "              [--frames N] [--frame-ticks 1..4] [--frame-delay-ms 0..250] [--capture PATH.ppm|PATH.pfm] [--samples N] [--seed N]\n"
         "              [--vsync] [--time SECONDS] [--step-seconds N] [--camera-drag X Y] [--camera-zoom N]\n"
         "              [--camera-pointer X Y] [--click X Y] [--command X Y] [--select-group 1..3] [--select-screen-group 1..2] [--focus] [--additive] [--restart]\n"
         "              [--pointer-drag X1 Y1 X2 Y2] (client pixels)\n"
@@ -134,6 +134,11 @@ int main(int argc, char** argv)
         {
             if (++i==argc || !parse_integer(argv[i],1,8,&menu_selection))
             { fprintf(stderr,"--menu-select requires a choice in [1,8].\n");return 2; }
+        }
+        else if (strcmp(argv[i],"--frame-ticks")==0)
+        {
+            if (++i==argc || !parse_integer(argv[i],1,4,&options.frame_ticks))
+            { fprintf(stderr,"--frame-ticks requires an integer in [1,4].\n");return 2; }
         }
         else if (strcmp(argv[i],"--frame-delay-ms")==0)
         {
@@ -289,6 +294,8 @@ int main(int argc, char** argv)
     }
     if (!options.frames && (options.headless || options.capture_path))
         options.frames = 1;
+    if (options.frame_ticks && (!options.frames || options.time_set))
+    { fprintf(stderr,"--frame-ticks requires bounded --frames and no --time override.\n");return 2; }
     if (options.frame_delay_ms && !options.frames) { fprintf(stderr,"--frame-delay-ms requires a bounded --frames run.\n");return 2; }
     bool diagnostic=options.smoke || options.headless || options.frames || options.capture_path || options.world_path!=world_path;
     if (force_menu || menu_selection || (!no_menu && !diagnostic))

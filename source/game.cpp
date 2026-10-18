@@ -440,6 +440,7 @@ int game_run(const GameOptions* options)
         double input_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_INPUT,start*MILLISECONDS_PER_SECOND,input_end);
         accumulator += elapsed < MAX_FRAME_CATCHUP_SECONDS ? elapsed : MAX_FRAME_CATCHUP_SECONDS;
         if (options->headless) accumulator=0;
+        if (options->frame_ticks) accumulator=options->frame_ticks*tick_seconds;
         while (accumulator >= tick_seconds)
         {
             simulation_step(&game.simulation);

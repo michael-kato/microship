@@ -23,7 +23,7 @@ p.add_argument('--blur-profile',choices=('authored','linear','off'),default='aut
 p.add_argument('--subgroup-size',type=int,choices=(0,32,64),default=32)
 p.add_argument('--baseline-subgroup-size',type=int,choices=(0,32,64))
 p.add_argument('--window',action='store_true')
-p.add_argument('--live',action='store_true',help='Advance the actual simulation by one fixed step per rendered frame')
+p.add_argument('--live',action='store_true',help='Advance the actual simulation by one fixed tick per rendered frame')
 p.add_argument('--frames',type=int,choices=(2,120),default=2,help='120 needs the user-authorized sustained performance check')
 p.add_argument('--pairs',type=int,choices=(1,3),default=1)
 p.add_argument('--reverse',action='store_true')
@@ -66,7 +66,10 @@ for pair in range(a.pairs):
   command=list(base)
   command[command.index('--frames')+1]=str(a.frames)
   if a.window:command.remove('--headless');command+=['--no-activate']
-  if a.live:command[command.index('--step-seconds')+1]='0.016666666666666666'
+  if a.live:
+   for flag in ('--time','--step-seconds'):
+    index=command.index(flag);del command[index:index+2]
+   command+=['--frame-ticks','1']
   if binary.suffix.lower()!='.exe' and sys.platform!='win32':command=[str(binary)]+command[command.index('--world'):]
   else:command[command.index(str(a.binary.resolve()))]=str(binary)
   for flag,value in (('--config',cp),('--capture',out/(name+'.ppm')),('--state',out/(name+'-state.json'))):command[command.index(flag)+1]=str(value)
@@ -109,6 +112,7 @@ report['batch_seconds']=time.monotonic()-started
 images={};state=None
 for name,_ in commands:
  current=json.loads((out/(name+'-state.json')).read_text())
+ if a.live:assert current['tick']==(1 if a.case=='overlap' else 600)+a.frames,current['tick']
  if state is None:state=current
  else:assert current==state,'Rendering changed simulation state'
  if a.no_capture:continue
