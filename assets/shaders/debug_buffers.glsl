@@ -1,5 +1,8 @@
 #include "render_bindings.glsl"
 // Current-frame surface guides and diagnostic AOVs. No lighting history.
+// Normal guide mode writes first-hit fields and surface.w = log2(1 + terminal depth).
+// Spatial volume mode uses grid-anchor volume/scatter_blur entries for fresh total
+// and sharp scattering, with log depth in volume.w. F2 overwrites the full AOVs.
 struct DebugPixel
 {
     vec4 vertex_hit;   // First film sample's vertex reflectance; W: 0 background, 1 opaque surface, 3 transmitting membrane.

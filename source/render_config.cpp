@@ -110,12 +110,22 @@ bool render_config_load(RenderConfig* config,const char* path)
         loaded.seed=json_uint(json_get(j,"seed"),0,UINT32_MAX);
     }
     {
-        Json j=json_get(root,"volume");json_object(j,"rays_per_pixel|integration_steps|optical_depth_lut|lighting_grid|quadrature");
+        Json j=json_get(root,"volume");json_object(j,"rays_per_pixel|integration_steps|optical_depth_lut|lighting_grid|quadrature|spatial_filter|spatial_stride");
         Json grid=json_find(j,"lighting_grid");
         if (json_present(grid)) loaded.volume_lighting_grid=json_bool(grid);
         Json optical=json_find(j,"optical_depth_lut");
         if (json_present(optical)) loaded.optical_depth_lut=json_bool(optical);
         loaded.volume_steps=json_uint(json_get(j,"integration_steps"),MIN_RENDER_INTEGRATION_STEPS,MAX_RENDER_INTEGRATION_STEPS);
+        loaded.volume_spatial_stride=2;
+        Json stride=json_find(j,"spatial_stride");
+        if (json_present(stride))
+        {
+            loaded.volume_spatial_stride=json_uint(stride,2,4);
+            if (loaded.volume_spatial_stride!=2 && loaded.volume_spatial_stride!=4)
+                json_error(stride,"spatial_stride must be two or four native pixels");
+        }
+        Json spatial=json_find(j,"spatial_filter");
+        if (json_present(spatial)) loaded.volume_spatial_filter=json_bool(spatial);
         Json quadrature=json_find(j,"quadrature");
         if (json_present(quadrature))
         {
@@ -126,6 +136,8 @@ bool render_config_load(RenderConfig* config,const char* path)
                 json_error(quadrature,"Gauss-Legendre quadrature requires two or three integration steps");
         }
         loaded.volume_rays_per_pixel=json_uint(json_get(j,"rays_per_pixel"),0,MAX_RENDER_RAYS_PER_PIXEL);
+        if (loaded.volume_spatial_filter && loaded.volume_rays_per_pixel!=1)
+            json_error(j,"spatial volume filtering requires one volume ray per grid point");
     }
     {
         Json j=json_get(root,"geometry");json_object(j,"sphere_segments|sphere_rings");

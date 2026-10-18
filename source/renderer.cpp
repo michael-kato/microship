@@ -246,7 +246,7 @@ struct RendererState
     VkDescriptorSet debug_descriptors;
     VkPipelineLayout pipeline_layout;
     VkPipeline pipeline;
-    VkPipeline volume_pipeline,shadow_grid_pipeline;
+    VkPipeline volume_pipeline,shadow_grid_pipeline,volume_coarse_pipeline,volume_filter_pipeline;
     VkPipeline debug_surface_pipeline, debug_volume_pipeline, debug_overlay_pipeline;
     VkPipelineLayout debug_overlay_layout;
     double trace_ms, volume_ms, bloom_ms;
@@ -1281,7 +1281,7 @@ static bool load_compute_pipeline(RendererState* state, const char* shader_path,
     subgroup.sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO_EXT;
     subgroup.requiredSubgroupSize=state->subgroup_size;
     pipeline.stage.pNext=state->subgroup_size ? &subgroup : 0;
-    uint32_t constants[]={state->config.volume_steps,state->uniform_data.scene[3],state->config.optical_depth_lut ? 1u : 0u,state->config.volume_lighting_grid ? 1u : 0u,state->config.texture_lighting_grid && state->config.shadow_grid_resolution ? 1u : 0u,state->config.organelle_lighting_cache && state->uniform_data.scene[3] ? 1u : 0u,state->config.subsurface_strength>0.0f && !no_subsurface ? 1u : 0u,state->config.samples_per_pixel==1 && state->config.volume_rays_per_pixel==1 ? 1u : 0u,state->config.volume_gauss ? 1u : 0u,state->config.spatial_antialiasing ? 1u : 0u};
+    uint32_t constants[]={state->config.volume_steps,state->uniform_data.scene[3],state->config.optical_depth_lut ? 1u : 0u,state->config.volume_lighting_grid ? 1u : 0u,state->config.texture_lighting_grid && state->config.shadow_grid_resolution ? 1u : 0u,state->config.organelle_lighting_cache && state->uniform_data.scene[3] ? 1u : 0u,state->config.subsurface_strength>0.0f && !no_subsurface ? 1u : 0u,state->config.samples_per_pixel==1 && state->config.volume_rays_per_pixel==1 && !state->config.volume_spatial_filter ? 1u : 0u,state->config.volume_gauss ? 1u : 0u,state->config.spatial_antialiasing ? 1u : 0u,state->config.volume_spatial_stride};
     VkSpecializationMapEntry entries[]={
         {VOLUME_STEPS_SPECIALIZATION_ID,0,sizeof(uint32_t)},
         {LIGHTING_CACHE_SPECIALIZATION_ID,sizeof(uint32_t),sizeof(uint32_t)},
@@ -1292,8 +1292,9 @@ static bool load_compute_pipeline(RendererState* state, const char* shader_path,
         {SUBSURFACE_ENABLED_SPECIALIZATION_ID,6*sizeof(uint32_t),sizeof(uint32_t)},
         {FUSED_VOLUME_SPECIALIZATION_ID,7*sizeof(uint32_t),sizeof(uint32_t)},
         {VOLUME_GAUSS_SPECIALIZATION_ID,8*sizeof(uint32_t),sizeof(uint32_t)},
-        {SPATIAL_AA_SPECIALIZATION_ID,9*sizeof(uint32_t),sizeof(uint32_t)}};
-    VkSpecializationInfo specialization={10,entries,sizeof(constants),constants};
+        {SPATIAL_AA_SPECIALIZATION_ID,9*sizeof(uint32_t),sizeof(uint32_t)},
+        {VOLUME_GRID_STRIDE_SPECIALIZATION_ID,10*sizeof(uint32_t),sizeof(uint32_t)}};
+    VkSpecializationInfo specialization={11,entries,sizeof(constants),constants};
     // Built-in pipelines use the startup count. External shaders keep their own contract.
     pipeline.stage.pSpecializationInfo=state->custom_shader ? 0 : &specialization;
     bool success = vk_ok(vkCreateComputePipelines(state->device, VK_NULL_HANDLE, 1, &pipeline, 0, output_pipeline), "Create compute pipeline");
@@ -1684,7 +1685,7 @@ static uint32_t available_features(const RendererState* state,const RenderScene*
 
 static const char* profile_name(const RendererState* state,uint32_t node)
 {
-    bool combined=!state->custom_shader && state->config.samples_per_pixel==1 && state->config.volume_rays_per_pixel==1;
+    bool combined=!state->custom_shader && state->config.samples_per_pixel==1 && state->config.volume_rays_per_pixel==1 && !state->config.volume_spatial_filter;
     if (combined && node==PROFILE_SURFACE) return "SURFACE + SSS + VOLUME";
     if (combined && node==PROFILE_VOLUME) return "VOLUME PASS UNUSED";
     return profile_definitions[node].name;
@@ -1921,9 +1922,9 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
     state->config = *config;
     state->headless = headless;
     state->no_activate = no_activate;
-    state->debug_available = !headless || debug_views || scene->guides_required || config->focus_radius>0;
+    state->debug_available = !headless || debug_views || scene->guides_required || config->focus_radius>0 || config->volume_spatial_filter;
     state->custom_shader = strcmp(shader_path,builtin_shader_path) != 0;
-    if (state->custom_shader && scene->guides_required)
+    if (state->custom_shader && (scene->guides_required || config->volume_spatial_filter))
     {
         fprintf(stderr,"Shader overrides require no depth-guided overlays.\n");
         renderer_shutdown(renderer);
@@ -1936,6 +1937,9 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
         && create_bloom(state, shader_path) && create_debug(state,builtin_shader_path)
         && create_surface_toggles(state,shader_path)
         && load_companion(state,builtin_shader_path,"effects.comp.spv",state->pipeline_layout,&state->effects_pipeline);
+    if (success && config->volume_spatial_filter)
+        success=load_companion(state,shader_path,"volume_coarse.comp.spv",state->pipeline_layout,&state->volume_coarse_pipeline)
+            && load_companion(state,shader_path,"volume_filter.comp.spv",state->pipeline_layout,&state->volume_filter_pipeline);
     if (success && (scene->background_blur>0))
         success=load_companion(state,builtin_shader_path,"backdrop.comp.spv",state->pipeline_layout,&state->backdrop_pipeline);
 
@@ -1950,11 +1954,12 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
         config->width,config->height,config->samples_per_pixel,config->max_transmission_layers,state->triangle_count);
     printf("Sampling: fixed mirrored film points; no stochastic surface transport, denoising, or temporal history.\n");
     printf("Spatial antialiasing: %s; current native pixels; HUD drawn afterward.\n",config->spatial_antialiasing ? "ON" : "OFF");
-    if (!state->custom_shader && config->samples_per_pixel==1 && config->volume_rays_per_pixel==1)
+    if (!state->custom_shader && config->samples_per_pixel==1 && config->volume_rays_per_pixel==1 && !config->volume_spatial_filter)
         printf("Camera traversal: combined surface/SSS/volume; GPU surface includes volume work.\n");
     printf("Subsurface: %.2f strength; %u existing film samples; one strongest back light; current geometry.\n",config->subsurface_strength,config->subsurface_samples);
     printf("Volumes: %u film rays; %u %s integration steps; analytic ambient fill; ray-traced studio shadows.\n",
         config->volume_rays_per_pixel,config->volume_steps,config->volume_gauss ? "Gauss-Legendre" : "midpoint");
+    printf("Volume spatial filter: %s; stride %u native pixels; current-frame grid, depth rejection and native silhouette fallback.\n",config->volume_spatial_filter ? "ON" : "OFF",config->volume_spatial_stride);
     printf("Optical depth: %s; %ux%u x %u R32F layers; %llu bytes plus upload storage.\n",
         config->optical_depth_lut && !state->custom_shader ? "lookup" : "midpoint",state->optical_depth_size,state->optical_depth_size,state->optical_depth_layers,
         (unsigned long long)state->optical_depth_upload.size);
@@ -2199,7 +2204,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
         }
     }
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_BACKDROP_END);
-    if (renderer->debug_views || scene->guides_required || uniform->quality[3] || state->config.focus_radius>0) shader_buffer_barrier(state->command);
+    if (renderer->debug_views || scene->guides_required || state->config.volume_spatial_filter || uniform->quality[3] || state->config.focus_radius>0) shader_buffer_barrier(state->command);
 
     shader_buffer_barrier(state->command);
     vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->pipeline_layout,0,1,&state->descriptors,0,0);
@@ -2209,26 +2214,38 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_SURFACE_BEGIN);
     bool no_sss=(renderer->disabled_features&RENDER_SSS)!=0;
     VkPipeline surface=renderer->debug_views ? (no_sss ? state->no_sss_debug_pipeline : state->debug_surface_pipeline)
-        : (scene->guides_required || uniform->focus_band[3]>0) ? (no_sss ? state->no_sss_guide_pipeline : state->guide_surface_pipeline)
+        : (scene->guides_required || state->config.volume_spatial_filter || uniform->focus_band[3]>0) ? (no_sss ? state->no_sss_guide_pipeline : state->guide_surface_pipeline)
         : (no_sss ? state->no_sss_pipeline : state->pipeline);
     vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,surface);
     vkCmdBindDescriptorSets(state->command, VK_PIPELINE_BIND_POINT_COMPUTE, state->pipeline_layout,
         0, 1, &state->descriptors, 0, 0);
     vkCmdDispatch(state->command, (state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, (state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, 1);
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_SURFACE_END);
-    if (renderer->debug_views || scene->guides_required || uniform->quality[3] || state->config.focus_radius>0) shader_buffer_barrier(state->command);
+    if (renderer->debug_views || scene->guides_required || state->config.volume_spatial_filter || uniform->quality[3] || state->config.focus_radius>0) shader_buffer_barrier(state->command);
     if (uniform->quality[0] && uniform->scene[1]
-        && (state->custom_shader || state->config.samples_per_pixel!=1 || state->config.volume_rays_per_pixel!=1))
+        && (state->custom_shader || state->config.samples_per_pixel!=1 || state->config.volume_rays_per_pixel!=1 || state->config.volume_spatial_filter))
     {
         image_barrier(state->command,state->hdr,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
             VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-        vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,
-            renderer->debug_views ? state->debug_volume_pipeline : state->volume_pipeline);
-        vkCmdDispatch(state->command,(state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,(state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,1);
+        if (state->config.volume_spatial_filter && !renderer->debug_views)
+        {
+            vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->volume_coarse_pipeline);
+            vkCmdDispatch(state->command,((state->config.width+state->config.volume_spatial_stride-1)/state->config.volume_spatial_stride+7)/8,((state->config.height+state->config.volume_spatial_stride-1)/state->config.volume_spatial_stride+7)/8,1);
+            shader_buffer_barrier(state->command);
+            vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->volume_filter_pipeline);
+            vkCmdDispatch(state->command,(state->config.width+7)/8,(state->config.height+7)/8,1);
+
+        }
+        else
+        {
+            vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,
+                renderer->debug_views ? state->debug_volume_pipeline : state->volume_pipeline);
+            vkCmdDispatch(state->command,(state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,(state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,1);
+        }
     }
     vkCmdWriteTimestamp(state->command, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, state->queries, GPU_TIME_VOLUME_END);
-    if (renderer->debug_views || scene->guides_required || uniform->quality[3] || state->config.focus_radius>0) shader_buffer_barrier(state->command);
+    if (renderer->debug_views || scene->guides_required || state->config.volume_spatial_filter || uniform->quality[3] || state->config.focus_radius>0) shader_buffer_barrier(state->command);
     image_barrier(state->command, state->hdr, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
         VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
@@ -2506,6 +2523,8 @@ bool renderer_shutdown(Renderer* renderer)
         }
         if (state->pipeline) vkDestroyPipeline(state->device, state->pipeline, 0);
         if (state->shadow_grid_pipeline) vkDestroyPipeline(state->device,state->shadow_grid_pipeline,0);
+        if (state->volume_coarse_pipeline) vkDestroyPipeline(state->device,state->volume_coarse_pipeline,0);
+        if (state->volume_filter_pipeline) vkDestroyPipeline(state->device,state->volume_filter_pipeline,0);
         if (state->volume_pipeline) vkDestroyPipeline(state->device,state->volume_pipeline,0);
         if (state->debug_surface_pipeline) vkDestroyPipeline(state->device,state->debug_surface_pipeline,0);
         if (state->debug_volume_pipeline) vkDestroyPipeline(state->device,state->debug_volume_pipeline,0);

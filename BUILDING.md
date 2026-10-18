@@ -405,3 +405,37 @@ volume work. Diagnostic output also reports start-to-start frame cadence.
 An extra one-film constant-folding trial did not improve timing and was
 removed. Reusable command lists also showed no useful median gain and
 were removed.
+
+## Spatial volume integration
+
+`volume.spatial_filter` evaluates scattering on a grid within the current
+frame. `volume.spatial_stride` accepts two or four native pixels. It needs
+one volume ray per grid point. Surface shading and final output stay at
+1920×1080. Attenuation stays in the native surface path. The filter checks
+terminal geometry depth. If no nearby sample matches within about two
+percent, the pixel uses native camera integration. Total and sharp light
+are filtered separately so front-cell detail retains its blur boundary.
+
+The grid, depth guides and scattering buffers are overwritten before use
+in each frame. No rendered data is reused from an earlier frame. F2 uses
+full-resolution volume integration so its light buffers remain direct
+diagnostics. F6 skips scattering and retains attenuation. Two-pixel
+filtering is the default only when this optional mode is enabled and the
+stride is absent.
+
+Four-pixel volume filtering against native integration at the same
+three-node sampling produced mean RGB8 error 0.0202, RMS 0.2076 and maximum
+16 in the close view. Three repeated frozen comparisons were identical
+within each variant. Interior, overlap and far views had mean error at
+most 0.0188 and maximum 13. Host validation passed. The separate fallback
+pass trial was slower and was removed.
+
+At matching three-node settings, three alternating live grown-factory
+comparisons measured 9.293 ms median application time and 9.448 ms at the
+95th percentile with four-pixel filtering. Start-to-start cadence was
+9.309 ms median and 9.468 ms at the 95th percentile. GPU time was 7.792 ms
+median. These use 300 measured frames per variant after 20 warm-up frames
+per process, Proton 11, immediate presentation, native 1080p, one film
+sample, spatial edge filtering and a 16-cell shadow field. All major
+effects stayed enabled. The largest measured frame was 11.623 ms, so
+these results do not establish a hard ten-millisecond bound.

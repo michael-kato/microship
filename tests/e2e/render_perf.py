@@ -14,6 +14,10 @@ p.add_argument('--baseline-samples',type=int,choices=(1,2,3,6))
 p.add_argument('--baseline-shadow-grid',type=int,choices=(8,16,32,64))
 p.add_argument('--baseline-quadrature',choices=('midpoint','gauss_legendre'))
 p.add_argument('--shadow-grid',type=int,choices=(8,16,32,64))
+p.add_argument('--volume-stride',type=int,choices=(2,4),default=2)
+p.add_argument('--baseline-volume-stride',type=int,choices=(2,4))
+p.add_argument('--spatial-volume',action='store_true')
+p.add_argument('--baseline-spatial-volume',action='store_true')
 p.add_argument('--baseline-spatial-aa',action='store_true')
 p.add_argument('--spatial-aa',action='store_true')
 p.add_argument('--quadrature',choices=('midpoint','gauss_legendre'),default='midpoint')
@@ -23,6 +27,7 @@ p.add_argument('--quality-comparison',action='store_true',help='Report intention
 p.add_argument('--blur-profile',choices=('authored','linear','off'),default='authored')
 p.add_argument('--subgroup-size',type=int,choices=(0,32,64),default=32)
 p.add_argument('--baseline-subgroup-size',type=int,choices=(0,32,64))
+p.add_argument('--cold-start',action='store_true',help='Use the authorized 10s process and 30s batch limits for new pipeline compilation; still two frames')
 p.add_argument('--window',action='store_true')
 p.add_argument('--live',action='store_true',help='Advance the actual simulation by one fixed tick per rendered frame')
 p.add_argument('--frames',type=int,choices=(2,120),default=2,help='120 needs the user-authorized sustained performance check')
@@ -31,6 +36,9 @@ p.add_argument('--reverse',action='store_true')
 p.add_argument('--no-capture',action='store_true')
 p.add_argument('--timing',action='store_true');p.add_argument('--run',action='store_true')
 p.add_argument('--output',type=Path,default=root/'build/render-perf');a=p.parse_args()
+if a.cold_start and a.frames!=2:p.error('--cold-start is limited to two frames')
+process_seconds=10 if a.cold_start else 8 if a.frames>2 else 2
+batch_seconds=30 if a.cold_start else 20 if a.frames>2 else 5
 if a.no_capture and not a.timing:p.error('--no-capture requires --timing')
 if a.frames>2 and (not a.timing or not a.no_capture):p.error('Sustained checks require --timing --no-capture')
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
@@ -53,6 +61,7 @@ for pair in range(a.pairs):
   if variant=='current':
    if a.quadrature!='midpoint':config['volume']['quadrature']=a.quadrature
    if a.spatial_aa:config['sampling']['spatial_antialiasing']=True
+   if a.spatial_volume:config['volume']['spatial_filter']=True;config['volume']['spatial_stride']=a.volume_stride
    if a.shadow_grid is not None:config['lighting']['shadow_grid_resolution']=a.shadow_grid
   if variant=='baseline':
    if a.baseline_samples is not None:config['sampling']['samples_per_pixel']=a.baseline_samples
@@ -60,6 +69,8 @@ for pair in range(a.pairs):
    if a.baseline_quadrature is not None:config['volume']['quadrature']=a.baseline_quadrature
    if a.baseline_shadow_grid is not None:config['lighting']['shadow_grid_resolution']=a.baseline_shadow_grid
    if a.baseline_spatial_aa:config['sampling']['spatial_antialiasing']=True
+   if a.baseline_spatial_volume:config['volume']['spatial_filter']=True
+   if a.baseline_volume_stride is not None:config['volume']['spatial_stride']=a.baseline_volume_stride
   config['lighting'].pop('subgroup_size',None)
   if variant=='current':config['lighting']['subgroup_size']=a.subgroup_size
   elif a.baseline_subgroup_size is not None:config['lighting']['subgroup_size']=a.baseline_subgroup_size
@@ -80,15 +91,15 @@ for pair in range(a.pairs):
   commands.append((name,command))
 (out/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
 if not a.run:
- print('Prepared',len(commands),'sequential native 1080p two-frame application runs;',a.samples,'film + 1 volume + 1 backdrop starts. 2s/process, 5s/batch, no hardware tracing. No GPU work started.')
+ print('Prepared',len(commands),'sequential native 1080p two-frame application runs;',a.samples,'film + 1 volume + 1 backdrop starts.',a.frames,'frames;',process_seconds,'s/process,',batch_seconds,'s/batch, no hardware tracing. No GPU work started.')
  raise SystemExit(0)
 check_gpu_environment();env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1'
-report={'window':a.window,'live':a.live,'frames':a.frames,'capture':not a.no_capture,'case':a.case,'blur_profile':a.blur_profile,'samples':a.samples,'spatial_aa':a.spatial_aa,'shadow_grid':a.shadow_grid,'quadrature':a.quadrature,'volume_steps':a.volume_steps,'baseline_samples':a.baseline_samples,'baseline_volume_steps':a.baseline_volume_steps,'quality_comparison':a.quality_comparison,'validation':not a.timing,'runs':{}}
+report={'process_limit_seconds':process_seconds,'batch_limit_seconds':batch_seconds,'window':a.window,'live':a.live,'frames':a.frames,'capture':not a.no_capture,'case':a.case,'blur_profile':a.blur_profile,'samples':a.samples,'volume_stride':a.volume_stride,'spatial_volume':a.spatial_volume,'spatial_aa':a.spatial_aa,'shadow_grid':a.shadow_grid,'quadrature':a.quadrature,'volume_steps':a.volume_steps,'baseline_samples':a.baseline_samples,'baseline_volume_steps':a.baseline_volume_steps,'quality_comparison':a.quality_comparison,'validation':not a.timing,'runs':{}}
 started=time.monotonic()
 for name,command in commands:
- remaining=(20 if a.frames>2 else 5)-(time.monotonic()-started);assert remaining>0,'GPU batch expired'
+ remaining=batch_seconds-(time.monotonic()-started);assert remaining>0,'GPU batch expired'
  before=time.monotonic();process=subprocess.Popen(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
- try:output,errors=process.communicate(timeout=min(8 if a.frames>2 else 2,remaining))
+ try:output,errors=process.communicate(timeout=min(process_seconds,remaining))
  except subprocess.TimeoutExpired:
   if sys.platform=='win32':process.terminate()
   else:os.killpg(process.pid,signal.SIGTERM)

@@ -24,8 +24,8 @@ struct RenderConfig
     float camera_keyboard_speed;
     float camera_min_distance;
     float camera_max_distance;
-    bool optical_depth_lut,volume_lighting_grid,volume_gauss;
-    uint32_t volume_steps;
+    bool optical_depth_lut,volume_lighting_grid,volume_gauss,volume_spatial_filter;
+    uint32_t volume_steps,volume_spatial_stride;
     uint32_t volume_rays_per_pixel;
     uint32_t microfacet_energy_compensation,shadow_grid_resolution,subgroup_size;
     bool static_lighting_cache,force_lighting_rebuild,texture_lighting_grid,organelle_lighting_cache;

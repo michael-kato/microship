@@ -218,6 +218,15 @@
             "midpoint",
             "gauss_legendre"
           ]
+        },
+        "spatial_filter": {
+          "type": "boolean"
+        },
+        "spatial_stride": {
+          "enum": [
+            2,
+            4
+          ]
         }
       },
       "required": [
@@ -244,6 +253,25 @@
                   2,
                   3
                 ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "spatial_filter"
+            ],
+            "properties": {
+              "spatial_filter": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "rays_per_pixel": {
+                "const": 1
               }
             }
           }

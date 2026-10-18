@@ -38,6 +38,17 @@ foreach(debug_variant IN ITEMS surface volume guide_surface)
             assets/shaders/debug_buffers.glsl VERBATIM)
     list(APPEND debug_outputs "${debug_output}")
 endforeach()
+foreach(volume_variant IN ITEMS coarse filter)
+    set(volume_variant_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/volume_${volume_variant}.comp.spv")
+    string(TOUPPER "${volume_variant}" volume_variant_define)
+    add_custom_command(OUTPUT "${volume_variant_output}"
+        COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DNANOVA_VOLUME_PASS=1
+            -DNANOVA_DEBUG_BUFFERS=1 -DNANOVA_NO_QUERY_COUNTERS=1 -DNANOVA_VOLUME_${volume_variant_define}=1
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/ray_trace.comp" -o "${volume_variant_output}"
+        DEPENDS assets/shaders/render_bindings.glsl assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl
+            assets/shaders/debug_buffers.glsl VERBATIM)
+    list(APPEND debug_outputs "${volume_variant_output}")
+endforeach()
 set(backdrop_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/backdrop.comp.spv")
 add_custom_command(OUTPUT "${backdrop_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"

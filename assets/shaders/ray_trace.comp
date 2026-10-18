@@ -51,6 +51,7 @@ layout(constant_id=ORGANELLE_CACHE_SPECIALIZATION_ID) const bool organelle_light
 layout(constant_id=SUBSURFACE_ENABLED_SPECIALIZATION_ID) const bool subsurface_enabled=true;
 layout(constant_id=FUSED_VOLUME_SPECIALIZATION_ID) const bool fused_volume=false;
 layout(constant_id=VOLUME_GAUSS_SPECIALIZATION_ID) const bool volume_gauss=false;
+layout(constant_id=VOLUME_GRID_STRIDE_SPECIALIZATION_ID) const uint volume_grid_stride=2u;
 layout(set=0,binding=RENDER_BINDING_LIGHTING_TEXTURE) uniform sampler3D lighting_texture;
 layout(set=0,binding=RENDER_BINDING_OPTICAL_DEPTH) uniform sampler2DArray optical_depth_table;
 
@@ -240,6 +241,7 @@ float medium_sharp_limit(vec3 direction)
 }
 
 vec3 film_sharp_sum=vec3(0),film_volume=vec3(0);
+float film_terminal_distance=RAY_MAX;
 float film_blur_max=0.0;
 layout(set=0,binding=RENDER_BINDING_SHARP_LAYER,std430) buffer SharpLayer { vec4 sharp_pixels[]; };
 
@@ -814,6 +816,7 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
         }
         weight*=transmittance(origin,direction,distance);
         path_distance+=distance;
+        if (sample_index==0u) film_terminal_distance=path_distance;
         float blur_radius=max(medium_blur_radius(direction,path_distance),through_wall ? render.membrane_fade.z : 0.0);
         film_blur_max=max(film_blur_max,blur_radius);
         if (!hit)
@@ -933,6 +936,38 @@ bool pixel_only_background(uvec2 pixel)
         farthest*cone+point_epsilon(center),low,high);
 }
 
+vec3 integrate_volume(uvec2 pixel,out vec3 sharp_result,out float terminal)
+{
+    uint volume_count = render.scene.y > 0u ? render.quality.x : 0u;
+    vec3 volume_sum = vec3(0.0),sharp_volume_sum=vec3(0.0);terminal=RAY_MAX;
+    for (uint sample_index = 0u; sample_index < volume_count; ++sample_index)
+    {
+        vec3 direction=film_direction(pixel,film_sample(sample_index,volume_count));
+        vec3 origin=render.camera_position.xyz,weight=vec3(1);
+        float sharp_limit=medium_sharp_limit(direction);
+        for (uint depth=0u;depth<=render.settings.w;++depth)
+        {
+            uint triangle;vec2 barycentric;float distance;
+            bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
+            if (!hit && render.backdrop_style.x>0.0)
+                distance=backdrop_remaining(origin,direction,pixel);
+            terminal=dot(origin-render.camera_position.xyz,direction)+distance;
+            vec3 sharp;
+            vec3 scattering=weight*single_scattering(origin,direction,distance,sharp_limit,sharp);
+            volume_sum+=scattering;sharp_volume_sum+=weight*sharp;
+            if (!hit || depth==render.settings.w) break;
+            Surface s;if (!surface_at(triangle,barycentric,direction,s) || !s.translucent) break;
+            float view_cosine=abs(dot(s.normal,direction)),opacity=membrane_opacity(view_cosine);
+            float clear=membrane_clear(view_cosine);if (clear<=0.0) break;
+            weight*=transmittance(origin,direction,distance)*clear*mix(vec3(1),s.color,CLEAR_MEMBRANE_PIGMENT_WEIGHT*opacity)
+                *exp(-render.thin_material.y*opacity/max(MIN_MEMBRANE_DIRECTION_COSINE,view_cosine));
+            origin=s.point-s.geometric_normal*point_epsilon(s.point);
+        }
+    }
+    sharp_result=volume_count>0u ? sharp_volume_sum/float(volume_count) : vec3(0);
+    return volume_count>0u ? volume_sum/float(volume_count) : vec3(0);
+}
+
 #ifdef NANOVA_SHADOW_GRID_PASS
 layout(push_constant) uniform GridPass { uint medium;uint pass;uint instance;uint triangle_count; } grid_pass;
 void main()
@@ -1008,9 +1043,44 @@ void main()
 void main()
 {
     uvec2 pixel = gl_GlobalInvocationID.xy;
-    if (pixel.x >= render.settings.x || pixel.y >= render.settings.y)
-        return;
+#ifdef NANOVA_VOLUME_COARSE
+    pixel*=volume_grid_stride;
+#endif
+    if (pixel.x >= render.settings.x || pixel.y >= render.settings.y) return;
 
+#if defined(NANOVA_VOLUME_COARSE)
+    vec3 sharp=vec3(0),volume=vec3(0);float terminal=RAY_MAX;
+    uint index=pixel.y*render.settings.x+pixel.x;
+    if (pixel_may_intersect_medium(pixel)) volume=integrate_volume(pixel,sharp,terminal);
+    else terminal=exp2(debug_pixels[index].surface.w)-1.0;
+    debug_pixels[index].volume=vec4(volume,log2(1.0+terminal));
+    debug_pixels[index].scatter_blur=vec4(sharp,0);
+#elif defined(NANOVA_VOLUME_FILTER)
+    uint index=pixel.y*render.settings.x+pixel.x;
+    float depth=debug_pixels[index].surface.w;
+    uvec2 low=pixel/volume_grid_stride,extent=(render.settings.xy+volume_grid_stride-1u)/volume_grid_stride;
+    vec2 f=vec2(pixel%uvec2(volume_grid_stride))/float(volume_grid_stride);
+    vec3 volume=vec3(0),sharp=vec3(0);float total=0;
+    for (uint y=0u;y<2u;++y) for (uint x=0u;x<2u;++x)
+    {
+        uvec2 anchor=min(low+uvec2(x,y),extent-1u)*volume_grid_stride;
+        uint source=anchor.y*render.settings.x+anchor.x;
+        vec2 w=mix(1.0-f,f,vec2(x,y));float weight=w.x*w.y;
+        if (weight==0.0) continue;
+        vec4 value=debug_pixels[source].volume;
+        // About two percent terminal-depth agreement. Thin silhouettes with
+        // no matching sample use exact current-pixel camera integration below.
+        if (abs(value.w-depth)>.03) continue;
+        volume+=weight*value.rgb;sharp+=weight*debug_pixels[source].scatter_blur.rgb;total+=weight;
+    }
+    if (total>0.0) { volume/=total;sharp/=total; }
+    else { float terminal;volume=integrate_volume(pixel,sharp,terminal); }
+    vec4 surface=imageLoad(output_image,ivec2(pixel));
+    vec3 radiance=surface.rgb+volume;
+    if (render.quality.w>0u && surface.a>0.0)
+    { sharp_pixels[index].rgb+=sharp;radiance-=sharp; }
+    imageStore(output_image,ivec2(pixel),vec4(radiance,surface.a));
+#else
 #ifndef NANOVA_VOLUME_PASS
 #ifndef NANOVA_DISABLE_VACUUM_SKIP
     // All samples here have exactly the same uniform-environment radiance.
@@ -1022,6 +1092,7 @@ void main()
 #ifdef NANOVA_NO_QUERY_COUNTERS
         debug_pixels[pixel.y*render.settings.x+pixel.x].vertex_hit=vec4(0);
         debug_pixels[pixel.y*render.settings.x+pixel.x].normal_depth=vec4(0);
+        debug_pixels[pixel.y*render.settings.x+pixel.x].surface.w=texelFetch(soft_backdrop,ivec2(pixel),0).a;
 #else
         debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(vec4(0),vec4(0),
             vec4(background,0),vec4(background,0),vec4(0),vec4(0));
@@ -1054,10 +1125,11 @@ void main()
     }
 #ifdef NANOVA_DEBUG_BUFFERS
 #ifdef NANOVA_NO_QUERY_COUNTERS
-    // Effects and focus read only these two current-frame guides. Do not keep
-    // diagnostic radiance sums live in the normal gameplay program.
+    // Effects and focus use first-hit guides. Spatial volume filtering also
+    // uses terminal depth. Diagnostic radiance sums are not needed here.
     debug_pixels[pixel.y*render.settings.x+pixel.x].vertex_hit=debug_vertex_hit;
     debug_pixels[pixel.y*render.settings.x+pixel.x].normal_depth=debug_normal_depth;
+    debug_pixels[pixel.y*render.settings.x+pixel.x].surface.w=log2(1.0+film_terminal_distance);
 #else
     debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(debug_vertex_hit,debug_normal_depth,
         vec4(debug_direct/float(sample_count),float(debug_primary_hits)/float(sample_count)),
@@ -1072,43 +1144,19 @@ void main()
     vec4 surface_radiance = imageLoad(output_image,ivec2(pixel));
     vec3 radiance = surface_radiance.rgb;
     // Volume film rays use the same fixed rule. Quadrature is deterministic.
-    uint volume_count = render.scene.y > 0u ? render.quality.x : 0u;
-    vec3 volume_sum = vec3(0.0),sharp_volume_sum=vec3(0.0);
-    for (uint sample_index = 0u; sample_index < volume_count; ++sample_index)
+    vec3 sharp;float terminal;
+    vec3 volume=integrate_volume(pixel,sharp,terminal);
+    if (render.quality.x>0u)
     {
-        vec3 direction=film_direction(pixel,film_sample(sample_index,volume_count));
-        vec3 origin=render.camera_position.xyz,weight=vec3(1);
-        float sharp_limit=medium_sharp_limit(direction);
-        for (uint depth=0u;depth<=render.settings.w;++depth)
-        {
-            uint triangle;vec2 barycentric;float distance;
-            bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
-            if (!hit && render.backdrop_style.x>0.0)
-                distance=backdrop_remaining(origin,direction,pixel);
-            vec3 sharp;
-            vec3 scattering=weight*single_scattering(origin,direction,distance,sharp_limit,sharp);
-            volume_sum+=scattering;sharp_volume_sum+=weight*sharp;
-            if (!hit || depth==render.settings.w) break;
-            Surface s;if (!surface_at(triangle,barycentric,direction,s) || !s.translucent) break;
-            float view_cosine=abs(dot(s.normal,direction)),opacity=membrane_opacity(view_cosine);
-            float clear=membrane_clear(view_cosine);if (clear<=0.0) break;
-            weight*=transmittance(origin,direction,distance)*clear*mix(vec3(1),s.color,CLEAR_MEMBRANE_PIGMENT_WEIGHT*opacity)
-                *exp(-render.thin_material.y*opacity/max(MIN_MEMBRANE_DIRECTION_COSINE,view_cosine));
-            origin=s.point-s.geometric_normal*point_epsilon(s.point);
-        }
-    }
-    if (volume_count > 0u)
-    {
-        radiance+=volume_sum/float(volume_count);
+        radiance+=volume;
         if (render.quality.w>0u && surface_radiance.a>0.0)
         {
-            vec3 sharp=sharp_volume_sum/float(volume_count);
             sharp_pixels[pixel.y*render.settings.x+pixel.x].rgb+=sharp;radiance-=sharp;
         }
     }
-#ifdef NANOVA_DEBUG_BUFFERS
+#if defined(NANOVA_DEBUG_BUFFERS) && !defined(NANOVA_NO_QUERY_COUNTERS)
     uint debug_index = pixel.y*render.settings.x+pixel.x;
-    debug_pixels[debug_index].volume.rgb = volume_count > 0u ? volume_sum/float(volume_count) : vec3(0);
+    debug_pixels[debug_index].volume.rgb = volume;
     debug_pixels[debug_index].surface.w += float(debug_closest_queries);
     debug_pixels[debug_index].volume.w += float(debug_shadow_queries);
 #endif
@@ -1119,6 +1167,7 @@ void main()
 #else
     imageStore(output_image,ivec2(pixel),vec4(radiance,film_blur_max));
 #endif
+#endif // Spatial volume variants.
 }
 
 #endif
