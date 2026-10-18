@@ -348,3 +348,11 @@ sampling. In a 120-frame close-view check, the last 100 frames changed
 from 10.983 to 10.473 ms median application time and from 11.514 to
 10.614 ms at the 95th percentile. This does not change the default six-film
 quality setting.
+
+Fog filtering now skips pixels with exactly zero fog. A CPU view check
+can skip the full filter only when every covered visibility-field vertex
+is fully revealed. Field edges and uncertain projections keep the filter.
+The tilt filter copies its center when all rounded taps address that
+pixel. Close and far captures differed by at most one RGB8 level. A
+120-frame close-view comparison reduced median GPU time from 9.254 to
+8.845 ms. Application time remained above ten milliseconds.

@@ -39,6 +39,8 @@ void main()
 {
     ivec2 pixel=ivec2(gl_GlobalInvocationID.xy);
     if (any(greaterThanEqual(pixel,fog_pass.extent))) return;
+    float amount=fog_pass.pass==1 ? fog_amount(pixel) : 1.0;
+    if (amount==0.0) return;
     // Two full-resolution 49-tap passes. Scratch is overwritten in this logical frame.
     vec3 sum=vec3(0);float weights=0;
     for (int tap=-24;tap<=24;++tap)
@@ -50,5 +52,5 @@ void main()
     }
     sum/=weights;
     if (fog_pass.pass==0) imageStore(scratch,pixel,vec4(sum,1));
-    else imageStore(beauty,pixel,vec4(mix(imageLoad(beauty,pixel).rgb,sum*render.fog_tint.rgb,fog_amount(pixel)),1));
+    else imageStore(beauty,pixel,vec4(mix(imageLoad(beauty,pixel).rgb,sum*render.fog_tint.rgb,amount),1));
 }

@@ -2015,6 +2015,39 @@ static bool update_meshes(RendererState* state,const Geometry& scene)
     return true;
 }
 
+// Bilinear fog is zero if every field vertex under the projected viewport is one.
+// Include a two-cell guard. Unbounded projections and field edges retain the filter.
+static bool fog_covers_view(const RenderUniform& u,const SightField& field)
+{
+    if (field.spacing<=0) return true;
+    double low[2]={1e30,1e30},high[2]={-1e30,-1e30};
+    for (int y=-1;y<=1;y+=2) for (int x=-1;x<=1;x+=2)
+    {
+        double direction[3];
+        for (int a=0;a<3;++a) direction[a]=u.camera_forward[a]
+            +x*u.display[1]*u.display[2]*u.camera_right[a]+y*u.display[1]*u.camera_up[a];
+        if (fabs(direction[2])<.000001) return true;
+        double distance=(u.fog[2]-u.camera_position[2])/direction[2];
+        if (distance<=0) return true;
+        for (int a=0;a<2;++a)
+        {
+            double p=u.camera_position[a]+distance*direction[a];
+            low[a]=std::min(low[a],p);high[a]=std::max(high[a],p);
+        }
+    }
+    double origin[2]={field.low_x,field.low_y};int begin[2],end[2];
+    for (int a=0;a<2;++a)
+    {
+        double l=floor((low[a]-origin[a])/field.spacing)-2;
+        double h=ceil((high[a]-origin[a])/field.spacing)+2;
+        if (l<0 || h>=SIGHT_FIELD_SIDE) return true;
+        begin[a]=(int)l;end[a]=(int)h;
+    }
+    for (int y=begin[1];y<=end[1];++y) for (int x=begin[0];x<=end[0];++x)
+        if (field.reveal[y*SIGHT_FIELD_SIDE+x]!=1.0f) return true;
+    return false;
+}
+
 bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera* camera, const char* capture_path)
 {
     RendererState* state = renderer->state;
@@ -2227,7 +2260,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     bloom.strength = state->config.bloom_strength;
     bloom.exposure = state->config.exposure;
     bloom.debug_views = renderer->debug_views ? 1.0f : 0.0f;
-    if (uniform->fog[0]>0 && !renderer->debug_views)
+    if (uniform->fog[0]>0 && !renderer->debug_views && fog_covers_view(*uniform,scene->fog_field))
     {
         image_barrier(state->command,state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
             VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_WRITE_BIT,

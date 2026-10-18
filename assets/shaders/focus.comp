@@ -22,6 +22,14 @@ void main()
     DebugPixel guide=debug_pixels[pixel.y*focus.extent.x+pixel.x];
     if (guide.vertex_hit.w==3.0) amount=0.0;
     float radius=render.focus_band.w*amount;
+    // Every rounded tap is the center when radius is below half a pixel.
+    if (radius<.5)
+    {
+        vec4 center=focus.pass==0 ? imageLoad(beauty,pixel) : imageLoad(scratch,pixel);
+        if (focus.pass==0) imageStore(scratch,pixel,vec4(center.rgb,1));
+        else imageStore(beauty,pixel,vec4(center.rgb,1));
+        return;
+    }
     vec3 sum=vec3(0);float weights=0;
     for (int tap=-12;tap<=12;++tap)
     {
