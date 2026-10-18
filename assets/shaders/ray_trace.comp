@@ -213,6 +213,30 @@ float medium_blur_radius(vec3 direction,float distance)
     }
     return radius;
 }
+// Blur starts once along a camera ray. Volume quadrature only needs this
+// boundary, not the pixel radius at every integration point.
+float medium_sharp_limit(vec3 direction)
+{
+    float limit=RAY_MAX;
+    if (render.quality.w==0u) return limit;
+    for (uint i=0u;i<render.scene.y;++i)
+    {
+        Medium medium=media[i];if (medium.blur.z<=0.0) continue;
+        float begin,end;
+        if (medium.blur.w>0.0)
+        {
+            if (medium.lighting.w>0.0) medium.center_radius.w=medium.lighting.w;
+            if (medium_interval(medium,render.camera_position.xyz,direction,RAY_MAX,begin,end))
+                limit=min(limit,begin+medium.blur.x*(end-begin));
+        }
+        else if (medium.blur.x>0.0
+            && medium_interval(medium,render.camera_position.xyz,direction,RAY_MAX,begin,end)
+            && end-begin>medium.blur.y)
+            limit=min(limit,begin+medium.blur.y);
+    }
+    return limit;
+}
+
 vec3 film_sharp_sum=vec3(0);
 float film_blur_max=0.0;
 layout(set=0,binding=RENDER_BINDING_SHARP_LAYER,std430) buffer SharpLayer { vec4 sharp_pixels[]; };
@@ -286,7 +310,7 @@ vec3 sampled_visibility(vec3 point,vec3 normal,int light);
 
 vec3 volume_incident(vec3 point,uint medium_index,vec3 ambient,vec3 phases);
 
-vec3 single_scattering(vec3 origin,vec3 direction,float distance,out vec3 sharp)
+vec3 single_scattering(vec3 origin,vec3 direction,float distance,float sharp_limit,out vec3 sharp)
 {
     vec3 radiance=vec3(0);sharp=vec3(0);
     float path_offset=dot(origin-render.camera_position.xyz,direction);
@@ -310,7 +334,7 @@ vec3 single_scattering(vec3 origin,vec3 direction,float distance,out vec3 sharp)
             vec3 point=origin+direction*d;
             vec3 contribution=transmittance(origin,direction,d)*medium_density(medium,point)*(medium.scattering.rgb*volume_incident(point,i,ambient,phases))*stride;
             radiance+=contribution;
-            if (medium_blur_radius(direction,path_offset+d)<=0.0) sharp+=contribution;
+            if (path_offset+d<=sharp_limit) sharp+=contribution;
         }
     }
     return radiance;
@@ -1023,6 +1047,7 @@ void main()
     {
         vec3 direction=film_direction(pixel,film_sample(sample_index,volume_count));
         vec3 origin=render.camera_position.xyz,weight=vec3(1);
+        float sharp_limit=medium_sharp_limit(direction);
         for (uint depth=0u;depth<=render.settings.w;++depth)
         {
             uint triangle;vec2 barycentric;float distance;
@@ -1030,7 +1055,7 @@ void main()
             if (!hit && render.backdrop_style.x>0.0)
                 distance=backdrop_remaining(origin,direction,pixel);
             vec3 sharp;
-            vec3 scattering=weight*single_scattering(origin,direction,distance,sharp);
+            vec3 scattering=weight*single_scattering(origin,direction,distance,sharp_limit,sharp);
             volume_sum+=scattering;sharp_volume_sum+=weight*sharp;
             if (!hit || depth==render.settings.w) break;
             Surface s;if (!surface_at(triangle,barycentric,direction,s) || !s.translucent) break;

@@ -10,13 +10,22 @@ p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('binary',type=Path);p.add_argument('--baseline',type=Path,required=True)
 p.add_argument('--case',choices=('near','normal','grown','inside','far','overlap','boundary','opaque'),default='near')
 p.add_argument('--samples',type=int,choices=(3,6),default=6)
+p.add_argument('--blur-profile',choices=('authored','linear','off'),default='authored')
 p.add_argument('--subgroup-size',type=int,choices=(0,32,64),default=32)
+p.add_argument('--baseline-subgroup-size',type=int,choices=(0,32,64))
 p.add_argument('--pairs',type=int,choices=(1,3),default=1)
 p.add_argument('--timing',action='store_true');p.add_argument('--run',action='store_true')
 p.add_argument('--output',type=Path,default=root/'build/render-perf');a=p.parse_args()
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 subprocess.run([sys.executable,str(root/'tests/e2e/static_lighting.py'),str(a.binary),'--case',a.case,'--variants','cached','--output',str(out)],check=True,stdout=subprocess.PIPE,text=True)
 base=json.loads((out/'commands.json').read_text())[0][1]
+if a.blur_profile!='authored':
+ wp=Path(base[base.index('--world')+1]);world=json.loads(wp.read_text())
+ for body in world['bodies']:
+  if 'medium' not in body:continue
+  if a.blur_profile=='off':body['medium'].pop('depth_blur',None)
+  else:body['medium']['depth_blur']=dict(pixels_per_unit=4,sharp_distance=1.5,max_radius=18)
+ wp.write_text(json.dumps(world,indent=2)+'\n')
 settings=json.loads(Path(base[base.index('--config')+1]).read_text());settings['sampling']['samples_per_pixel']=a.samples
 commands=[]
 for pair in range(a.pairs):
@@ -24,6 +33,7 @@ for pair in range(a.pairs):
   name=str(pair)+'-'+variant;config=deepcopy(settings)
   config['lighting'].pop('subgroup_size',None)
   if variant=='current':config['lighting']['subgroup_size']=a.subgroup_size
+  elif a.baseline_subgroup_size is not None:config['lighting']['subgroup_size']=a.baseline_subgroup_size
   cp=out/(name+'-render.json');cp.write_text(json.dumps(config,indent=2)+'\n')
   command=list(base);command[command.index(str(a.binary.resolve()))]=str((a.baseline if variant=='baseline' else a.binary).resolve())
   for flag,value in (('--config',cp),('--capture',out/(name+'.ppm')),('--state',out/(name+'-state.json'))):command[command.index(flag)+1]=str(value)
@@ -33,7 +43,7 @@ if not a.run:
  print('Prepared',len(commands),'sequential native 1080p two-frame application runs;',a.samples,'film + 1 volume + 1 backdrop starts. 2s/process, 5s/batch, no hardware tracing. No GPU work started.')
  raise SystemExit(0)
 check_gpu_environment();env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1'
-report={'case':a.case,'samples':a.samples,'validation':not a.timing,'runs':{}}
+report={'case':a.case,'blur_profile':a.blur_profile,'samples':a.samples,'validation':not a.timing,'runs':{}}
 started=time.monotonic()
 for name,command in commands:
  remaining=5-(time.monotonic()-started);assert remaining>0,'GPU batch expired'

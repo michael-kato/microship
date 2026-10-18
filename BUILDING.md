@@ -276,3 +276,21 @@ Volume time stayed near 7 ms. The 10 ms total target is still unmet.
 RenderDoc accepts `--subgroup-size 0`, `32` or `64` for this comparison.
 Zero omits the new field, so saved executables can use their original
 config contract. See PROFILING.md for the reports and validation limits.
+
+
+The volume pass computes the first blurred depth once per camera ray.
+It uses that depth to divide sharp and blurred scattering contributions.
+This replaces repeated blur-radius queries at each integration point;
+the surface pass still computes the actual pixel radius. It supports both
+fractional cell-depth and distance-based blur. The calculation uses the
+current camera and media and adds no persistent data.
+
+For an isolated comparison against the saved 32-lane build, add
+`--baseline-subgroup-size 32`. `--blur-profile linear` checks the
+supported distance-based profile; `--blur-profile off` checks media with
+no depth blur. The default keeps the authored profile. Three alternating
+close-view pairs measured volume time of 7.037 ms before and 5.298 ms
+after, with paired savings of 1.697 to 1.808 ms. Near-view RGB8 error was
+at most 2 in 12 color channels out of 6,220,800. Interior, overlap,
+linear-blur and blur-disabled comparisons matched exactly. Differences
+come from floating-point evaluation at the blur-start boundary.
