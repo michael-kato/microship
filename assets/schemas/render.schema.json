@@ -49,6 +49,9 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 32
+        },
+        "spatial_antialiasing": {
+          "type": "boolean"
         }
       },
       "required": [

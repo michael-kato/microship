@@ -7,6 +7,7 @@
 // These settings are loaded from assets; there are no compiled scene defaults.
 struct RenderConfig
 {
+    bool spatial_antialiasing;
     bool vsync; // Runtime preference; false requests immediate presentation.
     uint32_t width;
     uint32_t height;

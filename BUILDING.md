@@ -364,3 +364,17 @@ close-view and grown-factory captures had mean RGB8 error 0.390 and maximum
 8 against a 32-step midpoint volume reference at the same film sampling.
 Two nodes had mean error 0.748 and maximum 10 in the close view. These are
 volume approximations, not exact replacements or full-transport references.
+
+`sampling.spatial_antialiasing` enables a current-frame directional edge
+filter before the HUD. It does not use earlier frames or change output
+resolution. Missing or false keeps the previous output. F2 diagnostic
+panels bypass it. Broad bloom uses the center bloom contribution for
+neighbor tests. The method cannot recover geometry missed by a single ray.
+
+The one-film, three-node Gauss, 16-cell shadow-grid trial keeps all major
+rendering features enabled. Its mean close-view error against the former
+six-film/eight-step/32-cell setting was 0.860 RGB8 levels. The spatial
+filter reduced measured edge RMS error from 7.068 to 6.078 RGB8 levels
+against that reference (vertical contrast above eight levels, rows 1–849).
+This is one frozen scene, not a general motion-quality result. The former
+settings remain in `assets/rendering/biology-quality.json`.

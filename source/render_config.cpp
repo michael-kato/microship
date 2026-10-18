@@ -102,7 +102,9 @@ bool render_config_load(RenderConfig* config,const char* path)
         loaded.exposure=json_positive(json_get(j,"exposure"),MAX_RENDER_EXPOSURE);
     }
     {
-        Json j=json_get(root,"sampling");json_object(j,"samples_per_pixel|max_transmission_layers|seed");
+        Json j=json_get(root,"sampling");json_object(j,"samples_per_pixel|max_transmission_layers|seed|spatial_antialiasing");
+        Json aa=json_find(j,"spatial_antialiasing");
+        if (json_present(aa)) loaded.spatial_antialiasing=json_bool(aa);
         loaded.samples_per_pixel=json_uint(json_get(j,"samples_per_pixel"),1,MAX_RENDER_SAMPLES_PER_PIXEL);
         loaded.max_transmission_layers=json_uint(json_get(j,"max_transmission_layers"),1,MAX_TRANSMISSION_LAYERS);
         loaded.seed=json_uint(json_get(j,"seed"),0,UINT32_MAX);

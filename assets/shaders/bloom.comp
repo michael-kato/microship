@@ -35,9 +35,56 @@ vec3 linear_to_srgb(vec3 linear)
                SRGB_LINEAR_SCALE * linear, lessThanEqual(linear, vec3(SRGB_LINEAR_THRESHOLD)));
 }
 
+layout(constant_id=SPATIAL_AA_SPECIALIZATION_ID) const bool spatial_aa=false;
+
+vec3 mapped_texel(ivec2 position,vec3 glow)
+{
+    vec3 linear=imageLoad(beauty,clamp(position,ivec2(0),bloom.extent-1)).rgb*bloom.exposure+glow;
+    return linear/(vec3(1)+linear);
+}
+vec3 mapped_sample(vec2 position,vec3 glow)
+{
+    vec2 base=floor(position),f=position-base;
+    ivec2 low=ivec2(base),last=bloom.extent-1;
+    vec3 a=imageLoad(beauty,clamp(low,ivec2(0),last)).rgb;
+    vec3 b=imageLoad(beauty,clamp(low+ivec2(1,0),ivec2(0),last)).rgb;
+    vec3 c=imageLoad(beauty,clamp(low+ivec2(0,1),ivec2(0),last)).rgb;
+    vec3 d=imageLoad(beauty,clamp(low+ivec2(1,1),ivec2(0),last)).rgb;
+    vec3 linear=mix(mix(a,b,f.x),mix(c,d,f.x),f.y)*bloom.exposure+glow;
+    return linear/(vec3(1)+linear);
+}
+float edge_luma(vec3 color)
+{ return sqrt(max(0.0,dot(color,vec3(.299,.587,.114)))); }
+
+// Directional spatial edge filtering, following the FXAA method. Only current
+// native pixels are read. HUD and profiler are drawn after this pass.
+vec3 antialias(ivec2 pixel,vec3 center,vec3 glow)
+{
+    vec2 p=vec2(pixel);
+    float nw=edge_luma(mapped_texel(pixel+ivec2(-1,-1),glow));
+    float ne=edge_luma(mapped_texel(pixel+ivec2(1,-1),glow));
+    float sw=edge_luma(mapped_texel(pixel+ivec2(-1,1),glow));
+    float se=edge_luma(mapped_texel(pixel+ivec2(1,1),glow));
+    float luma=edge_luma(center);
+    float low=min(luma,min(min(nw,ne),min(sw,se))),high=max(luma,max(max(nw,ne),max(sw,se)));
+    if (high-low<max(.0156,high*.063)) return center;
+    vec2 direction=vec2(sw+se-nw-ne,nw+sw-ne-se);
+    float reduce=max((nw+ne+sw+se)*.03125,.0078125);
+    direction=clamp(direction/(min(abs(direction.x),abs(direction.y))+reduce),vec2(-8),vec2(8));
+    vec3 a=.5*(mapped_sample(p-direction/6.0,glow)+mapped_sample(p+direction/6.0,glow));
+    vec3 b=.5*a+.25*(mapped_sample(p-direction*.5,glow)+mapped_sample(p+direction*.5,glow));
+    float value=edge_luma(b);
+    return value<low || value>high ? a : b;
+}
+
 void write_display(ivec2 pixel,vec3 linear)
 {
     vec3 mapped=linear/(vec3(1.0)+linear);
+    if (spatial_aa && bloom.debug_views<.5)
+    {
+        vec3 glow=linear-imageLoad(beauty,pixel).rgb*bloom.exposure;
+        mapped=antialias(pixel,mapped,glow);
+    }
     vec3 value=linear_to_srgb(mapped);
     imageStore(display_image,pixel,vec4(value,1.0));
     if (bloom.debug_views>.5)

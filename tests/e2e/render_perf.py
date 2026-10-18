@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Compare the real renderer with a saved build at fixed image quality."""
-import argparse,json,os,re,signal,statistics,subprocess,sys,time
+import argparse,json,math,os,re,signal,statistics,subprocess,sys,time
 from copy import deepcopy
 from pathlib import Path
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
@@ -11,6 +11,10 @@ p.add_argument('binary',type=Path);p.add_argument('--baseline',type=Path,require
 p.add_argument('--case',choices=('near','normal','grown','inside','far','overlap','boundary','opaque'),default='near')
 p.add_argument('--samples',type=int,choices=(1,2,3,6),default=6)
 p.add_argument('--baseline-samples',type=int,choices=(1,2,3,6))
+p.add_argument('--baseline-shadow-grid',type=int,choices=(8,16,32,64))
+p.add_argument('--baseline-quadrature',choices=('midpoint','gauss_legendre'))
+p.add_argument('--shadow-grid',type=int,choices=(8,16,32,64))
+p.add_argument('--spatial-aa',action='store_true')
 p.add_argument('--quadrature',choices=('midpoint','gauss_legendre'),default='midpoint')
 p.add_argument('--volume-steps',type=int,choices=(2,3,4,8,32),default=8)
 p.add_argument('--baseline-volume-steps',type=int,choices=(2,3,4,8,32))
@@ -43,10 +47,15 @@ for pair in range(a.pairs):
   name=str(pair)+'-'+variant;config=deepcopy(settings)
   config['volume']['integration_steps']=a.volume_steps
   config['volume'].pop('quadrature',None)
-  if variant=='current' and a.quadrature!='midpoint':config['volume']['quadrature']=a.quadrature
+  if variant=='current':
+   if a.quadrature!='midpoint':config['volume']['quadrature']=a.quadrature
+   if a.spatial_aa:config['sampling']['spatial_antialiasing']=True
+   if a.shadow_grid is not None:config['lighting']['shadow_grid_resolution']=a.shadow_grid
   if variant=='baseline':
    if a.baseline_samples is not None:config['sampling']['samples_per_pixel']=a.baseline_samples
    if a.baseline_volume_steps is not None:config['volume']['integration_steps']=a.baseline_volume_steps
+   if a.baseline_quadrature is not None:config['volume']['quadrature']=a.baseline_quadrature
+   if a.baseline_shadow_grid is not None:config['lighting']['shadow_grid_resolution']=a.baseline_shadow_grid
   config['lighting'].pop('subgroup_size',None)
   if variant=='current':config['lighting']['subgroup_size']=a.subgroup_size
   elif a.baseline_subgroup_size is not None:config['lighting']['subgroup_size']=a.baseline_subgroup_size
@@ -65,7 +74,7 @@ if not a.run:
  print('Prepared',len(commands),'sequential native 1080p two-frame application runs;',a.samples,'film + 1 volume + 1 backdrop starts. 2s/process, 5s/batch, no hardware tracing. No GPU work started.')
  raise SystemExit(0)
 check_gpu_environment();env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1'
-report={'frames':a.frames,'capture':not a.no_capture,'case':a.case,'blur_profile':a.blur_profile,'samples':a.samples,'volume_steps':a.volume_steps,'baseline_samples':a.baseline_samples,'baseline_volume_steps':a.baseline_volume_steps,'quality_comparison':a.quality_comparison,'validation':not a.timing,'runs':{}}
+report={'frames':a.frames,'capture':not a.no_capture,'case':a.case,'blur_profile':a.blur_profile,'samples':a.samples,'spatial_aa':a.spatial_aa,'shadow_grid':a.shadow_grid,'quadrature':a.quadrature,'volume_steps':a.volume_steps,'baseline_samples':a.baseline_samples,'baseline_volume_steps':a.baseline_volume_steps,'quality_comparison':a.quality_comparison,'validation':not a.timing,'runs':{}}
 started=time.monotonic()
 for name,command in commands:
  remaining=(20 if a.frames>2 else 5)-(time.monotonic()-started);assert remaining>0,'GPU batch expired'
@@ -104,11 +113,12 @@ for name,_ in commands:
  if variant in images:assert images[variant]==pixels,'Repeated frozen output changed'
  else:
   images[variant]=pixels
-  archive_capture(out/(name+'.ppm'),'render-perf-'+a.case+'-'+variant+'-'+str(a.samples)+'-film')
+  archive_capture(out/(name+'.ppm'),'render-perf-'+a.case+'-'+variant+'-'+str(a.baseline_samples if variant=='baseline' and a.baseline_samples is not None else a.samples)+'-film')
 report['image_difference']=None
 if not a.no_capture:
  error=[abs(x-y) for x,y in zip(images['baseline'],images['current'])]
- report['image_difference']=dict(mean_rgb8=sum(error)/len(error),max_rgb8=max(error),changed_channels=sum(d!=0 for d in error))
+ rmse=math.sqrt(sum(d*d for d in error)/len(error))
+ report['image_difference']=dict(mean_rgb8=sum(error)/len(error),rmse_rgb8=rmse,psnr_db=20*math.log10(255/rmse) if rmse else None,max_rgb8=max(error),changed_channels=sum(d!=0 for d in error))
 report['summary']={}
 for key in report['runs']['0-baseline']['frames_ms']:
  values={variant:[report['runs'][str(pair)+'-'+variant]['frames_ms'][key][-1] for pair in range(a.pairs)] for variant in ('baseline','current')}
