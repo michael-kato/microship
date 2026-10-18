@@ -106,7 +106,8 @@ static bool parse_integer(const char* text, uint32_t minimum, uint32_t maximum, 
 
 int main(int argc, char** argv)
 {
-    setvbuf(stdout,0,_IONBF,0);
+    static char diagnostic_output[64*1024];
+    if (setvbuf(stdout,diagnostic_output,_IOFBF,sizeof(diagnostic_output))) return 1;
     GameOptions options = {};
     char world_path[EXECUTABLE_PATH_CAPACITY], config_path[EXECUTABLE_PATH_CAPACITY], shader_path[EXECUTABLE_PATH_CAPACITY],audio_path[EXECUTABLE_PATH_CAPACITY],menu_path[EXECUTABLE_PATH_CAPACITY];
     bool no_menu=false,force_menu=false;uint32_t menu_selection=0;

@@ -103,7 +103,7 @@ int start_menu(const char* path,char* world,size_t capacity,uint32_t selection)
         HWND handle=CreateWindowExA(0,klass.lpszClassName,"nanova - Choose faction",style,CW_USEDEFAULT,CW_USEDEFAULT,
             extent.right-extent.left,extent.bottom-extent.top,0,0,instance,&menu);
         if (!handle) return -1;
-        ShowWindow(handle,SW_SHOW);UpdateWindow(handle);printf("Start menu ready.\n");
+        ShowWindow(handle,SW_SHOW);UpdateWindow(handle);printf("Start menu ready.\n");fflush(stdout);
         MSG message;
         while (menu.open)
         {

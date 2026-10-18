@@ -2377,6 +2377,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     for (uint32_t i=0;i<sizeof(spans)/sizeof(spans[0]);++i)
         profiler_span(profile,spans[i].node,((timestamps[spans[i].begin]-timestamps[GPU_TIME_FRAME_BEGIN])&mask)*scale,
             ((timestamps[spans[i].end]-timestamps[spans[i].begin])&mask)*scale);
+    fflush(stdout);
     phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_READ_TIMES,phase_start,phase_end);phase_start=phase_end;
     state->trace_ms = milliseconds;
     state->volume_ms = volume_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND;
@@ -2405,6 +2406,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     printf("Presentation waits: acquire %.3f ms; present %.3f ms; GPU work %.3f ms.\n",renderer->acquire_ms,renderer->present_ms,renderer->gpu_frame_ms);
     if (capture_path && !capture_image(state, capture_path))
         return false;
+    fflush(stdout);
     phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_CAPTURE,phase_start,phase_end);
     profiler_cpu(profile,PROFILE_RENDER,render_start,phase_end);
     ++renderer->scene_submissions;

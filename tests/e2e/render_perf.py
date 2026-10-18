@@ -15,8 +15,10 @@ p.add_argument('--subgroup-size',type=int,choices=(0,32,64),default=32)
 p.add_argument('--baseline-subgroup-size',type=int,choices=(0,32,64))
 p.add_argument('--pairs',type=int,choices=(1,3),default=1)
 p.add_argument('--reverse',action='store_true')
+p.add_argument('--no-capture',action='store_true')
 p.add_argument('--timing',action='store_true');p.add_argument('--run',action='store_true')
 p.add_argument('--output',type=Path,default=root/'build/render-perf');a=p.parse_args()
+if a.no_capture and not a.timing:p.error('--no-capture requires --timing')
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 subprocess.run([sys.executable,str(root/'tests/e2e/static_lighting.py'),str(a.binary),'--case',a.case,'--variants','cached','--output',str(out)],check=True,stdout=subprocess.PIPE,text=True)
 base=json.loads((out/'commands.json').read_text())[0][1]
@@ -36,15 +38,20 @@ for pair in range(a.pairs):
   if variant=='current':config['lighting']['subgroup_size']=a.subgroup_size
   elif a.baseline_subgroup_size is not None:config['lighting']['subgroup_size']=a.baseline_subgroup_size
   cp=out/(name+'-render.json');cp.write_text(json.dumps(config,indent=2)+'\n')
-  command=list(base);command[command.index(str(a.binary.resolve()))]=str((a.baseline if variant=='baseline' else a.binary).resolve())
+  binary=(a.baseline if variant=='baseline' else a.binary).resolve()
+  command=list(base)
+  if binary.suffix.lower()!='.exe' and sys.platform!='win32':command=[str(binary)]+command[command.index('--world'):]
+  else:command[command.index(str(a.binary.resolve()))]=str(binary)
   for flag,value in (('--config',cp),('--capture',out/(name+'.ppm')),('--state',out/(name+'-state.json'))):command[command.index(flag)+1]=str(value)
+  if a.no_capture:
+   index=command.index('--capture');del command[index:index+2]
   commands.append((name,command))
 (out/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
 if not a.run:
  print('Prepared',len(commands),'sequential native 1080p two-frame application runs;',a.samples,'film + 1 volume + 1 backdrop starts. 2s/process, 5s/batch, no hardware tracing. No GPU work started.')
  raise SystemExit(0)
 check_gpu_environment();env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1'
-report={'case':a.case,'blur_profile':a.blur_profile,'samples':a.samples,'validation':not a.timing,'runs':{}}
+report={'capture':not a.no_capture,'case':a.case,'blur_profile':a.blur_profile,'samples':a.samples,'validation':not a.timing,'runs':{}}
 started=time.monotonic()
 for name,command in commands:
  remaining=5-(time.monotonic()-started);assert remaining>0,'GPU batch expired'
@@ -76,6 +83,7 @@ for name,_ in commands:
  current=json.loads((out/(name+'-state.json')).read_text())
  if state is None:state=current
  else:assert current==state,'Rendering changed simulation state'
+ if a.no_capture:continue
  data=(out/(name+'.ppm')).read_bytes();header=re.match(rb'P6\s+1920\s+1080\s+255\s',data);assert header
  pixels=data[header.end():];assert len(pixels)==1920*1080*3
  variant=name.split('-',1)[1]
@@ -83,8 +91,10 @@ for name,_ in commands:
  else:
   images[variant]=pixels
   archive_capture(out/(name+'.ppm'),'render-perf-'+a.case+'-'+variant+'-'+str(a.samples)+'-film')
-error=[abs(x-y) for x,y in zip(images['baseline'],images['current'])]
-report['image_difference']=dict(mean_rgb8=sum(error)/len(error),max_rgb8=max(error),changed_channels=sum(d!=0 for d in error))
+report['image_difference']=None
+if not a.no_capture:
+ error=[abs(x-y) for x,y in zip(images['baseline'],images['current'])]
+ report['image_difference']=dict(mean_rgb8=sum(error)/len(error),max_rgb8=max(error),changed_channels=sum(d!=0 for d in error))
 report['summary']={}
 for key in report['runs']['0-baseline']['frames_ms']:
  values={variant:[report['runs'][str(pair)+'-'+variant]['frames_ms'][key][-1] for pair in range(a.pairs)] for variant in ('baseline','current')}
@@ -93,4 +103,5 @@ for key in report['runs']['0-baseline']['frames_ms']:
 print('Image difference:',report['image_difference'])
 for key in ('surface','volume','fog_focus_display','gpu','app'):print(key,report['summary'][key])
 print('Batch seconds:',report['batch_seconds'])
-assert report['image_difference']['mean_rgb8']<.02 and report['image_difference']['max_rgb8']<=2,'Image difference exceeds the comparison limit'
+if not a.no_capture:
+ assert report['image_difference']['mean_rgb8']<.02 and report['image_difference']['max_rgb8']<=2,'Image difference exceeds the comparison limit'

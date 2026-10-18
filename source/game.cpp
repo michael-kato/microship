@@ -459,6 +459,7 @@ int game_run(const GameOptions* options)
             printf("Camera input: drag %g %g; wheel %g.\n", input.drag_x, input.drag_y, input.wheel);
         printf("Scene time: %.6f; camera: %g %g %g.\n",game.simulation.time_seconds,
             game.camera.position.x,game.camera.position.y,game.camera.position.z);
+        fflush(stdout); // Input checks wait for this frame boundary.
         bool final_frame = options->frames && frames + 1 == options->frames;
         if (!presentation_build(presentation.get(),&game.simulation,&game.camera,&config)) { success=false;break; }
         profiler_cpu(profile,PROFILE_SCENE,simulation_end,profiler_clock_ms());

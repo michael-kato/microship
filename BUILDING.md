@@ -330,3 +330,11 @@ Proton 10, 25.126 ms under Proton 11 and 25.793 ms natively. Median app time
 was 29.537, 29.502 and 27.408 ms. These are short frozen-scene comparisons.
 Native startup and live platform behavior are separate from steady GPU
 cost. The 10 ms target is still unmet.
+
+Diagnostic output is buffered in 64 KiB. The menu and scene-ready messages
+flush at their input boundaries. Render timing includes its diagnostic
+flushes. Three alternating close-view pairs without capture measured
+29.379 to 26.996 ms median application time. GPU time changed from 25.120
+to 25.625 ms, so this change reduces CPU output cost only. A validated
+two-frame window check restored all feature controls and reproduced the
+reference image below the timing panel.
