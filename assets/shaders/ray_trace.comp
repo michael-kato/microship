@@ -50,6 +50,7 @@ layout(constant_id=LIGHTING_TEXTURE_SPECIALIZATION_ID) const bool texture_lighti
 layout(constant_id=ORGANELLE_CACHE_SPECIALIZATION_ID) const bool organelle_lighting_cache=false;
 layout(constant_id=SUBSURFACE_ENABLED_SPECIALIZATION_ID) const bool subsurface_enabled=true;
 layout(constant_id=FUSED_VOLUME_SPECIALIZATION_ID) const bool fused_volume=false;
+layout(constant_id=VOLUME_GAUSS_SPECIALIZATION_ID) const bool volume_gauss=false;
 layout(set=0,binding=RENDER_BINDING_LIGHTING_TEXTURE) uniform sampler3D lighting_texture;
 layout(set=0,binding=RENDER_BINDING_OPTICAL_DEPTH) uniform sampler2DArray optical_depth_table;
 
@@ -331,9 +332,19 @@ vec3 single_scattering(vec3 origin,vec3 direction,float distance,float sharp_lim
         float stride=(end-begin)/float(steps);
         for (uint step=0u;step<steps;++step)
         {
-            float d=begin+(float(step)+.5)*stride;
+            float fraction=(float(step)+.5)/float(steps),weight=1.0/float(steps);
+            if (volume_gauss)
+            {
+                if (steps==2u) fraction=step==0u ? .2113248654051871 : .7886751345948129;
+                else
+                {
+                    fraction=step==0u ? .1127016653792583 : step==1u ? .5 : .8872983346207417;
+                    weight=step==1u ? 4.0/9.0 : 5.0/18.0;
+                }
+            }
+            float d=volume_gauss ? begin+fraction*(end-begin) : begin+(float(step)+.5)*stride;
             vec3 point=origin+direction*d;
-            vec3 contribution=transmittance(origin,direction,d)*medium_density(medium,point)*(medium.scattering.rgb*volume_incident(point,i,ambient,phases))*stride;
+            vec3 contribution=transmittance(origin,direction,d)*medium_density(medium,point)*(medium.scattering.rgb*volume_incident(point,i,ambient,phases))*(volume_gauss ? (end-begin)*weight : stride);
             radiance+=contribution;
             if (path_offset+d<=sharp_limit) sharp+=contribution;
         }

@@ -356,3 +356,11 @@ The tilt filter copies its center when all rounded taps address that
 pixel. Close and far captures differed by at most one RGB8 level. A
 120-frame close-view comparison reduced median GPU time from 9.254 to
 8.845 ms. Application time remained above ten milliseconds.
+
+`volume.quadrature` accepts `midpoint` (default) or `gauss_legendre`.
+Gauss-Legendre requires two or three integration steps. The optical-depth
+table and static light fields are unchanged. At three nodes, native
+close-view and grown-factory captures had mean RGB8 error 0.390 and maximum
+8 against a 32-step midpoint volume reference at the same film sampling.
+Two nodes had mean error 0.748 and maximum 10 in the close view. These are
+volume approximations, not exact replacements or full-transport references.

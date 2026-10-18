@@ -2,6 +2,7 @@
 #include "asset_json.h"
 #include <stdio.h>
 #include <cmath>
+#include <string.h>
 
 static const int MAX_CAMERA_KEYBOARD_SPEED = 1000;
 static const int MAX_BLOOM_THRESHOLD = 1000000;
@@ -107,12 +108,21 @@ bool render_config_load(RenderConfig* config,const char* path)
         loaded.seed=json_uint(json_get(j,"seed"),0,UINT32_MAX);
     }
     {
-        Json j=json_get(root,"volume");json_object(j,"rays_per_pixel|integration_steps|optical_depth_lut|lighting_grid");
+        Json j=json_get(root,"volume");json_object(j,"rays_per_pixel|integration_steps|optical_depth_lut|lighting_grid|quadrature");
         Json grid=json_find(j,"lighting_grid");
         if (json_present(grid)) loaded.volume_lighting_grid=json_bool(grid);
         Json optical=json_find(j,"optical_depth_lut");
         if (json_present(optical)) loaded.optical_depth_lut=json_bool(optical);
         loaded.volume_steps=json_uint(json_get(j,"integration_steps"),MIN_RENDER_INTEGRATION_STEPS,MAX_RENDER_INTEGRATION_STEPS);
+        Json quadrature=json_find(j,"quadrature");
+        if (json_present(quadrature))
+        {
+            char name[32]={};json_string(quadrature,name,sizeof(name));
+            if (strcmp(name,"gauss_legendre")==0) loaded.volume_gauss=true;
+            else if (strcmp(name,"midpoint")!=0) json_error(quadrature,"quadrature must be midpoint or gauss_legendre");
+            if (loaded.volume_gauss && loaded.volume_steps!=2 && loaded.volume_steps!=3)
+                json_error(quadrature,"Gauss-Legendre quadrature requires two or three integration steps");
+        }
         loaded.volume_rays_per_pixel=json_uint(json_get(j,"rays_per_pixel"),0,MAX_RENDER_RAYS_PER_PIXEL);
     }
     {

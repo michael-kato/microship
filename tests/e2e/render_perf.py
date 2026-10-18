@@ -11,8 +11,9 @@ p.add_argument('binary',type=Path);p.add_argument('--baseline',type=Path,require
 p.add_argument('--case',choices=('near','normal','grown','inside','far','overlap','boundary','opaque'),default='near')
 p.add_argument('--samples',type=int,choices=(1,2,3,6),default=6)
 p.add_argument('--baseline-samples',type=int,choices=(1,2,3,6))
-p.add_argument('--volume-steps',type=int,choices=(2,3,4,8),default=8)
-p.add_argument('--baseline-volume-steps',type=int,choices=(2,3,4,8))
+p.add_argument('--quadrature',choices=('midpoint','gauss_legendre'),default='midpoint')
+p.add_argument('--volume-steps',type=int,choices=(2,3,4,8,32),default=8)
+p.add_argument('--baseline-volume-steps',type=int,choices=(2,3,4,8,32))
 p.add_argument('--quality-comparison',action='store_true',help='Report intentional sampling differences without the exact-refactor image limit')
 p.add_argument('--blur-profile',choices=('authored','linear','off'),default='authored')
 p.add_argument('--subgroup-size',type=int,choices=(0,32,64),default=32)
@@ -41,6 +42,8 @@ for pair in range(a.pairs):
  for variant in ('baseline','current') if (pair+int(a.reverse))%2==0 else ('current','baseline'):
   name=str(pair)+'-'+variant;config=deepcopy(settings)
   config['volume']['integration_steps']=a.volume_steps
+  config['volume'].pop('quadrature',None)
+  if variant=='current' and a.quadrature!='midpoint':config['volume']['quadrature']=a.quadrature
   if variant=='baseline':
    if a.baseline_samples is not None:config['sampling']['samples_per_pixel']=a.baseline_samples
    if a.baseline_volume_steps is not None:config['volume']['integration_steps']=a.baseline_volume_steps

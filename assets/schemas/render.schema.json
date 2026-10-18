@@ -209,13 +209,43 @@
         },
         "lighting_grid": {
           "type": "boolean"
+        },
+        "quadrature": {
+          "enum": [
+            "midpoint",
+            "gauss_legendre"
+          ]
         }
       },
       "required": [
         "rays_per_pixel",
         "integration_steps"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "quadrature"
+            ],
+            "properties": {
+              "quadrature": {
+                "const": "gauss_legendre"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "integration_steps": {
+                "enum": [
+                  2,
+                  3
+                ]
+              }
+            }
+          }
+        }
+      ]
     },
     "tilt_shift": {
       "type": "object",

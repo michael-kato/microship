@@ -1281,7 +1281,7 @@ static bool load_compute_pipeline(RendererState* state, const char* shader_path,
     subgroup.sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO_EXT;
     subgroup.requiredSubgroupSize=state->subgroup_size;
     pipeline.stage.pNext=state->subgroup_size ? &subgroup : 0;
-    uint32_t constants[]={state->config.volume_steps,state->uniform_data.scene[3],state->config.optical_depth_lut ? 1u : 0u,state->config.volume_lighting_grid ? 1u : 0u,state->config.texture_lighting_grid && state->config.shadow_grid_resolution ? 1u : 0u,state->config.organelle_lighting_cache && state->uniform_data.scene[3] ? 1u : 0u,state->config.subsurface_strength>0.0f && !no_subsurface ? 1u : 0u,state->config.samples_per_pixel==1 && state->config.volume_rays_per_pixel==1 ? 1u : 0u};
+    uint32_t constants[]={state->config.volume_steps,state->uniform_data.scene[3],state->config.optical_depth_lut ? 1u : 0u,state->config.volume_lighting_grid ? 1u : 0u,state->config.texture_lighting_grid && state->config.shadow_grid_resolution ? 1u : 0u,state->config.organelle_lighting_cache && state->uniform_data.scene[3] ? 1u : 0u,state->config.subsurface_strength>0.0f && !no_subsurface ? 1u : 0u,state->config.samples_per_pixel==1 && state->config.volume_rays_per_pixel==1 ? 1u : 0u,state->config.volume_gauss ? 1u : 0u};
     VkSpecializationMapEntry entries[]={
         {VOLUME_STEPS_SPECIALIZATION_ID,0,sizeof(uint32_t)},
         {LIGHTING_CACHE_SPECIALIZATION_ID,sizeof(uint32_t),sizeof(uint32_t)},
@@ -1290,8 +1290,9 @@ static bool load_compute_pipeline(RendererState* state, const char* shader_path,
         {LIGHTING_TEXTURE_SPECIALIZATION_ID,4*sizeof(uint32_t),sizeof(uint32_t)},
         {ORGANELLE_CACHE_SPECIALIZATION_ID,5*sizeof(uint32_t),sizeof(uint32_t)},
         {SUBSURFACE_ENABLED_SPECIALIZATION_ID,6*sizeof(uint32_t),sizeof(uint32_t)},
-        {FUSED_VOLUME_SPECIALIZATION_ID,7*sizeof(uint32_t),sizeof(uint32_t)}};
-    VkSpecializationInfo specialization={8,entries,sizeof(constants),constants};
+        {FUSED_VOLUME_SPECIALIZATION_ID,7*sizeof(uint32_t),sizeof(uint32_t)},
+        {VOLUME_GAUSS_SPECIALIZATION_ID,8*sizeof(uint32_t),sizeof(uint32_t)}};
+    VkSpecializationInfo specialization={9,entries,sizeof(constants),constants};
     // Built-in pipelines use the startup count. External shaders keep their own contract.
     pipeline.stage.pSpecializationInfo=state->custom_shader ? 0 : &specialization;
     bool success = vk_ok(vkCreateComputePipelines(state->device, VK_NULL_HANDLE, 1, &pipeline, 0, output_pipeline), "Create compute pipeline");
@@ -1940,8 +1941,8 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
         config->width,config->height,config->samples_per_pixel,config->max_transmission_layers,state->triangle_count);
     printf("Sampling: fixed mirrored film points; no stochastic surface transport, denoising, or temporal history.\n");
     printf("Subsurface: %.2f strength; %u existing film samples; one strongest back light; current geometry.\n",config->subsurface_strength,config->subsurface_samples);
-    printf("Volumes: %u film rays; %u midpoint integration steps; analytic ambient fill; ray-traced studio shadows.\n",
-        config->volume_rays_per_pixel,config->volume_steps);
+    printf("Volumes: %u film rays; %u %s integration steps; analytic ambient fill; ray-traced studio shadows.\n",
+        config->volume_rays_per_pixel,config->volume_steps,config->volume_gauss ? "Gauss-Legendre" : "midpoint");
     printf("Optical depth: %s; %ux%u x %u R32F layers; %llu bytes plus upload storage.\n",
         config->optical_depth_lut && !state->custom_shader ? "lookup" : "midpoint",state->optical_depth_size,state->optical_depth_size,state->optical_depth_layers,
         (unsigned long long)state->optical_depth_upload.size);
