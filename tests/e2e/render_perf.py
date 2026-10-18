@@ -9,16 +9,22 @@ from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('binary',type=Path);p.add_argument('--baseline',type=Path,required=True)
 p.add_argument('--case',choices=('near','normal','grown','inside','far','overlap','boundary','opaque'),default='near')
-p.add_argument('--samples',type=int,choices=(3,6),default=6)
+p.add_argument('--samples',type=int,choices=(1,2,3,6),default=6)
+p.add_argument('--baseline-samples',type=int,choices=(1,2,3,6))
+p.add_argument('--volume-steps',type=int,choices=(2,3,4,8),default=8)
+p.add_argument('--baseline-volume-steps',type=int,choices=(2,3,4,8))
+p.add_argument('--quality-comparison',action='store_true',help='Report intentional sampling differences without the exact-refactor image limit')
 p.add_argument('--blur-profile',choices=('authored','linear','off'),default='authored')
 p.add_argument('--subgroup-size',type=int,choices=(0,32,64),default=32)
 p.add_argument('--baseline-subgroup-size',type=int,choices=(0,32,64))
+p.add_argument('--frames',type=int,choices=(2,120),default=2,help='120 needs the user-authorized sustained performance check')
 p.add_argument('--pairs',type=int,choices=(1,3),default=1)
 p.add_argument('--reverse',action='store_true')
 p.add_argument('--no-capture',action='store_true')
 p.add_argument('--timing',action='store_true');p.add_argument('--run',action='store_true')
 p.add_argument('--output',type=Path,default=root/'build/render-perf');a=p.parse_args()
 if a.no_capture and not a.timing:p.error('--no-capture requires --timing')
+if a.frames>2 and (not a.timing or not a.no_capture):p.error('Sustained checks require --timing --no-capture')
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 subprocess.run([sys.executable,str(root/'tests/e2e/static_lighting.py'),str(a.binary),'--case',a.case,'--variants','cached','--output',str(out)],check=True,stdout=subprocess.PIPE,text=True)
 base=json.loads((out/'commands.json').read_text())[0][1]
@@ -34,12 +40,17 @@ commands=[]
 for pair in range(a.pairs):
  for variant in ('baseline','current') if (pair+int(a.reverse))%2==0 else ('current','baseline'):
   name=str(pair)+'-'+variant;config=deepcopy(settings)
+  config['volume']['integration_steps']=a.volume_steps
+  if variant=='baseline':
+   if a.baseline_samples is not None:config['sampling']['samples_per_pixel']=a.baseline_samples
+   if a.baseline_volume_steps is not None:config['volume']['integration_steps']=a.baseline_volume_steps
   config['lighting'].pop('subgroup_size',None)
   if variant=='current':config['lighting']['subgroup_size']=a.subgroup_size
   elif a.baseline_subgroup_size is not None:config['lighting']['subgroup_size']=a.baseline_subgroup_size
   cp=out/(name+'-render.json');cp.write_text(json.dumps(config,indent=2)+'\n')
   binary=(a.baseline if variant=='baseline' else a.binary).resolve()
   command=list(base)
+  command[command.index('--frames')+1]=str(a.frames)
   if binary.suffix.lower()!='.exe' and sys.platform!='win32':command=[str(binary)]+command[command.index('--world'):]
   else:command[command.index(str(a.binary.resolve()))]=str(binary)
   for flag,value in (('--config',cp),('--capture',out/(name+'.ppm')),('--state',out/(name+'-state.json'))):command[command.index(flag)+1]=str(value)
@@ -51,12 +62,12 @@ if not a.run:
  print('Prepared',len(commands),'sequential native 1080p two-frame application runs;',a.samples,'film + 1 volume + 1 backdrop starts. 2s/process, 5s/batch, no hardware tracing. No GPU work started.')
  raise SystemExit(0)
 check_gpu_environment();env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1'
-report={'capture':not a.no_capture,'case':a.case,'blur_profile':a.blur_profile,'samples':a.samples,'validation':not a.timing,'runs':{}}
+report={'frames':a.frames,'capture':not a.no_capture,'case':a.case,'blur_profile':a.blur_profile,'samples':a.samples,'volume_steps':a.volume_steps,'baseline_samples':a.baseline_samples,'baseline_volume_steps':a.baseline_volume_steps,'quality_comparison':a.quality_comparison,'validation':not a.timing,'runs':{}}
 started=time.monotonic()
 for name,command in commands:
- remaining=5-(time.monotonic()-started);assert remaining>0,'GPU batch expired'
+ remaining=(20 if a.frames>2 else 5)-(time.monotonic()-started);assert remaining>0,'GPU batch expired'
  before=time.monotonic();process=subprocess.Popen(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
- try:output,errors=process.communicate(timeout=min(2,remaining))
+ try:output,errors=process.communicate(timeout=min(8 if a.frames>2 else 2,remaining))
  except subprocess.TimeoutExpired:
   if sys.platform=='win32':process.terminate()
   else:os.killpg(process.pid,signal.SIGTERM)
@@ -72,10 +83,10 @@ for name,command in commands:
  assert expected in output
  labels={'surface':'GPU surface','volume':'GPU volumes','grid':'GPU shadow grid','bake':'GPU static lighting bake','gpu':'total render','app':'Application frame','fog_focus_display':'GPU fog/bloom/display','cell_blur':'GPU medium blur','backdrop':'GPU backdrop'}
  frames={key:list(map(float,re.findall(re.escape(label)+r': ([0-9.]+) ms',output))) for key,label in labels.items()}
- assert all(len(v)==2 for v in frames.values()),frames
+ assert all(len(v)==a.frames for v in frames.values()),frames
  if name.endswith('current'):assert 'Compute subgroups: '+str(a.subgroup_size)+' ' in output
  cache=re.findall(r'Static lighting: (\d+) baked, (\d+) reused;',output)
- assert len(cache)==2 and int(cache[1][0])==0 and int(cache[1][1])>0,cache
+ assert len(cache)==a.frames and int(cache[1][0])==0 and int(cache[1][1])>0,cache
  report['runs'][name]=dict(seconds=time.monotonic()-before,frames_ms=frames)
 report['batch_seconds']=time.monotonic()-started
 images={};state=None
@@ -99,9 +110,15 @@ report['summary']={}
 for key in report['runs']['0-baseline']['frames_ms']:
  values={variant:[report['runs'][str(pair)+'-'+variant]['frames_ms'][key][-1] for pair in range(a.pairs)] for variant in ('baseline','current')}
  report['summary'][key]=dict(values_ms=values,median_ms={v:statistics.median(values[v]) for v in values},paired_savings_ms=[x-y for x,y in zip(values['baseline'],values['current'])])
+if a.frames>2:
+ report['steady']={}
+ for variant in ('baseline','current'):
+  samples={key:[v for pair in range(a.pairs) for v in report['runs'][str(pair)+'-'+variant]['frames_ms'][key][20:]] for key in ('surface','volume','gpu','app')}
+  report['steady'][variant]={key:dict(count=len(v),median_ms=statistics.median(v),p95_ms=sorted(v)[int(.95*(len(v)-1))],max_ms=max(v)) for key,v in samples.items()}
+ print('Steady:',report['steady'])
 (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
 print('Image difference:',report['image_difference'])
 for key in ('surface','volume','fog_focus_display','gpu','app'):print(key,report['summary'][key])
 print('Batch seconds:',report['batch_seconds'])
-if not a.no_capture:
+if not a.no_capture and not a.quality_comparison:
  assert report['image_difference']['mean_rgb8']<.02 and report['image_difference']['max_rgb8']<=2,'Image difference exceeds the comparison limit'

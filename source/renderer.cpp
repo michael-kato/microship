@@ -1281,7 +1281,7 @@ static bool load_compute_pipeline(RendererState* state, const char* shader_path,
     subgroup.sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO_EXT;
     subgroup.requiredSubgroupSize=state->subgroup_size;
     pipeline.stage.pNext=state->subgroup_size ? &subgroup : 0;
-    uint32_t constants[]={state->config.volume_steps,state->uniform_data.scene[3],state->config.optical_depth_lut ? 1u : 0u,state->config.volume_lighting_grid ? 1u : 0u,state->config.texture_lighting_grid && state->config.shadow_grid_resolution ? 1u : 0u,state->config.organelle_lighting_cache && state->uniform_data.scene[3] ? 1u : 0u,state->config.subsurface_strength>0.0f && !no_subsurface ? 1u : 0u};
+    uint32_t constants[]={state->config.volume_steps,state->uniform_data.scene[3],state->config.optical_depth_lut ? 1u : 0u,state->config.volume_lighting_grid ? 1u : 0u,state->config.texture_lighting_grid && state->config.shadow_grid_resolution ? 1u : 0u,state->config.organelle_lighting_cache && state->uniform_data.scene[3] ? 1u : 0u,state->config.subsurface_strength>0.0f && !no_subsurface ? 1u : 0u,state->config.samples_per_pixel==1 && state->config.volume_rays_per_pixel==1 ? 1u : 0u};
     VkSpecializationMapEntry entries[]={
         {VOLUME_STEPS_SPECIALIZATION_ID,0,sizeof(uint32_t)},
         {LIGHTING_CACHE_SPECIALIZATION_ID,sizeof(uint32_t),sizeof(uint32_t)},
@@ -1289,8 +1289,9 @@ static bool load_compute_pipeline(RendererState* state, const char* shader_path,
         {VOLUME_LIGHTING_GRID_SPECIALIZATION_ID,3*sizeof(uint32_t),sizeof(uint32_t)},
         {LIGHTING_TEXTURE_SPECIALIZATION_ID,4*sizeof(uint32_t),sizeof(uint32_t)},
         {ORGANELLE_CACHE_SPECIALIZATION_ID,5*sizeof(uint32_t),sizeof(uint32_t)},
-        {SUBSURFACE_ENABLED_SPECIALIZATION_ID,6*sizeof(uint32_t),sizeof(uint32_t)}};
-    VkSpecializationInfo specialization={7,entries,sizeof(constants),constants};
+        {SUBSURFACE_ENABLED_SPECIALIZATION_ID,6*sizeof(uint32_t),sizeof(uint32_t)},
+        {FUSED_VOLUME_SPECIALIZATION_ID,7*sizeof(uint32_t),sizeof(uint32_t)}};
+    VkSpecializationInfo specialization={8,entries,sizeof(constants),constants};
     // Built-in pipelines use the startup count. External shaders keep their own contract.
     pipeline.stage.pSpecializationInfo=state->custom_shader ? 0 : &specialization;
     bool success = vk_ok(vkCreateComputePipelines(state->device, VK_NULL_HANDLE, 1, &pipeline, 0, output_pipeline), "Create compute pipeline");
@@ -2170,7 +2171,8 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     vkCmdDispatch(state->command, (state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, (state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, 1);
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_SURFACE_END);
     if (renderer->debug_views || scene->guides_required || uniform->quality[3] || state->config.focus_radius>0) shader_buffer_barrier(state->command);
-    if (uniform->quality[0] && uniform->scene[1])
+    if (uniform->quality[0] && uniform->scene[1]
+        && (state->custom_shader || state->config.samples_per_pixel!=1 || state->config.volume_rays_per_pixel!=1))
     {
         image_barrier(state->command,state->hdr,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
             VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,

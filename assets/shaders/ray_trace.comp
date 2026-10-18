@@ -49,6 +49,7 @@ layout(constant_id=VOLUME_LIGHTING_GRID_SPECIALIZATION_ID) const bool volume_lig
 layout(constant_id=LIGHTING_TEXTURE_SPECIALIZATION_ID) const bool texture_lighting_grid=false;
 layout(constant_id=ORGANELLE_CACHE_SPECIALIZATION_ID) const bool organelle_lighting_cache=false;
 layout(constant_id=SUBSURFACE_ENABLED_SPECIALIZATION_ID) const bool subsurface_enabled=true;
+layout(constant_id=FUSED_VOLUME_SPECIALIZATION_ID) const bool fused_volume=false;
 layout(set=0,binding=RENDER_BINDING_LIGHTING_TEXTURE) uniform sampler3D lighting_texture;
 layout(set=0,binding=RENDER_BINDING_OPTICAL_DEPTH) uniform sampler2DArray optical_depth_table;
 
@@ -237,7 +238,7 @@ float medium_sharp_limit(vec3 direction)
     return limit;
 }
 
-vec3 film_sharp_sum=vec3(0);
+vec3 film_sharp_sum=vec3(0),film_volume=vec3(0);
 float film_blur_max=0.0;
 layout(set=0,binding=RENDER_BINDING_SHARP_LAYER,std430) buffer SharpLayer { vec4 sharp_pixels[]; };
 
@@ -785,6 +786,7 @@ float backdrop_remaining(vec3 origin,vec3 direction,uvec2 pixel)
 vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float subsurface_sample_weight)
 {
     vec3 radiance=vec3(0),weight=vec3(1);float path_distance=0;bool through_wall=false;
+    float sharp_limit=fused_volume ? medium_sharp_limit(direction) : RAY_MAX;
     // The limit counts transparent crossings. An opaque surface after the last
     // allowed crossing can still be shaded. Exhaustion does not reveal the sky.
     for (uint layer=0u;layer<=render.settings.w;++layer)
@@ -793,6 +795,12 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
         bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
         if (!hit && render.backdrop_style.x>0.0)
             distance=backdrop_remaining(origin,direction,pixel);
+        if (fused_volume && render.quality.x>0u)
+        {
+            vec3 sharp;
+            vec3 volume=weight*single_scattering(origin,direction,distance,sharp_limit,sharp);
+            radiance+=volume;film_volume+=volume;film_sharp_sum+=weight*sharp;
+        }
         weight*=transmittance(origin,direction,distance);
         path_distance+=distance;
         float blur_radius=max(medium_blur_radius(direction,path_distance),through_wall ? render.membrane_fade.z : 0.0);
@@ -1032,7 +1040,7 @@ void main()
     debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(debug_vertex_hit,debug_normal_depth,
         vec4(debug_direct/float(sample_count),float(debug_primary_hits)/float(sample_count)),
         vec4(sum/float(sample_count),float(debug_closest_queries)),
-        vec4(0,0,0,float(debug_shadow_queries)),vec4(debug_sss/float(sample_count),film_blur_max));
+        vec4(film_volume/float(sample_count),float(debug_shadow_queries)),vec4(debug_sss/float(sample_count),film_blur_max));
 #endif
 #else
     // The surface pass overwrites HDR before this pass. Skip empty-space pixels

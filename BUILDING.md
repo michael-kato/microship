@@ -338,3 +338,13 @@ flushes. Three alternating close-view pairs without capture measured
 to 25.625 ms, so this change reduces CPU output cost only. A validated
 two-frame window check restored all feature controls and reproduced the
 reference image below the timing panel.
+
+For one film sample and one volume ray, the bundled shader integrates
+surface and volume light in the same camera traversal. Other sample
+settings and external shaders retain separate passes. The volume hotkey
+still removes scattering while it keeps attenuation. Near, inside and
+overlapping-medium application checks compare the two paths at identical
+sampling. In a 120-frame close-view check, the last 100 frames changed
+from 10.983 to 10.473 ms median application time and from 11.514 to
+10.614 ms at the 95th percentile. This does not change the default six-film
+quality setting.
