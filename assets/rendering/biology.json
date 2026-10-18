@@ -6,9 +6,10 @@
     "exposure": 1.6
   },
   "sampling": {
-    "samples_per_pixel": 6,
+    "samples_per_pixel": 1,
     "seed": 1,
-    "max_transmission_layers": 8
+    "max_transmission_layers": 8,
+    "spatial_antialiasing": true
   },
   "geometry": {
     "sphere_segments": 64,
@@ -37,7 +38,7 @@
   },
   "lighting": {
     "microfacet_energy_compensation": true,
-    "shadow_grid_resolution": 32,
+    "shadow_grid_resolution": 16,
     "static_lighting_cache": true,
     "texture_grid": true,
     "subgroup_size": 32
@@ -49,9 +50,12 @@
   },
   "volume": {
     "rays_per_pixel": 1,
-    "integration_steps": 8,
+    "integration_steps": 3,
     "optical_depth_lut": true,
-    "lighting_grid": true
+    "lighting_grid": true,
+    "quadrature": "gauss_legendre",
+    "spatial_filter": true,
+    "spatial_stride": 4
   },
   "tilt_shift": {
     "focus_center": 0.52,

@@ -28,7 +28,7 @@ a=p.parse_args()
 if 'baseline' in a.variants and not a.baseline:p.error('Baseline variant requires --baseline')
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 world=stage_world(a.world.resolve(),out)
-settings=json.loads((root/'assets/rendering/biology.json').read_text())
+settings=json.loads((root/'assets/rendering/biology-quality.json').read_text())
 settings['sampling']['samples_per_pixel']=3
 assert settings['output']['width']==1920 and settings['output']['height']==1080
 assert all(settings['volume'][k]==v for k,v in dict(rays_per_pixel=1,integration_steps=8).items())

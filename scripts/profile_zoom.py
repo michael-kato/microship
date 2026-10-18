@@ -25,9 +25,9 @@ mode=parser.add_mutually_exclusive_group();mode.add_argument('--cpu',action='sto
 args=parser.parse_args();binary=args.binary.resolve();out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 base=stage_world(root/'assets/levels/biology-virus.json',out)
-config=json.loads((root/'assets/rendering/biology.json').read_text())
+config=json.loads((root/'assets/rendering/biology-quality.json').read_text())
 assert config['output']['width']==1920 and config['output']['height']==1080
-assert config['sampling']['samples_per_pixel']==6 and config['volume']==dict(rays_per_pixel=1,integration_steps=8)
+assert config['sampling']['samples_per_pixel']==6 and all(config['volume'][k]==v for k,v in dict(rays_per_pixel=1,integration_steps=8).items())
 if not 0<args.process_seconds<=10 or not 0<args.batch_seconds<=30:parser.error('Process and batch limits must be in (0,10] and (0,30] seconds')
 # BUILDING.md's current ordinary budget is reduced. Higher budgets need explicit approval.
 config['sampling']['samples_per_pixel']=args.film_samples

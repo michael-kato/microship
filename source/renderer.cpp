@@ -1968,7 +1968,7 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
         state->lighting_extent.width,state->lighting_extent.height,state->lighting_extent.depth,
         (unsigned long long)state->lighting_extent.width*state->lighting_extent.height*state->lighting_extent.depth*4*sizeof(float),
         config->organelle_lighting_cache && state->uniform_data.scene[3] ? "baked with live fallback" : "live");
-    printf("Current-frame guides: %llu bytes; no history or upscaling.\n",(unsigned long long)state->debug_pixels.size);
+    printf("Current-frame guides: %llu bytes; no frame history; native surfaces and output.\n",(unsigned long long)state->debug_pixels.size);
     return true;
 }
 

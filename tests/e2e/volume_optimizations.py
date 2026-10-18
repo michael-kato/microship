@@ -42,7 +42,7 @@ for body in data['bodies']:
     if 'medium' not in body:continue
     if args.depth_blur=='off':body['medium'].pop('depth_blur',None)
     if args.weak_medium:body['medium'].update(scattering=[.035,.045,.04],absorption=.012)
-config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3
+config=json.loads((root/'assets/rendering/biology-quality.json').read_text());config['sampling']['samples_per_pixel']=3
 # Keep strict legacy comparisons on the unbaked path.
 config['lighting'].pop('texture_grid',None);config['lighting'].pop('static_lighting_cache',None);config['lighting'].pop('force_lighting_rebuild',None)
 config['lighting'].pop('subgroup_size',None)

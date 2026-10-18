@@ -11,14 +11,17 @@ p.add_argument('--native',type=Path,default=root/'build/linux-diagnostic/nanova'
 p.add_argument('--platforms',nargs='+',choices=('proton10','proton11','native'),default=('proton10','proton11','native'))
 p.add_argument('--case',choices=('near','normal','grown','inside','far','overlap','boundary','opaque'),default='near')
 p.add_argument('--pairs',type=int,choices=(1,3),default=1)
-p.add_argument('--samples',type=int,choices=(3,6),default=6)
+p.add_argument('--samples',type=int,choices=(1,3,6))
+p.add_argument('--config',type=Path,help='Use a named render config; default is the fixed six-film quality reference')
 p.add_argument('--timing',action='store_true');p.add_argument('--no-capture',action='store_true')
 p.add_argument('--run',action='store_true');p.add_argument('--output',type=Path,default=root/'build/platform-perf');a=p.parse_args()
 if a.no_capture and not a.timing:p.error('--no-capture requires --timing')
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 subprocess.run([sys.executable,str(root/'tests/e2e/static_lighting.py'),str(a.windows),'--case',a.case,'--variants','cached','--output',str(out)],check=True,stdout=subprocess.PIPE,text=True)
 base=json.loads((out/'commands.json').read_text())[0][1]
-cp=Path(base[base.index('--config')+1]);config=json.loads(cp.read_text());config['sampling']['samples_per_pixel']=a.samples;cp.write_text(json.dumps(config,indent=2)+'\n')
+cp=Path(base[base.index('--config')+1]);config=json.loads(a.config.read_text() if a.config else cp.read_text())
+if a.samples is None:a.samples=config['sampling']['samples_per_pixel'] if a.config else 6
+config['sampling']['samples_per_pixel']=a.samples;cp.write_text(json.dumps(config,indent=2)+'\n')
 arguments=base[base.index('--world'):];commands=[];steam=Path.home()/'.local/share/Steam/steamapps/common'
 versions={};prefixes={'proton10':root/'build/proton-prefix','proton11':root/'build/proton11-prefix'}
 for platform in a.platforms:
@@ -39,7 +42,7 @@ for pair in range(a.pairs):
 (out/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
 if not a.run:
  print('Prepared',len(commands),'sequential native 1080p two-frame runs;',a.samples,'film + 1 volume + 1 backdrop starts. 2s/process, 5s/batch; no hardware tracing. No GPU work started.');raise SystemExit(0)
-check_gpu_environment();started=time.monotonic();report=dict(versions=versions,capture=not a.no_capture,validation=not a.timing,runs={})
+check_gpu_environment();started=time.monotonic();report=dict(versions=versions,render_settings=config,capture=not a.no_capture,validation=not a.timing,runs={})
 for name,platform,command in commands:
  env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1'
  if platform!='native':

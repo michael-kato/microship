@@ -17,18 +17,22 @@ p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('binary',type=Path)
 p.add_argument('--renderdoc',type=Path,default=Path('/opt/renderdoc_1.44'))
 p.add_argument('--world',type=Path,default=root/'assets/levels/biology-virus.json')
-p.add_argument('--samples',type=int,choices=(3,6),default=6)
+p.add_argument('--samples',type=int,choices=(1,3,6),default=6)
+p.add_argument('--config',type=Path,default=root/'assets/rendering/biology-quality.json')
+p.add_argument('--cold-start',action='store_true')
 p.add_argument('--sss',choices=('on','off'),default='on')
 p.add_argument('--subgroup-size',type=int,choices=(0,32,64))
 p.add_argument('--run',action='store_true')
 p.add_argument('--output',type=Path,default=root/'build/renderdoc-profile')
 a=p.parse_args()
+process_limit=10 if a.cold_start else 2
+batch_limit=30 if a.cold_start else 5
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 renderdoc=a.renderdoc.resolve();binary=a.binary.resolve()
 world=stage_world(a.world.resolve(),out);wp=out/'world.json';write_world(wp,world)
-config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=a.samples
+config=json.loads(a.config.read_text());config['sampling']['samples_per_pixel']=a.samples
 assert config['output']['width']==1920 and config['output']['height']==1080
-assert config['volume']['rays_per_pixel']==1 and config['volume']['integration_steps']==8
+assert config['volume']['rays_per_pixel']==1 and 2<=config['volume']['integration_steps']<=32
 if a.sss=='off':config['subsurface']['strength']=0
 if a.subgroup_size==0:config['lighting'].pop('subgroup_size',None)
 elif a.subgroup_size is not None:config['lighting']['subgroup_size']=a.subgroup_size
@@ -38,7 +42,7 @@ command=([sys.executable,str(root/'scripts/proton_run.py'),str(binary)] if binar
     '--camera-zoom','1000','--capture',str(out/'display.ppm'),'--state',str(out/'state.json')]
 (out/'command.json').write_text(json.dumps(command,indent=2)+'\n')
 if not a.run:
-    print('Prepared RenderDoc: native 1920x1080,',a.samples,'film + 1 volume + 1 backdrop starts; two game frames; capture frame two. One bounded replay process collects standard counters and compiler data. 2s/process, 5s/batch; no hardware tracing. No GPU work started.')
+    print('Prepared RenderDoc: native 1920x1080,',a.samples,'film + 1 volume grid + 1 backdrop starts; two game frames; capture frame two. One bounded replay collects standard counters and compiler data.',process_limit,'s/process,',batch_limit,'s/batch; no hardware tracing. No GPU work started.')
     raise SystemExit(0)
 check_gpu_environment()
 subprocess.run(['cc','-shared','-fPIC','-O2','-Wall','-Wextra','-I',str(renderdoc/'include'),
@@ -52,11 +56,11 @@ env.update(NANOVA_RENDERDOC_LIBRARY=str(renderdoc/'lib/librenderdoc.so'),NANOVA_
     VK_LAYER_PATH=str(layers),VK_INSTANCE_LAYERS=layer['name'],DISABLE_VULKAN_RENDERDOC_CAPTURE_1_44='1')
 started=time.monotonic()
 def run(name,args,environment):
-    remaining=5-(time.monotonic()-started)
-    if remaining<=0:raise RuntimeError('Five-second RenderDoc batch expired')
+    remaining=batch_limit-(time.monotonic()-started)
+    if remaining<=0:raise RuntimeError('RenderDoc batch expired')
     before=time.monotonic()
     process=subprocess.Popen(args,env=environment,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
-    try:stdout,stderr=process.communicate(timeout=min(2,remaining))
+    try:stdout,stderr=process.communicate(timeout=min(process_limit,remaining))
     except subprocess.TimeoutExpired:
         os.killpg(process.pid,signal.SIGTERM)
         try:stdout,stderr=process.communicate(timeout=.2)
@@ -77,8 +81,8 @@ replay_env.update(NANOVA_RENDERDOC_OUTPUT=str(out),NANOVA_RENDERDOC_CAPTURE_FILE
 replay_seconds=run('replay',[str(renderdoc/'bin/qrenderdoc'),'--python',str(root/'scripts/renderdoc_analyze.py')],replay_env)
 report=json.loads((out/'analysis.json').read_text());assert 'error' not in report,report.get('error')
 report.update(capture_seconds=capture_seconds,replay_seconds=replay_seconds,batch_seconds=time.monotonic()-started,
-    samples=a.samples,sss=a.sss,width=1920,height=1080,capture_bytes=capture.stat().st_size,
-    limits='Two game frames; one captured frame; one bounded replay process; 2s/process, 5s/batch; no hardware tracing.')
+    samples=a.samples,render_settings=config,sss=a.sss,width=1920,height=1080,capture_bytes=capture.stat().st_size,
+    limits=f'Two game frames; one captured frame; one bounded replay process; {process_limit}s/process, {batch_limit}s/batch; no hardware tracing.')
 (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
 archive_capture(out/'display.ppm','renderdoc-'+a.sss+'-'+str(a.samples)+'-film')
 print('Capture:',capture)

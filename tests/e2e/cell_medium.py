@@ -62,6 +62,21 @@ with tempfile.TemporaryDirectory(prefix='nanova-medium-') as directory:
     for value in (1,16,31,33,65,True):
         config=deepcopy(settings);config['lighting']['subgroup_size']=value
         run('bad-subgroup-'+str(value),data,config=config,expected=1)
+    for mode,n in [('midpoint',8),('gauss_legendre',2),('gauss_legendre',3)]:
+        config=deepcopy(settings);config['volume'].update(quadrature=mode,integration_steps=n)
+        assert run('quadrature-'+mode+str(n),data,4800,orders,config)[0]==baseline
+    for stride in (2,4):
+        config=deepcopy(settings);config['volume'].update(spatial_filter=True,spatial_stride=stride)
+        assert run('spatial-volume-'+str(stride),data,4800,orders,config)[0]==baseline
+    for section,field in [('sampling','spatial_antialiasing'),('volume','spatial_filter')]:
+        for value in (False,True):
+            config=deepcopy(settings);config[section][field]=value
+            assert run('spatial-'+field+str(value),data,4800,orders,config)[0]==baseline
+        config=deepcopy(settings);config[section][field]=1
+        run('bad-spatial-'+field,data,config=config,expected=1)
+    for field,value in [('spatial_stride',3),('spatial_stride',True),('spatial_stride',5),('rays_per_pixel',0),('rays_per_pixel',2),('quadrature','unknown'),('quadrature',True),('integration_steps',8)]:
+        config=deepcopy(settings);config['volume'].update(quadrature='gauss_legendre',integration_steps=3,spatial_filter=True)
+        config['volume'][field]=value;run('bad-volume-mode-'+str(count),data,config=config,expected=1)
     # Optional focus settings must not affect simulation or geometry.
     config=deepcopy(settings);config.pop('tilt_shift')
     s,_=run('focus-off',data,4800,orders,config);assert s==baseline

@@ -19,7 +19,7 @@ python3 scripts/proton_run.py build/windows-cross/nanova.exe --world assets/leve
 
 `biology-fungus.json` and `biology-swarm.json` are faction trials. `--world-seed N` fixes the variation seed. `--smoke` loads assets, runs the simulation, builds render input, and shuts down without a GPU. `--state PATH.json` and `--scene-state PATH.json` export diagnostics.
 
-All checks use the real application. Keep native 1920×1080, three film samples, one volume film ray, and one backdrop query. Each GPU process can use at most two frames and 2 seconds; a sequential batch can use at most 5 seconds. See [PROFILING.md](PROFILING.md) for commands and validation limits.
+All checks use the real application. Short GPU checks keep native 1920×1080, at most six film samples, one volume film ray or grid sample, and one backdrop query. Each ordinary process uses at most two frames and two seconds, with five seconds per sequential batch. Longer startup and performance limits are described below. See [PROFILING.md](PROFILING.md) for commands and validation limits.
 
 To record flight paths, run `python3 tests/e2e/navigation.py build/windows-cross/nanova.exe --output build/navigation`. With Matplotlib installed, run `python3 scripts/plot_flight.py build/navigation/paths.json --output build/navigation/flight-paths.svg`. The plot joins measured half-second positions.
 
@@ -257,8 +257,9 @@ Run the fixed-quality comparison with a saved executable and its assets:
 python3 tests/e2e/render_perf.py build/windows-cross/nanova.exe --baseline build/render-opt-baseline/nanova.exe --pairs 3 --timing --run
 ```
 
-The default uses six film samples at native 1080p. `--samples 3` selects the
-reduced check. Each GPU process uses two frames and at most two seconds;
+Fixed-quality comparisons use `biology-quality.json` with six film samples
+and eight midpoint steps at native 1080p. `--samples 3` reduces film sampling
+for those comparisons. The game default is described below. Each GPU process uses two frames and at most two seconds;
 the sequential batch has a five-second limit. Omit `--timing` for host
 validation. `--case` selects the existing near, normal, grown, inside,
 far, overlap, boundary or opaque scene. `--subgroup-size 0` checks the
@@ -339,15 +340,15 @@ to 25.625 ms, so this change reduces CPU output cost only. A validated
 two-frame window check restored all feature controls and reproduced the
 reference image below the timing panel.
 
-For one film sample and one volume ray, the bundled shader integrates
+With spatial volume filtering disabled, one film sample and one volume
+ray let the bundled shader integrate
 surface and volume light in the same camera traversal. Other sample
 settings and external shaders retain separate passes. The volume hotkey
 still removes scattering while it keeps attenuation. Near, inside and
 overlapping-medium application checks compare the two paths at identical
 sampling. In a 120-frame close-view check, the last 100 frames changed
 from 10.983 to 10.473 ms median application time and from 11.514 to
-10.614 ms at the 95th percentile. This does not change the default six-film
-quality setting.
+10.614 ms at the 95th percentile. This result used the former six-film quality config, which remains available.
 
 Fog filtering now skips pixels with exactly zero fog. A CPU view check
 can skip the full filter only when every covered visibility-field vertex
@@ -439,3 +440,79 @@ per process, Proton 11, immediate presentation, native 1080p, one film
 sample, spatial edge filtering and a 16-cell shadow field. All major
 effects stayed enabled. The largest measured frame was 11.623 ms, so
 these results do not establish a hard ten-millisecond bound.
+
+## Default performance preset
+
+`assets/rendering/biology.json` now uses one native film sample, current-frame
+directional edge filtering, three Gauss-Legendre volume points, a four-pixel
+volume grid and a 16-cell shadow field. SSS, scattering, cell blur, tilt shift,
+fog, atmosphere and backdrop highlights stay enabled. Static lighting bakes
+keep their dependency checks. There is no temporal reconstruction.
+
+Use the former six-film/eight-step/32-cell settings with:
+
+```sh
+python3 scripts/proton_run.py build/windows-cross/nanova.exe --config assets/rendering/biology-quality.json
+```
+
+The fast preset trades subpixel coverage and scattering/shadow detail for
+time. Its one ray cannot recover every feature covered by six film rays.
+The edge filter improves the measured silhouette error, but cannot replace
+all multisample detail. Use the quality config for visual comparisons.
+Fixed-quality test and profiling tools select that config explicitly.
+`platform_perf.py --config assets/rendering/biology.json` compares the new
+default across platforms.
+
+`render_perf.py --frames 120 --timing --no-capture` uses 20 warm-up frames
+then reports 100 frames per process. `--live --window` adds one fixed game
+tick per frame and real presentation. Both compared builds must support
+`--frame-ticks`. These user-authorized performance runs use at most eight
+seconds per process and twenty seconds per batch. `--cold-start` permits
+the authorized ten-second process/thirty-second batch startup limit,
+with two frames only. Ordinary short checks retain their smaller limits.
+
+The expanded CPU medium check includes malformed spatial settings and
+quality-independent simulation. Its timeout is 45 seconds; the earlier
+30-second run expired after the additional whole-application checks.
+
+## Final default checks
+
+The final close-view default image had mean RGB8 error 0.8595, RMS 1.7600
+and maximum 66 against the six-film quality config. The largest errors
+are at edges; one film sample has less subpixel coverage. This is a quality
+tradeoff. The spatial-volume-only comparisons have much smaller errors
+listed above. The disabled spatial path reproduced the old six-film
+reference exactly.
+
+Windows cross-build, native headless build, smoke, SSS and the expanded
+medium checks pass. The medium check ran for 35.44 seconds. F5–F9 restore
+checks pass at the default. Returning from F2 reproduces a fresh normal
+image exactly below the timing panel. Queued menu close and all three
+faction selections pass. A queued menu-to-game check rendered one
+host-validated native frame with an inactive window and muted test audio.
+The desktop was locked. Physical mouse input and normal foreground
+activation could not be verified. No lock-screen setting was changed.
+
+Native GPU validation passed. Its default-preset image differs from
+Proton 11 in 59 channels by one RGB8 level. Simulation/scene floats differ
+slightly between compilers, so cross-platform determinism is not claimed.
+The native headless live factory check measured about 9.15–9.20 ms median
+application time and 9.26–9.30 ms at the 95th percentile. It does not test
+a native Linux window or live audio. Native Windows remains untested.
+
+RenderDoc captured the actual default programs. Driver reports contain
+`image_bvh64_intersect_ray` in surface, coarse-volume and filter-fallback
+programs. Dispatches are 240×135 groups for native surface/filter work
+and 60×34 groups for the four-pixel volume grid. The 32-lane compiler
+reports have no SGPR or VGPR spills. Compiler subgroup limits are not
+measured occupancy. The instrumented event sum was 9.306 ms; it is not
+application frame time or FPS. The uninstrumented warm window results
+above remain the performance measurement.
+
+Local evidence is in `build/volume-stride-four-grown-steady/`,
+`build/final-fast-native-steady/`, `build/final-fast-platform-validated/`,
+`build/final-preset-quality-reference/`, `build/final-fast-renderdoc/`,
+`build/final-fast-toggles-buffer-return/` and
+`build/final-fast-menu-queue-background/`. Captures are archived in the
+numbered screenshots folder. These are bounded scene checks; they do not
+establish a ten-millisecond maximum for every match or all frame outliers.

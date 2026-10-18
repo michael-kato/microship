@@ -7,18 +7,21 @@ from gpu_environment import check_gpu_environment
 from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('binary',type=Path)
-p.add_argument('--case',choices=('baseline','off','restore','repeat','buffers'),default='off')
+p.add_argument('--samples',type=int,choices=(1,3,6),default=1)
+p.add_argument('--cold-start',action='store_true')
+p.add_argument('--case',choices=('baseline','off','restore','repeat','buffers','buffers-return'),default='off')
 p.add_argument('--output',type=Path,default=root/'build/render-toggles')
 p.add_argument('--reference',type=Path,help='Fresh baseline output folder for exact restoration checks')
 p.add_argument('--run',action='store_true');a=p.parse_args()
+process_limit=10 if a.cold_start else 2
 binary=a.binary.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
-command+=['--no-menu','--frames','2','--frame-delay-ms','250','--samples','3','--stats','--no-activate',
+command+=['--no-menu','--frames','2','--frame-delay-ms','250','--samples',str(a.samples),'--stats','--no-activate',
  '--ticks','600','--time','10','--step-seconds','0','--world-seed','1234','--camera-zoom','1000',
  '--capture',str(out/'display.ppm'),'--state',str(out/'state.json')]
 (out/'command.json').write_text(json.dumps(command,indent=2)+'\n')
 if not a.run:
- print('Prepared one native 1920x1080 two-frame game window, 3 film + 1 volume + 1 backdrop starts; host validation, 2s process, 5s batch, no tracing. No GPU work started.')
+ print('Prepared one native 1920x1080 two-frame game window,',a.samples,'film + 1 volume grid + 1 backdrop starts; host validation,',process_limit,'s process; no tracing. No GPU work started.')
  raise SystemExit(0)
 check_gpu_environment()
 helper=binary.parent/'nanova_input_probe.exe';assert helper.is_file(),'Build nanova_input_probe first'
@@ -38,16 +41,17 @@ helper_process=None
 try:
  before=['pause'];after=[]
  if a.case=='restore':before+=['5','6','7','8','9']
- if a.case=='buffers':before+=['buffers']
+ if a.case in ('buffers','buffers-return'):before+=['buffers']
  if a.case in ('off','restore'):after=['5','6','7','8','9']
  elif a.case=='repeat':after=['repeat']
  elif a.case=='buffers':after=['5']
+ elif a.case=='buffers-return':after=['buffers']
  helper_process=subprocess.Popen([*helper_prefix,'--render-keys',*before,'--next',*after],
   env=helper_env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
- assert ready.wait(max(.01,1.7-(time.monotonic()-started))),'No first frame within input budget'
- helper_output,helper_errors=helper_process.communicate(input='\n',timeout=max(.01,2-(time.monotonic()-started)))
+ assert ready.wait(max(.01,process_limit-.3-(time.monotonic()-started))),'No first frame within input budget'
+ helper_output,helper_errors=helper_process.communicate(input='\n',timeout=max(.01,process_limit-(time.monotonic()-started)))
  assert helper_process.returncode==0,(helper_output,helper_errors)
- process.wait(timeout=max(.01,2-(time.monotonic()-started)))
+ process.wait(timeout=max(.01,process_limit-(time.monotonic()-started)))
 finally:
  if helper_process is not None and helper_process.poll() is None:
   if sys.platform=='win32':helper_process.terminate()
@@ -70,11 +74,11 @@ finally:
 seconds=time.monotonic()-started
 assert process.returncode==0,(output,errors)
 archive_capture(out/'display.ppm','render-toggles-'+a.case)
-assert seconds<=2,seconds
+assert seconds<=process_limit,seconds
 assert 'Vulkan validation: enabled.' in output
 settings=re.findall(r'Render settings: disabled (\d+); SSS (ON|OFF|N/A); volume rays (\d+); cell blur (\d+); tilt radius ([0-9.]+); fog radius ([0-9]+\.[0-9]+)\.',output)
 assert len(settings)==2,settings
-expected={'baseline':[0,0],'off':[0,31],'restore':[31,0],'repeat':[0,0],'buffers':[0,1]}[a.case]
+expected={'baseline':[0,0],'off':[0,31],'restore':[31,0],'repeat':[0,0],'buffers':[0,1],'buffers-return':[0,0]}[a.case]
 assert [int(s[0]) for s in settings]==expected,(settings,expected)
 for s in settings:
  mask=int(s[0]);assert s[1]==('OFF' if mask&1 else 'ON'),s

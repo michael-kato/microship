@@ -54,19 +54,18 @@ try:
     report['shaders']=[]
     shader_folder=Path(os.environ['NANOVA_RENDERDOC_SHADER_FOLDER'])
     known={hashlib.sha256(p.read_bytes()).hexdigest():p.name for p in shader_folder.glob('*.spv')}
-    # Inspect the two expensive programs. These native full-frame dispatches are
-    # distinguished by their captured SPIR-V hashes, not their event positions.
+    # Identify the surface and volume programs by captured SPIR-V hashes.
+    # Spatial-volume programs have different dispatch dimensions.
     for action in actions:
         if not action.flags & rd.ActionFlags.Dispatch:continue
-        if list(action.dispatchDimension)!=[240,135,1]:continue
         controller.SetFrameEvent(action.eventId,False)
         pipeline=controller.GetPipelineState()
         reflection=pipeline.GetShaderReflection(rd.ShaderStage.Compute)
         if reflection is None:continue
         digest=hashlib.sha256(bytes(reflection.rawBytes)).hexdigest()
         name=known.get(digest,'unknown')
-        if name not in ('debug_guide_surface.comp.spv','debug_surface.comp.spv','ray_trace.comp.spv','volume.comp.spv','debug_volume.comp.spv'):continue
-        record=dict(event=action.eventId,shader=name,sha256=digest,threads=list(reflection.dispatchThreadsDimension))
+        if name not in ('debug_guide_surface.comp.spv','debug_surface.comp.spv','ray_trace.comp.spv','volume.comp.spv','debug_volume.comp.spv','volume_coarse.comp.spv','volume_filter.comp.spv'):continue
+        record=dict(event=action.eventId,shader=name,sha256=digest,threads=list(reflection.dispatchThreadsDimension),dispatch=list(action.dispatchDimension))
         target='KHR_pipeline_executable_properties'
         if target in report['disassembly_targets']:
             text=controller.DisassembleShader(pipeline.GetComputePipelineObject(),reflection,target)
@@ -78,9 +77,10 @@ try:
                 match=re.search(r'^'+re.escape(key)+r': (\d+)',text,re.M)
                 if match:record['compiler_statistics'][key]=int(match.group(1))
         report['shaders'].append(record)
-        if len(report['shaders'])==2:break
-    if len(report['shaders'])!=2:
-        raise RuntimeError('Could not identify both full-resolution surface and volume shaders')
+    names={s['shader'] for s in report['shaders']}
+    surface=bool(names&{'debug_guide_surface.comp.spv','debug_surface.comp.spv','ray_trace.comp.spv'})
+    volume=bool(names&{'volume.comp.spv','debug_volume.comp.spv'}) or {'volume_coarse.comp.spv','volume_filter.comp.spv'}<=names
+    if not surface or not volume:raise RuntimeError('Could not identify the surface and volume programs')
     report['replay_analysis_seconds']=time.monotonic()-started
 except BaseException:
     report['error']=traceback.format_exc()
