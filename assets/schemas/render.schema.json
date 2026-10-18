@@ -150,6 +150,14 @@
         },
         "organelle_cache": {
           "type": "boolean"
+        },
+        "subgroup_size": {
+          "type": "integer",
+          "enum": [
+            0,
+            32,
+            64
+          ]
         }
       },
       "required": [

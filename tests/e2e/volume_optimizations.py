@@ -45,6 +45,7 @@ for body in data['bodies']:
 config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3
 # Keep strict legacy comparisons on the unbaked path.
 config['lighting'].pop('texture_grid',None);config['lighting'].pop('static_lighting_cache',None);config['lighting'].pop('force_lighting_rebuild',None)
+config['lighting'].pop('subgroup_size',None)
 if args.tilt_shift=='off':config.pop('tilt_shift',None)
 if args.subsurface=='off':config['subsurface']['strength']=0
 if args.subsurface=='wrap':config['subsurface']['transmission']=0

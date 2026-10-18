@@ -39,7 +39,8 @@
     "microfacet_energy_compensation": true,
     "shadow_grid_resolution": 32,
     "static_lighting_cache": true,
-    "texture_grid": true
+    "texture_grid": true,
+    "subgroup_size": 32
   },
   "bloom": {
     "radius": 32,

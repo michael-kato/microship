@@ -194,7 +194,7 @@ register counts and code statistics from
 `KHR_pipeline_executable_properties`. Compiler subgroup limits are not
 measured occupancy. This setup exposes no AMD hardware stall counters.
 
-In the final six-film close-view captures, the surface pass took
+In the earlier six-film close-view captures, the surface pass took
 20.252 ms with SSS and 15.205 ms with SSS compiled out. Volume took
 7.277 ms and 7.101 ms. The surface program used 216 and 168 vector
 registers. An earlier runtime-only SSS-off test retained the 216-register
@@ -239,3 +239,40 @@ and exact display pixels below the profiler. The timing panel is excluded
 because its measured numbers change between runs. The checks also verify
 that skipped pass timings fall near zero, profiler means restart, and
 valid static lighting is reused. See GAMEPLAY.md for the control details.
+
+
+## Compute execution groups
+
+`lighting.subgroup_size` accepts 0, 32 or 64. Zero or a missing field uses
+the driver choice. The biology config selects 32, measured on the RX 7800
+XT with RADV. This changes execution grouping, not resolution, sample
+counts or the lighting model. The renderer checks the extension, feature,
+stage, size range and group limit before creating the device. An explicit
+unsupported size gives a startup error. Use zero for the driver default.
+External shaders keep the driver choice.
+
+Run the fixed-quality comparison with a saved executable and its assets:
+
+```sh
+python3 tests/e2e/render_perf.py build/windows-cross/nanova.exe --baseline build/render-opt-baseline/nanova.exe --pairs 3 --timing --run
+```
+
+The default uses six film samples at native 1080p. `--samples 3` selects the
+reduced check. Each GPU process uses two frames and at most two seconds;
+the sequential batch has a five-second limit. Omit `--timing` for host
+validation. `--case` selects the existing near, normal, grown, inside,
+far, overlap, boundary or opaque scene. `--subgroup-size 0` checks the
+driver default. Results include image differences, simulation equality,
+second-frame times and each alternating pair. These are short frozen-scene
+checks; they do not establish sustained gameplay or percentile frame time.
+
+The close-view six-film comparison measured median surface time of
+19.865 ms before and 16.072 ms after. Paired savings were 3.728 to
+4.083 ms. Median GPU render time was 31.162 ms and 26.742 ms. All compared
+RGB8 pixels matched exactly. RenderDoc confirmed subgroup size 32 and a
+surface event of 16.038 ms against 19.604 ms for the saved 64-lane build.
+Volume time stayed near 7 ms. The 10 ms total target is still unmet.
+
+RenderDoc accepts `--subgroup-size 0`, `32` or `64` for this comparison.
+Zero omits the new field, so saved executables can use their original
+config contract. See PROFILING.md for the reports and validation limits.

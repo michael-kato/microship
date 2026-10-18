@@ -30,6 +30,7 @@ commands=[]
 for pair in range(a.pairs):
  for variant in a.variants if pair%2==0 else reversed(a.variants):
   name=f'{pair}-{variant}';cfg=json.loads(json.dumps(settings));cfg['volume'].pop('optical_depth_lut',None);cfg['volume'].pop('lighting_grid',None)
+  if variant=='baseline':cfg['lighting'].pop('subgroup_size',None)
   if variant!='baseline':cfg['volume']['optical_depth_lut']=variant!='off'
   if variant in ('grid','grid-refresh'):cfg['volume']['lighting_grid']=True
   cfg['lighting'].pop('texture_grid',None);cfg['lighting'].pop('organelle_cache',None)

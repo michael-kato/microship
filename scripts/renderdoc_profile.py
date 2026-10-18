@@ -19,6 +19,7 @@ p.add_argument('--renderdoc',type=Path,default=Path('/opt/renderdoc_1.44'))
 p.add_argument('--world',type=Path,default=root/'assets/levels/biology-virus.json')
 p.add_argument('--samples',type=int,choices=(3,6),default=6)
 p.add_argument('--sss',choices=('on','off'),default='on')
+p.add_argument('--subgroup-size',type=int,choices=(0,32,64))
 p.add_argument('--run',action='store_true')
 p.add_argument('--output',type=Path,default=root/'build/renderdoc-profile')
 a=p.parse_args()
@@ -29,6 +30,8 @@ config=json.loads((root/'assets/rendering/biology.json').read_text());config['sa
 assert config['output']['width']==1920 and config['output']['height']==1080
 assert config['volume']['rays_per_pixel']==1 and config['volume']['integration_steps']==8
 if a.sss=='off':config['subsurface']['strength']=0
+if a.subgroup_size==0:config['lighting'].pop('subgroup_size',None)
+elif a.subgroup_size is not None:config['lighting']['subgroup_size']=a.subgroup_size
 cp=out/'render.json';cp.write_text(json.dumps(config,indent=2)+'\n')
 command=[sys.executable,str(root/'scripts/proton_run.py'),str(binary),'--world',str(wp),'--config',str(cp),
     '--headless','--frames','2','--no-stats','--ticks','600','--world-seed','1234','--time','10','--step-seconds','0',

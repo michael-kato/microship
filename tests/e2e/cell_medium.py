@@ -56,6 +56,12 @@ with tempfile.TemporaryDirectory(prefix='nanova-medium-') as directory:
             assert run('optical-'+section+'-'+field+str(value),data,4800,orders,config)[0]==baseline
         config=deepcopy(settings);config[section][field]=1
         run('bad-optical-'+field,data,config=config,expected=1)
+    for value in (0,32,64):
+        config=deepcopy(settings);config['lighting']['subgroup_size']=value
+        assert run('subgroup-'+str(value),data,4800,orders,config)[0]==baseline
+    for value in (1,16,31,33,65,True):
+        config=deepcopy(settings);config['lighting']['subgroup_size']=value
+        run('bad-subgroup-'+str(value),data,config=config,expected=1)
     # Optional focus settings must not affect simulation or geometry.
     config=deepcopy(settings);config.pop('tilt_shift')
     s,_=run('focus-off',data,4800,orders,config);assert s==baseline

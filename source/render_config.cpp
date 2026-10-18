@@ -132,7 +132,11 @@ bool render_config_load(RenderConfig* config,const char* path)
         loaded.vertical_fov_degrees=json_float(json_get(j,"vertical_fov_degrees"),1,MAX_RENDER_VERTICAL_FOV_DEGREES);
     }
     {
-        Json j=json_get(root,"lighting");json_object(j,"microfacet_energy_compensation|shadow_grid_resolution|static_lighting_cache|force_lighting_rebuild|texture_grid|organelle_cache");
+        Json j=json_get(root,"lighting");json_object(j,"microfacet_energy_compensation|shadow_grid_resolution|static_lighting_cache|force_lighting_rebuild|texture_grid|organelle_cache|subgroup_size");
+        Json subgroup=json_find(j,"subgroup_size");
+        if (json_present(subgroup)) loaded.subgroup_size=json_uint(subgroup,0,64);
+        if (loaded.subgroup_size!=0 && loaded.subgroup_size!=32 && loaded.subgroup_size!=64)
+            json_error(subgroup,"subgroup size must be 0, 32 or 64");
         Json organelle=json_find(j,"organelle_cache");
         if (json_present(organelle)) loaded.organelle_lighting_cache=json_bool(organelle);
         Json texture=json_find(j,"texture_grid");

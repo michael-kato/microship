@@ -151,7 +151,7 @@ struct RendererState
     VkDevice device;
     VkQueue queue;
     uint32_t queue_family;
-    uint32_t timestamp_bits;
+    uint32_t timestamp_bits,subgroup_size;
     VkDeviceSize scratch_alignment;
     VkSurfaceKHR surface;
     VkSwapchainKHR swapchain;
@@ -436,6 +436,9 @@ static bool create_device(RendererState* state)
     VkPhysicalDeviceDriverProperties driver = {};
     driver.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
     acceleration_properties.pNext = &driver;
+    VkPhysicalDeviceSubgroupSizeControlPropertiesEXT subgroup_properties={};
+    subgroup_properties.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES_EXT;
+    driver.pNext=&subgroup_properties;
     VkPhysicalDeviceProperties2 properties = {};
     properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
     properties.pNext = &acceleration_properties;
@@ -452,6 +455,31 @@ static bool create_device(RendererState* state)
         if (state->memory_properties.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
             printf("Device-local heap: %.2f GiB (capacity, not available budget).\n",
                 state->memory_properties.memoryHeaps[i].size / (BINARY_UNIT_SCALE * BINARY_UNIT_SCALE * BINARY_UNIT_SCALE));
+    state->subgroup_size=state->custom_shader ? 0u : state->config.subgroup_size;
+    VkPhysicalDeviceSubgroupSizeControlFeaturesEXT subgroup={};
+    subgroup.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_FEATURES_EXT;
+    if (state->subgroup_size)
+    {
+        PFN_vkEnumerateDeviceExtensionProperties enumerate_extensions=(PFN_vkEnumerateDeviceExtensionProperties)
+            vkGetInstanceProcAddr(state->instance,"vkEnumerateDeviceExtensionProperties");
+        if (!enumerate_extensions) { fprintf(stderr,"GPU extension query is unavailable.\n");return false; }
+        uint32_t extension_count=0;
+        if (!vk_ok(enumerate_extensions(state->physical,0,&extension_count,0),"Count GPU extensions")) return false;
+        std::vector<VkExtensionProperties> available(extension_count);
+        if (!vk_ok(enumerate_extensions(state->physical,0,&extension_count,available.data()),"Read GPU extensions")) return false;
+        bool supported=false;
+        for (uint32_t i=0;i<extension_count;++i)
+            if (!strcmp(available[i].extensionName,VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME)) supported=true;
+        VkPhysicalDeviceFeatures2 supported_features={};supported_features.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        supported_features.pNext=&subgroup;vkGetPhysicalDeviceFeatures2(state->physical,&supported_features);
+        if (!supported || !subgroup.subgroupSizeControl
+            || !(subgroup_properties.requiredSubgroupSizeStages&VK_SHADER_STAGE_COMPUTE_BIT)
+            || state->subgroup_size<subgroup_properties.minSubgroupSize || state->subgroup_size>subgroup_properties.maxSubgroupSize
+            || COMPUTE_GROUP_SIZE*COMPUTE_GROUP_SIZE>state->subgroup_size*subgroup_properties.maxComputeWorkgroupSubgroups)
+        { fprintf(stderr,"Requested compute subgroup size %u is unsupported.\n",state->subgroup_size);return false; }
+        subgroup.computeFullSubgroups=VK_FALSE;
+    }
+    printf("Compute subgroups: %u (zero uses driver choice).\n",state->subgroup_size);
     float priority = 1.0f;
     VkDeviceQueueCreateInfo queue = {};
     queue.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -465,19 +493,24 @@ static bool create_device(RendererState* state)
     acceleration.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
     acceleration.accelerationStructure = VK_TRUE;
     acceleration.pNext = &ray;
+    ray.pNext=state->subgroup_size ? &subgroup : 0;
     VkPhysicalDeviceVulkan12Features features12 = {};
     features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
     features12.bufferDeviceAddress = VK_TRUE;
     features12.pNext = &acceleration;
     const char* extensions[] = { VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
         VK_KHR_RAY_QUERY_EXTENSION_NAME, VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+        VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME, VK_KHR_SWAPCHAIN_EXTENSION_NAME };
     VkDeviceCreateInfo create = {};
     create.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     create.pNext = &features12;
     create.queueCreateInfoCount = 1;
     create.pQueueCreateInfos = &queue;
-    create.enabledExtensionCount = state->headless ? 3 : 4;
+    // Keep swapchain last; omit optional subgroup control when it is not requested.
+    uint32_t extension_count=3;
+    if (state->subgroup_size) ++extension_count;
+    if (!state->headless) extensions[extension_count++]=VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+    create.enabledExtensionCount = extension_count;
     create.ppEnabledExtensionNames = extensions;
     if (!vk_ok(vkCreateDevice(state->physical, &create, 0, &state->device), "Create Vulkan device"))
         return false;
@@ -1237,6 +1270,10 @@ static bool load_compute_pipeline(RendererState* state, const char* shader_path,
     pipeline.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     pipeline.stage.module = shader;
     pipeline.stage.pName = "main";
+    VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT subgroup={};
+    subgroup.sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO_EXT;
+    subgroup.requiredSubgroupSize=state->subgroup_size;
+    pipeline.stage.pNext=state->subgroup_size ? &subgroup : 0;
     uint32_t constants[]={state->config.volume_steps,state->uniform_data.scene[3],state->config.optical_depth_lut ? 1u : 0u,state->config.volume_lighting_grid ? 1u : 0u,state->config.texture_lighting_grid && state->config.shadow_grid_resolution ? 1u : 0u,state->config.organelle_lighting_cache && state->uniform_data.scene[3] ? 1u : 0u,state->config.subsurface_strength>0.0f && !no_subsurface ? 1u : 0u};
     VkSpecializationMapEntry entries[]={
         {VOLUME_STEPS_SPECIALIZATION_ID,0,sizeof(uint32_t)},
