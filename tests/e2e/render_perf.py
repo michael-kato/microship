@@ -22,6 +22,8 @@ p.add_argument('--quality-comparison',action='store_true',help='Report intention
 p.add_argument('--blur-profile',choices=('authored','linear','off'),default='authored')
 p.add_argument('--subgroup-size',type=int,choices=(0,32,64),default=32)
 p.add_argument('--baseline-subgroup-size',type=int,choices=(0,32,64))
+p.add_argument('--window',action='store_true')
+p.add_argument('--live',action='store_true',help='Advance the actual simulation by one fixed step per rendered frame')
 p.add_argument('--frames',type=int,choices=(2,120),default=2,help='120 needs the user-authorized sustained performance check')
 p.add_argument('--pairs',type=int,choices=(1,3),default=1)
 p.add_argument('--reverse',action='store_true')
@@ -63,6 +65,8 @@ for pair in range(a.pairs):
   binary=(a.baseline if variant=='baseline' else a.binary).resolve()
   command=list(base)
   command[command.index('--frames')+1]=str(a.frames)
+  if a.window:command.remove('--headless');command+=['--no-activate']
+  if a.live:command[command.index('--step-seconds')+1]='0.016666666666666666'
   if binary.suffix.lower()!='.exe' and sys.platform!='win32':command=[str(binary)]+command[command.index('--world'):]
   else:command[command.index(str(a.binary.resolve()))]=str(binary)
   for flag,value in (('--config',cp),('--capture',out/(name+'.ppm')),('--state',out/(name+'-state.json'))):command[command.index(flag)+1]=str(value)
@@ -74,7 +78,7 @@ if not a.run:
  print('Prepared',len(commands),'sequential native 1080p two-frame application runs;',a.samples,'film + 1 volume + 1 backdrop starts. 2s/process, 5s/batch, no hardware tracing. No GPU work started.')
  raise SystemExit(0)
 check_gpu_environment();env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1'
-report={'frames':a.frames,'capture':not a.no_capture,'case':a.case,'blur_profile':a.blur_profile,'samples':a.samples,'spatial_aa':a.spatial_aa,'shadow_grid':a.shadow_grid,'quadrature':a.quadrature,'volume_steps':a.volume_steps,'baseline_samples':a.baseline_samples,'baseline_volume_steps':a.baseline_volume_steps,'quality_comparison':a.quality_comparison,'validation':not a.timing,'runs':{}}
+report={'window':a.window,'live':a.live,'frames':a.frames,'capture':not a.no_capture,'case':a.case,'blur_profile':a.blur_profile,'samples':a.samples,'spatial_aa':a.spatial_aa,'shadow_grid':a.shadow_grid,'quadrature':a.quadrature,'volume_steps':a.volume_steps,'baseline_samples':a.baseline_samples,'baseline_volume_steps':a.baseline_volume_steps,'quality_comparison':a.quality_comparison,'validation':not a.timing,'runs':{}}
 started=time.monotonic()
 for name,command in commands:
  remaining=(20 if a.frames>2 else 5)-(time.monotonic()-started);assert remaining>0,'GPU batch expired'
@@ -98,8 +102,9 @@ for name,command in commands:
  assert all(len(v)==a.frames for v in frames.values()),frames
  if name.endswith('current'):assert 'Compute subgroups: '+str(a.subgroup_size)+' ' in output
  cache=re.findall(r'Static lighting: (\d+) baked, (\d+) reused;',output)
- assert len(cache)==a.frames and int(cache[1][0])==0 and int(cache[1][1])>0,cache
- report['runs'][name]=dict(seconds=time.monotonic()-before,frames_ms=frames)
+ assert len(cache)==a.frames,cache
+ if not a.live:assert int(cache[1][0])==0 and int(cache[1][1])>0,cache
+ report['runs'][name]=dict(seconds=time.monotonic()-before,frames_ms=frames,cache_counts=cache)
 report['batch_seconds']=time.monotonic()-started
 images={};state=None
 for name,_ in commands:

@@ -378,3 +378,11 @@ filter reduced measured edge RMS error from 7.068 to 6.078 RGB8 levels
 against that reference (vertical contrast above eight levels, rows 1–849).
 This is one frozen scene, not a general motion-quality result. The former
 settings remain in `assets/rendering/biology-quality.json`.
+
+The authored four-pixel backdrop blur uses five linear texture fetches
+per axis. The weights combine the original 49 fractional-position reads
+into nine texel weights, then pair adjacent weights. Other radii retain
+the original filter. A host-validated close-view capture differed in
+2,445 color channels by one RGB8 level at most. All three backdrop lights
+remain active. An image check caught an accidental light-loop edit during
+the trial; it was corrected before this result.

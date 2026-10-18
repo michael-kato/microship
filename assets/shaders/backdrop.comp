@@ -47,7 +47,24 @@ void main()
         // the 49-tap Gaussian; no geometry guides or lighting paths.
         vec2 axis=filter_pass.pass==1 ? vec2(1.0/extent.x,0) : vec2(0,1.0/extent.y);
         vec3 sum=vec3(0);float weights=0;
-        for (int i=-BLUR_HALF_TAPS;i<=BLUR_HALF_TAPS;++i)
+        if (render.backdrop_style.x==4.0)
+        {
+            // The 49 samples at one-sixth-pixel spacing form a nine-texel kernel.
+            // Combine adjacent texels with linear sampling: five fetches, same kernel.
+            const float center_weight=0.286898242169;
+            const float pair_weight[2]=float[2](0.324310876609,0.032240002307);
+            const float pair_offset[2]=float[2](1.315989071435,3.124312725869);
+            sum=center_weight*(filter_pass.pass==1 ? textureLod(source_a,uv,0).rgb : textureLod(source_b,uv,0).rgb);
+            for (int i=0;i<2;++i)
+            {
+                vec2 delta=axis*pair_offset[i];
+                vec3 a=filter_pass.pass==1 ? textureLod(source_a,uv-delta,0).rgb : textureLod(source_b,uv-delta,0).rgb;
+                vec3 b=filter_pass.pass==1 ? textureLod(source_a,uv+delta,0).rgb : textureLod(source_b,uv+delta,0).rgb;
+                sum+=pair_weight[i]*(a+b);
+            }
+            weights=1.0;
+        }
+        else for (int i=-BLUR_HALF_TAPS;i<=BLUR_HALF_TAPS;++i)
         {
             float x=float(i)/BLUR_HALF_TAPS_FLOAT,weight=exp(-BLUR_GAUSSIAN_FALLOFF*x*x);
             vec2 position=uv+axis*(x*render.backdrop_style.x);
