@@ -2453,7 +2453,10 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     memcpy(frame.instance_styles.mapped,state->style_data.data(),state->style_data.size()*sizeof(float));
     state->effect_count=scene->effect_count;
     memcpy(frame.effects.mapped,scene->effects.data(),state->effect_count*sizeof(EffectSegment));
-    memcpy(frame.effect_tiles.mapped,scene->effect_tiles.data(),frame.effect_tiles.size);
+    // Tile offsets, CPU cursors, then only the references this frame uses.
+    if (state->effect_count)
+        memcpy(frame.effect_tiles.mapped,scene->effect_tiles.data(),
+            (2*(size_t)scene->tile_count+1+scene->effect_tiles[scene->tile_count])*sizeof(uint32_t));
     VkMemoryBarrier host_upload={};host_upload.sType=VK_STRUCTURE_TYPE_MEMORY_BARRIER;
     host_upload.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT;host_upload.dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
     vkCmdPipelineBarrier(state->command,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,

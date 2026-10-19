@@ -681,6 +681,8 @@ uploads them once through a staging buffer and builds every BLAS in one
 submission; static meshes share temporary scratch. Deformable walls copy
 their changed vertex ranges from host staging into the device-local buffer
 before the refit, so shading never reads geometry over the PCIe BAR.
+Effect tile lists upload only the offsets and the references the frame
+uses, not the 2.1 MB reference capacity.
 
 Two frames are in flight. Each slot owns its command buffer, fence, acquire
 semaphore, timestamp queries, descriptor sets and every buffer the CPU
