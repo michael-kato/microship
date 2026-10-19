@@ -141,6 +141,26 @@
                     "type": "number",
                     "minimum": 0.1,
                     "maximum": 0.9
+                  },
+                  "branch_probability": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "angle_jitter_degrees": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 30
+                  },
+                  "length_jitter": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 0.4
+                  },
+                  "width_jitter": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 0.3
                   }
                 },
                 "required": [
@@ -153,6 +173,16 @@
                   "root_share"
                 ],
                 "additionalProperties": false
+              },
+              "root_limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 128
+              },
+              "root_minimum_radius": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1.5
               }
             },
             "required": ["seconds", "count", "spacing", "production", "seed", "normal"],

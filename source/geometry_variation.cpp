@@ -26,7 +26,7 @@ static const int DISPLACEMENT_LOW_FREQUENCY = 3;
 static const int DISPLACEMENT_HIGH_FREQUENCY = 4;
 
 namespace {
-struct Part { uint32_t first,count;Vec3 pivot,attachment;float minimum_scale;bool anchor,movable; };
+struct Part { uint32_t first,count;Vec3 pivot,attachment;float minimum_scale,radius;bool anchor,movable; };
 struct Parts { Part values[MAX_MESH_PARTS];uint32_t count; };
 bool load(const char* path,Parts* parts)
 {
@@ -35,11 +35,12 @@ bool load(const char* path,Parts* parts)
     JsonArray a=json_array(json_get(root,"parts"),MAX_MESH_PARTS);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"first|count|pivot|movable|attachment|minimum_scale");Part p={};
+        json_object(j,"first|count|pivot|movable|attachment|minimum_scale|attachment_radius");Part p={};
         p.first=json_uint(json_get(j,"first"),0,vertices-1);p.count=json_uint(json_get(j,"count"),1,vertices);
         p.pivot=json_vector(json_get(j,"pivot"),-MAX_LOCAL_COORDINATE,MAX_LOCAL_COORDINATE);p.movable=json_bool(json_get(j,"movable"));
         Json anchor=json_find(j,"attachment");p.anchor=json_present(anchor);
         if (p.anchor) p.attachment=json_vector(anchor,-MAX_LOCAL_COORDINATE,MAX_LOCAL_COORDINATE);
+        Json radius=json_find(j,"attachment_radius");if (json_present(radius)) p.radius=json_positive(radius,MAX_LOCAL_COORDINATE);
         Json minimum=json_find(j,"minimum_scale");
         if (json_present(minimum)) p.minimum_scale=json_float(minimum,0,MAX_ORGAN_MINIMUM_SCALE);
         if (p.first!=next || p.count>vertices-next) return json_error(j,"mesh parts must cover vertices in order without gaps or overlap");
@@ -68,25 +69,35 @@ Vec3 transform(Vec3 v,const Part& p,const MeshSource& source,uint32_t index)
         v.z+a*std::sin(DISPLACEMENT_LOW_FREQUENCY*v.x-phase)*std::sin(DISPLACEMENT_HIGH_FREQUENCY*v.y-phase)};
 }
 }
-bool geometry_attachments(const MeshSource& source,Vec3 direction,Vec3* points,uint32_t capacity,uint32_t* count)
+bool geometry_attachments(const MeshSource& source,Vec3 direction,Vec3* points,float* radii,uint32_t capacity,uint32_t* count)
 {
     *count=0;
     if (!source.parts_path || !source.parts_path[0])
     {
         if (!capacity || !geometry_surface_point(source.path,source.position,source.scale,direction,points)) return false;
-        *count=1;return true;
+        radii[0]=1;*count=1;return true;
     }
     Parts parts={};if (!load(source.parts_path,&parts)) return false;
     for (uint32_t i=0;i<parts.count;++i) if (parts.values[i].anchor && source.scale>=parts.values[i].minimum_scale)
     {
         if (*count==capacity) { fprintf(stderr,"%s: attachment capacity exceeded\n",source.parts_path);return false; }
-        points[(*count)++]=transform(parts.values[i].attachment,parts.values[i],source,i);
+        const Part& part=parts.values[i];float size=1;
+        if (part.movable)
+        {
+            uint32_t seed=source.seed^(i*PART_SEED_MULTIPLIER+PART_SEED_OFFSET);
+            // Match phase, translation and rotation draws before the startup scale.
+            for (uint32_t draw=0;draw<5;++draw) random(&seed);
+            size+=random(&seed)*source.part_variation;
+        }
+        radii[*count]=part.radius*size;
+        points[(*count)++]=transform(part.attachment,part,source,i);
     }
     if (!*count) { fprintf(stderr,"%s: no active attachment points in mesh parts\n",source.parts_path);return false; }
     // Keep the most forward attachment first. The remaining order is authored.
     uint32_t best=0;
     for (uint32_t i=1;i<*count;++i) if (dot(normalize(points[i]),direction)>dot(normalize(points[best]),direction)) best=i;
     Vec3 first=points[best];points[best]=points[0];points[0]=first;
+    float radius=radii[best];radii[best]=radii[0];radii[0]=radius;
     for (uint32_t i=0;i<*count;++i) points[i]=add(source.position,scale(points[i],source.scale));
     return true;
 }

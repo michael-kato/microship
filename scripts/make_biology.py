@@ -124,8 +124,6 @@ IMMUNE_STEM_LOBE_SIZE = (.18,.23,.14)
 IMMUNE_CROWN_SIZE = (.22,.25,.20)
 IMMUNE_FACTORY_GRANULE_SIZE = (.14,.17,.12)
 FUNGAL_CAP_STALK_SIZE = (.14,.28,.14)
-VIRUS_SHEATH_HALF_HEIGHT = .065
-VIRUS_HEAD_HEIGHT_SCALE = 1.25
 VIRUS_FACTORY_FIBRE_COUNT = 6
 VIRUS_FIBRE_BEND_Y = .32
 VIRUS_FIBRE_END_SPREAD_SCALE = 1.35
@@ -333,7 +331,10 @@ def export(name,anatomy=False,subsurface_weight=None):
             count=groups.count(index)
             if not count:raise RuntimeError('empty mesh part')
             d=dict(first=first,count=count,pivot=part['pivot'],movable=part['movable'])
-            if part['attachment'] is not None:d['attachment']=list(part['attachment'])
+            if part['attachment'] is not None:
+                d['attachment']=list(part['attachment'])
+                points=records[first:first+count]
+                d['attachment_radius']=max(max(v[k] for v in points)-min(v[k] for v in points) for k in range(3))*.5
             if part['minimum_scale']:d['minimum_scale']=part['minimum_scale']
             definitions.append(d);first+=count
         (out/(name+'.parts.json')).write_text(json.dumps({'$schema':'../schemas/mesh-parts.schema.json','vertices':len(records),'parts':definitions},indent=2)+'\n')
@@ -453,16 +454,25 @@ def factory(side):
     saved=rng.getstate()
     p=profiles[side];f=profiles['factories'][side]
     if side=='virus':
-        # Six-sided pointed collars keep the glowing shaft visible between dark ridges.
-        for i in range(f['rings']):
-            y=(i+.5)/f['rings'];n=f['collar_points'];r=f['sheath_radius']
-            vertices=[(0,y-VIRUS_SHEATH_HALF_HEIGHT,0),(0,y+VIRUS_SHEATH_HALF_HEIGHT,0)]
-            vertices += [(r*math.cos(j*math.tau/n),y,r*math.sin(j*math.tau/n)) for j in range(n)]
-            faces=[face for j in range(n) for face in [(0,2+(j+1)%n,2+j),(1,2+j,2+(j+1)%n)]]
-            mesh=bpy.data.meshes.new('collar');mesh.from_pydata(vertices,[],faces);mesh.update()
-            obj=bpy.data.objects.new('collar',mesh);bpy.context.collection.objects.link(obj)
-            finish(obj,f['ridge_color'],smooth=False,surface='virus_sheath')
-        rod((0,0,0),(0,1,0),f['shaft_radius'],p['body'],'virus_sheath',emission=1,sides=f['collar_points'],smooth=False)
+        # A continuous irregular shaft replaces the repeated collars.
+        shaft_rng=random.Random(profiles['seed']);sides=f['shaft_sides'];sections=f['stem_sections']
+        vertices=[];faces=[]
+        for j in range(sections+1):
+            t=j/sections;envelope=math.sin(math.pi*t)
+            x=shaft_rng.uniform(-1,1)*f['shaft_radius']*f['surface_jitter']*envelope
+            z=shaft_rng.uniform(-1,1)*f['shaft_radius']*f['surface_jitter']*envelope
+            for k in range(sides):
+                a=k*math.tau/sides
+                radius=f['shaft_radius']*(1-(1-ROD_TIP_RADIUS_SCALE)*t)*(1+shaft_rng.uniform(-1,1)*f['surface_jitter']*envelope)
+                vertices.append((x+radius*math.cos(a),t,z+radius*math.sin(a)))
+        for j in range(sections):
+            for k in range(sides):
+                a=j*sides+k;b=j*sides+(k+1)%sides
+                faces.append((b,a,a+sides,b+sides))
+        faces.extend([tuple(range(sides)),tuple(sections*sides+k for k in reversed(range(sides)))])
+        mesh=bpy.data.meshes.new('shaft');mesh.from_pydata(vertices,[],faces);mesh.update()
+        obj=bpy.data.objects.new('shaft',mesh);bpy.context.collection.objects.link(obj)
+        finish(obj,p['body'],smooth=True,surface='virus_sheath',emission=1)
         export('virus_stem',subsurface_weight=0)
         bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1,radius=1)
         obj=bpy.context.object;obj.scale=(f['head_radius'],f['head_radius']*f['head_height_scale'],f['head_radius'])

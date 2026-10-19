@@ -7,6 +7,7 @@
 typedef uint32_t Faction;
 enum { FACTION_NEUTRAL=0, MAX_FACTIONS=9, MAX_GROUPS=8, MAX_UNIT_TYPES=32, MAX_PRODUCER_TYPES=8, MAX_BODY_TYPES=32, MAX_FACTORY_STRUCTURES=128 };
 enum { MAX_UNIT_PAYLOADS=6, MAX_HIT_COUNT=32, BRANCH_FIELDS_COMPLETE=3 };
+enum { MAX_CELL_DISPLACEMENT_FEATURES=256 };
 enum GrowthGrammar { GROWTH_AXIAL,GROWTH_FAN,GROWTH_HYPHA,GROWTH_TREE };
 enum { TARGET_UNITS=1, TARGET_STRUCTURES=2 };
 enum AttackMode { ATTACK_PROJECTILE,ATTACK_DIGEST,ATTACK_SPORE };
@@ -57,7 +58,8 @@ struct BranchRules
     float health;
     float seconds,spacing,production,regrow_seconds;
     Vec3 normal;
-    uint32_t children,levels;
+    uint32_t children,levels,root_limit;
+    float root_minimum_radius,branch_probability,angle_jitter,length_jitter,width_jitter;
     float length_scale,width_scale,angle,bend,root_share;
 };
 struct ProducerDefinition

@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-animation-') as directory:
     same,fixed=run('fixed',still)
     assert same==game,'Appearance motion changed the game'
     assert fixed['meshes']==scene['meshes'],'Motion changed mesh vertices or topology'
-    assert scene['organelle_style']==[1.8,.65,2.5,2.5]
+    assert scene['organelle_style']==[data['appearance']['organelle_appearance'][key] for key in ('edge_saturation','edge_width','center_glow','center_power')]
     assert scene['membrane_ripple'][0]==.05 and fixed['membrane_ripple'][0]==0
     organs=[i for i in scene['instances'] if int(i['style'][7])&4]
     assert len(organs)==44, len(organs)  # 34 rooted organs and ten internal networks.

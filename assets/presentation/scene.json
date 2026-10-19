@@ -52,10 +52,10 @@
   "thin_surface": {
     "transmission": 0.82,
     "absorption": 0.025,
-    "clarity": 0.9,
+    "clarity": 0.2,
     "edge_fade": {
       "strength": 1,
-      "power": 2
+      "power": 0.5
     }
   },
   "atmosphere": {
@@ -84,7 +84,7 @@
   "organelle_appearance": {
     "edge_saturation": 1.8,
     "edge_width": 0.65,
-    "center_glow": 2.5,
+    "center_glow": 4.5,
     "center_power": 2.5
   },
   "animation": {

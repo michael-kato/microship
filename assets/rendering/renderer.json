@@ -55,7 +55,7 @@
     "strength": 1,
     "wrap": 0.5,
     "transmission": 0.35,
-    "membrane_thickness": 0.06,
+    "membrane_thickness": 0.16,
     "samples_per_pixel": 1
   }
 }

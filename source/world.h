@@ -18,6 +18,7 @@ struct Body
     Vec3 colony_normal;
     Vec3 factory_root;
     Vec3 factory_roots[MAX_FACTORY_STRUCTURES];
+    float factory_root_radii[MAX_FACTORY_STRUCTURES]; // Local major radii after startup part scaling.
     uint32_t factory_root_count;
     float availability;
     float interior_radius, interior_fade;

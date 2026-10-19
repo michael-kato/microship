@@ -90,6 +90,7 @@ struct Colony
     uint32_t root_generation,root_count,structure_count;
     float limb_scale[MAX_FACTORY_STRUCTURES],deployment_start[MAX_FACTORY_STRUCTURES],deployment_seconds[MAX_FACTORY_STRUCTURES];
     int32_t parents[MAX_FACTORY_STRUCTURES];
+    uint32_t root_attachments[MAX_FACTORY_STRUCTURES];
     uint32_t wounds;
     EmbeddedSpike embedded[MAX_EMBEDDED];
     float branch_timer;

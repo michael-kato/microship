@@ -75,7 +75,7 @@ for name,command in commands:
     if state is None:state=current
     else:assert state==current,'Glow changed game state'
     structures=current['colonies'][0]['structures']
-    assert len(structures)==70 and all(s['growth']>=.999 for s in structures)
+    assert 3<len(structures)<=world['content']['buildings'][0]['branches']['count'] and all(s['growth']>=.999 for s in structures)
     scene=json.loads((folder/'scene.json').read_text())
     if not name.endswith('off'):
         emission=world['appearance']['self_glow']

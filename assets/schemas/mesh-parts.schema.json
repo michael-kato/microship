@@ -39,6 +39,11 @@
             "type": "number",
             "minimum": 0,
             "maximum": 10000
+          },
+          "attachment_radius": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1.5
           }
         },
         "required": ["first", "count", "pivot", "movable"],

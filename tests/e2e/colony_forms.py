@@ -23,7 +23,15 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
         return (json.loads(state.read_text()),json.loads(scene.read_text())) if expected==0 else (None,None)
     for side,home,faction in [('virus',0,1),('immune',1,2),('fungus',0,3)]:
         data=stage_world(root/'assets/levels'/(side+'-player-level.json'),out)
-        for building in data['content']['buildings']:building.update(establishment_seconds=4,growth_seconds=.1)
+        # Retain the full, regular-tree fixture; natural_factory checks the new defaults.
+        for building in data['content']['buildings']:
+            building.update(establishment_seconds=4,growth_seconds=.1)
+            branch=building['branches'];branch.pop('root_limit',None);branch.pop('root_minimum_radius',None)
+            if branch['grammar']=='tree':
+                branch['count']=70
+                for key in ('branch_probability','angle_jitter_degrees','length_jitter','width_jitter'):branch['tree'].pop(key,None)
+                branch['tree']['bend']=.2
+            else:branch['count']=16
         for profile in data['content']['factions']:
             if 'cell_appearance' in profile:profile['cell_appearance'].update(seconds=12,morph_seconds=12)
         data['rules']['ai']['expansion_delay']=1 if side=='fungus' else 300

@@ -38,7 +38,7 @@ bool geometry_build(Geometry*,const MeshSource*,uint32_t count,const RenderConfi
 bool geometry_validate_model(const char* path); // Startup validation of unselected authored alternatives.
 bool geometry_surface_point(const char* path,Vec3 position,float scale,Vec3 direction,Vec3* point);
 // The same startup transform is used for mesh parts and their attachment points.
-bool geometry_attachments(const MeshSource&,Vec3 direction,Vec3* points,uint32_t capacity,uint32_t* count);
+bool geometry_attachments(const MeshSource&,Vec3 direction,Vec3* points,float* radii,uint32_t capacity,uint32_t* count);
 // Assign current-scene surface emission at startup; keep thin walls clear.
 struct MeshPartPose { uint32_t mesh;Vec3 pivot; };
 // Partition existing triangles into immutable part meshes. No new vertices or triangles.

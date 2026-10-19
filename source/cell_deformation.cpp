@@ -12,18 +12,27 @@ static const float GOLDEN_ANGLE = 2.39996323f;
 static const float PI_RADIANS = 3.14159265f;
 static const float MIN_TRIANGLE_NORMAL_SQUARED = 1e-20f;
 
-// Evaluate a scalar height field on the neutral wall once at startup.
-// No image, new vertex, or extra surface is created.
-static Vec3 target_displacement(Vec3 point,const Body& body,const FactionDefinition& profile)
+// Each peak direction is shared by all wall vertices of one cell.
+static void displacement_centers(const Body& body,const FactionDefinition& profile,Vec3* centers)
 {
-    if (!profile.displacement_features) return Vec3{};
-    Vec3 radial=normalize(subtract(point,body.position));float height=0;
     float phase=((body.seed^profile.displacement_seed)%65536)*(2*PI_RADIANS/65536);
     for (uint32_t k=0;k<profile.displacement_features;++k)
     {
         float z=1-2*(k+.5f)/profile.displacement_features,ring=std::sqrt(1-z*z),angle=k*GOLDEN_ANGLE+phase;
-        Vec3 center={ring*std::cos(angle),ring*std::sin(angle),z};
-        float distance=std::acos(std::fmax(-1.0f,std::fmin(1.0f,dot(radial,center))));
+        centers[k]=Vec3{ring*std::cos(angle),ring*std::sin(angle),z};
+    }
+}
+
+// Evaluate the existing height field at startup. The support test retains a
+// rounding margin at the angular boundary; accepted peaks use the same formula.
+static Vec3 target_displacement(Vec3 point,const Body& body,const FactionDefinition& profile,const Vec3* centers,float support)
+{
+    if (!profile.displacement_features) return Vec3{};
+    Vec3 radial=normalize(subtract(point,body.position));float height=0;
+    for (uint32_t k=0;k<profile.displacement_features;++k)
+    {
+        float alignment=dot(radial,centers[k]);if (alignment<support) continue;
+        float distance=std::acos(std::fmax(-1.0f,std::fmin(1.0f,alignment)));
         float t=std::fmax(0.0f,1-distance/profile.displacement_width);
         float shape=profile.displacement_pointed ? t : .5f-.5f*std::cos(t*PI_RADIANS);
         height=std::fmax(height,shape);
@@ -58,6 +67,13 @@ bool presentation_prepare_membranes(Presentation* p,const Simulation* s)
     for (uint32_t body=0;body<s->world.body_count;++body)
     {
         if (!s->world.content.bodies[s->world.bodies[body].type].hosts_site) continue;
+        Vec3 centers[MAX_FACTIONS][MAX_CELL_DISPLACEMENT_FEATURES];float support[MAX_FACTIONS]={};
+        for (uint32_t f=1;f<MAX_FACTIONS;++f)
+        {
+            const FactionDefinition& profile=s->world.content.factions[f];
+            displacement_centers(s->world.bodies[body],profile,centers[f]);
+            support[f]=std::cos(profile.displacement_width)-FLT_EPSILON;
+        }
         MeshRange& mesh=g.meshes[p->body_meshes[body]];
         std::vector<uint8_t> wall(mesh.vertex_count,0);
         for (uint32_t t=mesh.first;t<mesh.first+mesh.count;++t)
@@ -79,7 +95,7 @@ bool presentation_prepare_membranes(Presentation* p,const Simulation* s)
             if (inserted.second) p->membrane_normals.push_back(Vec3{});
             p->membrane_groups[record.index]=record.group;
             for (uint32_t f=1;f<MAX_FACTIONS;++f)
-                record.displacement[f]=target_displacement(point,s->world.bodies[body],s->world.content.factions[f]);
+                record.displacement[f]=target_displacement(point,s->world.bodies[body],s->world.content.factions[f],centers[f],support[f]);
             p->membrane_vertices.push_back(record);
         }
         membrane.count=(uint32_t)p->membrane_vertices.size()-membrane.first;

@@ -11,6 +11,8 @@ def established_world(source,directory):
     data=stage_world(source,directory)
     for start in data['match'].pop('starts',[]):data['bodies'][start['cell']]['owner']=start['faction']
     for building in data['content']['buildings']:
+        building['branches'].pop('root_limit',None);building['branches'].pop('root_minimum_radius',None)
+        building['branches']['count']=max(16,building['branches']['count'])
         if building['branches']['grammar']=='tree':
             building['branches'].update(grammar='axial',count=24,production=.05)
             building['branches'].pop('tree',None)
@@ -55,5 +57,6 @@ def branches(data,**settings):
         if building['faction'] not in emitters:
             building['branches'].update(settings)
             if 'count' in settings:
+                building['branches'].pop('root_limit',None);building['branches'].pop('root_minimum_radius',None)
                 building['branches']['roots']='single';building['branches']['grammar']='axial';building['branches'].pop('tree',None)
     return result
