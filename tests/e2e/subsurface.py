@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-subsurface-') as directory:
         if expected:assert p.stderr and not state.exists();return None,None
         return json.loads(state.read_text()),json.loads(scene.read_text())
     initial,scene=run('materials')
-    assert all(m['subsurface_weight'][0]>0 and m['subsurface_radius'][0]>0 for m in scene['meshes'][:-1]),'A biological mesh has no scattering material'
+    assert all(m['subsurface_weight'][0]>0 for m in scene['meshes'][:len(data['bodies'])]),'A cell lost its scattering material'
     assert scene['meshes'][-1]['subsurface_weight']==[0,0],'Backdrop was given SSS'
     # Loading scales optical distance with the cell mesh, while instance scaling happens in shading.
     bodies={b['name']:b for b in data['content']['bodies']}
@@ -32,6 +32,11 @@ with tempfile.TemporaryDirectory(prefix='nanova-subsurface-') as directory:
         radius=max(max(struct.unpack_from('<4f',raw,16+i*64+48)[:3]) for i in range(n))
         assert abs(m['subsurface_radius'][1]-body['radius']*radius)<.00001
     baseline,view=run('grown',ticks=4800)
+    assert sum(m['subsurface_weight']==[0,0] for m in view['meshes'])>=10,'A factory retained scattering'
+    for producer in data['content']['buildings']:
+        for path in [producer['model'],*producer.get('growth_meshes',{}).values()]:
+            raw=(out/path).resolve().read_bytes();n=struct.unpack_from('<I',raw,8)[0]
+            if raw[:8]==b'FLMESH02':assert all(struct.unpack_from('<f',raw,16+i*64+60)[0]==0 for i in range(n)),path
     disabled=deepcopy(settings);disabled['subsurface']['strength']=0
     no_sss,no_view=run('disabled',config=disabled,ticks=4800)
     assert baseline==no_sss and view==no_view,'SSS changed simulation or scene geometry'

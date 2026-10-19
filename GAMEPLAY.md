@@ -110,3 +110,12 @@ does not feed the halo. Virus stalk ridges have dark pigment and no emission;
 the shaft beneath them glows. Bloom uses the current visible emissive strength,
 a brightness threshold, and a quarter-resolution blur. Surfaces and display
 output stay at native resolution. F10 switches self-glow and the halo together.
+
+Virus factories use faceted phage heads, six pointed tail fibres, and dark,
+pointed collars around the glowing shaft. Growth still follows the forked tree.
+Factory stems and heads have zero SSS. Cells, organelles, and units retain SSS.
+Factory shape controls are in `assets/models/source/cell-unit-factory-shape.json`,
+under `factories.virus`. `collar_points` sets the collar corners; `sheath_radius`
+sets their reach; `head_radius` and `head_height_scale` set the capsid size;
+`fibre_spread` and `fibre_radius` set the tail fibres. Run the mesh authoring script
+after an edit. These controls do not change production or combat rules.

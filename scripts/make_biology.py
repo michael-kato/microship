@@ -281,11 +281,11 @@ def sphere(center,size,color,sub=2,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,s
     obj=bpy.context.object;obj.scale=size
     return finish(obj,color,roughness,ior,surface=surface,subsurface=subsurface)
 
-def rod(a,b,radius,color,surface=None,subsurface=None,emission=0):
+def rod(a,b,radius,color,surface=None,subsurface=None,emission=0,sides=ROD_SIDES,smooth=True,tip_scale=ROD_TIP_RADIUS_SCALE):
     a,b=Vector(a),Vector(b);delta=b-a
-    bpy.ops.mesh.primitive_cone_add(vertices=ROD_SIDES,radius1=radius,radius2=radius*ROD_TIP_RADIUS_SCALE,depth=delta.length,location=(a+b)/2)
+    bpy.ops.mesh.primitive_cone_add(vertices=sides,radius1=radius,radius2=radius*tip_scale,depth=delta.length,location=(a+b)/2)
     obj=bpy.context.object;obj.rotation_euler=delta.to_track_quat('Z','Y').to_euler()
-    return finish(obj,color,surface=surface,subsurface=subsurface,emission=emission)
+    return finish(obj,color,surface=surface,subsurface=subsurface,emission=emission,smooth=smooth)
 
 def branches(start,direction,length,radius,depth,color,planar=False,buds=None,surface=None,bud_surface=None):
     p=profiles['fractal'];start=Vector(start);direction=Vector(direction).normalized();end=start+direction*length
@@ -303,7 +303,7 @@ def branches(start,direction,length,radius,depth,color,planar=False,buds=None,su
         if not planar:child+=axis*rng.uniform(-p['jitter'],p['jitter'])
         branches(end,child,length*p['scale'],radius*p['radius_scale'],depth-1,color,planar,buds,surface,bud_surface)
 
-def export(name,anatomy=False):
+def export(name,anatomy=False,subsurface_weight=None):
     global parts
     bpy.ops.object.select_all(action='DESELECT')
     for obj in parts:obj.select_set(True)
@@ -311,6 +311,8 @@ def export(name,anatomy=False):
     obj=bpy.context.object;obj.name=name;mesh=obj.data;mesh.calc_loop_triangles()
     sss=mesh.color_attributes['Subsurface'].data;colors=mesh.color_attributes['Color'].data;rough=mesh.attributes['roughness'].data;ior=mesh.attributes['ior'].data
     glow=mesh.attributes['emission'].data
+    if subsurface_weight is not None:
+        for value in sss:value.color=(*value.color[:3],subsurface_weight)
     records=[];indices=[];lookup={};groups=[]
     for triangle in mesh.loop_triangles:
         row=[]
@@ -451,50 +453,56 @@ def factory(side):
     saved=rng.getstate()
     p=profiles[side];f=profiles['factories'][side]
     if side=='virus':
-        # Repeated sheath rings, an angular capsid, and six bent tail fibres.
+        # Six-sided pointed collars keep the glowing shaft visible between dark ridges.
         for i in range(f['rings']):
-            y=(i+.5)/f['rings']
-            sphere((0,y,0),(f['sheath_radius'],VIRUS_SHEATH_HALF_HEIGHT,f['sheath_radius']),f['ridge_color'],1,surface='virus_sheath')
-        rod((0,0,0),(0,1,0),f['shaft_radius'],p['body'],'virus_sheath' if side=='virus' else 'immune_surface',emission=1)
-        export('virus_stem')
+            y=(i+.5)/f['rings'];n=f['collar_points'];r=f['sheath_radius']
+            vertices=[(0,y-VIRUS_SHEATH_HALF_HEIGHT,0),(0,y+VIRUS_SHEATH_HALF_HEIGHT,0)]
+            vertices += [(r*math.cos(j*math.tau/n),y,r*math.sin(j*math.tau/n)) for j in range(n)]
+            faces=[face for j in range(n) for face in [(0,2+(j+1)%n,2+j),(1,2+j,2+(j+1)%n)]]
+            mesh=bpy.data.meshes.new('collar');mesh.from_pydata(vertices,[],faces);mesh.update()
+            obj=bpy.data.objects.new('collar',mesh);bpy.context.collection.objects.link(obj)
+            finish(obj,f['ridge_color'],smooth=False,surface='virus_sheath')
+        rod((0,0,0),(0,1,0),f['shaft_radius'],p['body'],'virus_sheath',emission=1,sides=f['collar_points'],smooth=False)
+        export('virus_stem',subsurface_weight=0)
         bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1,radius=1)
-        obj=bpy.context.object;obj.scale=(f['head_radius'],f['head_radius']*VIRUS_HEAD_HEIGHT_SCALE,f['head_radius'])
+        obj=bpy.context.object;obj.scale=(f['head_radius'],f['head_radius']*f['head_height_scale'],f['head_radius'])
         finish(obj,p['body'],smooth=False,surface='virus_capsid')
         for i in range(VIRUS_FACTORY_FIBRE_COUNT):
             a=i*math.tau/VIRUS_FACTORY_FIBRE_COUNT;d=Vector((math.cos(a),0,math.sin(a)))
             bend=d*f['fibre_spread']+Vector((0,-VIRUS_FIBRE_BEND_Y,0));end=d*f['fibre_spread']*VIRUS_FIBRE_END_SPREAD_SCALE+Vector((0,-VIRUS_FIBRE_END_Y,0))
-            rod((0,-VIRUS_FIBRE_ROOT_Y,0),bend,FACTORY_BRANCH_RADIUS,p['spikes'],'virus_fibre');rod(bend,end,VIRUS_FIBRE_TIP_RADIUS,p['core'],'virus_fibre')
-        export('virus_head')
+            rod((0,-VIRUS_FIBRE_ROOT_Y,0),bend,f['fibre_radius'],p['spikes'],'virus_fibre',sides=3,smooth=False)
+            rod(bend,end,f['fibre_radius'],p['core'],'virus_fibre',sides=3,smooth=False,tip_scale=0)
+        export('virus_head',subsurface_weight=0)
     elif side=='immune':
         rod((0,0,0),(0,1,0),f['shaft_radius'],p['body'],'virus_sheath' if side=='virus' else 'immune_surface')
         for i in range(f['lobes']):
             y=(i+.5)/f['lobes'];sign=-1 if i%2 else 1
             sphere((sign*IMMUNE_STEM_LOBE_X,y,0),IMMUNE_STEM_LOBE_SIZE,p['body'],2,surface='immune_surface')
             branches((0,y,0),(sign,IMMUNE_FACTORY_BRANCH_UP_COMPONENT,IMMUNE_FACTORY_BRANCH_DEPTH_COMPONENT),f['spread'],FACTORY_BRANCH_RADIUS,2,p['body'],buds=p['granules'],surface='immune_surface',bud_surface='immune_granule')
-        export('immune_stem')
+        export('immune_stem',subsurface_weight=0)
         for i in range(f['crown_lobes']):
             a=i*math.tau/f['crown_lobes']
             sphere((IMMUNE_CROWN_RADIUS*math.cos(a),IMMUNE_CROWN_Y,IMMUNE_CROWN_RADIUS*math.sin(a)),IMMUNE_CROWN_SIZE,p['body'],2,surface='immune_surface')
         sphere((0,FACTORY_GRANULE_Y,IMMUNE_FACTORY_GRANULE_Z),IMMUNE_FACTORY_GRANULE_SIZE,p['granules'],2,surface='immune_granule')
-        export('immune_head')
+        export('immune_head',subsurface_weight=0)
     else:
         rod((0,0,0),(0,1,0),f['shaft_radius'],p['rays'],'fungal_stalk')
         for i in range(f['forks']):
             a=i*GOLDEN_ANGLE_RADIANS;y=(i+.5)/f['forks']
             branches((0,y,0),(math.cos(a),FUNGAL_BRANCH_UP_COMPONENT,math.sin(a)),f['spread'],FACTORY_BRANCH_RADIUS,2,p['body'],buds=p['core'],surface='fungal_stalk',bud_surface='fungal_spore')
-        export('fungal_stem')
+        export('fungal_stem',subsurface_weight=0)
         sphere((0,-FUNGAL_STALK_ROOT_Y,0),FUNGAL_CAP_STALK_SIZE,p['rays'],2,surface='fungal_stalk')
         sphere((0,FUNGAL_CAP_Y,0),(f['cap_radius'],FUNGAL_CAP_HALF_HEIGHT,f['cap_radius']),p['body'],2,surface='fungal_cap')
         for i in range(f['spores']):
             a=i*GOLDEN_ANGLE_RADIANS
             sphere((FUNGAL_SPORE_RING_RADIUS*math.cos(a),FUNGAL_SPORE_RING_Y,FUNGAL_SPORE_RING_RADIUS*math.sin(a)),(FUNGAL_FACTORY_SPORE_RADIUS,)*3,p['core'],1,surface='fungal_spore')
-        export('fungal_head')
+        export('fungal_head',subsurface_weight=0)
     # The complete model is used by the non-staged presentation path.
     for i,source in enumerate(models[-2:]):
         obj=bpy.data.objects.new('complete',source.data.copy());bpy.context.collection.objects.link(obj)
         if i:obj.data.transform(Matrix.Translation((0,1,0)))
         parts.append(obj)
-    export(('fungal' if side=='fungal_spore' else side)+'_factory')
+    export(('fungal' if side=='fungal_spore' else side)+'_factory',subsurface_weight=0)
     rng.setstate(saved)
 
 def background(name,key):

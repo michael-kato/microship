@@ -590,3 +590,17 @@ keys and non-JSON numbers, and preserves number precision and field order.
 VS Code tasks provide **nanova: format JSON** and **nanova: check JSON formatting**.
 The built-in JSON formatter keeps existing line breaks; use the format
 task to apply the array width rule. No additional packages are needed.
+
+## Angular virus factory check
+
+The factory shape check used the same seed, game ticks, camera, and render
+settings before and after the mesh change. Three native 1920 x 1080 captures
+passed Khronos host validation through Proton. The wide game states matched.
+The virus stem changed from 148 to 92 triangles per segment. The growing tip
+changed from an eight-triangle leaf to a 92-triangle phage head. Each four-part
+limb uses fewer triangles in total. Factory SSS weights are zero in every faction.
+
+The single-frame GPU times were 8.079 ms before and 8.105 ms after in the wide
+view, and 9.467 ms after in the close view. These are bounded capture results,
+not a sustained performance test. Images are `000835` through `000837` in
+`screenshots/`. CPU checks passed for data assets, colony forms, and SSS.
