@@ -3,6 +3,7 @@
 
     python3 scripts/compare_images.py
     python3 scripts/compare_images.py before.png after.png --no-open
+    python3 scripts/compare_images.py --browser firefox
 
 Drag the slider for a split view, or select Blend to change opacity.
 The generated HTML file contains both images and works without a server.
@@ -104,6 +105,7 @@ def main():
     parser.add_argument('after', nargs='?', type=Path, default=DEFAULT_AFTER)
     parser.add_argument('--output', type=Path, default=ROOT / 'build/image-comparison.html')
     parser.add_argument('--no-open', action='store_true', help='Write the viewer without opening it.')
+    parser.add_argument('--browser', help='Browser name, for example firefox. Uses the default if omitted.')
     args = parser.parse_args()
     try:
         before, size = read_png(args.before)
@@ -123,9 +125,17 @@ def main():
         output.write_text(page, encoding='utf-8')
     except (OSError, ValueError) as error:
         parser.exit(1, f'Error: {error}\n')
-    print(f'Viewer: {output}')
+    print(f'Viewer: {output}', flush=True)
+    print(f'Open: {output.as_uri()}', flush=True)
     if not args.no_open:
-        webbrowser.open(output.as_uri())
+        try:
+            opened = webbrowser.get(args.browser).open(output.as_uri())
+        except (webbrowser.Error, OSError) as error:
+            parser.exit(1, f'Browser launch failed: {error}\nOpen the URL above manually, '
+                        'or use --browser firefox.\n')
+        if not opened:
+            parser.exit(1, 'Browser launch failed. Open the URL above manually, '
+                        'or use --browser firefox.\n')
 
 
 if __name__ == '__main__':
