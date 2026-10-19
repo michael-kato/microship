@@ -381,6 +381,45 @@
         "plane_z"
       ],
       "additionalProperties": false
+    },
+    "self_glow": {
+      "type": "object",
+      "description": "Surface emission strengths. These surfaces do not illuminate other objects.",
+      "properties": {
+        "cell_interior": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "organelles": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "factory_stems": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "factory_leaves": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "units": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 8
+        }
+      },
+      "required": [
+        "cell_interior",
+        "organelles",
+        "factory_stems",
+        "factory_leaves",
+        "units"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [

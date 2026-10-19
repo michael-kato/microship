@@ -39,6 +39,8 @@ bool geometry_validate_model(const char* path); // Startup validation of unselec
 bool geometry_surface_point(const char* path,Vec3 position,float scale,Vec3 direction,Vec3* point);
 // The same startup transform is used for mesh parts and their attachment points.
 bool geometry_attachments(const MeshSource&,Vec3 direction,Vec3* points,uint32_t capacity,uint32_t* count);
+// Assign current-scene surface emission at startup; keep thin walls clear.
+bool geometry_self_glow(Geometry*,uint32_t mesh,const char* parts,float interior,float organelles);
 bool geometry_vary(GpuVertex*,uint32_t,GpuTriangle*,uint32_t*,const MeshSource&);
 
 #endif

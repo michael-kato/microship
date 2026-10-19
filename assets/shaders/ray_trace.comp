@@ -240,7 +240,7 @@ float medium_sharp_limit(vec3 direction)
     return limit;
 }
 
-vec3 film_sharp_sum=vec3(0),film_volume=vec3(0);
+vec3 film_sharp_sum=vec3(0),film_volume=vec3(0),film_emission=vec3(0);
 float film_terminal_distance=RAY_MAX;
 float film_blur_max=0.0;
 layout(set=0,binding=RENDER_BINDING_SHARP_LAYER,std430) buffer SharpLayer { vec4 sharp_pixels[]; };
@@ -298,11 +298,11 @@ float henyey_greenstein(float cosine, float g)
     return (1.0 - g*g) / (4.0*PI*denominator*sqrt(denominator));
 }
 
-// Artistic edge fade: an oblique membrane becomes clearer rather than more reflective.
+// Fresnel-style coverage: face-on membrane is clear; oblique edges are more opaque.
 float membrane_opacity(float cosine)
 {
     if (render.membrane_fade.x<=0.0 || render.thin_material.x<=0.0 || render.thin_material.w<=0.0) return 1.0;
-    return 1.0-render.membrane_fade.x*pow(clamp(1.0-cosine,0.0,1.0),render.membrane_fade.y);
+    return 1.0-render.membrane_fade.x+render.membrane_fade.x*pow(clamp(1.0-cosine,0.0,1.0),render.membrane_fade.y);
 }
 float membrane_clear(float cosine)
 {
@@ -476,7 +476,7 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
     vec4 tint=instance_style[hit_instance].tint;
     uint flags=uint(instance_style[hit_instance].material.w);
     if ((flags&2u)==0u || surface.translucent) surface.color=mix(surface.color,tint.rgb,tint.a);
-    surface.emission+=instance_style[hit_instance].material.x;
+    surface.emission=surface.translucent ? 0.0 : (surface.emission+instance_style[hit_instance].material.x)*render.membrane_fade.w;
     surface.unshadowed=(flags&1u)!=0u;
     if (surface.translucent) surface.roughness=mix(surface.roughness,instance_style[hit_instance].material.y,instance_style[hit_instance].material.z);
     return true;
@@ -849,6 +849,7 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
         { vec3 contribution=subsurface_sample_weight*evaluate_subsurface(s,-direction);direct+=contribution;sss+=contribution; }
         float view_cosine=abs(dot(s.normal,direction));
         float opacity=s.translucent ? membrane_opacity(view_cosine) : 1.0;
+        film_emission+=weight*s.color*s.emission*opacity;
         vec3 contribution=weight*(direct+ambient_surface(s,-direction))*opacity;
         radiance+=contribution;
         if (blur_radius<=0.0) film_sharp_sum+=contribution;
@@ -1087,6 +1088,7 @@ void main()
     // No path traversal, random draws or repeated per-sample normalization.
     if (render.backdrop_style.x>0.0 && pixel_is_vacuum(pixel))
     {
+        if (render.background_quality.w>0u) sharp_pixels[pixel.y*render.settings.x+pixel.x].a=0.0;
         vec3 background=texelFetch(soft_backdrop,ivec2(pixel),0).rgb;
 #ifdef NANOVA_DEBUG_BUFFERS
 #ifdef NANOVA_NO_QUERY_COUNTERS
@@ -1118,9 +1120,12 @@ void main()
     }
 
     vec3 radiance = sum/float(sample_count);
+    vec3 emitted=film_emission/float(sample_count);
+    float glow=max(emitted.r,max(emitted.g,emitted.b));
+    if (render.background_quality.w>0u && render.quality.w==0u) sharp_pixels[pixel.y*render.settings.x+pixel.x].a=glow;
     if (render.quality.w>0u)
     {
-        sharp_pixels[pixel.y*render.settings.x+pixel.x]=vec4(film_blur_max>0.0 ? film_sharp_sum/float(sample_count) : vec3(0),1);
+        sharp_pixels[pixel.y*render.settings.x+pixel.x]=vec4(film_blur_max>0.0 ? film_sharp_sum/float(sample_count) : vec3(0),glow);
         if (film_blur_max>0.0) radiance-=film_sharp_sum/float(sample_count);
     }
 #ifdef NANOVA_DEBUG_BUFFERS

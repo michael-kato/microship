@@ -244,7 +244,7 @@ def cell_part(pivot,movable=True,attachment=None,minimum_scale=0):
     component=len(components)
     components.append(dict(pivot=list(pivot),movable=movable,attachment=attachment,minimum_scale=minimum_scale))
 
-def finish(obj,color,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,smooth=True,material=0,surface=None,subsurface=None):
+def finish(obj,color,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,smooth=True,material=0,surface=None,subsurface=None,emission=0):
     obj.data.transform(Matrix.LocRotScale(obj.location,obj.rotation_euler.to_quaternion(),obj.scale))
     obj.matrix_world=Matrix.Identity(4);mesh=obj.data
     colors=mesh.color_attributes.new(name='Color',type='FLOAT_COLOR',domain='POINT')
@@ -252,6 +252,7 @@ def finish(obj,color,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,smooth=True,mat
     scattering=materials[subsurface]['subsurface'] if subsurface else m['subsurface'] if m else None
     rough=mesh.attributes.new(name='roughness',type='FLOAT',domain='POINT')
     optical=mesh.attributes.new(name='ior',type='FLOAT',domain='POINT')
+    glow=mesh.attributes.new(name='emission',type='FLOAT',domain='POINT')
     sss=mesh.color_attributes.new(name='Subsurface',type='FLOAT_COLOR',domain='POINT')
     for v in mesh.vertices:
         rgb=color(v.co) if callable(color) else color
@@ -265,6 +266,7 @@ def finish(obj,color,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,smooth=True,mat
             rgb=tuple(rgb[i]*(m['pigment_low'][i]*(1-pigment)+m['pigment_high'][i]*pigment) for i in range(3))
             r=m['roughness_min']+(m['roughness_max']-m['roughness_min'])*wave
         colors.data[v.index].color=(*rgb,1)
+        glow.data[v.index].value=emission
         rough.data[v.index].value=r;optical.data[v.index].value=m['ior'] if m else ior
         sss.data[v.index].color=(*scattering['radius'],scattering['weight']) if scattering else (0,0,0,0)
     tag=mesh.attributes.new(name="surface",type="INT",domain="FACE")
@@ -279,11 +281,11 @@ def sphere(center,size,color,sub=2,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,s
     obj=bpy.context.object;obj.scale=size
     return finish(obj,color,roughness,ior,surface=surface,subsurface=subsurface)
 
-def rod(a,b,radius,color,surface=None,subsurface=None):
+def rod(a,b,radius,color,surface=None,subsurface=None,emission=0):
     a,b=Vector(a),Vector(b);delta=b-a
     bpy.ops.mesh.primitive_cone_add(vertices=ROD_SIDES,radius1=radius,radius2=radius*ROD_TIP_RADIUS_SCALE,depth=delta.length,location=(a+b)/2)
     obj=bpy.context.object;obj.rotation_euler=delta.to_track_quat('Z','Y').to_euler()
-    return finish(obj,color,surface=surface,subsurface=subsurface)
+    return finish(obj,color,surface=surface,subsurface=subsurface,emission=emission)
 
 def branches(start,direction,length,radius,depth,color,planar=False,buds=None,surface=None,bud_surface=None):
     p=profiles['fractal'];start=Vector(start);direction=Vector(direction).normalized();end=start+direction*length
@@ -308,6 +310,7 @@ def export(name,anatomy=False):
     bpy.context.view_layer.objects.active=parts[0];bpy.ops.object.join()
     obj=bpy.context.object;obj.name=name;mesh=obj.data;mesh.calc_loop_triangles()
     sss=mesh.color_attributes['Subsurface'].data;colors=mesh.color_attributes['Color'].data;rough=mesh.attributes['roughness'].data;ior=mesh.attributes['ior'].data
+    glow=mesh.attributes['emission'].data
     records=[];indices=[];lookup={};groups=[]
     for triangle in mesh.loop_triangles:
         row=[]
@@ -315,7 +318,7 @@ def export(name,anatomy=False):
             normal=mesh.corner_normals[li].vector;key=(vi,*normal)
             if key not in lookup:
                 lookup[key]=len(records)
-                records.append((*mesh.vertices[vi].co,ior[vi].value,*normal,0,*colors[vi].color[:3],rough[vi].value,*sss[vi].color))
+                records.append((*mesh.vertices[vi].co,ior[vi].value,*normal,glow[vi].value,*colors[vi].color[:3],rough[vi].value,*sss[vi].color))
                 groups.append(mesh.attributes['component'].data[vi].value)
             row.append(lookup[key])
         indices.append((*row,mesh.attributes["surface"].data[triangle.polygon_index].value))
@@ -451,8 +454,8 @@ def factory(side):
         # Repeated sheath rings, an angular capsid, and six bent tail fibres.
         for i in range(f['rings']):
             y=(i+.5)/f['rings']
-            sphere((0,y,0),(f['sheath_radius'],VIRUS_SHEATH_HALF_HEIGHT,f['sheath_radius']),p['spikes'],1,surface='virus_sheath')
-        rod((0,0,0),(0,1,0),f['shaft_radius'],p['body'],'virus_sheath' if side=='virus' else 'immune_surface')
+            sphere((0,y,0),(f['sheath_radius'],VIRUS_SHEATH_HALF_HEIGHT,f['sheath_radius']),f['ridge_color'],1,surface='virus_sheath')
+        rod((0,0,0),(0,1,0),f['shaft_radius'],p['body'],'virus_sheath' if side=='virus' else 'immune_surface',emission=1)
         export('virus_stem')
         bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1,radius=1)
         obj=bpy.context.object;obj.scale=(f['head_radius'],f['head_radius']*VIRUS_HEAD_HEIGHT_SCALE,f['head_radius'])

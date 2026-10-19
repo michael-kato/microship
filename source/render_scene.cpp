@@ -101,10 +101,13 @@ bool render_scene_write(const RenderScene* scene,const char* path)
     {
         const MeshRange* m=&scene->geometry.meshes[i];
         float rough_low=1,rough_high=0,ior_low=3,ior_high=1,sss_low=1,sss_high=0,radius_low=FLT_MAX,radius_high=0;
+        float emission_low=FLT_MAX,emission_high=0,wall_emission=0;
         for (uint32_t t=m->first;t<m->first+m->count;++t)
             for (uint32_t j=0;j<3;++j)
             {
                 const GpuVertex& v=scene->geometry.vertices[scene->geometry.triangles[t].index[j]];
+                emission_low=std::fmin(emission_low,v.normal[3]);emission_high=std::fmax(emission_high,v.normal[3]);
+                if (scene->geometry.triangles[t].index[3]==3u) wall_emission=std::fmax(wall_emission,v.normal[3]);
                 rough_low=std::fmin(rough_low,v.color[3]);rough_high=std::fmax(rough_high,v.color[3]);
                 ior_low=std::fmin(ior_low,v.position[3]);ior_high=std::fmax(ior_high,v.position[3]);
                 sss_low=std::fmin(sss_low,v.subsurface[3]);sss_high=std::fmax(sss_high,v.subsurface[3]);
@@ -113,6 +116,7 @@ bool render_scene_write(const RenderScene* scene,const char* path)
         fprintf(file,"%s{\"triangles\":%u,\"low\":[%.6f,%.6f,%.6f],\"high\":[%.6f,%.6f,%.6f],\"roughness\":[%.6f,%.6f],\"ior\":[%.6f,%.6f]",
             i ? "," : "",m->count,m->low[0],m->low[1],m->low[2],m->high[0],m->high[1],m->high[2],rough_low,rough_high,ior_low,ior_high);
         fprintf(file,",\"subsurface_weight\":[%.6f,%.6f],\"subsurface_radius\":[%.6f,%.6f]",sss_low,sss_high,radius_low,radius_high);
+        fprintf(file,",\"emission\":[%.6f,%.6f],\"wall_emission\":%.6f",emission_low,emission_high,wall_emission);
         float axis_colors[2][3]={};uint32_t axis_counts[2]={};
         for (uint32_t v=m->first_vertex;v<m->first_vertex+m->vertex_count;++v)
         {

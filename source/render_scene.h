@@ -42,7 +42,7 @@ struct RenderScene
     Color ambient, ambient_top, ambient_bottom;
     RenderLight lights[3];
     float thin_transmission, thin_absorption, thin_clarity,thin_edge_strength,thin_edge_power,thin_blur_radius;
-    bool lights_enabled, guides_required;
+    bool lights_enabled, guides_required,self_glow;
     uint32_t background_samples, background_triangles;
     float background_blur, background_glow, background_ambient;
     Vec3 background_wave;

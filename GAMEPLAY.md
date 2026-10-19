@@ -20,7 +20,7 @@ Damage removes stem sections and can remove descendants of a damaged support. Ot
 
 Fog uses a severe current-frame spatial blur and a dark red tint outside current sight. It also covers previously discovered cells after sight is lost. Neutral cell forms remain visible through the blur. Enemy units and factories still require current sight. Discovery persists for orders. Camera movement changes neither sight nor discovery. The HUD remains clear.
 
-Cells keep one authored membrane wall. An angle fade makes the wall more transparent at oblique angles. `thin_surface.edge_fade` sets its strength and power. Visible membrane light, pigment, absorption, and straight transmission use the same fade. No extra wall geometry is added.
+Cells keep one authored membrane wall. A Fresnel-style response makes the wall more opaque at oblique angles. `thin_surface.edge_fade` sets its strength and power. Visible membrane light, pigment, absorption, and straight transmission use the same fade. No extra wall geometry is added.
 
 Cell scattering is RGB 0.10/0.075/0.085, with absorption 0.018. Cell depth blur starts one third of the way along each camera ray through the cell and reaches its eighteen-pixel limit at two thirds. The front third, including its opaque internals, stays sharp. The same depth rule applies to light and objects behind the wall. `medium.depth_blur.start_fraction`, `full_fraction`, and `max_radius` set this profile. The filter uses current-frame radiance only. The global miniature focus filter leaves cell-wall pixels to this depth filter.
 
@@ -59,6 +59,7 @@ Audio uses twelve generated PCM effects and a fixed sixteen-voice mixer. Off-scr
 | F7 | Toggle cell depth and membrane blur |
 | F8 | Toggle tilt shift |
 | F9 | Toggle the fog-of-war blur and tint |
+| F10 | Toggle surface self-glow and its halo |
 
 Both sides start with craft at neutral cells. Select craft and right-click your starting cell to establish the first factory. One craft is consumed. The enemy establishes its first site automatically. The fungal trial uses an automatic founder.
 
@@ -83,7 +84,7 @@ F1 opens the frame profiler. CPU and GPU icicle graphs show a rolling mean of up
 CPU spans cover input, simulation, scene and audio preparation, render command recording, GPU submission and wait, presentation wait, and capture. CPU wall time includes time blocked on the GPU. GPU spans cover acceleration updates, backdrop, shadow grid, surface lighting and SSS, volume scattering, effects, cell blur, fog, tilt shift, bloom and display, the HUD, and output copy. Surface lighting and SSS share one shader and one timing span. Timings include stage barriers. The header shows both latest and mean durations. The panel uses the previous completed frame; no extra GPU wait is added for profiling. Timing history contains numbers only, with no image or lighting history. Bounded `--frames N --stats` runs also print each span and its mean.
 
 
-F5 through F9 change rendering during play. A second press restores the
+F5 through F10 change rendering during play. A second press restores the
 values from the loaded assets. A held key changes its feature once.
 These keys open the F1 profiler, which shows ON, OFF or N/A for each
 feature. N/A means that the loaded scene or config does not provide that
@@ -99,3 +100,11 @@ exploration rules still apply. F2 keeps its existing diagnostic behavior:
 it bypasses the tilt-shift and fog filters. Changes last for the current
 application session and do not edit assets. R restarts the match with the
 current render switches.
+
+Self-glow strengths are in `assets/presentation/biology.json`, under `self_glow`.
+Cell internals, organelles, factory stems, leaves, and units have separate controls.
+These surfaces do not light nearby objects. The cell wall has no self-glow and
+does not feed the halo. Virus stalk ridges have dark pigment and no emission;
+the shaft beneath them glows. Bloom uses the current visible emissive strength,
+a brightness threshold, and a quarter-resolution blur. Surfaces and display
+output stay at native resolution. F10 switches self-glow and the halo together.

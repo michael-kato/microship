@@ -516,3 +516,36 @@ Local evidence is in `build/volume-stride-four-grown-steady/`,
 `build/final-fast-menu-queue-background/`. Captures are archived in the
 numbered screenshots folder. These are bounded scene checks; they do not
 establish a ten-millisecond maximum for every match or all frame outliers.
+
+
+## Surface self-glow checks
+
+Prepare matching close and full-factory views. Add `--run` for six sequential
+native 1920 by 1080 captures, two frames per process, Khronos validation,
+10 seconds per process and 30 seconds for the batch. No hardware tracing.
+
+```sh
+python3 tests/e2e/self_glow.py build/windows-cross/nanova.exe --output build/self-glow-refined
+```
+
+The check compares glow off, surface emission only, and emission with a halo.
+It checks equal simulation state, complete factories, zero wall emission,
+and separate stalk-core, leaf, and unit strengths. It makes two slider pages
+in `build/self-glow-near.html` and `build/self-glow-wide.html`.
+
+After preparation, measure the same close factory during live simulation:
+
+```sh
+python3 tests/e2e/glow_perf.py --prepared build/self-glow-refined
+```
+
+Add `--run` for six sequential 120-frame native 1080p windows, with three
+alternating on/off pairs, no capture or validation, 8 seconds per process,
+and 20 seconds for the batch. Each process discards 20 warmup frames. This
+reports application, cadence, total GPU, surface, and halo/display times.
+A short scene measurement does not establish full-match performance.
+
+The rendering-key check accepts `--case glow-off` or `glow-restore` for F10.
+The input probe sends Win32 system-key messages and held-key repeats. Use a
+fresh `baseline` folder with `--reference` to check exact restored output
+below the timing panel. A queued-input check does not verify physical input.

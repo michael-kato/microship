@@ -100,6 +100,7 @@ struct World
     Color atmosphere_scattering;
     float fog_blur,fog_feather,fog_plane_z,fog_half_life;
     Color fog_tint;
+    float glow_interior,glow_organelles,glow_stems,glow_leaves,glow_units;
     StudioLight studio[3];
     uint32_t studio_mask;
     float thin_transmission, thin_absorption;

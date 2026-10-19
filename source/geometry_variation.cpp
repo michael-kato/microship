@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <vector>
 
+static const uint32_t THIN_WALL_MATERIAL = 3;
 static const int MAX_MESH_PARTS = 64;
 static const int MAX_PART_VERTEX_COUNT = 1000000;
 static const double MAX_LOCAL_COORDINATE = 1.5;
@@ -88,6 +89,26 @@ bool geometry_attachments(const MeshSource& source,Vec3 direction,Vec3* points,u
     for (uint32_t i=0;i<*count;++i) points[i]=add(source.position,scale(points[i],source.scale));
     return true;
 }
+bool geometry_self_glow(Geometry* geometry,uint32_t mesh_index,const char* path,float interior,float organelles)
+{
+    if (interior==0 && organelles==0) return true;
+    MeshRange& mesh=geometry->meshes[mesh_index];
+    std::vector<uint8_t> wall(mesh.vertex_count,0);
+    for (uint32_t t=mesh.first;t<mesh.first+mesh.count;++t)
+        if (geometry->triangles[t].index[3]==THIN_WALL_MATERIAL)
+            for (uint32_t j=0;j<3;++j) wall[geometry->triangles[t].index[j]-mesh.first_vertex]=1;
+    for (uint32_t v=0;v<mesh.vertex_count;++v)
+        if (!wall[v]) geometry->vertices[mesh.first_vertex+v].normal[3]+=interior;
+    if (!path || !path[0]) return true;
+    Parts parts={};if (!load(path,&parts)) return false;
+    const Part& last=parts.values[parts.count-1];
+    if (last.first+last.count!=mesh.vertex_count) return false;
+    for (uint32_t p=0;p<parts.count;++p) if (parts.values[p].movable)
+        for (uint32_t v=parts.values[p].first;v<parts.values[p].first+parts.values[p].count;++v)
+            if (!wall[v]) geometry->vertices[mesh.first_vertex+v].normal[3]+=organelles-interior;
+    return true;
+}
+
 bool geometry_vary(GpuVertex* vertices,uint32_t count,GpuTriangle* triangles,uint32_t* triangle_count,const MeshSource& source)
 {
     Parts parts={};if (!load(source.parts_path,&parts)) return false;

@@ -406,7 +406,7 @@ int game_run(const GameOptions* options)
     game.renderer.debug_stats = options->stats_set ? options->show_stats : false;
     if (!options->headless && !audio_open(&audio)) { renderer_shutdown(&game.renderer);return 1; }
     game.renderer.debug_views = options->debug_views;
-    printf("Left-drag to select; middle-drag or WASD/arrows to pan; wheel to zoom. F1 profiler; F2 render buffers; F5 SSS; F6 volume; F7 cell blur; F8 tilt shift; F9 fog blur. Gameplay: F/B select fighters/bombers on screen; 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
+    printf("Left-drag to select; middle-drag or WASD/arrows to pan; wheel to zoom. F1 profiler; F2 render buffers; F5 SSS; F6 volume; F7 cell blur; F8 tilt shift; F9 fog blur; F10 self-glow and halo. Gameplay: F/B select fighters/bombers on screen; 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
     const double tick_seconds = 1.0 / SIMULATION_TICKS_PER_SECOND_DOUBLE;
     double previous = monotonic_seconds();
     double accumulator = 0.0;

@@ -44,9 +44,9 @@
     "subgroup_size": 32
   },
   "bloom": {
-    "radius": 32,
-    "strength": 0.0,
-    "threshold": 1.0
+    "radius": 8,
+    "strength": 0.14,
+    "threshold": 0.55
   },
   "volume": {
     "rays_per_pixel": 1,

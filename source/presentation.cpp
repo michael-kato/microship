@@ -42,6 +42,18 @@ static void set_instance(Presentation* p,uint32_t slot,uint32_t mesh,Vec3 positi
     }
 }
 
+// Authored vertex emission is a mask on factory meshes. Apply its asset strength once.
+static bool scale_authored_glow(Geometry* geometry,uint32_t mesh_index,float strength)
+{
+    const MeshRange& mesh=geometry->meshes[mesh_index];bool masked=false;
+    for (uint32_t v=mesh.first_vertex;v<mesh.first_vertex+mesh.vertex_count;++v)
+    {
+        float& emission=geometry->vertices[v].normal[3];masked=masked || emission>0;
+        emission*=strength;
+    }
+    return masked;
+}
+
 bool presentation_initialize(Presentation* p,const Simulation* s,const RenderConfig* config)
 {
     const World* w=&s->world;RenderScene* scene=&p->scene;
@@ -105,6 +117,16 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
                 for (uint32_t c=0;c<3;++c) vertex.color[c]*=1-weight+weight*tint[c];
             }
         }
+        for (uint32_t i=0;i<w->body_count;++i)
+            if (w->content.bodies[w->bodies[i].type].hosts_site && !geometry_self_glow(&scene->geometry,p->body_meshes[i],
+                w->content.bodies[w->bodies[i].type].parts_path,w->glow_interior,w->glow_organelles)) return false;
+        for (uint32_t i=0;i<w->content.producer_count;++i)
+        {
+            scale_authored_glow(&scene->geometry,p->factory_meshes[i],w->glow_stems);
+            p->stem_glow_mask[i]=w->content.producers[i].segment_path[0]
+                && scale_authored_glow(&scene->geometry,p->segment_meshes[i],w->glow_stems);
+        }
+        scene->self_glow=w->glow_interior>0 || w->glow_organelles>0 || w->glow_stems>0 || w->glow_leaves>0 || w->glow_units>0;
         p->unit_base=0;p->body_base=w->gameplay.enabled ? (uint32_t)MAX_UNITS : w->spawn_count;
         p->factory_base=p->body_base+w->body_count;
         p->stem_base=p->factory_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES : 0);
@@ -237,6 +259,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
             Vec3 delta=subtract(s->world.bodies[unit->target].position,unit->position);
             yaw=std::atan2(delta.x,delta.z);
         }
+        state->scene.instances[state->unit_base+i].style[4]=s->world.glow_units;
         if (s->world.combat.enabled)
         {
             Vec3 velocity=subtract(unit->position,s->trails[i].points[0]);
@@ -246,7 +269,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
             if (!flash && unit->wounds) tint=s->world.spikes.injury[std::min(1u,unit->wounds-1)];
             float* style=state->scene.instances[state->unit_base+i].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;
             style[3]=flash ? HIT_FLASH_TINT_STRENGTH*flash_strength : (unit->wounds ? INJURY_TINT_STRENGTH : 0);
-            style[4]=flash ? HIT_FLASH_EMISSION_STRENGTH*flash_strength : 0;
+            style[4]=s->world.glow_units+(flash ? HIT_FLASH_EMISSION_STRENGTH*flash_strength : 0);
         }
         if (s->world.combat.flight_enabled)
         {
@@ -284,6 +307,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                         uint32_t wounds=k ? colony->branches[k-1].wounds : colony->wounds;
                         Color tint=wounds ? s->world.spikes.injury[std::min(1u,wounds-1)] : color;
                         float* style=state->scene.instances[slot].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=wounds ? INJURY_TINT_STRENGTH : FACTORY_FACTION_TINT_STRENGTH;
+                        style[4]=state->stem_glow_mask[colony->type] ? 0 : s->world.glow_stems;
                     }
                     float size=definition->width*(definition->branches.grammar==GROWTH_TREE ? simulation_structure_scale(s,p,k) : (colony->parents[k]>=0 ? FACTORY_CHILD_HEAD_WIDTH_SCALE : 1))*(FACTORY_HEAD_START_WIDTH_SCALE+FACTORY_HEAD_GROWTH_WIDTH_SCALE*growth);
                     uint32_t slot=factory_instance_slot(state,p,k);
@@ -292,6 +316,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                     if (growth>=(k ? colony->branches[k-1].growth : colony->growth) && (definition->branches.grammar!=GROWTH_TREE || simulation_structure_terminal(s,p,k)))
                         set_instance(state,slot,state->tip_meshes[colony->type],tip,scale(x,size),scale(y,size),scale(z,size));
                     float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=FACTORY_FACTION_TINT_STRENGTH;
+                    style[4]=s->world.glow_leaves;
                 }
                 for (uint32_t k=0;k<colony->structure_count;++k) if (colony->leaves[k].active)
                 {
@@ -300,6 +325,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                     float size=u.scale*(BUD_START_SCALE+BUD_GROWTH_SCALE*t*t*(3-2*t));Vec3 tip=simulation_structure_position(s,p,k);
                     Vec3 z=normalize(subtract(tip,s->world.bodies[p].position));
                     Vec3 x=normalize(cross(std::fabs(z.y)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0},z)),y=cross(z,x);
+                    state->scene.instances[state->bud_base+p*MAX_FACTORY_STRUCTURES+k].style[4]=s->world.glow_units;
                     set_instance(state,state->bud_base+p*MAX_FACTORY_STRUCTURES+k,state->unit_meshes[job.type],tip,scale(x,size),scale(y,size),scale(z,size));
                 }
                 continue;

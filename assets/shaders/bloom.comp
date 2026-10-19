@@ -12,8 +12,8 @@ const float SRGB_LINEAR_THRESHOLD = 0.0031308;
 const float GAUSSIAN_RADIUS_SIGMAS = 3.0;
 const float MIN_BLOOM_PEAK = 0.000001;
 
-// A separable, native-resolution glare filter. Both passes overwrite this
-// frame's buffers; neither samples a preceding frame or changes resolution.
+// Current-frame halo: downsample, two separable quarter-size blurs, then
+// native display composition. Two disjoint tiles reuse HDR scratch storage.
 layout(local_size_x = COMPUTE_GROUP_SIZE, local_size_y = COMPUTE_GROUP_SIZE) in;
 layout(set = 0, binding = BLOOM_BINDING_BEAUTY, rgba32f) uniform readonly image2D beauty;
 layout(set = 0, binding = BLOOM_BINDING_HORIZONTAL, rgba32f) uniform image2D horizontal;
@@ -27,7 +27,9 @@ layout(push_constant) uniform Bloom
     float strength;
     float exposure;
     float debug_views;
+    uint emissive_only;
 } bloom;
+layout(set=0,binding=BLOOM_BINDING_SHARP_LAYER,std430) readonly buffer EmissionGuide { vec4 sharp_pixels[]; };
 
 vec3 linear_to_srgb(vec3 linear)
 {
@@ -92,39 +94,61 @@ void write_display(ivec2 pixel,vec3 linear)
             uintBitsToFloat(packUnorm4x8(vec4(value,0.0)));
 }
 
+vec3 bright(vec3 value,ivec2 pixel)
+{
+    float peak=max(value.r,max(value.g,value.b));
+    float source=bloom.emissive_only!=0u ? min(peak,sharp_pixels[pixel.y*bloom.extent.x+pixel.x].a) : peak;
+    return value*max(0.0,source-bloom.threshold)/max(peak,MIN_BLOOM_PEAK);
+}
+
+vec3 halo_sample(ivec2 pixel,ivec2 extent)
+{
+    vec2 p=(vec2(pixel)+.5)/float(BLOOM_DOWNSAMPLE)-.5;
+    ivec2 low=ivec2(floor(p));vec2 f=fract(p);ivec2 last=extent-1;
+    vec3 a=imageLoad(horizontal,clamp(low,ivec2(0),last)).rgb;
+    vec3 b=imageLoad(horizontal,clamp(low+ivec2(1,0),ivec2(0),last)).rgb;
+    vec3 c=imageLoad(horizontal,clamp(low+ivec2(0,1),ivec2(0),last)).rgb;
+    vec3 d=imageLoad(horizontal,clamp(low+ivec2(1,1),ivec2(0),last)).rgb;
+    return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);
+}
+
 void main()
 {
-    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
-    if (any(greaterThanEqual(pixel, bloom.extent))) return;
-    if (bloom.strength<=0.0)
+    ivec2 pixel=ivec2(gl_GlobalInvocationID.xy);
+    ivec2 small=(bloom.extent+BLOOM_DOWNSAMPLE-1)/BLOOM_DOWNSAMPLE;
+    if (bloom.pass==BLOOM_COMPOSITE_PASS)
     {
-        if (bloom.pass==1) write_display(pixel,imageLoad(beauty,pixel).rgb*bloom.exposure);
+        if (any(greaterThanEqual(pixel,bloom.extent))) return;
+        vec3 glow=vec3(0);
+        if (bloom.strength>0.0)
+            glow=bloom.extent.y<2 ? bright(imageLoad(beauty,pixel).rgb,pixel) : halo_sample(pixel,small);
+        write_display(pixel,(imageLoad(beauty,pixel).rgb+bloom.strength*glow)*bloom.exposure);
         return;
     }
-    vec3 sum = vec3(0.0);
-    float weight_sum = 0.0;
-    float sigma = max(0.5, float(bloom.radius) / GAUSSIAN_RADIUS_SIGMAS);
-    for (int offset = -bloom.radius; offset <= bloom.radius; ++offset)
+    if (any(greaterThanEqual(pixel,small))) return;
+    if (bloom.pass==0)
     {
-        float weight = exp(-0.5 * float(offset * offset) / (sigma * sigma));
-        weight_sum += weight;
-        ivec2 sample_pixel = pixel + (bloom.pass == 0 ? ivec2(offset, 0) : ivec2(0, offset));
-        if (any(lessThan(sample_pixel, ivec2(0))) || any(greaterThanEqual(sample_pixel, bloom.extent))) continue;
-        vec3 value;
-        if (bloom.pass == 0)
-        {
-            value = imageLoad(beauty, sample_pixel).rgb;
-            float peak = max(value.r, max(value.g, value.b));
-            value *= max(0.0, peak - bloom.threshold) / max(peak, MIN_BLOOM_PEAK);
-        }
-        else value = imageLoad(horizontal, sample_pixel).rgb;
-        sum += value * weight;
+        vec3 sum=vec3(0);float count=0;
+        for (int y=0;y<BLOOM_DOWNSAMPLE;++y)
+            for (int x=0;x<BLOOM_DOWNSAMPLE;++x)
+            {
+                ivec2 p=pixel*BLOOM_DOWNSAMPLE+ivec2(x,y);
+                if (any(greaterThanEqual(p,bloom.extent))) continue;
+                sum+=bright(imageLoad(beauty,p).rgb,p);count+=1;
+            }
+        imageStore(horizontal,pixel,vec4(sum/count,1));
+        return;
     }
-    sum /= weight_sum;
-    if (bloom.pass == 0) imageStore(horizontal, pixel, vec4(sum, 1.0));
-    else
+    int radius=max(1,(bloom.radius+BLOOM_DOWNSAMPLE-1)/BLOOM_DOWNSAMPLE);
+    float sigma=max(.5,float(bloom.radius)/float(BLOOM_DOWNSAMPLE)/GAUSSIAN_RADIUS_SIGMAS);
+    vec3 sum=vec3(0);float weights=0;
+    for (int offset=-radius;offset<=radius;++offset)
     {
-        vec3 linear = (imageLoad(beauty, pixel).rgb + bloom.strength * sum) * bloom.exposure;
-        write_display(pixel,linear);
+        float w=exp(-.5*float(offset*offset)/(sigma*sigma));
+        ivec2 p=clamp(pixel+(bloom.pass==1 ? ivec2(offset,0) : ivec2(0,offset)),ivec2(0),small-1);
+        if (bloom.pass==2) p.y+=small.y;
+        sum+=imageLoad(horizontal,p).rgb*w;weights+=w;
     }
+    ivec2 destination=pixel+(bloom.pass==1 ? ivec2(0,small.y) : ivec2(0));
+    imageStore(horizontal,destination,vec4(sum/weights,1));
 }

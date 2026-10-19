@@ -329,7 +329,12 @@
       "sheath_radius": 0.13,
       "shaft_radius": 0.07,
       "head_radius": 0.36,
-      "fibre_spread": 0.39
+      "fibre_spread": 0.39,
+      "ridge_color": [
+        0.035,
+        0.075,
+        0.065
+      ]
     },
     "immune": {
       "shaft_radius": 0.12,

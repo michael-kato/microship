@@ -111,6 +111,9 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
         window->camera_keys=0;window->render_keys=0;window->panning=false;window->stats_held=false;window->buffers_held=false;
         if (GetCapture()==handle) ReleaseCapture();
     }
+    // F10 is a system key on Win32. Consume only its system messages here.
+    if (window && ((message==WM_SYSKEYDOWN || message==WM_SYSKEYUP) && wparam==VK_F10))
+        message=message==WM_SYSKEYDOWN ? WM_KEYDOWN : WM_KEYUP;
     if (window && (message==WM_KEYDOWN || message==WM_KEYUP))
     {
         if (wparam==VK_F1 || wparam==VK_F2)
@@ -121,7 +124,7 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
             else { if (!*held) *toggle=!*toggle;*held=true; }
             return 0;
         }
-        if (wparam>=VK_F5 && wparam<=VK_F9)
+        if (wparam>=VK_F5 && wparam<=VK_F10)
         {
             uint32_t bit=1u<<(wparam-VK_F5);
             if (message==WM_KEYUP) window->render_keys&=~bit;

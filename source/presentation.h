@@ -18,6 +18,7 @@ struct Presentation
     std::vector<Vec3> membrane_normals;
     uint32_t body_meshes[MAX_BODIES],unit_meshes[MAX_UNIT_TYPES],factory_meshes[MAX_PRODUCER_TYPES],spike_mesh,background_mesh;
     uint32_t payload_meshes[MAX_UNIT_TYPES];
+    bool stem_glow_mask[MAX_PRODUCER_TYPES];
     uint32_t segment_meshes[MAX_PRODUCER_TYPES],tip_meshes[MAX_PRODUCER_TYPES],stem_base,bud_base,debris_base;
     uint32_t unit_base,body_base,factory_base,attached_base,flying_base,embedded_base,background_slot;
     int32_t medium_bodies[MAX_BODIES+1];

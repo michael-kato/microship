@@ -9,7 +9,7 @@ p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('binary',type=Path)
 p.add_argument('--samples',type=int,choices=(1,3,6),default=1)
 p.add_argument('--cold-start',action='store_true')
-p.add_argument('--case',choices=('baseline','off','restore','repeat','buffers','buffers-return'),default='off')
+p.add_argument('--case',choices=('baseline','off','restore','repeat','buffers','buffers-return','glow-off','glow-restore'),default='off')
 p.add_argument('--output',type=Path,default=root/'build/render-toggles')
 p.add_argument('--reference',type=Path,help='Fresh baseline output folder for exact restoration checks')
 p.add_argument('--run',action='store_true');a=p.parse_args()
@@ -40,9 +40,11 @@ for reader in readers:reader.start()
 helper_process=None
 try:
  before=['pause'];after=[]
+ if a.case=='glow-restore':before+=['10']
  if a.case=='restore':before+=['5','6','7','8','9']
  if a.case in ('buffers','buffers-return'):before+=['buffers']
- if a.case in ('off','restore'):after=['5','6','7','8','9']
+ if a.case in ('glow-off','glow-restore'):after=['10']
+ elif a.case in ('off','restore'):after=['5','6','7','8','9']
  elif a.case=='repeat':after=['repeat']
  elif a.case=='buffers':after=['5']
  elif a.case=='buffers-return':after=['buffers']
@@ -78,7 +80,7 @@ assert seconds<=process_limit,seconds
 assert 'Vulkan validation: enabled.' in output
 settings=re.findall(r'Render settings: disabled (\d+); SSS (ON|OFF|N/A); volume rays (\d+); cell blur (\d+); tilt radius ([0-9.]+); fog radius ([0-9]+\.[0-9]+)\.',output)
 assert len(settings)==2,settings
-expected={'baseline':[0,0],'off':[0,31],'restore':[31,0],'repeat':[0,0],'buffers':[0,1],'buffers-return':[0,0]}[a.case]
+expected={'baseline':[0,0],'off':[0,31],'restore':[31,0],'repeat':[0,0],'buffers':[0,1],'buffers-return':[0,0],'glow-off':[0,32],'glow-restore':[32,0]}[a.case]
 assert [int(s[0]) for s in settings]==expected,(settings,expected)
 for s in settings:
  mask=int(s[0]);assert s[1]==('OFF' if mask&1 else 'ON'),s
@@ -86,13 +88,18 @@ for s in settings:
 profiles=re.findall(r'Profile (.*?): start ([0-9.]+) ms; last ([0-9.]+) ms; mean ([0-9.]+) ms; samples (\d+)\.',output)
 assert len(profiles)==56,len(profiles)
 frames=[profiles[:28],profiles[28:]]
-assert [int(f[0][-1]) for f in frames]==([1,1] if a.case in ('off','restore','buffers') else [1,2]),frames
+assert [int(f[0][-1]) for f in frames]==([1,1] if a.case in ('off','restore','buffers','glow-off','glow-restore') else [1,2]),frames
 for f in frames:
  for _,_,last,mean,samples in f:
   if samples=='1':assert abs(float(last)-float(mean))<.00001,(last,mean)
 if a.case=='off':
  for name,_,last,_,_ in frames[1]:
   if name in ('VOLUME','CELL BLUR','FOG','TILT SHIFT'):assert float(last)<.05,(name,last)
+glow_settings=re.findall(r'Surface self-glow: (ON|OFF); halo strength ([0-9.]+)\.',output)
+assert len(glow_settings)==2,glow_settings
+for mask,settings_glow in zip(expected,glow_settings):
+ assert (settings_glow[0]=='OFF')==bool(mask&32),(mask,settings_glow)
+ assert (float(settings_glow[1])==0)==bool(mask&32),(mask,settings_glow)
 state=json.loads((out/'state.json').read_text())
 assert state['tick']==600,state['tick']
 cache=re.findall(r'Static lighting: (\d+) baked, (\d+) reused;',output)

@@ -18,6 +18,7 @@ static const int MAX_BACKDROP_PERIOD_SECONDS = 120;
 static const float MAX_BACKDROP_PULSE_AMPLITUDE = .15f;
 static const int MAX_BACKDROP_AMBIENT = 10;
 static const int MAX_BACKDROP_GLOW = 20;
+static const int MAX_SURFACE_GLOW_STRENGTH = 8;
 static const int MAX_BACKDROP_SCALE = 10000;
 static const int MAX_BACKDROP_COORDINATE = 1000000;
 static const int MAX_MEMBRANE_ABSORPTION = 10;
@@ -219,7 +220,7 @@ static bool load_effects(World* w,const char* path)
 static bool load_appearance(World* w,const char* path,uint32_t seed)
 {
     JsonDocument d;if (!json_load(&d,path)) return false;Json root=json_root(&d);
-    json_object(root,"$schema|ambient|gradient|lights|thin_surface|backdrop|atmosphere|fog");
+    json_object(root,"$schema|ambient|gradient|lights|thin_surface|backdrop|atmosphere|fog|self_glow");
     w->ambient=json_color(json_get(root,"ambient"),MAX_AMBIENT_RADIANCE);w->ambient_enabled=true;
     Json gradient=json_find(root,"gradient");
     if (json_present(gradient))
@@ -249,6 +250,16 @@ static bool load_appearance(World* w,const char* path,uint32_t seed)
         Json half_life=json_find(fog,"memory_half_life_seconds");
         if (json_present(half_life)) w->fog_half_life=json_float(half_life,0,60);
         w->fog_plane_z=json_float(json_get(fog,"plane_z"),-MAX_BACKDROP_COORDINATE,MAX_BACKDROP_COORDINATE);
+    }
+    Json glow=json_find(root,"self_glow");
+    if (json_present(glow))
+    {
+        json_object(glow,"cell_interior|organelles|factory_stems|factory_leaves|units");
+        w->glow_interior=json_float(json_get(glow,"cell_interior"),0,MAX_SURFACE_GLOW_STRENGTH);
+        w->glow_organelles=json_float(json_get(glow,"organelles"),0,MAX_SURFACE_GLOW_STRENGTH);
+        w->glow_stems=json_float(json_get(glow,"factory_stems"),0,MAX_SURFACE_GLOW_STRENGTH);
+        w->glow_leaves=json_float(json_get(glow,"factory_leaves"),0,MAX_SURFACE_GLOW_STRENGTH);
+        w->glow_units=json_float(json_get(glow,"units"),0,MAX_SURFACE_GLOW_STRENGTH);
     }
     Json lights=json_find(root,"lights");
     if (json_present(lights))

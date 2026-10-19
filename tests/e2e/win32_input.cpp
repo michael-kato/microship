@@ -7,7 +7,7 @@
 static bool key(HWND window,WPARAM code,bool down,bool repeat=false)
 {
     LPARAM scan=(LPARAM)MapVirtualKeyA((UINT)code,MAPVK_VK_TO_VSC)<<16;
-    return PostMessageA(window,down ? WM_KEYDOWN : WM_KEYUP,code,scan|1
+    return PostMessageA(window,code==VK_F10 ? (down ? WM_SYSKEYDOWN : WM_SYSKEYUP) : (down ? WM_KEYDOWN : WM_KEYUP),code,scan|1
         |((!down || repeat) ? (LPARAM)1<<30 : 0)|(!down ? (LPARAM)1<<31 : 0))!=0;
 }
 static bool press(HWND window,WPARAM code)
@@ -50,15 +50,16 @@ int main(int argc,char** argv)
             else if (!strcmp(argv[i],"repeat"))
             {
                 // Focus loss, a late repeat, then a new press must cancel once.
-                for (WPARAM code=VK_F5;code<=VK_F9;++code)
+                for (WPARAM code=VK_F5;code<=VK_F10;++code)
                     if (!key(window,code,true) || !PostMessageA(window,WM_KILLFOCUS,0,0)
                         || !key(window,code,true,true) || !key(window,code,false) || !press(window,code)) return 1;
                 if (!press(window,VK_F1) || !press(window,VK_F1)
                     || !press(window,VK_F2) || !press(window,VK_F2)) return 1;
             }
+            else if (!strcmp(argv[i],"10")) { if (!press(window,VK_F10)) return 1; }
             else if (strlen(argv[i])==1 && argv[i][0]>='5' && argv[i][0]<='9')
             { if (!press(window,VK_F5+argv[i][0]-'5')) return 1; }
-            else { fprintf(stderr,"Expected rendering key 5..9, pause, buffers or repeat.\n");return 2; }
+            else { fprintf(stderr,"Expected rendering key 5..10, pause, buffers or repeat.\n");return 2; }
         }
         printf("Queued rendering keys, with held repeats, to the game window.\n");return 0;
     }

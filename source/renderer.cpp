@@ -113,6 +113,7 @@ struct BloomParameters
     float strength;
     float exposure;
     float debug_views;
+    uint32_t emissive_only;
 };
 
 struct DebugParameters
@@ -737,7 +738,7 @@ static void scene_uniform(RenderUniform* uniform,const RenderScene* scene)
     uniform->ambient_bottom[0]=scene->ambient_bottom.r;uniform->ambient_bottom[1]=scene->ambient_bottom.g;uniform->ambient_bottom[2]=scene->ambient_bottom.b;
     uniform->background_quality[0]=scene->background_samples;uniform->background_quality[1]=scene->background_triangles;
     uniform->backdrop_style[0]=scene->background_blur;uniform->backdrop_style[1]=scene->background_glow;uniform->backdrop_style[2]=scene->background_ambient;
-    uniform->membrane_fade[0]=scene->thin_edge_strength;uniform->membrane_fade[1]=scene->thin_edge_power;uniform->membrane_fade[2]=scene->thin_blur_radius;
+    uniform->membrane_fade[0]=scene->thin_edge_strength;uniform->membrane_fade[1]=scene->thin_edge_power;uniform->membrane_fade[2]=scene->thin_blur_radius;uniform->membrane_fade[3]=1;
     uniform->thin_material[0]=scene->thin_transmission;uniform->thin_material[1]=scene->thin_absorption;
     uniform->thin_material[2]=scene->lights_enabled ? 1 : 0;uniform->thin_material[3]=scene->thin_clarity;
     float total=0;
@@ -912,6 +913,7 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
     uniform.display[0]=state->config.exposure;uniform.display[1]=std::tan(state->config.vertical_fov_degrees*HALF_DEGREES_TO_RADIANS);
     uniform.display[2]=(float)state->config.width/state->config.height;uniform.display[3]=(float)state->config.volume_steps;
     uniform.quality[0]=state->config.volume_rays_per_pixel;
+    uniform.background_quality[3]=state->config.bloom_strength>0 && !state->custom_shader ? 1u : 0u;
     uniform.quality[1]=state->config.shadow_grid_resolution;
     uniform.scene[3]=state->config.static_lighting_cache && state->config.shadow_grid_resolution && !state->custom_shader ? 1 : 0;
     uniform.quality[2]=state->config.microfacet_energy_compensation;
@@ -1158,7 +1160,7 @@ static bool create_output(RendererState* state)
         || !create_buffer(state,&state->lighting_bounds,(state->medium_count ? state->medium_count : 1)*sizeof(RenderGridBounds),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host)
         || !create_buffer(state,&state->surface_lighting,surface_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
         || !create_buffer(state,&state->lighting_instances,state->lighting_input.size()*sizeof(LightingInstance),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host)) return false;
-    VkDeviceSize sharp_bytes=state->uniform_data.quality[3] ? (VkDeviceSize)state->config.width*state->config.height*4*sizeof(float) : 4*sizeof(float);
+    VkDeviceSize sharp_bytes=(state->uniform_data.quality[3] || state->uniform_data.background_quality[3]) ? (VkDeviceSize)state->config.width*state->config.height*4*sizeof(float) : 4*sizeof(float);
     if (sharp_bytes>state->properties.limits.maxStorageBufferRange)
     { fprintf(stderr,"Medium sharp layer exceeds the storage-buffer range.\n");return false; }
     if (!create_buffer(state,&state->sharp_layer,sharp_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
@@ -1680,6 +1682,7 @@ static uint32_t available_features(const RendererState* state,const RenderScene*
     if (!state->custom_shader && state->uniform_data.quality[3]) mask|=RENDER_CELL_BLUR;
     if (state->config.focus_radius>0) mask|=RENDER_TILT_SHIFT;
     if (scene->fog_blur>0) mask|=RENDER_FOG_BLUR;
+    if (scene->self_glow || state->config.bloom_strength>0) mask|=RENDER_GLOW;
     return mask;
 }
 
@@ -1699,8 +1702,8 @@ static void profile_overlay(RendererState* state,const Renderer* renderer,Profil
     snprintf(line,sizeof(line),"F5 SSS %s / F6 VOLUME %s / F7 CELL BLUR %s",
         feature_status(renderer,RENDER_SSS),feature_status(renderer,RENDER_VOLUME),feature_status(renderer,RENDER_CELL_BLUR));
     profile_text(state,line,8,268,STATS_TEXT_WIDTH-8);
-    snprintf(line,sizeof(line),"F8 TILT SHIFT %s / F9 FOG BLUR %s / MEAN RESETS ON CHANGE",
-        feature_status(renderer,RENDER_TILT_SHIFT),feature_status(renderer,RENDER_FOG_BLUR));
+    snprintf(line,sizeof(line),"F8 TILT SHIFT %s / F9 FOG BLUR %s / F10 GLOW %s",
+        feature_status(renderer,RENDER_TILT_SHIFT),feature_status(renderer,RENDER_FOG_BLUR),feature_status(renderer,RENDER_GLOW));
     profile_text(state,line,8,286,STATS_TEXT_WIDTH-8);
     if (!p->count) { profile_text(state,"WAITING FOR THE FIRST COMPLETED FRAME",8,30,STATS_TEXT_WIDTH-8);return; }
     snprintf(line,sizeof(line),"MEAN CPU %.2F / GPU %.2F MS   LAST CPU %.2F / GPU %.2F MS   %.1F FPS",
@@ -2106,6 +2109,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     uniform->subsurface[0]=renderer->disabled_features&RENDER_SSS ? 0.0f : state->config.subsurface_strength;
     uniform->focus_band[3]=renderer->disabled_features&RENDER_TILT_SHIFT ? 0.0f : state->config.focus_radius;
     if (renderer->disabled_features&RENDER_FOG_BLUR) uniform->fog[0]=0;
+    uniform->membrane_fade[3]=renderer->disabled_features&RENDER_GLOW ? 0.0f : 1.0f;
     if (state->custom_shader || (renderer->disabled_features&RENDER_CELL_BLUR))
     { uniform->quality[3]=0;uniform->membrane_fade[2]=0; }
     if (scene->instances.size()!=state->instance_count || scene->media.size()!=state->medium_count
@@ -2287,9 +2291,10 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     bloom.extent[1] = (int32_t)state->config.height;
     bloom.radius = (int32_t)state->config.bloom_radius;
     bloom.threshold = state->config.bloom_threshold;
-    bloom.strength = state->config.bloom_strength;
+    bloom.strength = renderer->disabled_features&RENDER_GLOW ? 0.0f : state->config.bloom_strength;
     bloom.exposure = state->config.exposure;
     bloom.debug_views = renderer->debug_views ? 1.0f : 0.0f;
+    bloom.emissive_only=state->uniform_data.background_quality[3];
     if (uniform->fog[0]>0 && !renderer->debug_views && fog_covers_view(*uniform,scene->fog_field))
     {
         image_barrier(state->command,state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
@@ -2336,15 +2341,23 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_FOCUS_END);
     vkCmdBindPipeline(state->command, VK_PIPELINE_BIND_POINT_COMPUTE, state->bloom_pipeline);
     vkCmdBindDescriptorSets(state->command, VK_PIPELINE_BIND_POINT_COMPUTE, state->bloom_layout, 0, 1, &state->bloom_descriptors, 0, 0);
-    if (bloom.strength>0.0f)
+    if (bloom.strength>0.0f && bloom.emissive_only) shader_buffer_barrier(state->command);
+    if (bloom.strength>0.0f && state->config.height>=2)
     {
-        vkCmdPushConstants(state->command, state->bloom_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(bloom), &bloom);
-        vkCmdDispatch(state->command, (state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, (state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, 1);
-        image_barrier(state->command, state->hdr_scratch, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
-            VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+        const uint32_t width=(state->config.width+BLOOM_DOWNSAMPLE-1)/BLOOM_DOWNSAMPLE;
+        const uint32_t height=(state->config.height+BLOOM_DOWNSAMPLE-1)/BLOOM_DOWNSAMPLE;
+        for (bloom.pass=0;bloom.pass<BLOOM_COMPOSITE_PASS;++bloom.pass)
+        {
+            image_barrier(state->command,state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+            vkCmdPushConstants(state->command,state->bloom_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,sizeof(bloom),&bloom);
+            vkCmdDispatch(state->command,(width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,(height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,1);
+        }
+        image_barrier(state->command,state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+            VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
     }
-    bloom.pass = 1;
+    bloom.pass = BLOOM_COMPOSITE_PASS;
     vkCmdPushConstants(state->command, state->bloom_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(bloom), &bloom);
     vkCmdDispatch(state->command, (state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, (state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, 1);
     vkCmdWriteTimestamp(state->command, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, state->queries, GPU_TIME_BLOOM_END);
@@ -2416,8 +2429,12 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     renderer->gpu_frame_ms=gpu_ticks*scale;
     printf("GPU acceleration update: %.3f ms; GPU effects: %.3f ms.\n",as_ticks*scale,fx_ticks*scale);
     printf("GPU fog/bloom/display: %.3f ms; total render: %.3f ms\n",bloom_ms,renderer->gpu_frame_ms);
+    uint64_t halo_ticks=(timestamps[GPU_TIME_BLOOM_END]-timestamps[GPU_TIME_FOCUS_END]);
+    if (state->timestamp_bits<TIMESTAMP_WORD_BITS) halo_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1;
+    printf("GPU halo/display: %.3f ms.\n",halo_ticks*scale);
     printf("GPU debug overlay: %.3f ms; buffer views %u; FPS stats %u.\n",debug_ms,
         renderer->debug_views ? 1u : 0u,renderer->debug_stats ? 1u : 0u);
+    printf("Surface self-glow: %s; halo strength %.3f.\n",uniform->membrane_fade[3]>0 ? "ON" : "OFF",renderer->disabled_features&RENDER_GLOW ? 0.0f : state->config.bloom_strength);
     printf("Render settings: disabled %u; SSS %s; volume rays %u; cell blur %u; tilt radius %.1f; fog radius %.1f.\n",
         renderer->disabled_features,feature_status(renderer,RENDER_SSS),uniform->quality[0],uniform->quality[3],uniform->focus_band[3],uniform->fog[0]);
     static const struct { ProfileNode node;int begin,end; } spans[]={
