@@ -78,6 +78,7 @@ struct LightingInstance
 static_assert(sizeof(LightingInstance)==64,"Lighting instance shader layout");
 // Inputs of one slot that static light transport depends on.
 struct LightingKey { float transform[3][4];uint32_t mesh,mask; };
+struct WorldBounds { float low[3],high[3]; };
 
 struct RenderUniform
 {
@@ -141,6 +142,7 @@ struct MeshAllocation
     VkDeviceAddress address;
     MeshRange range;
     uint32_t opaque_count; // Opaque triangles first, then thin membranes.
+    uint32_t refits,unchanged; // Updates since the last full build; frames since the last change.
 };
 
 enum { FRAMES_IN_FLIGHT=2 };
@@ -205,7 +207,10 @@ struct RendererState
     std::vector<LightingInstance> lighting_input; // Active instances in TLAS order.
     std::vector<uint32_t> slot_cache_first; // Per scene slot: first surface-cache triangle.
     uint32_t surface_cache_triangles;
-    bool surface_lighting_valid;
+    std::vector<uint8_t> surface_valid; // Per scene slot: baked thin-surface samples match current inputs.
+    std::vector<WorldBounds> baked_slot_bounds; // Per scene slot, at its last bake.
+    std::vector<uint32_t> active_slots; // Scene slot of each compacted active instance.
+    std::vector<WorldBounds> lighting_changes; // Changed regions found this frame; preallocated.
     std::vector<LightingKey> baked_instances; // Per scene slot.
     std::vector<uint64_t> baked_mesh_revisions;
     std::vector<RenderMedium> baked_media;
@@ -828,39 +833,105 @@ static void scene_uniform(RenderUniform* uniform,const RenderScene* scene)
     uniform->fog[0]=scene->fog_blur;uniform->fog[1]=scene->fog_feather;uniform->fog[2]=scene->fog_plane_z;
 }
 
-// Only scene inputs used by static light transport invalidate the bake.
+static WorldBounds empty_bounds()
+{
+    WorldBounds b;
+    for (uint32_t a=0;a<3;++a) { b.low[a]=FLT_MAX;b.high[a]=-FLT_MAX; }
+    return b;
+}
+static void include_bounds(WorldBounds* target,const WorldBounds& source)
+{
+    for (uint32_t a=0;a<3;++a) { target->low[a]=std::min(target->low[a],source.low[a]);target->high[a]=std::max(target->high[a],source.high[a]); }
+}
+static WorldBounds slot_bounds(const RenderInstance& instance,const MeshRange& mesh)
+{
+    WorldBounds b;
+    for (uint32_t r=0;r<3;++r)
+    {
+        float center=instance.transform[r][3],extent=0;
+        for (uint32_t c=0;c<3;++c)
+        {
+            center+=instance.transform[r][c]*.5f*(mesh.low[c]+mesh.high[c]);
+            extent+=std::fabs(instance.transform[r][c])*.5f*(mesh.high[c]-mesh.low[c]);
+        }
+        b.low[r]=center-extent;b.high[r]=center+extent;
+    }
+    return b;
+}
+static WorldBounds medium_bounds(const RenderMedium& medium)
+{
+    WorldBounds b;
+    for (uint32_t a=0;a<3;++a) { b.low[a]=medium.center_radius[a]-medium.center_radius[3];b.high[a]=medium.center_radius[a]+medium.center_radius[3]; }
+    return b;
+}
+
+// Static transport at a point depends on what its rays toward the lights cross.
+// A change reaches a target if the change, swept away from any active light,
+// meets the target: a ray from the change's center along -L against the target
+// grown by the change's half extent. The margin covers ray-origin offsets.
+static bool change_reaches(const WorldBounds& change,const WorldBounds& target,const RenderUniform& u)
+{
+    if (change.low[0]>change.high[0] || target.low[0]>target.high[0]) return false;
+    const float margin=.01f;
+    for (uint32_t light=0;light<3;++light)
+    {
+        if (u.studio_direction[light][3]<=0) continue;
+        float begin=0,end=FLT_MAX;bool hit=true;
+        for (uint32_t a=0;a<3 && hit;++a)
+        {
+            float half=.5f*(change.high[a]-change.low[a])+margin,origin=.5f*(change.low[a]+change.high[a]);
+            float low=target.low[a]-half,high=target.high[a]+half,direction=-u.studio_direction[light][a];
+            if (std::fabs(direction)<1e-12f) { hit=origin>=low && origin<=high;continue; }
+            float t0=(low-origin)/direction,t1=(high-origin)/direction;
+            begin=std::max(begin,std::min(t0,t1));end=std::min(end,std::max(t0,t1));hit=begin<=end;
+        }
+        if (hit) return true;
+    }
+    return false;
+}
+
+// Static light transport depends on light directions, thin-surface transport,
+// stationary blockers and media. A change invalidates only the grids and thin
+// surfaces whose light paths it can reach; light or material changes reset all.
 static void update_lighting_dependencies(RendererState* state,const RenderScene* scene)
 {
     if (!state->uniform_data.scene[3]) return;
-    bool changed=!state->lighting_dependencies_valid || state->config.force_lighting_rebuild;
     const RenderUniform& u=state->uniform_data;RenderUniform& old=state->baked_uniform;
-    changed=changed || memcmp(u.studio_direction,old.studio_direction,sizeof(u.studio_direction))
+    bool global=!state->lighting_dependencies_valid || state->config.force_lighting_rebuild
+        || memcmp(u.studio_direction,old.studio_direction,sizeof(u.studio_direction))
         || memcmp(u.thin_material,old.thin_material,sizeof(u.thin_material))
         || memcmp(u.membrane_fade,old.membrane_fade,2*sizeof(float));
+    std::vector<WorldBounds>& changes=state->lighting_changes;changes.clear();
+    std::vector<WorldBounds>& slot_bake=state->baked_slot_bounds;
     for (uint32_t i=0;i<state->instance_count;++i)
     {
         LightingKey current={};const RenderInstance& source=scene->instances[i];
-        if (source.static_lighting && (source.mask&1u))
+        bool stationary=source.static_lighting && (source.mask&SURFACE_RAY_MASK);
+        if (stationary)
         { memcpy(current.transform,source.transform,sizeof(current.transform));current.mesh=source.mesh;current.mask=source.mask; }
-        changed=changed || memcmp(&current,&state->baked_instances[i],sizeof(current));
-        state->baked_instances[i]=current;
+        const MeshRange& mesh=scene->geometry.meshes[source.mesh];
+        bool deformed=stationary && state->baked_mesh_revisions[source.mesh]!=mesh.revision;
+        if (!memcmp(&current,&state->baked_instances[i],sizeof(current)) && !deformed) continue;
+        // Both the old and the new blocker can change light elsewhere.
+        WorldBounds now=stationary ? slot_bounds(source,mesh) : empty_bounds(),both=slot_bake[i];include_bounds(&both,now);
+        changes.push_back(both);
+        slot_bake[i]=now;state->baked_instances[i]=current;state->surface_valid[i]=0;
     }
-    for (uint32_t i=0;i<state->mesh_count;++i)
-    {
-        changed=changed || state->baked_mesh_revisions[i]!=scene->geometry.meshes[i].revision;
-        state->baked_mesh_revisions[i]=scene->geometry.meshes[i].revision;
-    }
+    for (uint32_t i=0;i<state->mesh_count;++i) state->baked_mesh_revisions[i]=scene->geometry.meshes[i].revision;
     for (uint32_t i=0;i<state->medium_count;++i)
     {
         // Extinction uses center/radius, density fade, scattering and absorption.
-        changed=changed || memcmp(&state->baked_media[i],&scene->media[i],3*4*sizeof(float))
-            || memcmp(&state->baked_bounds[i],&scene->lighting_bounds[i],sizeof(RenderGridBounds));
+        bool medium=memcmp(&state->baked_media[i],&scene->media[i],3*4*sizeof(float))!=0;
+        if (medium) { WorldBounds both=medium_bounds(state->baked_media[i]);include_bounds(&both,medium_bounds(scene->media[i]));changes.push_back(both); }
+        if (medium || memcmp(&state->baked_bounds[i],&scene->lighting_bounds[i],sizeof(RenderGridBounds))) state->lighting_valid[i]=0;
         state->baked_media[i]=scene->media[i];state->baked_bounds[i]=scene->lighting_bounds[i];
     }
-    if (changed)
+    for (uint32_t c=0;c<changes.size() || (global && !c);++c)
     {
-        for (uint32_t i=0;i<state->medium_count;++i) state->lighting_valid[i]=0;
-        state->surface_lighting_valid=false;
+        for (uint32_t i=0;i<state->medium_count;++i)
+            if (global || change_reaches(changes[c],medium_bounds(scene->media[i]),u)) state->lighting_valid[i]=0;
+        for (uint32_t i=0;i<state->instance_count;++i)
+            if (global || change_reaches(changes[c],slot_bake[i],u)) state->surface_valid[i]=0;
     }
     old=u;state->lighting_dependencies_valid=true;
 }
@@ -892,7 +963,7 @@ static void scene_instances(RendererState* state,const RenderScene* scene)
     for (uint32_t i=0;i<state->instance_count;++i)
     {
         const RenderInstance* source=&scene->instances[i];if (!source->mask) continue;
-        uint32_t j=active++;VkAccelerationStructureInstanceKHR* out=&state->instance_data[j];
+        uint32_t j=active++;VkAccelerationStructureInstanceKHR* out=&state->instance_data[j];state->active_slots[j]=i;
         memcpy(out->transform.matrix,source->transform,sizeof(source->transform));
         bool stationary=source->static_lighting && (source->mask&SURFACE_RAY_MASK);
         out->mask=source->mask | (source->mask&SURFACE_RAY_MASK ? (stationary ? STATIC_BLOCKER_RAY_MASK : DYNAMIC_BLOCKER_RAY_MASK) : 0u);
@@ -1062,7 +1133,9 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
         state->meshes.resize(state->mesh_count);state->instance_data.resize(state->instance_count);state->style_data.resize(state->instance_count*INSTANCE_STYLE_FLOATS);
         state->baked_instances.resize(state->instance_count);state->baked_mesh_revisions.resize(state->mesh_count);
         state->baked_media.resize(scene->media.size());state->baked_bounds.resize(scene->media.size());state->lighting_input.resize(state->instance_count);
-        state->slot_cache_first.resize(state->instance_count);
+        state->slot_cache_first.resize(state->instance_count);state->active_slots.resize(state->instance_count);
+        state->surface_valid.resize(state->instance_count);state->baked_slot_bounds.assign(state->instance_count,empty_bounds());
+        state->lighting_changes.reserve(state->instance_count+scene->media.size());
         state->surface_cache_meshes.resize(state->instance_count);
         state->lighting_valid.resize(scene->media.size());state->vertex_upload_offsets.resize(state->mesh_count);
     }
@@ -1782,16 +1855,14 @@ static void record_lighting_fields(RendererState* state)
         vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->shadow_grid_pipeline);
         if (state->uniform_data.scene[3])
         {
-            if (!state->surface_lighting_valid)
             {
-                for (uint32_t i=0;i<state->active_count;++i) if (state->lighting_input[i].active)
+                for (uint32_t i=0;i<state->active_count;++i) if (state->lighting_input[i].active && !state->surface_valid[state->active_slots[i]])
                 {
                     uint32_t parameters[4]={0,LIGHTING_PASS_SURFACE,i,state->lighting_input[i].count};
                     vkCmdPushConstants(state->command,state->pipeline_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,BACKDROP_PUSH_BYTES,parameters);
                     vkCmdDispatch(state->command,(state->lighting_input[i].count+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,1,1);
-                    ++state->lighting_surface_bakes;
+                    ++state->lighting_surface_bakes;state->surface_valid[state->active_slots[i]]=1;
                 }
-                state->surface_lighting_valid=true;
             }
             for (uint32_t i=0;i<state->medium_count;++i) if (media[i].lighting[2]>0)
             {
@@ -2194,58 +2265,71 @@ bool renderer_poll(Renderer* renderer, PointerInput* input)
 }
 
 // The CPU scene changes vertex positions and normals, with fixed mesh topology.
-// Changed ranges go through host staging into device-local vertices, then each
-// mutable BLAS refits with its persistent scratch.
+// Changed ranges go through host staging into device-local vertices. A changing
+// BLAS refits; refits keep the tree built for the earlier shape, so it is fully
+// rebuilt about once a second during a morph and once the shape has settled.
+// Rendering outpaces 60 Hz simulation, so settling needs several unchanged frames.
+static const uint32_t BLAS_REFITS_PER_BUILD = 60;
+static const uint32_t BLAS_SETTLED_FRAMES = 30;
 static bool update_meshes(RendererState* state,const Geometry& scene,bool log)
 {
     if (scene.vertices.size()*sizeof(GpuVertex)!=state->vertices.size
         || scene.triangles.size()!=state->triangle_count)
     { fprintf(stderr,"Render mesh storage changed after initialization.\n");return false; }
-    uint32_t updates=0;
+    uint32_t uploads=0,work=0;
     for (uint32_t i=0;i<state->mesh_count;++i)
     {
         MeshAllocation& mesh=state->meshes[i];const MeshRange& source=scene.meshes[i];
         if (source.first!=mesh.range.first || source.count!=mesh.range.count || source.deformable!=mesh.range.deformable
             || source.first_vertex!=mesh.range.first_vertex || source.vertex_count!=mesh.range.vertex_count)
         { fprintf(stderr,"Render mesh topology changed after initialization.\n");return false; }
-        if (source.revision==mesh.range.revision) continue;
+        bool changed=source.revision!=mesh.range.revision;
+        mesh.unchanged=changed ? 0 : mesh.unchanged+1;
+        if (!changed && !(mesh.refits && mesh.unchanged>=BLAS_SETTLED_FRAMES)) continue;
         if (!source.deformable) { fprintf(stderr,"Static render mesh changed after initialization.\n");return false; }
-        if (!updates)
+        if (!work++)
         {
-            // Earlier submissions may still read these vertices.
+            // Earlier submissions may still read these vertices and this BLAS.
             vkCmdPipelineBarrier(state->command,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-                VK_PIPELINE_STAGE_TRANSFER_BIT,0,0,0,0,0,0,0);
+                VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,0,0,0,0,0,0,0);
         }
+        if (!changed) continue;
         VkDeviceSize bytes=(VkDeviceSize)source.vertex_count*sizeof(GpuVertex);
         GpuBuffer& upload=frame_data(state).vertex_upload;
         memcpy((char*)upload.mapped+state->vertex_upload_offsets[i],scene.vertices.data()+source.first_vertex,bytes);
         VkBufferCopy copy={state->vertex_upload_offsets[i],(VkDeviceSize)source.first_vertex*sizeof(GpuVertex),bytes};
         state->copy_buffer(state->command,upload.handle,state->vertices.handle,1,&copy);
-        ++updates;
+        ++uploads;
     }
-    if (!updates) return true;
+    if (!work) return true;
     VkMemoryBarrier uploaded={};uploaded.sType=VK_STRUCTURE_TYPE_MEMORY_BARRIER;
     uploaded.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
     uploaded.dstAccessMask=VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
-    vkCmdPipelineBarrier(state->command,VK_PIPELINE_STAGE_TRANSFER_BIT,
+    if (uploads) vkCmdPipelineBarrier(state->command,VK_PIPELINE_STAGE_TRANSFER_BIT,
         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,0,1,&uploaded,0,0,0,0);
+    uint32_t refits=0,builds=0;
     for (uint32_t i=0;i<state->mesh_count;++i)
     {
         MeshAllocation& mesh=state->meshes[i];const MeshRange& source=scene.meshes[i];
-        if (source.revision==mesh.range.revision) continue;
+        bool changed=source.revision!=mesh.range.revision;
+        if (!changed && !(mesh.refits && mesh.unchanged>=BLAS_SETTLED_FRAMES)) continue;
+        bool rebuild=!changed || mesh.refits>=BLAS_REFITS_PER_BUILD;
         VkAccelerationStructureGeometryKHR geometries[2];VkAccelerationStructureBuildRangeInfoKHR ranges[2];
         mesh_geometries(state,(uint32_t)scene.vertices.size(),mesh,geometries,ranges);
         VkAccelerationStructureBuildGeometryInfoKHR build={};build.sType=VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
         build.type=VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
         build.flags=VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
-        build.mode=VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;build.srcAccelerationStructure=build.dstAccelerationStructure=mesh.acceleration;
+        build.mode=rebuild ? VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR : VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;
+        build.srcAccelerationStructure=rebuild ? VK_NULL_HANDLE : mesh.acceleration;build.dstAccelerationStructure=mesh.acceleration;
         build.geometryCount=2;build.pGeometries=geometries;
         build.scratchData.deviceAddress=aligned_scratch(state,mesh.scratch.address);
         const VkAccelerationStructureBuildRangeInfoKHR* pointer=ranges;state->build_as(state->command,1,&build,&pointer);
-        mesh.range=source;
+        // After a rebuild during a change, one more rebuild follows once the shape settles.
+        mesh.refits=rebuild ? (changed ? 1u : 0u) : mesh.refits+1;
+        mesh.range=source;rebuild ? ++builds : ++refits;
     }
     // The following TLAS build barrier makes these BLAS writes visible.
-    if (log) printf("Deformed mesh updates: %u BLAS refits.\n",updates);
+    if (log) printf("Deformed mesh updates: %u BLAS refits; %u rebuilds.\n",refits,builds);
     return true;
 }
 

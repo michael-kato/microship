@@ -52,6 +52,19 @@ SSS thickness uses live queries unless the optional thickness bake is on. Moving
 Static transport changes cause a rebuild before the next draw. These
 bakes stay in GPU memory; they are not saved as authored image maps.
 
+Invalidation is targeted. A changed stationary blocker (its old and new
+world bounds), a deformed wall, or a changed medium invalidates only the
+interior grids and thin-surface instances whose rays toward an active
+light can cross the change: the change's bounds swept away from each light
+must meet the target's bounds. Light directions, light activation and
+thin-surface transport settings still reset everything. While a wall morphs,
+the close view rebakes about 0.5 thin surfaces per frame instead of 2.35;
+mean bake time fell from 0.163 to 0.070 ms per frame.
+
+A morphing wall refits its BLAS. Refits keep the tree built for the earlier
+shape, so the BLAS is fully rebuilt after 60 refits (about a second of
+morph) and once the wall has been unchanged for 30 rendered frames.
+
 Set `lighting.static_lighting_cache` to `false` for the unbaked reference.
 Set `lighting.force_lighting_rebuild` to `true` to rebuild the same bake
 each frame for comparison. This retains the bake's spatial approximation.
