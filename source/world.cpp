@@ -220,7 +220,7 @@ static bool load_effects(World* w,const char* path)
 static bool load_appearance(World* w,const char* path,uint32_t seed)
 {
     JsonDocument d;if (!json_load(&d,path)) return false;Json root=json_root(&d);
-    json_object(root,"$schema|ambient|gradient|lights|thin_surface|backdrop|atmosphere|fog|self_glow");
+    json_object(root,"$schema|ambient|gradient|lights|thin_surface|backdrop|atmosphere|fog|self_glow|organelle_appearance|animation");
     w->ambient=json_color(json_get(root,"ambient"),MAX_AMBIENT_RADIANCE);w->ambient_enabled=true;
     Json gradient=json_find(root,"gradient");
     if (json_present(gradient))
@@ -250,6 +250,32 @@ static bool load_appearance(World* w,const char* path,uint32_t seed)
         Json half_life=json_find(fog,"memory_half_life_seconds");
         if (json_present(half_life)) w->fog_half_life=json_float(half_life,0,60);
         w->fog_plane_z=json_float(json_get(fog,"plane_z"),-MAX_BACKDROP_COORDINATE,MAX_BACKDROP_COORDINATE);
+    }
+    w->organelle_style[0]=1;w->organelle_style[1]=.5f;w->organelle_style[2]=1;w->organelle_style[3]=0;
+    w->organelle_period=w->membrane_wavelength=w->membrane_period=w->factory_period=1;
+    Json organelles=json_find(root,"organelle_appearance");
+    if (json_present(organelles))
+    {
+        json_object(organelles,"edge_saturation|edge_width|center_glow|center_power");
+        w->organelle_style[0]=json_float(json_get(organelles,"edge_saturation"),0,3);
+        w->organelle_style[1]=json_float(json_get(organelles,"edge_width"),.01f,1);
+        w->organelle_style[2]=json_float(json_get(organelles,"center_glow"),0,8);
+        w->organelle_style[3]=json_float(json_get(organelles,"center_power"),0,16);
+    }
+    Json animation=json_find(root,"animation");
+    if (json_present(animation))
+    {
+        json_object(animation,"organelles|membrane|factories");
+        Json organs=json_get(animation,"organelles");json_object(organs,"squash|period_seconds");
+        w->organelle_squash=json_float(json_get(organs,"squash"),0,.1f);
+        w->organelle_period=json_float(json_get(organs,"period_seconds"),1,300);
+        Json membrane=json_get(animation,"membrane");json_object(membrane,"ripple_strength|wavelength|period_seconds");
+        w->membrane_ripple=json_float(json_get(membrane,"ripple_strength"),0,.2f);
+        w->membrane_wavelength=json_float(json_get(membrane,"wavelength"),.1f,100);
+        w->membrane_period=json_float(json_get(membrane,"period_seconds"),1,300);
+        Json factories=json_get(animation,"factories");json_object(factories,"sway_degrees|period_seconds");
+        w->factory_sway=json_float(json_get(factories,"sway_degrees"),0,5)*.01745329252f;
+        w->factory_period=json_float(json_get(factories,"period_seconds"),1,300);
     }
     Json glow=json_find(root,"self_glow");
     if (json_present(glow))

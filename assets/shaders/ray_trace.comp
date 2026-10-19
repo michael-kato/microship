@@ -470,6 +470,14 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
         geometric_normal = -geometric_normal;
         normal = -normal;
     }
+    if (triangle.w==THIN_MEMBRANE_MATERIAL && render.membrane_ripple.x>0.0)
+    {
+        vec3 first=vec3(1.0,.4,-.7),second=vec3(.5,0,-1.0);
+        float a=dot(point,first)*render.membrane_ripple.y+render.membrane_ripple.z;
+        float b=dot(point,second)*render.membrane_ripple.y-render.membrane_ripple.z;
+        vec3 gradient=render.membrane_ripple.x*(first*cos(a)*sin(b)+second*sin(a)*cos(b));
+        normal=normalize(normal-gradient+normal*dot(normal,gradient));
+    }
     float view_cosine=dot(normal,-direction);
     if (triangle.w==THIN_MEMBRANE_MATERIAL)
     {
@@ -493,6 +501,15 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
     uint flags=uint(instance_style[hit_instance].material.w);
     if ((flags&2u)==0u || surface.translucent) surface.color=mix(surface.color,tint.rgb,tint.a);
     surface.emission=surface.translucent ? 0.0 : (surface.emission+instance_style[hit_instance].material.x)*render.membrane_fade.w;
+    if ((flags&4u)!=0u)
+    {
+        float facing=clamp(dot(normal,-direction),0.0,1.0);
+        float edge=1.0-smoothstep(0.0,render.organelle_style.y,facing);
+        float grey=dot(surface.color,vec3(.2126,.7152,.0722));
+        float saturation=mix(1.0,render.organelle_style.x,edge);
+        surface.color=clamp(mix(vec3(grey),surface.color,saturation),vec3(0),vec3(1));
+        surface.emission*=render.organelle_style.z*pow(max(facing,1e-6),render.organelle_style.w);
+    }
     surface.unshadowed=(flags&1u)!=0u;
     if (surface.translucent) surface.roughness=mix(surface.roughness,instance_style[hit_instance].material.y,instance_style[hit_instance].material.z);
     return true;

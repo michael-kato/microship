@@ -48,6 +48,12 @@ bool render_scene_validate(const RenderScene* scene)
         && std::isfinite(scene->time_seconds) && scene->sight_count<=MAX_RENDER_SIGHT
         && std::isfinite(scene->fog_blur) && scene->fog_blur>=0 && scene->fog_blur<=256
         && std::isfinite(scene->fog_feather) && (scene->fog_blur==0 || scene->fog_feather>0) && std::isfinite(scene->fog_plane_z);
+    for (uint32_t i=0;i<4;++i) valid=valid && std::isfinite(scene->organelle_style[i]) && std::isfinite(scene->membrane_ripple[i]);
+    valid=valid && scene->organelle_style[0]>=0 && scene->organelle_style[0]<=3
+        && scene->organelle_style[1]>=.01f && scene->organelle_style[1]<=1
+        && scene->organelle_style[2]>=0 && scene->organelle_style[2]<=8
+        && scene->organelle_style[3]>=0 && scene->organelle_style[3]<=16
+        && scene->membrane_ripple[0]>=0 && scene->membrane_ripple[0]<=.2f;
     valid=valid && std::isfinite(scene->thin_blur_radius) && scene->thin_blur_radius>=0 && scene->thin_blur_radius<=32
         && std::isfinite(scene->thin_edge_strength) && scene->thin_edge_strength>=0 && scene->thin_edge_strength<=1
         && std::isfinite(scene->thin_edge_power) && scene->thin_edge_power>=0 && scene->thin_edge_power<=16;
@@ -96,7 +102,9 @@ bool render_scene_write(const RenderScene* scene,const char* path)
 {
     FILE* file=fopen(path,"wb");
     if (!file) { fprintf(stderr,"Cannot write render scene '%s'.\n",path);return false; }
-    fprintf(file,"{\"meshes\":[");
+    fprintf(file,"{\"organelle_style\":[%.6f,%.6f,%.6f,%.6f],\"membrane_ripple\":[%.6f,%.6f,%.6f],\"meshes\":[",
+        scene->organelle_style[0],scene->organelle_style[1],scene->organelle_style[2],scene->organelle_style[3],
+        scene->membrane_ripple[0],scene->membrane_ripple[1],scene->membrane_ripple[2]);
     for (uint32_t i=0;i<scene->geometry.meshes.size();++i)
     {
         const MeshRange* m=&scene->geometry.meshes[i];

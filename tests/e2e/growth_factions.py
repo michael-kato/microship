@@ -112,7 +112,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-growth-') as directory:
     small=deepcopy(base);small['bodies'][0]['radius']=2.1
     reduced,rr=run('small-anatomy',small)
     assert reduced['colonies'][0]['root_count']==4
-    assert rr['meshes'][0]['triangles']<ar['meshes'][0]['triangles'], 'Small cells retained all organ geometry'
+    assert sum(m['triangles'] for m in rr['meshes'])<sum(m['triangles'] for m in ar['meshes']), 'Small cells retained all organ geometry'
     # Compare the former and new manufacture times with the same scene and roots.
     slower,_=run('slower-production',base,1800)
     faster=deepcopy(base);faster['rules']['economy']['manufacture_seconds']=2.5

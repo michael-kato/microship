@@ -608,3 +608,42 @@ not a sustained performance test. Images are `000835` through `000837` in
 New screenshot names use underscores, such as `000845_cell_animation_pose.png`.
 The archive tool counts both old hyphen names and new underscore names. It keeps
 the earlier images and continues the same numeric sequence.
+
+## Biological motion and organelle appearance
+
+The `cell_animation` CPU check runs the application with motion on and off. It
+checks game state, mesh topology, volume-preserving squash, fixed attachment
+points, connected stem joints, repeatable poses, optional controls, and invalid
+settings. It also rejects an active cell whose membrane is marked as movable
+internal geometry. The full membrane group makes 66 application runs. Its CTest
+limit is 90 seconds; the checked run took about 45 seconds.
+
+Prepare the GPU check without starting the GPU:
+
+```sh
+python3 tests/e2e/cell_animation_render.py build/windows-cross/nanova.exe
+```
+
+Add `--run` to execute the prepared check within the approved ordinary limits.
+It uses three sequential native 1920 x 1080 processes, at most two frames per
+process, ten seconds per process, thirty seconds per batch, Khronos host
+validation, and no hardware tracing. It uses the loaded shipping sample settings
+and rejects settings above the ordinary cap. It compares time 14 from a fresh
+process with time 14 after time 10 in the same process. Both scene exports and
+output pixels must match exactly. Time 10 and time 14 must produce different
+images. Logs and reports stay in `build/cell_animation_render/`.
+
+The check passed through Proton. The final close views measured 8.374 and
+8.449 ms after static bakes, with first frames from 9.886 to 9.993 ms. A prior
+close capture reached 10.345 ms on its first frame. These captures used the
+current local scene and renderer settings, including the user's membrane edits.
+They do not establish sustained performance or native Windows behavior. The
+six-case glow check also passed host validation and preserved all game states.
+Images `000838` through `000849` show the motion, mutation, and glow checks.
+
+Animation partitions the existing cell triangles into part meshes. It adds no
+vertices or triangles. Organelle and factory motion uses instance transforms;
+BLAS geometry stays fixed for this motion. Moving objects use current lighting
+and shadows. Static membrane lighting remains cached while its inputs are valid.
+Faction displacement remains a separate vertex morph with its existing refit
+and cache invalidation. Membrane ripples change visible shading normals only.

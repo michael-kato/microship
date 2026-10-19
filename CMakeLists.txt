@@ -265,7 +265,7 @@ add_test(NAME startup COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/startup.py $<TARGET_FILE:nanova>)
 set_tests_properties(startup PROPERTIES TIMEOUT 60)
 
-foreach(group IN ITEMS selection colony_forms)
+foreach(group IN ITEMS selection colony_forms cell_animation)
     add_test(NAME ${group} COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/${group}.py $<TARGET_FILE:nanova>)
     set_tests_properties(${group} PROPERTIES TIMEOUT 60)
@@ -285,7 +285,7 @@ set_tests_properties(match_flow PROPERTIES TIMEOUT 45)
 
 add_test(NAME cell_medium COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/cell_medium.py $<TARGET_FILE:nanova>)
-set_tests_properties(cell_medium PROPERTIES TIMEOUT 45)
+set_tests_properties(cell_medium PROPERTIES TIMEOUT 90)
 add_test(NAME payloads COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/payloads.py $<TARGET_FILE:nanova>)
 set_tests_properties(payloads PROPERTIES TIMEOUT 30)

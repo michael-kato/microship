@@ -2,6 +2,7 @@
 #include "asset_json.h"
 #include "vector_math.h"
 #include <stdio.h>
+#include <float.h>
 #include <vector>
 
 static const uint32_t THIN_WALL_MATERIAL = 3;
@@ -151,5 +152,54 @@ bool geometry_vary(GpuVertex* vertices,uint32_t count,GpuTriangle* triangles,uin
         float* n=vertices[i].normal;Vec3 v={n[0],n[1],n[2]};if (dot(v,v)<MIN_GENERATED_NORMAL_SQUARED_LENGTH) return false;
         v=normalize(v);n[0]=v.x;n[1]=v.y;n[2]=v.z;
     }
+    return true;
+}
+
+
+bool geometry_partition_parts(Geometry* g,uint32_t mesh_index,const MeshSource& source,std::vector<MeshPartPose>* output)
+{
+    if (!source.parts_path || !source.parts_path[0]) return true;
+    Parts parts={};if (!load(source.parts_path,&parts)) return false;
+    const MeshRange original=g->meshes[mesh_index];
+    if (parts.values[parts.count-1].first+parts.values[parts.count-1].count!=original.vertex_count) return false;
+    std::vector<uint32_t> groups(original.vertex_count,0);
+    for (uint32_t p=0;p<parts.count;++p) if (parts.values[p].movable)
+        for (uint32_t v=parts.values[p].first;v<parts.values[p].first+parts.values[p].count;++v) groups[v]=p+1;
+    std::vector<GpuTriangle> triangles(g->triangles.begin()+original.first,g->triangles.begin()+original.first+original.count);
+    uint32_t counts[MAX_MESH_PARTS+1]={},next[MAX_MESH_PARTS+1]={};
+    for (uint32_t t=0;t<triangles.size();++t)
+    {
+        const GpuTriangle& triangle=triangles[t];uint32_t group=groups[triangle.index[0]-original.first_vertex];
+        for (uint32_t j=1;j<3;++j) if (groups[triangle.index[j]-original.first_vertex]!=group)
+        { fprintf(stderr,"%s: triangle crosses mesh parts.\n",source.parts_path);return false; }
+        if (triangle.index[3]==THIN_WALL_MATERIAL && group)
+        { fprintf(stderr,"%s: a movable part contains the cell wall.\n",source.parts_path);return false; }
+        ++counts[group];
+    }
+    if (!counts[0]) { fprintf(stderr,"%s: cell has no stationary surface.\n",source.parts_path);return false; }
+    uint32_t first=original.first;
+    for (uint32_t group=0;group<=parts.count;++group)
+    {
+        next[group]=first;
+        if (counts[group])
+        {
+            MeshRange mesh=original;mesh.first=first;mesh.count=counts[group];
+            if (!group) g->meshes[mesh_index]=mesh;
+            else
+            {
+                const Part& part=parts.values[group-1];mesh.first_vertex=original.first_vertex+part.first;mesh.vertex_count=part.count;
+                for (uint32_t axis=0;axis<3;++axis) { mesh.low[axis]=FLT_MAX;mesh.high[axis]=-FLT_MAX; }
+                for (uint32_t v=mesh.first_vertex;v<mesh.first_vertex+mesh.vertex_count;++v)
+                    for (uint32_t axis=0;axis<3;++axis)
+                    { mesh.low[axis]=std::fmin(mesh.low[axis],g->vertices[v].position[axis]);mesh.high[axis]=std::fmax(mesh.high[axis],g->vertices[v].position[axis]); }
+                Vec3 pivot=transform(part.anchor ? part.attachment : part.pivot,part,source,group-1);
+                pivot=add(source.position,scale(pivot,source.scale));
+                output->push_back(MeshPartPose{(uint32_t)g->meshes.size(),pivot});g->meshes.push_back(mesh);
+            }
+        }
+        first+=counts[group];
+    }
+    for (uint32_t t=0;t<triangles.size();++t)
+    { uint32_t group=groups[triangles[t].index[0]-original.first_vertex];g->triangles[next[group]++]=triangles[t]; }
     return true;
 }

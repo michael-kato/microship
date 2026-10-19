@@ -79,7 +79,8 @@ for name,command in commands:
     scene=json.loads((folder/'scene.json').read_text())
     if not name.endswith('off'):
         emission=world['appearance']['self_glow']
-        assert scene['meshes'][0]['emission']==[0,emission['organelles']],scene['meshes'][0]
+        assert scene['meshes'][0]['emission']==[0,0]
+        assert all(scene['meshes'][i['mesh']]['emission']==[emission['organelles'],emission['organelles']] for i in scene['instances'] if int(i['style'][7])&4)
         assert all(m['wall_emission']==0 for m in scene['meshes'])
         assert any(m['emission']==[0,emission['factory_stems']] for m in scene['meshes'])
         styles=[i['style'][4] for i in scene['instances'] if i['mask']==1]

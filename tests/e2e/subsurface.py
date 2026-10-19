@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-subsurface-') as directory:
         return json.loads(state.read_text()),json.loads(scene.read_text())
     initial,scene=run('materials')
     assert all(m['subsurface_weight'][0]>0 for m in scene['meshes'][:len(data['bodies'])]),'A cell lost its scattering material'
-    assert scene['meshes'][-1]['subsurface_weight']==[0,0],'Backdrop was given SSS'
+    assert scene['meshes'][next(i['mesh'] for i in scene['instances'] if i['mask']==4)]['subsurface_weight']==[0,0],'Backdrop was given SSS'
     # Loading scales optical distance with the cell mesh, while instance scaling happens in shading.
     bodies={b['name']:b for b in data['content']['bodies']}
     for body,m in zip(data['bodies'],scene['meshes']):

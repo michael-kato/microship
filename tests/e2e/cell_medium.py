@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-medium-') as directory:
         authored=sum(struct.unpack_from('<I',raw,16+vertices*(64 if raw[:8]==b'FLMESH02' else 48)+t*16+12)[0]==3 for t in range(triangles))
         drawn=sum(t[3]==3 for t in mesh['deformation']['indices'])
         assert authored==drawn>0,'An extra membrane wall was added'
-    assert scene['membrane_fade']==[1,2] and scene['wall_blur_radius']==0
+    assert scene['membrane_fade']==[data['appearance']['thin_surface']['edge_fade'][key] for key in ('strength','power')] and scene['wall_blur_radius']==0
     assert all(abs(v[0]-1/3)<1e-6 and abs(v[1]-2/3)<1e-6 and v[2]==18 for v in scene['medium_blur'][:-1]) and scene['medium_blur'][-1]==[0,0,0]
     assert scene['medium_blur_fractional']==[True]*len(data['bodies'])+[False]
     orders='0 select all\n0 order 0\n600 ratio 65\n'

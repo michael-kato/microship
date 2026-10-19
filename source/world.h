@@ -101,6 +101,8 @@ struct World
     float fog_blur,fog_feather,fog_plane_z,fog_half_life;
     Color fog_tint;
     float glow_interior,glow_organelles,glow_stems,glow_leaves,glow_units;
+    float organelle_style[4]; // Edge saturation/width, center emission multiplier/power.
+    float organelle_squash,organelle_period,membrane_ripple,membrane_wavelength,membrane_period,factory_sway,factory_period;
     StudioLight studio[3];
     uint32_t studio_mask;
     float thin_transmission, thin_absorption;

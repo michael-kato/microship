@@ -126,3 +126,32 @@ Virus wall mutation uses 64 pointed displacement features, each with a
 `width_degrees` for narrower, steeper peaks. `height` sets the maximum height
 as a fraction of cell radius. This moves the existing wall vertices; it adds
 no geometry. `morph_seconds` sets the time to reach the faction shape.
+
+Organelle color and glow controls are in `assets/presentation/scene.json`, under
+`organelle_appearance`. Restart the application after you change the file.
+
+| Control | Effect |
+| --- | --- |
+| `edge_saturation` | Color strength at the rim. One keeps the authored color; higher values increase saturation. |
+| `edge_width` | Width of the saturated rim. Higher values make it wider. |
+| `center_glow` | Multiplies `self_glow.organelles` at the center. Zero removes organelle emission. |
+| `center_power` | Concentrates emission toward the center. Higher values make the bright area smaller. Zero gives uniform emission. |
+
+The defaults are 1.8, 0.65, 2.5, and 2.5. Rim color and center glow depend on the
+current viewing angle. The organelle keeps its pigment color. Its glow does not
+cast light onto other surfaces. F10 removes emission and bloom; rim color remains.
+
+Motion controls are in the same file, under `animation`.
+
+| Object | Controls |
+| --- | --- |
+| Organelles | `squash` is the fractional stretch; `period_seconds` is one cycle. The default is 0.035 over 16 seconds. |
+| Membrane | `ripple_strength` sets the normal change; `wavelength` is in world units; `period_seconds` sets the cycle. Defaults are 0.05, 1.6, and 20. |
+| Factories | `sway_degrees` sets the maximum angle; `period_seconds` sets the cycle. Defaults are 1.8 degrees and 28 seconds. |
+
+Set `squash`, `ripple_strength`, or `sway_degrees` to zero to stop that motion.
+Organelle squash preserves volume and keeps factory attachment points fixed.
+Factory trees sway about their roots, with connected joints, heads, and growing
+units. The membrane ripple changes its shading normal. It does not move the
+silhouette or add another wall. Faction mutation still moves the wall vertices.
+All motion uses the current simulation time. Pause stops it.

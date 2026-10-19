@@ -80,5 +80,26 @@
     "factory_stems": 2.5,
     "factory_leaves": 1.8,
     "units": 0.22
+  },
+  "organelle_appearance": {
+    "edge_saturation": 1.8,
+    "edge_width": 0.65,
+    "center_glow": 2.5,
+    "center_power": 2.5
+  },
+  "animation": {
+    "organelles": {
+      "squash": 0.035,
+      "period_seconds": 16
+    },
+    "membrane": {
+      "ripple_strength": 0.05,
+      "wavelength": 1.6,
+      "period_seconds": 20
+    },
+    "factories": {
+      "sway_degrees": 1.8,
+      "period_seconds": 28
+    }
   }
 }

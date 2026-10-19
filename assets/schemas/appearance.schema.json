@@ -367,6 +367,96 @@
       },
       "required": ["cell_interior", "organelles", "factory_stems", "factory_leaves", "units"],
       "additionalProperties": false
+    },
+    "organelle_appearance": {
+      "type": "object",
+      "properties": {
+        "edge_saturation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "edge_width": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 1
+        },
+        "center_glow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "center_power": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 16
+        }
+      },
+      "required": ["edge_saturation", "edge_width", "center_glow", "center_power"],
+      "additionalProperties": false
+    },
+    "animation": {
+      "type": "object",
+      "properties": {
+        "organelles": {
+          "type": "object",
+          "properties": {
+            "squash": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.1
+            },
+            "period_seconds": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 300
+            }
+          },
+          "required": ["squash", "period_seconds"],
+          "additionalProperties": false
+        },
+        "membrane": {
+          "type": "object",
+          "properties": {
+            "ripple_strength": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.2
+            },
+            "wavelength": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 100
+            },
+            "period_seconds": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 300
+            }
+          },
+          "required": ["ripple_strength", "wavelength", "period_seconds"],
+          "additionalProperties": false
+        },
+        "factories": {
+          "type": "object",
+          "properties": {
+            "sway_degrees": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "period_seconds": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 300
+            }
+          },
+          "required": ["sway_degrees", "period_seconds"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["organelles", "membrane", "factories"],
+      "additionalProperties": false
     }
   },
   "required": ["ambient"],

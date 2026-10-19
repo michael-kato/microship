@@ -9,9 +9,12 @@ struct RenderConfig;
 // Game code owns these mappings. The renderer receives RenderScene only.
 struct MembraneVertex { uint32_t index,group;GpuVertex neutral;Vec3 displacement[MAX_FACTIONS]; };
 struct CellMembrane { uint32_t body,first,count,first_group,group_count;float weights[MAX_FACTIONS]; };
+struct OrganellePose { uint32_t body,mesh;Vec3 pivot; };
 struct Presentation
 {
     RenderScene scene;
+    std::vector<OrganellePose> organelles;
+    uint32_t organelle_base;
     std::vector<CellMembrane> membranes;
     std::vector<MembraneVertex> membrane_vertices;
     std::vector<uint32_t> membrane_groups;

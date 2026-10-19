@@ -136,6 +136,14 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
         p->flying_base=p->attached_base+(w->spikes.enabled ? MAX_UNITS*(w->spikes.count+MAX_UNIT_PAYLOADS) : 0);
         p->embedded_base=p->flying_base+(w->spikes.enabled ? MAX_PROJECTILES : 0);
         p->background_slot=p->embedded_base+(w->spikes.enabled ? MAX_EMBEDDED*(MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES) : 0);
+        p->organelle_base=p->background_slot;
+        for (uint32_t body=0;body<w->body_count;++body) if (w->content.bodies[w->bodies[body].type].hosts_site)
+        {
+            std::vector<MeshPartPose> parts;
+            if (!geometry_partition_parts(&scene->geometry,p->body_meshes[body],sources[body],&parts)) return false;
+            for (uint32_t j=0;j<parts.size();++j) p->organelles.push_back(OrganellePose{body,parts[j].mesh,parts[j].pivot});
+        }
+        p->background_slot+=(uint32_t)p->organelles.size();
         if (!presentation_prepare_membranes(p,s)) return false;
         scene->instances.resize(p->background_slot+1);
         scene->effects.resize(MAX_EFFECT_SEGMENTS);
@@ -149,6 +157,7 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
         scene->lighting_bounds.resize(scene->media.size());
     }
     catch (const std::bad_alloc&) { fprintf(stderr,"Cannot allocate game presentation storage.\n");return false; }
+    memcpy(scene->organelle_style,w->organelle_style,sizeof(scene->organelle_style));
     scene->ambient=w->ambient;scene->ambient_top=w->ambient_top;scene->ambient_bottom=w->ambient_bottom;
     for (uint32_t i=0;i<3;++i) scene->lights[i]=RenderLight{w->studio[i].direction,w->studio[i].color,w->studio[i].irradiance};
     scene->lights_enabled=w->studio_mask!=0;scene->guides_required=w->combat.enabled;
@@ -247,6 +256,42 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
     }
 }
 
+static Vec3 factory_sway_vector(Vec3 value,float sine,float cosine)
+{ return Vec3{value.x*cosine-value.y*sine,value.x*sine+value.y*cosine,value.z}; }
+static void sway_factory_instance(Presentation* p,uint32_t slot,Vec3 pivot,float sine,float cosine)
+{
+    RenderInstance& instance=p->scene.instances[slot];if (!instance.mask) return;
+    Vec3 position={instance.transform[0][3],instance.transform[1][3],instance.transform[2][3]};
+    position=add(pivot,factory_sway_vector(subtract(position,pivot),sine,cosine));
+    for (uint32_t column=0;column<3;++column)
+    {
+        Vec3 axis={instance.transform[0][column],instance.transform[1][column],instance.transform[2][column]};
+        axis=factory_sway_vector(axis,sine,cosine);
+        instance.transform[0][column]=axis.x;instance.transform[1][column]=axis.y;instance.transform[2][column]=axis.z;
+    }
+    instance.transform[0][3]=position.x;instance.transform[1][3]=position.y;instance.transform[2][3]=position.z;
+}
+static void animate_factories(Presentation* p,const Simulation* s)
+{
+    if (s->world.factory_sway==0) return;
+    for (uint32_t body=0;body<s->world.body_count;++body)
+    {
+        const Colony& colony=s->colonies[body];
+        if (!colony.active || !s->visible_bodies[body] || !simulation_producer_definition(s,body)->segment_path[0]) continue;
+        for (uint32_t k=0;k<colony.structure_count;++k)
+        {
+            uint32_t root=k;while (colony.parents[root]>=0) root=(uint32_t)colony.parents[root];
+            double phase=std::fmod(s->time_seconds/s->world.factory_period+(s->world.bodies[body].seed%997+root*71)/997.0,1.0)*FULL_TURN_RADIANS;
+            float angle=s->world.factory_sway*(float)std::sin(phase),sine=std::sin(angle),cosine=std::cos(angle);
+            Vec3 pivot=colony.stems[root][0];
+            sway_factory_instance(p,factory_instance_slot(p,body,k),pivot,sine,cosine);
+            for (uint32_t j=0;j<GROWTH_SEGMENTS;++j) sway_factory_instance(p,p->stem_base+(body*MAX_FACTORY_STRUCTURES+k)*GROWTH_SEGMENTS+j,pivot,sine,cosine);
+            sway_factory_instance(p,p->bud_base+body*MAX_FACTORY_STRUCTURES+k,pivot,sine,cosine);
+            if (s->world.spikes.enabled) for (uint32_t j=0;j<MAX_EMBEDDED;++j)
+                sway_factory_instance(p,p->embedded_base+MAX_UNITS*MAX_EMBEDDED+(body*MAX_FACTORY_STRUCTURES+k)*MAX_EMBEDDED+j,pivot,sine,cosine);
+        }
+    }
+}
 static void update_gameplay_instances(Presentation* state,const Simulation* simulation)
 {
     const Simulation* s=simulation;
@@ -377,6 +422,8 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
     RenderScene* scene=&p->scene;const World* w=&s->world;
     static_assert(MAX_RENDER_SIGHT>=MAX_UNITS+MAX_BODIES,"Sight source capacity");
     if (!presentation_update_membranes(p,s)) return false;
+    scene->membrane_ripple[0]=w->membrane_ripple;scene->membrane_ripple[1]=(float)(FULL_TURN_RADIANS/w->membrane_wavelength);
+    scene->membrane_ripple[2]=(float)(std::fmod(s->time_seconds/w->membrane_period,1.0)*FULL_TURN_RADIANS);
     scene->sight_count=0;scene->fog_blur=w->sight_radius>0 ? w->fog_blur : 0;
     scene->fog_tint=w->fog_tint;scene->fog_feather=w->fog_feather;scene->fog_plane_z=w->fog_plane_z;
     if (scene->fog_blur>0)
@@ -410,6 +457,17 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
             if (weight>0) { style[5]=roughness/weight;style[6]=std::fmin(1.0f,weight); }
 
         }
+    for (uint32_t i=0;i<p->organelles.size();++i)
+    {
+        const OrganellePose& part=p->organelles[i];
+        double phase=std::fmod(s->time_seconds/w->organelle_period+(w->bodies[part.body].seed%997+i*37)/997.0,1.0)*FULL_TURN_RADIANS;
+        float y=1+w->organelle_squash*(float)std::sin(phase),xz=1/std::sqrt(y);
+        Vec3 offset={part.pivot.x*(1-xz),part.pivot.y*(1-y),part.pivot.z*(1-xz)};
+        set_instance(p,p->organelle_base+i,part.mesh,offset,Vec3{xz,0,0},Vec3{0,y,0},Vec3{0,0,xz});
+        RenderInstance& instance=scene->instances[p->organelle_base+i];instance.style[7]=INSTANCE_ORGANELLE;
+        instance.mask=scene->instances[p->body_base+part.body].mask;
+        instance.static_lighting=w->organelle_squash==0;
+    }
     for (uint32_t i=0;i<scene->media.size();++i)
     {
         RenderMedium* medium=&scene->media[i];*medium=RenderMedium();
@@ -439,7 +497,7 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
         }
 
     }
-    if (w->gameplay.enabled) update_gameplay_instances(p,s);
+    if (w->gameplay.enabled) { update_gameplay_instances(p,s);animate_factories(p,s); }
     else
         for (uint32_t i=0;i<w->spawn_count;++i)
         {

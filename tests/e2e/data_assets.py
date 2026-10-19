@@ -45,9 +45,16 @@ with tempfile.TemporaryDirectory(prefix='nanova-content-') as directory:
     text=established_world(root/'assets/levels/virus-player-level.json',out)
     order='0 cell 0\n0 priority bomber\n'
     base,scene,log=run('baseline',text,1800,order)
-    roughness=scene['meshes'][0]['roughness']
+    body=text['bodies'][0];center=body['position']
+    cell_meshes=[scene['meshes'][0]]
+    for instance in scene['instances']:
+        if not int(instance['style'][7])&4:continue
+        mesh=scene['meshes'][instance['mesh']]
+        midpoint=[(a+b)/2 for a,b in zip(mesh['low'],mesh['high'])]
+        if math.dist(midpoint,center)<body['radius']:cell_meshes.append(mesh)
+    roughness=[min(m['roughness'][0] for m in cell_meshes),max(m['roughness'][1] for m in cell_meshes)]
     assert .02<=roughness[0]<.35 and .85<roughness[1]<=1, 'Cell surfaces lost their gloss and matte range'
-    assert scene['meshes'][0]['ior'][0]<scene['meshes'][0]['ior'][1], 'Cell surfaces use one optical material'
+    assert min(m['ior'][0] for m in cell_meshes)<max(m['ior'][1] for m in cell_meshes), 'Cell surfaces use one optical material'
     names=dict([('virus_fighter','type_a'),('virus_bomber','type_b'),('immune_fighter','type_c'),
                 ('immune_bomber','type_d'),('virus_factory','growth_a'),('immune_factory','growth_b'),
                 ('virus','team_a'),('immune','team_b'),('fighter','guard'),('fighters','guards'),
