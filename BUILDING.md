@@ -775,3 +775,10 @@ integral B), instead of a mirror Schlick term at n.v. Rough surfaces lose the
 bright white grazing rim and keep more diffuse color there. The environment
 lookup follows the GGX dominant direction, which moves toward the normal as
 roughness grows. Conductors keep their multiple-scattering gain.
+
+Subsurface wrap is continuous for solid organelles as well as walls:
+`max(0, cos + wrap) / (1 + wrap)^2`, gated by the smooth shading normal so it
+falls to zero at `cos = -wrap`. Surface reflection still requires the
+geometric front face. The previous solid form added a constant
+`wrap / (1 + 2 wrap)` floor that switched off per triangle at the geometric
+terminator, which drew faceted bands on organelles.

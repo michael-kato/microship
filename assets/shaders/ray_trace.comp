@@ -706,18 +706,21 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
     float cosine=dot(s.normal,direction),geometric_cosine=dot(s.geometric_normal,direction);
     float transmission=s.translucent ? membrane_transmission(max(0.0,dot(s.normal,outgoing))) : 0.0;
     float scatter=scattering_weight(s);vec3 weighted=vec3(0);
-    if ((s.translucent || geometric_cosine>0.0) && (cosine>0.0 || scatter>0.0))
+    float wrap=render.subsurface.y;
+    bool front=s.translucent || geometric_cosine>0.0;
+    // Surface reflection needs the geometric front. Scattered light wraps past
+    // the smooth shading terminator instead, so faceted triangles do not switch it.
+    if ((front && cosine>0.0) || (scatter>0.0 && cosine+wrap>0.0))
     {
         float interface_fresnel;
-        vec3 reflected=evaluate_bsdf(s.normal,outgoing,direction,s.color,s.roughness,s.ior,s.metal,1.0-scatter,interface_fresnel)*max(0.0,cosine);
+        vec3 reflected=front ? evaluate_bsdf(s.normal,outgoing,direction,s.color,s.roughness,s.ior,s.metal,1.0-scatter,interface_fresnel)*max(0.0,cosine) : vec3(0);
+        if (!front) interface_fresnel=0.0;
         if (scatter>0.0)
         {
-            // Preserve solid-surface wrapping. The thin wall wraps continuously
-            // across the smooth light horizon, normalized over its full support.
-            float wrap=render.subsurface.y;
-            float diffuse=s.translucent ? max(0.0,cosine+wrap)/((1.0+wrap)*(1.0+wrap))
-                : (max(0.0,cosine)+wrap)/(1.0+2.0*wrap);
-            if (s.translucent && cosine<=0.0)
+            // Wrapped diffusion falls continuously to zero at cosine = -wrap and is
+            // normalized over that support for walls and solid organelles alike.
+            float diffuse=max(0.0,cosine+wrap)/((1.0+wrap)*(1.0+wrap));
+            if (cosine<=0.0)
             {
                 vec3 half_vector=direction+outgoing;
                 float half_cosine=dot(outgoing,half_vector)*inversesqrt(max(MIN_SHADING_DENOMINATOR,dot(half_vector,half_vector)));
