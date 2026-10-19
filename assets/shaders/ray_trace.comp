@@ -388,15 +388,24 @@ float ggx_mask(float cosine, float alpha)
     return 2.0*cosine / (cosine + sqrt(alpha*alpha + (1.0-alpha*alpha)*cosine*cosine));
 }
 
-float directional_energy(float cosine, float roughness)
+// Bilinear lookup in a 32x32 GGX table over sqrt(n.v) and roughness.
+float energy_table(uint table, float cosine, float roughness)
 {
     vec2 grid = vec2(sqrt(clamp(cosine,MIN_ENERGY_TABLE_COSINE,1.0)),clamp(roughness,0.0,1.0))*ENERGY_TABLE_LAST_COORDINATE;
     uvec2 cell = min(uvec2(grid),uvec2(ENERGY_TABLE_LAST_CELL));
     vec2 fraction = grid-vec2(cell);
-    uint base = cell.y*ENERGY_TABLE_ROW_STRIDE+cell.x;
+    uint base = table*ENERGY_TABLE_ROW_STRIDE*ENERGY_TABLE_ROW_STRIDE+cell.y*ENERGY_TABLE_ROW_STRIDE+cell.x;
     float low = mix(ggx_energy[base],ggx_energy[base+1u],fraction.x);
     float high = mix(ggx_energy[base+ENERGY_TABLE_ROW_STRIDE],ggx_energy[base+ENERGY_TABLE_DIAGONAL_OFFSET],fraction.x);
     return mix(low,high,fraction.y);
+}
+// GGX directional albedo with Fresnel = 1.
+float directional_energy(float cosine, float roughness) { return energy_table(0u,cosine,roughness); }
+// Directional albedo for normal-incidence reflectance f0 (Schlick): f0*(E-B)+B.
+vec3 directional_albedo(vec3 f0, float cosine, float roughness)
+{
+    float energy=energy_table(0u,cosine,roughness),bias=energy_table(1u,cosine,roughness);
+    return f0*(energy-bias)+bias;
 }
 
 vec3 evaluate_bsdf(vec3 normal, vec3 outgoing, vec3 incoming, vec3 albedo,
@@ -816,10 +825,18 @@ vec3 ambient_surface(Surface s,vec3 outgoing)
     // Cosine-weighted integral of the authored linear environment gradient.
     // Ambient fill is an approximation, with no traced diffuse bounces or AO.
     vec3 diffuse=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5+s.normal.y/COSINE_GRADIENT_DENOMINATOR);
-    vec3 reflected=environment_radiance(reflect(-outgoing,s.normal));
     float cosine=max(0.0,dot(s.normal,outgoing));
+    // Rough lobes gather light around the normal: use the GGX dominant direction.
+    float alpha=max(MIN_GGX_ALPHA,s.roughness*s.roughness);
+    vec3 dominant=normalize(mix(s.normal,reflect(-outgoing,s.normal),(1.0-alpha)*(sqrt(1.0-alpha)+alpha)));
+    vec3 reflected=environment_radiance(dominant);
     float transmission=s.translucent ? membrane_transmission(max(0.0,dot(s.normal,outgoing))) : 0.0;
-    vec3 f=s.metal ? s.color+(vec3(1)-s.color)*pow(1.0-cosine,SCHLICK_EXPONENT) : vec3(fresnel(cosine,s.ior));
+    // Pre-integrated GGX albedo instead of a mirror Fresnel term, so rough surfaces
+    // do not gain a bright grazing rim. Conductors keep their multiple-scattering gain.
+    float f0=(s.ior-1.0)/(s.ior+1.0);f0*=f0;
+    vec3 f=directional_albedo(s.metal ? s.color : vec3(f0),cosine,s.roughness);
+    if (s.metal && render.quality.z!=0u)
+    { float energy=directional_energy(cosine,s.roughness);f*=vec3(1.0)+s.color*((1.0-energy)/energy); }
     vec3 result=s.metal ? f*reflected : (vec3(1)-f)*s.color*diffuse+f*reflected;
     result*=1.0-transmission;
     if (transmission>0.0)

@@ -1173,7 +1173,7 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
     uniform.subsurface[0]=state->config.subsurface_strength;uniform.subsurface[1]=state->config.subsurface_wrap;
     uniform.subsurface[2]=state->config.subsurface_transmission;uniform.subsurface[3]=state->config.subsurface_thickness;
     scene_uniform(&uniform,scene);
-    if (!create_buffer(state, &state->energy, MICROFACET_TABLE_SIZE*MICROFACET_TABLE_SIZE*sizeof(float),
+    if (!create_buffer(state, &state->energy, 2*MICROFACET_TABLE_SIZE*MICROFACET_TABLE_SIZE*sizeof(float),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, host)) return false;
     microfacet_energy_table((float*)state->energy.mapped);
     state->medium_count=(uint32_t)scene->media.size();

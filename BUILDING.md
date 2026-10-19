@@ -768,3 +768,10 @@ middle grey 0.5 down to 0.33. AgX keeps middle grey near 0.18 and rolls bright
 saturated light toward white. At the authored exposure of 1.6 the stable
 close view's mean display value rose from 119 to 136 (RGB8); `output.exposure`
 remains the brightness control.
+
+Ambient specular uses pre-integrated GGX albedo, `F0*(E-B)+B`, from the
+32x32 tables in `microfacet.cpp` (directional albedo E and the Schlick bias
+integral B), instead of a mirror Schlick term at n.v. Rough surfaces lose the
+bright white grazing rim and keep more diffuse color there. The environment
+lookup follows the GGX dominant direction, which moves toward the normal as
+roughness grows. Conductors keep their multiple-scattering gain.

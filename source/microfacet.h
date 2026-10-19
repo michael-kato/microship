@@ -3,8 +3,10 @@
 
 enum { MICROFACET_TABLE_SIZE = 32 };
 
-// Directional albedo of the same separable-Smith GGX used by the shader,
-// with Fresnel = 1. Mathematical coefficients, not cached scene illumination.
+// Two tables of the same separable-Smith GGX used by the shader: directional
+// albedo with Fresnel = 1, then the Schlick bias integral of (1 - v.h)^5.
+// Albedo for reflectance F0 is F0*(E - B) + B. Mathematical coefficients, not
+// cached scene illumination. Writes 2*MICROFACET_TABLE_SIZE^2 values.
 void microfacet_energy_table(float* values);
 
 #endif

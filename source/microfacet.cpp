@@ -40,7 +40,7 @@ void microfacet_energy_table(float* values)
             Vec3 stretched = normalize(Vec3{alpha*view.x, 0.0f, view.z});
             Vec3 t1 = {0.0f, 1.0f, 0.0f};
             Vec3 t2 = cross(stretched, t1);
-            double energy = 0.0;
+            double energy = 0.0, bias = 0.0;
             for (unsigned int i = 0; i < samples; ++i)
             {
                 float radius = std::sqrt((i + 0.5f) / samples);
@@ -55,9 +55,14 @@ void microfacet_energy_table(float* values)
                 float nl = 2.0f*dot(view,h)*h.z-view.z;
                 // With VNDF sampling and Fresnel=1, BRDF*cos/PDF = Smith G1(L).
                 if (nl > 0.0f)
-                    energy += 2.0f*nl / (nl + std::sqrt(alpha*alpha + (1.0f-alpha*alpha)*nl*nl));
+                {
+                    float g1 = 2.0f*nl / (nl + std::sqrt(alpha*alpha + (1.0f-alpha*alpha)*nl*nl));
+                    float grazing = 1.0f-dot(view,h);if (grazing < 0.0f) grazing = 0.0f;
+                    energy += g1;bias += g1*grazing*grazing*grazing*grazing*grazing;
+                }
             }
             values[y*MICROFACET_TABLE_SIZE+x] = (float)(energy/samples);
+            values[(MICROFACET_TABLE_SIZE+y)*MICROFACET_TABLE_SIZE+x] = (float)(bias/samples);
         }
     }
 }
