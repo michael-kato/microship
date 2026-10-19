@@ -307,7 +307,8 @@ float membrane_opacity(float cosine)
 float membrane_clear(float cosine)
 {
     float base=render.thin_material.x*render.thin_material.w;
-    return base>0.0 ? 1.0-membrane_opacity(cosine)*(1.0-base) : 0.0;
+    // The covered rim must not retain the baseline clear transmission.
+    return base>0.0 ? 1.0-membrane_opacity(cosine)+base*(1.0-render.membrane_fade.x) : 0.0;
 }
 vec3 studio_visibility(vec3 origin,vec3 direction);
 vec3 sampled_visibility(vec3 point,vec3 normal,int light);
