@@ -9,7 +9,7 @@ command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'sc
 cases=[('normal',()),('near',('--camera-zoom','1000')),('buffers',('--debug-views',))]
 if not a.run:print('Prepared three sequential native 1920x1080 two-frame profiler captures; three film samples, one volume ray, one backdrop query; 2s/process, 5s/batch. No GPU work started.');raise SystemExit(0)
 os.environ['NANOVA_VULKAN_VALIDATION']='1';out.mkdir(parents=True,exist_ok=True);report={};started=time.monotonic()
-parents={'CPU FRAME':['INPUT','SIMULATION','SCENE + AUDIO','RENDER'],'RENDER':['ACQUIRE','UPLOAD + AS RECORD','PASS RECORD','SUBMIT + GPU WAIT','QUERY + STATS','PRESENT WAIT','CAPTURE'],
+parents={'CPU FRAME':['INPUT','SIMULATION','SCENE + AUDIO','RENDER'],'RENDER':['ACQUIRE','UPLOAD + AS RECORD','PASS RECORD','SUBMIT','SLOT WAIT + QUERY','PRESENT WAIT','CAPTURE'],
  'GPU FRAME':['SCENE','POST','OUTPUT'],'SCENE':['AS UPDATE','BACKDROP','LIGHTING FIELDS','SURFACE + SSS','VOLUME'],'POST':['EFFECTS','CELL BLUR','FOG','TILT SHIFT','BLOOM + DISPLAY'],'OUTPUT':['HUD + PROFILER','OUTPUT COPY']}
 for name,extra in cases:
  remaining=5-(time.monotonic()-started);assert remaining>0,'GPU batch budget expired'
@@ -30,7 +30,8 @@ for name,extra in cases:
    root_node=frame[parent];child_nodes=[frame[c] for c in children]
    assert abs(sum(c['last'] for c in child_nodes)-root_node['last'])<(.2 if parent=='CPU FRAME' else .0001),(name,parent,child_nodes,root_node)
    assert all(c['start']>=root_node['start']-.0001 and c['start']+c['last']<=root_node['start']+root_node['last']+.0001 for c in child_nodes),(name,parent)
-  assert frame['GPU FRAME']['last']>0 and frame['SUBMIT + GPU WAIT']['last']>0
+  # GPU spans arrive when a frame completes; the capture drains the final frame.
+  assert frame['SUBMIT']['last']>0 and (index==0 or frame['GPU FRAME']['last']>0)
  report[name]=dict(seconds=seconds,frames=frames)
 report['batch_seconds']=time.monotonic()-started
 sys.path.insert(0,str(root/'scripts'));from save_progress import archive_capture

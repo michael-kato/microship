@@ -681,3 +681,21 @@ uploads them once through a staging buffer and builds every BLAS in one
 submission; static meshes share temporary scratch. Deformable walls copy
 their changed vertex ranges from host staging into the device-local buffer
 before the refit, so shading never reads geometry over the PCIe BAR.
+
+Two frames are in flight. Each slot owns its command buffer, fence, acquire
+semaphore, timestamp queries, descriptor sets and every buffer the CPU
+writes per frame (uniform, TLAS instances, media, lighting instances and
+bounds, sight, styles, effects, HUD text, wall staging). GPU-only images,
+grids and caches are shared: one queue runs frames in order and each pass's
+first barrier orders it after the previous frame's last use; the TLAS build
+waits for the previous frame's compute stage. Present semaphores are one per
+swapchain image. The CPU waits only for the slot it is about to reuse, so
+simulation and recording overlap the previous frame's GPU work. Timestamps
+are read when a slot is reused; captures and shutdown drain the queue, so
+bounded runs still print one GPU report per frame. F1 names these CPU spans
+`SLOT WAIT + QUERY` and `SUBMIT`.
+
+At the grown close view (live simulation, IMMEDIATE present, alternating
+pairs of 120-frame windows, first 20 frames discarded) median cadence fell
+from 9.21 to 7.91 ms; the wide view fell from 6.02 to 5.10 ms. Application
+time now tracks GPU time.
