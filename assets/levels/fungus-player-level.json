@@ -2,7 +2,7 @@
   "$schema": "../schemas/world.schema.json",
   "content": "../gameplay/faction-trial-content.json",
   "rules": "../gameplay/gameplay-rules.json",
-  "appearance": "../presentation/scene-appearance.json",
+  "appearance": "../presentation/scene.json",
   "effects": "../presentation/combat-effects.json",
   "match": {
     "player": "fungus",

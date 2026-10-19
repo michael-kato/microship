@@ -3,6 +3,6 @@
   "world": "levels/virus-player-level.json",
   "render": "rendering/renderer.json",
   "shader": "shaders/ray_trace.comp.spv",
-  "audio": "audio/sound-playback.json",
+  "audio": "audio/audio.json",
   "menu": "presentation/start-menu.json"
 }

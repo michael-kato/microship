@@ -1,8 +1,8 @@
 {
   "$schema": "../schemas/world.schema.json",
-  "content": "../gameplay/gameplay-content.json",
+  "content": "../gameplay/gameplay.json",
   "rules": "../gameplay/gameplay-rules.json",
-  "appearance": "../presentation/scene-appearance.json",
+  "appearance": "../presentation/scene.json",
   "effects": "../presentation/combat-effects.json",
   "match": {
     "player": "immune",

@@ -118,6 +118,9 @@ foreach(legacy_asset IN ITEMS startup.game gameplay/biology.content
 endforeach()
 # Remove old configuration names from an existing active build bundle.
 foreach(old_settings IN ITEMS
+    audio/sound-playback.json
+    gameplay/gameplay-content.json
+    presentation/scene-appearance.json
     audio/biology.json
     audio/synthesis.json
     gameplay/biology.json

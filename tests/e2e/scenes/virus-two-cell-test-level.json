@@ -1,8 +1,8 @@
 {
   "$schema": "../../../assets/schemas/world.schema.json",
-  "content": "../../../assets/gameplay/gameplay-content.json",
+  "content": "../../../assets/gameplay/gameplay.json",
   "rules": "two-cell-test-gameplay-rules.json",
-  "appearance": "../../../assets/presentation/scene-appearance.json",
+  "appearance": "../../../assets/presentation/scene.json",
   "effects": "../../../assets/presentation/combat-effects.json",
   "match": {
     "player": "virus",

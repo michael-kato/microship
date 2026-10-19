@@ -562,11 +562,11 @@ bundle. Restart the application to reload them. Filenames identify their purpose
 | `renderer.json` | Normal rendering quality, camera, SSS, and bloom |
 | `renderer-quality.json` | Higher-sample rendering preset |
 | `renderer-reference.json` | Reference renderer configuration |
-| `scene-appearance.json` | Lighting, membrane opacity, atmosphere, fog, and self-glow |
-| `gameplay-content.json` | Links cell, faction, unit, and factory definitions |
+| `scene.json` | Lighting, membrane opacity, atmosphere, fog, and self-glow |
+| `gameplay.json` | Links cell, faction, unit, and factory definitions |
 | `gameplay-rules.json` | Simulation, exploration, and AI settings |
 | `combat-effects.json` | Projectile, trail, damage, and injury presentation |
-| `sound-playback.json` | Sound files, levels, cooldowns, and playback distance |
+| `audio.json` | Sound files, levels, cooldowns, and playback distance |
 | `sound-synthesis.json` | Procedural sound generation |
 | `start-menu.json` | Faction menu presentation and level paths |
 
