@@ -748,9 +748,17 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
             exp(-render.thin_material.y/max(MIN_MEMBRANE_DIRECTION_COSINE,-cosine))*render.studio_color[selected].rgb;
     if (max(weighted.r,max(weighted.g,weighted.b))<=0.0) { sss=vec3(0);return vec3(0); }
     vec3 origin=s.point+s.geometric_normal*(geometric_cosine>0.0 ? point_epsilon(s.point) : -point_epsilon(s.point));
-    vec3 visibility=s.unshadowed ? vec3(1) : baked_surface_visibility(s,selected,geometric_cosine<=0.0,origin);
-    sss*=(1.0-transmission)*render.studio_color[selected].rgb*visibility;
-    return weighted*visibility;
+    vec3 visibility=vec3(1),diffused_visibility=vec3(1);
+    if (!s.unshadowed)
+    {
+        // Thin walls use their baked samples. Opaque receivers trace exact current
+        // shadows for surface reflection; light diffused under the surface keeps the
+        // smooth field, since scattering blurs it over the mean free path anyway.
+        diffused_visibility=baked_surface_visibility(s,selected,geometric_cosine<=0.0,origin);
+        visibility=s.translucent || geometric_cosine<=0.0 ? diffused_visibility : studio_visibility(origin,direction);
+    }
+    sss*=(1.0-transmission)*render.studio_color[selected].rgb*diffused_visibility;
+    return (weighted-sss)*visibility+sss;
 }
 
 bool subsurface_exit(Surface s,vec3 direction,float limit,out vec3 exit_point,out float thickness)

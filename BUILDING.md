@@ -788,3 +788,12 @@ diffuse dielectric, but specular reflection and the interface Fresnel split
 now fade out over roughness 0.95–0.999 and IOR 1.05–1.0 instead of switching
 off, so vertex materials interpolated across those limits shade without a
 seam. No current material is inside either band.
+
+Opaque surfaces inside cells trace exact current shadow rays for their
+surface reflection. They previously read the 16^3 interior visibility grid,
+offset one voxel (about 0.56 units in a radius-4.2 cell) along the normal,
+which removed contact shadows, leaked light and blurred moving units' shadows.
+The grid still lights the volume, and light diffused under organelle surfaces
+(the SSS wrap) keeps the smooth field, since scattering blurs it anyway. Thin
+walls keep their baked per-vertex samples. This costs about 0.75 ms of surface
+time in the close view and 0.17 ms in the wide view.
