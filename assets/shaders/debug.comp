@@ -3,6 +3,7 @@
 #include "render_bindings.glsl"
 #include "debug_buffers.glsl"
 #include "hud_layout.glsl"
+#include "display_transform.glsl"
 
 const float SRGB_POWER_SCALE = 1.055;
 const float SRGB_GAMMA = 2.4;
@@ -128,7 +129,7 @@ vec3 srgb(vec3 linear)
 vec3 radiance_display(vec3 value)
 {
     vec3 linear=max(value,vec3(0))*debug.settings.x;
-    return srgb(linear/(vec3(1)+linear));
+    return srgb(agx_display(linear));
 }
 
 const uint PANEL_DISPLAY=0u;

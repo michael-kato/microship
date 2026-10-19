@@ -4,6 +4,7 @@
 #define NANOVA_DEBUG_BINDING BLOOM_BINDING_DEBUG
 #define NANOVA_GUIDE_BINDING BLOOM_BINDING_GUIDES
 #include "debug_buffers.glsl"
+#include "display_transform.glsl"
 
 const float SRGB_POWER_SCALE = 1.055;
 const float SRGB_GAMMA = 2.4;
@@ -43,7 +44,7 @@ layout(constant_id=SPATIAL_AA_SPECIALIZATION_ID) const bool spatial_aa=false;
 vec3 mapped_texel(ivec2 position,vec3 glow)
 {
     vec3 linear=imageLoad(beauty,clamp(position,ivec2(0),bloom.extent-1)).rgb*bloom.exposure+glow;
-    return linear/(vec3(1)+linear);
+    return agx_display(linear);
 }
 vec3 mapped_sample(vec2 position,vec3 glow)
 {
@@ -54,7 +55,7 @@ vec3 mapped_sample(vec2 position,vec3 glow)
     vec3 c=imageLoad(beauty,clamp(low+ivec2(0,1),ivec2(0),last)).rgb;
     vec3 d=imageLoad(beauty,clamp(low+ivec2(1,1),ivec2(0),last)).rgb;
     vec3 linear=mix(mix(a,b,f.x),mix(c,d,f.x),f.y)*bloom.exposure+glow;
-    return linear/(vec3(1)+linear);
+    return agx_display(linear);
 }
 float edge_luma(vec3 color)
 { return sqrt(max(0.0,dot(color,vec3(.299,.587,.114)))); }
@@ -82,7 +83,7 @@ vec3 antialias(ivec2 pixel,vec3 center,vec3 glow)
 
 void write_display(ivec2 pixel,vec3 linear)
 {
-    vec3 mapped=linear/(vec3(1.0)+linear);
+    vec3 mapped=agx_display(linear);
     if (spatial_aa && bloom.debug_views<.5)
     {
         vec3 glow=linear-imageLoad(beauty,pixel).rgb*bloom.exposure;

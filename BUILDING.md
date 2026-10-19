@@ -758,3 +758,13 @@ At the grown close view (live simulation, IMMEDIATE present, alternating
 pairs of 120-frame windows, first 20 frames discarded) median cadence fell
 from 9.21 to 7.91 ms; the wide view fell from 6.02 to 5.10 ms. Application
 time now tracks GPU time.
+
+## Shading model updates
+
+The display transform is AgX (`assets/shaders/display_transform.glsl`), used
+by the display pass, its edge filter and F2 radiance panels. It replaces
+per-channel Reinhard, which shifted saturated highlights in hue and mapped
+middle grey 0.5 down to 0.33. AgX keeps middle grey near 0.18 and rolls bright
+saturated light toward white. At the authored exposure of 1.6 the stable
+close view's mean display value rose from 119 to 136 (RGB8); `output.exposure`
+remains the brightness control.

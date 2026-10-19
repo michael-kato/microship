@@ -78,7 +78,8 @@ set(debug_overlay "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/debug.comp.spv")
 add_custom_command(OUTPUT "${debug_overlay}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/debug.comp" -o "${debug_overlay}"
-    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/hud_layout.glsl assets/shaders/debug.comp assets/shaders/debug_buffers.glsl VERBATIM)
+    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/hud_layout.glsl assets/shaders/debug.comp assets/shaders/debug_buffers.glsl
+        assets/shaders/display_transform.glsl VERBATIM)
 add_custom_command(OUTPUT "${volume_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DNANOVA_VOLUME_PASS=1
@@ -88,7 +89,7 @@ add_custom_command(OUTPUT "${bloom_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/bloom.comp" -o "${bloom_output}"
-    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/bloom.comp assets/shaders/debug_buffers.glsl VERBATIM)
+    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/bloom.comp assets/shaders/debug_buffers.glsl assets/shaders/display_transform.glsl VERBATIM)
 add_custom_command(OUTPUT "${shader_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O
