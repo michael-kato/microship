@@ -797,3 +797,14 @@ The grid still lights the volume, and light diffused under organelle surfaces
 (the SSS wrap) keeps the smooth field, since scattering blurs it anyway. Thin
 walls keep their baked per-vertex samples. This costs about 0.75 ms of surface
 time in the close view and 0.17 ms in the wide view.
+
+Ambient fill inside cells is scaled by a baked ambient visibility stored in
+the spare alpha channel of each interior grid point's first light entry. The
+static bake traces 32 fixed Fibonacci directions per grid point through
+stationary blockers, wall transmission and medium attenuation, weighted by
+the environment gradient's luminance. Surface ambient (diffuse, specular and
+light from behind thin walls) and ambient in-scattering in cell volumes read
+it with the same one-voxel normal offset as the light grids. Moving units do
+not occlude ambient light. Previously enclosed organelles received the full
+open environment. The close view darkens by about half a display level on
+average, mostly in crevices; GPU cost is about 0.08 ms.
