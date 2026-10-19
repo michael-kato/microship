@@ -17,7 +17,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-targets-') as directory:
   result=subprocess.run(cmd,capture_output=True,text=True,timeout=10);count+=1;assert result.returncode==0,(name,result.stdout,result.stderr)
   return json.loads(state.read_text()),json.loads(scene.read_text())
  def lines(scene):return [e for e in scene['effect_segments'] if e[7]==4]
- selected,view=run('moving',orders='0 select all\n0 move -32 2 8\n');segments=lines(view);assert len(segments)==7
+ selected,view=run('moving',ticks=20,orders='0 select all\n0 move -32 2 8\n');segments=lines(view);assert len(segments)==7
  f=[0,-6/math.sqrt(436),-20/math.sqrt(436)];up=[0,-f[2],f[1]];eye=[-52,2,20];focal=1080/(2*math.tan(math.radians(22.5)))
  def project(point):
   v=[a-b for a,b in zip(point,eye)];z=sum(a*b for a,b in zip(v,f));return [960+v[0]*focal/z,540-sum(a*b for a,b in zip(v,up))*focal/z]
@@ -26,17 +26,17 @@ with tempfile.TemporaryDirectory(prefix='nanova-targets-') as directory:
  for e,u in zip(segments,[u for u in selected['units'] if u['selected']]):assert math.dist(e[:2],project(u['position']))<.001
  _,unselected=run('unselected');assert not lines(unselected)
  disabled=deepcopy(base);disabled['effects']['target_line']['alpha']=0
- same,none=run('lines-disabled',disabled,orders='0 select all\n0 move -32 2 8\n');assert not lines(none) and same==selected
+ same,none=run('lines-disabled',disabled,20,orders='0 select all\n0 move -32 2 8\n');assert not lines(none) and same==selected
  # A long move keeps the target active while its marker fades.
  slow=deepcopy(base)
  for u in slow['content']['units']:u['speed']=.01
- for ticks,alpha in ((180,.1),(210,.05),(240,0),(360,0)):
+ for ticks,alpha in ((30,.1),(45,.05),(60,0),(120,0)):
   state,scene=run('fade-'+str(ticks),slow,ticks,'0 select all\n0 move -32 2 8\n')
   fading=lines(scene)
   if alpha:assert len(fading)==7 and all(abs(e[11]-alpha)<.00001 for e in fading),(ticks,fading)
   else:assert not fading and all(u['moving'] for u in state['units'] if u['selected'])
  for command in ('select all','move -30 3 8'):
-  _,scene=run('refresh-'+command.split()[0],slow,330,'0 select all\n0 move -32 2 8\n300 '+command+'\n')
+  _,scene=run('refresh-'+command.split()[0],slow,315,'0 select all\n0 move -32 2 8\n300 '+command+'\n')
   assert len(lines(scene))==7 and all(abs(e[11]-.1)<.00001 for e in lines(scene))
  # An attached immune craft and its selected captive both suppress target lines.
  held=deepcopy(base);held['spawns']=[dict(type='immune_fighter',position=[-52,-1,6.4]),dict(type='virus_fighter',position=[-51.65,-1,6.4])]
