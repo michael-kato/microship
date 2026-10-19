@@ -684,6 +684,15 @@ before the refit, so shading never reads geometry over the PCIe BAR.
 Effect tile lists upload only the offsets and the references the frame
 uses, not the 2.1 MB reference capacity.
 
+The scene keeps about 11,000 fixed instance slots; most are empty. Each
+frame compacts the slots with a nonzero mask and fully rebuilds the TLAS
+from them. Instance IDs index the compacted style and lighting arrays in the
+same order, so shaders are unchanged; slot-indexed data (bake keys,
+surface-cache offsets) stays on the CPU. The previous design built the TLAS
+once at startup and refit it every frame, so its tree kept the startup
+layout while units spread out. At tick 4,800 the acceleration stage fell
+from 0.29 to 0.25 ms; total GPU time changed by about 0.04 ms.
+
 Two frames are in flight. Each slot owns its command buffer, fence, acquire
 semaphore, timestamp queries, descriptor sets and every buffer the CPU
 writes per frame (uniform, TLAS instances, media, lighting instances and

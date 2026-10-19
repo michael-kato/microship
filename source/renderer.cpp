@@ -75,6 +75,8 @@ struct LightingInstance
     uint32_t first,count,cache_first,active;
 };
 static_assert(sizeof(LightingInstance)==64,"Lighting instance shader layout");
+// Inputs of one slot that static light transport depends on.
+struct LightingKey { float transform[3][4];uint32_t mesh,mask; };
 
 struct RenderUniform
 {
@@ -197,10 +199,11 @@ struct RendererState
     GpuBuffer tlas_buffer;
     GpuBuffer tlas_scratch;
     GpuBuffer shadow_grid,sharp_layer,static_lighting,surface_lighting,dynamic_lighting;
-    std::vector<LightingInstance> lighting_input;
+    std::vector<LightingInstance> lighting_input; // Active instances in TLAS order.
+    std::vector<uint32_t> slot_cache_first; // Per scene slot: first surface-cache triangle.
     uint32_t surface_cache_triangles;
     bool surface_lighting_valid;
-    std::vector<VkAccelerationStructureInstanceKHR> baked_instances;
+    std::vector<LightingKey> baked_instances; // Per scene slot.
     std::vector<uint64_t> baked_mesh_revisions;
     std::vector<RenderMedium> baked_media;
     std::vector<RenderGridBounds> baked_bounds;
@@ -232,11 +235,11 @@ struct RendererState
     uint32_t effect_count, effect_tile_count;
     RenderUniform uniform_data;
     uint32_t text_mask[(STATS_TEXT_WIDTH*STATS_TEXT_HEIGHT+HUD_TEXT_WIDTH*HUD_TEXT_HEIGHT)/TEXT_MASK_WORD_BITS];
-    std::vector<VkAccelerationStructureInstanceKHR> instance_data;
+    std::vector<VkAccelerationStructureInstanceKHR> instance_data; // Active instances only.
     GpuBuffer readback;
     VkAccelerationStructureKHR tlas;
     std::vector<MeshAllocation> meshes;
-    uint32_t mesh_count, instance_count;
+    uint32_t mesh_count, instance_count, active_count; // Scene slots; slots with a nonzero mask.
     size_t effect_tile_size;
     VkImage hdr;
     VkDeviceMemory hdr_memory;
@@ -701,72 +704,83 @@ static bool submit_commands(RendererState* state, bool presentation, uint32_t im
     return !wait || vk_ok(vkWaitForFences(state->device, 1, &frame.fence, VK_TRUE, UINT64_MAX), "Wait for frame");
 }
 
-static bool build_acceleration(RendererState* state, VkAccelerationStructureTypeKHR type,
-    VkAccelerationStructureGeometryKHR* geometry, uint32_t primitive_count,
-    GpuBuffer* storage, VkAccelerationStructureKHR* result,GpuBuffer* update_scratch=0)
+static VkDeviceAddress aligned_scratch(const RendererState* state,VkDeviceAddress address)
 {
+    return (address+state->scratch_alignment-1)&~(state->scratch_alignment-1);
+}
+
+static VkAccelerationStructureGeometryKHR instance_geometry(VkDeviceAddress instances)
+{
+    VkAccelerationStructureGeometryKHR geometry = {};
+    geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+    geometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
+    geometry.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
+    geometry.geometry.instances.data.deviceAddress = instances;
+    return geometry;
+}
+
+// Full build of the slot's compacted active instances. A fresh build keeps the
+// tree matched to current positions; refitting kept the startup topology.
+static void record_tlas_build(RendererState* state,VkDeviceAddress instances)
+{
+    VkAccelerationStructureGeometryKHR geometry=instance_geometry(instances);
     VkAccelerationStructureBuildGeometryInfoKHR build = {};
     build.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
-    build.type = type;
+    build.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
     build.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
-    if (type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR || update_scratch)
-        build.flags |= VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
     build.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+    build.dstAccelerationStructure = state->tlas;
     build.geometryCount = 1;
-    build.pGeometries = geometry;
+    build.pGeometries = &geometry;
+    build.scratchData.deviceAddress = aligned_scratch(state,state->tlas_scratch.address);
+    VkAccelerationStructureBuildRangeInfoKHR range = {};
+    range.primitiveCount = state->active_count;
+    const VkAccelerationStructureBuildRangeInfoKHR* ranges = &range;
+    // Host instance writes, the previous build, and the previous frame's traces come first.
+    VkMemoryBarrier before = {};
+    before.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    before.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+    before.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR | VK_ACCESS_SHADER_READ_BIT;
+    vkCmdPipelineBarrier(state->command, VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR
+        | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &before, 0, 0, 0, 0);
+    state->build_as(state->command, 1, &build, &ranges);
+    VkMemoryBarrier after = {};
+    after.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    after.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+    after.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+    vkCmdPipelineBarrier(state->command, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &after, 0, 0, 0, 0);
+}
+
+// Storage and scratch cover every scene slot; each frame builds only active ones.
+static bool create_tlas(RendererState* state)
+{
+    VkAccelerationStructureGeometryKHR geometry=instance_geometry(state->frames[0].instances.address);
+    VkAccelerationStructureBuildGeometryInfoKHR build = {};
+    build.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+    build.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+    build.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+    build.geometryCount = 1;
+    build.pGeometries = &geometry;
     VkAccelerationStructureBuildSizesInfoKHR sizes = {};
     sizes.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
-    state->get_as_sizes(state->device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
-        &build, &primitive_count, &sizes);
-    if (!create_buffer(state, storage, sizes.accelerationStructureSize,
-        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+    uint32_t capacity=state->instance_count;
+    state->get_as_sizes(state->device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build, &capacity, &sizes);
+    if (!create_buffer(state, &state->tlas_buffer, sizes.accelerationStructureSize,
+            VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+        || !create_buffer(state, &state->tlas_scratch, sizes.buildScratchSize + state->scratch_alignment,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
         return false;
     VkAccelerationStructureCreateInfoKHR create = {};
     create.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
-    create.type = type;
-    create.buffer = storage->handle;
+    create.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+    create.buffer = state->tlas_buffer.handle;
     create.size = sizes.accelerationStructureSize;
-    if (!vk_ok(state->create_as(state->device, &create, 0, result), "Create acceleration structure"))
+    if (!vk_ok(state->create_as(state->device, &create, 0, &state->tlas), "Create acceleration structure")
+        || !begin_commands(state))
         return false;
-    GpuBuffer local_scratch = {};
-    GpuBuffer* scratch = type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR ? &state->tlas_scratch
-        : update_scratch ? update_scratch : &local_scratch;
-    VkDeviceSize scratch_size = sizes.buildScratchSize > sizes.updateScratchSize ? sizes.buildScratchSize : sizes.updateScratchSize;
-    if (!create_buffer(state, scratch, scratch_size + state->scratch_alignment,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
-    {
-        destroy_buffer(state, &local_scratch);
-        return false;
-    }
-    build.dstAccelerationStructure = *result;
-    build.scratchData.deviceAddress = (scratch->address + state->scratch_alignment - 1)
-        & ~(state->scratch_alignment - 1);
-    VkAccelerationStructureBuildRangeInfoKHR range = {};
-    range.primitiveCount = primitive_count;
-    const VkAccelerationStructureBuildRangeInfoKHR* ranges = &range;
-    bool success = begin_commands(state);
-    if (success)
-    {
-        VkMemoryBarrier before = {};
-        before.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-        before.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR | VK_ACCESS_HOST_WRITE_BIT;
-        before.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_SHADER_READ_BIT;
-        vkCmdPipelineBarrier(state->command, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR
-            | VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-            0, 1, &before, 0, 0, 0, 0);
-        state->build_as(state->command, 1, &build, &ranges);
-        VkMemoryBarrier after = {};
-        after.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-        after.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
-        after.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
-        vkCmdPipelineBarrier(state->command, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &after, 0, 0, 0, 0);
-        success = submit_commands(state, false);
-    }
-    destroy_buffer(state, &local_scratch);
-    return success;
+    record_tlas_build(state,state->frames[0].instances.address);
+    return submit_commands(state, false);
 }
 
 static void store_vector(float* destination, Vec3 value)
@@ -822,8 +836,9 @@ static void update_lighting_dependencies(RendererState* state,const RenderScene*
         || memcmp(u.membrane_fade,old.membrane_fade,2*sizeof(float));
     for (uint32_t i=0;i<state->instance_count;++i)
     {
-        VkAccelerationStructureInstanceKHR current={};
-        if (scene->instances[i].static_lighting && (state->instance_data[i].mask&1u)) current=state->instance_data[i];
+        LightingKey current={};const RenderInstance& source=scene->instances[i];
+        if (source.static_lighting && (source.mask&1u))
+        { memcpy(current.transform,source.transform,sizeof(current.transform));current.mesh=source.mesh;current.mask=source.mask; }
         changed=changed || memcmp(&current,&state->baked_instances[i],sizeof(current));
         state->baked_instances[i]=current;
     }
@@ -866,22 +881,27 @@ static void update_grid_activity(RendererState* state)
     }
 }
 
+// Masked-out slots stay out of the TLAS. Instance IDs index the compacted
+// style and lighting arrays, which use the same order.
 static void scene_instances(RendererState* state,const RenderScene* scene)
 {
+    uint32_t active=0;
     for (uint32_t i=0;i<state->instance_count;++i)
     {
-        const RenderInstance* source=&scene->instances[i];VkAccelerationStructureInstanceKHR* out=&state->instance_data[i];
+        const RenderInstance* source=&scene->instances[i];if (!source->mask) continue;
+        uint32_t j=active++;VkAccelerationStructureInstanceKHR* out=&state->instance_data[j];
         memcpy(out->transform.matrix,source->transform,sizeof(source->transform));
         out->mask=source->mask;
         out->flags=VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
         const MeshAllocation* mesh=&state->meshes[source->mesh];
         out->instanceCustomIndex=mesh->range.first;out->accelerationStructureReference=mesh->address;
-        memcpy(&state->style_data[i*INSTANCE_STYLE_FLOATS],source->style,INSTANCE_STYLE_FLOATS*sizeof(float));
-        LightingInstance& light=state->lighting_input[i];
+        memcpy(&state->style_data[j*INSTANCE_STYLE_FLOATS],source->style,INSTANCE_STYLE_FLOATS*sizeof(float));
+        LightingInstance& light=state->lighting_input[j];
         memcpy(light.transform,source->transform,sizeof(light.transform));
-        light.first=mesh->range.first;light.count=mesh->range.count;
+        light.first=mesh->range.first;light.count=mesh->range.count;light.cache_first=state->slot_cache_first[i];
         light.active=source->static_lighting && (source->mask&1u) ? 1u : 0u;
     }
+    state->active_count=active;
 }
 
 static VkAccelerationStructureGeometryKHR triangle_geometry(RendererState* state,uint32_t vertex_count,uint32_t first)
@@ -898,11 +918,6 @@ static VkAccelerationStructureGeometryKHR triangle_geometry(RendererState* state
     mesh.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
     mesh.geometry.triangles.indexData.deviceAddress = state->indices.address+(VkDeviceSize)first*3*sizeof(uint32_t);
     return mesh;
-}
-
-static VkDeviceAddress aligned_scratch(const RendererState* state,VkDeviceAddress address)
-{
-    return (address+state->scratch_alignment-1)&~(state->scratch_alignment-1);
 }
 
 // Device-local geometry is uploaded once through staging. All BLAS builds share
@@ -1018,6 +1033,7 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
         state->meshes.resize(state->mesh_count);state->instance_data.resize(state->instance_count);state->style_data.resize(state->instance_count*INSTANCE_STYLE_FLOATS);
         state->baked_instances.resize(state->instance_count);state->baked_mesh_revisions.resize(state->mesh_count);
         state->baked_media.resize(scene->media.size());state->baked_bounds.resize(scene->media.size());state->lighting_input.resize(state->instance_count);
+        state->slot_cache_first.resize(state->instance_count);
         state->surface_cache_meshes.resize(state->instance_count);
         state->lighting_valid.resize(scene->media.size());state->vertex_upload_offsets.resize(state->mesh_count);
     }
@@ -1026,7 +1042,7 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
     for (uint32_t i=0;i<state->instance_count;++i) if (scene->instances[i].static_lighting)
     {
         state->surface_cache_meshes[i]=scene->instances[i].mesh+1;
-        state->lighting_input[i].cache_first=state->surface_cache_triangles;
+        state->slot_cache_first[i]=state->surface_cache_triangles;
         state->surface_cache_triangles+=state->meshes[scene->instances[i].mesh].range.count;
     }
     scene_instances(state,scene);
@@ -1034,16 +1050,9 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
     {
         GpuBuffer& instances=state->frames[f].instances;
         if (!create_buffer(state,&instances,state->instance_count*sizeof(state->instance_data[0]),input,host)) return false;
-        memcpy(instances.mapped,state->instance_data.data(),instances.size);
+        memcpy(instances.mapped,state->instance_data.data(),state->active_count*sizeof(state->instance_data[0]));
     }
-    VkAccelerationStructureGeometryKHR instances = {};
-    instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-    instances.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
-    instances.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
-    instances.geometry.instances.data.deviceAddress = state->frames[0].instances.address;
-    if (!build_acceleration(state, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
-        &instances, state->instance_count, &state->tlas_buffer, &state->tlas))
-        return false;
+    if (!create_tlas(state)) return false;
     RenderUniform uniform={};
     uniform.settings[0]=state->config.width;uniform.settings[1]=state->config.height;
     uniform.settings[2]=state->config.samples_per_pixel;uniform.settings[3]=state->config.max_transmission_layers;uniform.scene[0]=state->config.seed;
@@ -1300,7 +1309,6 @@ static bool create_output(RendererState* state)
             || !create_buffer(state,&frame.instance_styles,state->style_data.size()*sizeof(float),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host)
             || !create_buffer(state,&frame.lighting_bounds,(state->medium_count ? state->medium_count : 1)*sizeof(RenderGridBounds),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host)
             || !create_buffer(state,&frame.lighting_instances,state->lighting_input.size()*sizeof(LightingInstance),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host)) return false;
-        memcpy(frame.instance_styles.mapped,state->style_data.data(),state->style_data.size()*sizeof(float));
     }
     VkDeviceSize n=state->config.shadow_grid_resolution;
     VkDeviceSize grid_bytes=n ? n*n*n*3*(state->medium_count ? state->medium_count : 1)*4*sizeof(float) : 4*sizeof(float);
@@ -1744,7 +1752,7 @@ static void record_lighting_fields(RendererState* state)
         {
             if (!state->surface_lighting_valid)
             {
-                for (uint32_t i=0;i<state->instance_count;++i) if (state->lighting_input[i].active)
+                for (uint32_t i=0;i<state->active_count;++i) if (state->lighting_input[i].active)
                 {
                     uint32_t parameters[4]={0,LIGHTING_PASS_SURFACE,i,state->lighting_input[i].count};
                     vkCmdPushConstants(state->command,state->pipeline_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,BACKDROP_PUSH_BYTES,parameters);
@@ -2408,49 +2416,17 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     if (!update_meshes(state,scene->geometry,renderer->frame_log)) return false;
     scene_instances(state,scene);
     if (state->medium_count) memcpy(frame.media.mapped,scene->media.data(),state->medium_count*sizeof(RenderMedium));
-    memcpy(frame.lighting_instances.mapped,state->lighting_input.data(),state->lighting_input.size()*sizeof(LightingInstance));
+    memcpy(frame.lighting_instances.mapped,state->lighting_input.data(),state->active_count*sizeof(LightingInstance));
     if (state->medium_count) memcpy(frame.lighting_bounds.mapped,scene->lighting_bounds.data(),state->medium_count*sizeof(RenderGridBounds));
     record_optical_depth(state);
     update_lighting_dependencies(state,scene);
     update_grid_activity(state);
     if (scene->fog_blur>0) memcpy(frame.sight.mapped,scene->fog_field.reveal,sizeof(scene->fog_field.reveal));
     memcpy((char*)frame.sight.mapped+sizeof(scene->fog_field.reveal),scene->sight,sizeof(scene->sight));
-    {
-        memcpy(frame.instances.mapped,state->instance_data.data(),frame.instances.size);
-        VkAccelerationStructureGeometryKHR geometry = {};
-        geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-        geometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
-        geometry.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
-        geometry.geometry.instances.data.deviceAddress = frame.instances.address;
-        VkAccelerationStructureBuildGeometryInfoKHR build = {};
-        build.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
-        build.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-        build.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
-        build.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;
-        build.srcAccelerationStructure = build.dstAccelerationStructure = state->tlas;
-        build.geometryCount = 1;
-        build.pGeometries = &geometry;
-        build.scratchData.deviceAddress = (state->tlas_scratch.address + state->scratch_alignment - 1) & ~(state->scratch_alignment - 1);
-        VkAccelerationStructureBuildRangeInfoKHR range = {};
-        range.primitiveCount = state->instance_count;
-        const VkAccelerationStructureBuildRangeInfoKHR* ranges = &range;
-        VkMemoryBarrier before = {};
-        before.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-        before.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
-        before.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR | VK_ACCESS_SHADER_READ_BIT;
-        // The previous frame may still trace this TLAS; its compute stage must finish first.
-        vkCmdPipelineBarrier(state->command, VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR
-            | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &before, 0, 0, 0, 0);
-        state->build_as(state->command, 1, &build, &ranges);
-        VkMemoryBarrier after = {};
-        after.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-        after.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
-        after.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
-        vkCmdPipelineBarrier(state->command, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &after, 0, 0, 0, 0);
-    }
+    memcpy(frame.instances.mapped,state->instance_data.data(),state->active_count*sizeof(state->instance_data[0]));
+    record_tlas_build(state,frame.instances.address);
     memcpy(frame.uniform.mapped,uniform,sizeof(*uniform));
-    memcpy(frame.instance_styles.mapped,state->style_data.data(),state->style_data.size()*sizeof(float));
+    memcpy(frame.instance_styles.mapped,state->style_data.data(),state->active_count*INSTANCE_STYLE_FLOATS*sizeof(float));
     state->effect_count=scene->effect_count;
     memcpy(frame.effects.mapped,scene->effects.data(),state->effect_count*sizeof(EffectSegment));
     // Tile offsets, CPU cursors, then only the references this frame uses.
