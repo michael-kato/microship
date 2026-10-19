@@ -470,8 +470,15 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
         geometric_normal = -geometric_normal;
         normal = -normal;
     }
-    if (dot(normal, -direction) <= 0.0)
-        normal = geometric_normal;
+    float view_cosine=dot(normal,-direction);
+    if (triangle.w==THIN_MEMBRANE_MATERIAL)
+    {
+        // Keep the interpolated wall normal continuous at the view horizon.
+        // A switch to the flat triangle normal creates wedges in Fresnel coverage.
+        if (view_cosine<MIN_SHADING_DENOMINATOR)
+            normal=normalize(normal-direction*(MIN_SHADING_DENOMINATOR-view_cosine));
+    }
+    else if (view_cosine<=0.0) normal=geometric_normal;
 
     float instance_scale=min(length(hit_to_world[0]),min(length(hit_to_world[1]),length(hit_to_world[2])));
     surface.subsurface=a.subsurface*weights.x+b.subsurface*weights.y+c.subsurface*weights.z;
@@ -669,24 +676,31 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
     float cosine=dot(s.normal,direction),geometric_cosine=dot(s.geometric_normal,direction);
     float transmission=s.translucent ? membrane_transmission(max(0.0,dot(s.normal,outgoing))) : 0.0;
     float scatter=scattering_weight(s);vec3 weighted=vec3(0);
-    if (geometric_cosine>0.0 && (cosine>0.0 || scatter>0.0))
+    if ((s.translucent || geometric_cosine>0.0) && (cosine>0.0 || scatter>0.0))
     {
         float interface_fresnel;
         vec3 reflected=evaluate_bsdf(s.normal,outgoing,direction,s.color,s.roughness,s.ior,s.metal,1.0-scatter,interface_fresnel)*max(0.0,cosine);
         if (scatter>0.0)
         {
-            // The wrap integrates to Lambert's energy over the front hemisphere.
-            // Replace diffuse energy only. Keep the original specular highlight.
+            // Preserve solid-surface wrapping. The thin wall wraps continuously
+            // across the smooth light horizon, normalized over its full support.
             float wrap=render.subsurface.y;
-            float diffuse=(max(0.0,cosine)+wrap)/(1.0+2.0*wrap);
-            // The direct lobe already evaluated this interface for the same light and view.
+            float diffuse=s.translucent ? max(0.0,cosine+wrap)/((1.0+wrap)*(1.0+wrap))
+                : (max(0.0,cosine)+wrap)/(1.0+2.0*wrap);
+            if (s.translucent && cosine<=0.0)
+            {
+                vec3 half_vector=direction+outgoing;
+                float half_cosine=dot(outgoing,half_vector)*inversesqrt(max(MIN_SHADING_DENOMINATOR,dot(half_vector,half_vector)));
+                interface_fresnel=fresnel(clamp(half_cosine,0.0,1.0),s.ior);
+            }
+            // Keep the interface response continuous across the light horizon.
             sss=s.color*((1.0-interface_fresnel)*scatter*(1.0-render.subsurface.z)*diffuse/PI);
             reflected+=sss;
         }
         weighted=(1.0-transmission)*reflected*render.studio_color[selected].rgb;
     }
-    else if (cosine<0.0 && geometric_cosine<0.0 && transmission>0.0)
-        weighted=s.color*((1.0-scatter)*transmission*(1.0-render.thin_material.w)*(-cosine)/PI)*
+    if (cosine<0.0 && (s.translucent || geometric_cosine<0.0) && transmission>0.0)
+        weighted+=s.color*((1.0-scatter)*transmission*(1.0-render.thin_material.w)*(-cosine)/PI)*
             exp(-render.thin_material.y/max(MIN_MEMBRANE_DIRECTION_COSINE,-cosine))*render.studio_color[selected].rgb;
     if (max(weighted.r,max(weighted.g,weighted.b))<=0.0) { sss=vec3(0);return vec3(0); }
     vec3 origin=s.point+s.geometric_normal*(geometric_cosine>0.0 ? point_epsilon(s.point) : -point_epsilon(s.point));
@@ -742,7 +756,7 @@ vec3 evaluate_subsurface(Surface s,vec3 outgoing)
     int selected=-1;float best=0.0;
     for (int light=0;light<3;++light)
     {
-        float cosine=-dot(s.geometric_normal,render.studio_direction[light].xyz);
+        float cosine=-dot(s.translucent ? s.normal : s.geometric_normal,render.studio_direction[light].xyz);
         float score=cosine*render.studio_direction[light].w;
         if (score>best) { best=score;selected=light; }
     }
@@ -995,13 +1009,17 @@ void main()
         vec3 normal=cross(b-a,c-a);float area=length(normal);
         normal=area>0.0 ? normal/area : vec3(0);
         vec3 point=corner%3u==0u ? a : corner%3u==1u ? b : c;
-        vec3 origin=point+normal*(corner<3u ? point_epsilon(point) : -point_epsilon(point));
         uint index=(instance.range.z+local)*SURFACE_LIGHTING_RECORDS_PER_TRIANGLE+corner*3u;
         for (uint light=0u;light<3u;++light)
         {
             if (triangle.w==THIN_MEMBRANE_MATERIAL)
+            {
+                // Shared wall vertices bake the same incoming light. A flat
+                // face-normal offset creates a different shadow per triangle.
+                vec3 light_origin=point+render.studio_direction[light].xyz*point_epsilon(point);
                 surface_visibility[index+light]=vec4(render.studio_direction[light].w>0.0 && area>0.0
-                    ? light_visibility(origin,render.studio_direction[light].xyz,LIGHTING_STATIC_ONLY,true) : vec3(0),1);
+                    ? light_visibility(light_origin,render.studio_direction[light].xyz,LIGHTING_STATIC_ONLY,true) : vec3(0),1);
+            }
             if (organelle_lighting_cache && triangle.w==0u)
             {
                 Surface sample_value;sample_value.point=point;sample_value.geometric_normal=corner<3u ? normal : -normal;
