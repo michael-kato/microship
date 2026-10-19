@@ -36,6 +36,21 @@ static const double MILLISECONDS_PER_SECOND = 1000.0;
 static const double MAX_FRAME_CATCHUP_SECONDS = 0.25;
 static const int SMOKE_SIMULATION_TICKS = 3;
 
+// Positions of moving things at the previous simulation tick. Interactive frames
+// draw between that tick and the current one, so motion advances on every frame
+// even when rendering outpaces the fixed 60 Hz simulation. Only drawing uses it.
+struct MotionHistory
+{
+    Vec3 units[MAX_UNITS],debris_start[MAX_LIMB_DEBRIS],debris_end[MAX_LIMB_DEBRIS];
+    uint32_t unit_generation[MAX_UNITS];
+    float debris_age[MAX_LIMB_DEBRIS];
+};
+// Current positions held aside while the scene is built from blended ones.
+struct MotionRestore
+{
+    Vec3 units[MAX_UNITS],projectiles[MAX_PROJECTILES],debris_start[MAX_LIMB_DEBRIS],debris_end[MAX_LIMB_DEBRIS];
+};
+
 struct Game
 {
     Simulation simulation;
@@ -47,7 +62,49 @@ struct Game
     int ratio_body;
     bool box_dragging,box_moved;
     int box[4];
+    MotionHistory motion;
+    MotionRestore current_motion;
 };
+
+static void record_motion(MotionHistory* h,const Simulation* s)
+{
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    { h->units[i]=s->units[i].position;h->unit_generation[i]=s->units[i].health>0 ? s->units[i].generation : 0; }
+    for (uint32_t i=0;i<MAX_LIMB_DEBRIS;++i)
+    { h->debris_start[i]=s->debris[i].start;h->debris_end[i]=s->debris[i].end;h->debris_age[i]=s->debris[i].seconds>0 ? s->debris[i].age : -1.0f; }
+}
+
+static Vec3 blend(Vec3 previous,Vec3 current,float alpha)
+{ return add(previous,scale(subtract(current,previous),alpha)); }
+
+// Draw alpha of the way from the previous tick to the current one. Entities that
+// did not exist at the previous tick keep their current pose.
+static void blend_motion(Simulation* s,const MotionHistory* h,float alpha,MotionRestore* saved)
+{
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    {
+        Unit& u=s->units[i];saved->units[i]=u.position;
+        if (u.health>0 && h->unit_generation[i]==u.generation) u.position=blend(h->units[i],u.position,alpha);
+    }
+    for (uint32_t i=0;i<MAX_PROJECTILES;++i)
+    {
+        Projectile& p=s->projectiles[i];saved->projectiles[i]=p.position;
+        if (p.active) p.position=blend(p.previous,p.position,alpha);
+    }
+    for (uint32_t i=0;i<MAX_LIMB_DEBRIS;++i)
+    {
+        LimbDebris& d=s->debris[i];saved->debris_start[i]=d.start;saved->debris_end[i]=d.end;
+        if (d.seconds>0 && h->debris_age[i]>=0 && h->debris_age[i]<d.age)
+        { d.start=blend(h->debris_start[i],d.start,alpha);d.end=blend(h->debris_end[i],d.end,alpha); }
+    }
+}
+
+static void restore_motion(Simulation* s,const MotionRestore* saved)
+{
+    for (uint32_t i=0;i<MAX_UNITS;++i) s->units[i].position=saved->units[i];
+    for (uint32_t i=0;i<MAX_PROJECTILES;++i) s->projectiles[i].position=saved->projectiles[i];
+    for (uint32_t i=0;i<MAX_LIMB_DEBRIS;++i) { s->debris[i].start=saved->debris_start[i];s->debris[i].end=saved->debris_end[i]; }
+}
 
 static double monotonic_seconds()
 {
@@ -410,6 +467,9 @@ int game_run(const GameOptions* options)
     game.renderer.debug_views = options->debug_views;
     printf("Left-drag to select; middle-drag or WASD/arrows to pan; wheel to zoom. F1 profiler; F2 render buffers; F5 SSS; F6 volume; F7 cell blur; F8 tilt shift; F9 fog blur; F10 self-glow and halo. Gameplay: F/B select fighters/bombers on screen; 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
     const double tick_seconds = 1.0 / SIMULATION_TICKS_PER_SECOND_DOUBLE;
+    // Bounded diagnostics and captures draw the exact current tick.
+    bool interpolate=!options->frames && !options->headless;
+    record_motion(&game.motion,&game.simulation);
     double previous = monotonic_seconds();
     double accumulator = 0.0;
     double frame_total = 0.0;
@@ -443,8 +503,10 @@ int game_run(const GameOptions* options)
         accumulator += elapsed < MAX_FRAME_CATCHUP_SECONDS ? elapsed : MAX_FRAME_CATCHUP_SECONDS;
         if (options->headless) accumulator=0;
         if (options->frame_ticks) accumulator=options->frame_ticks*tick_seconds;
+        if (input.restart) record_motion(&game.motion,&game.simulation);
         while (accumulator >= tick_seconds)
         {
+            if (interpolate) record_motion(&game.motion,&game.simulation);
             simulation_step(&game.simulation);
             audio_events(&audio,&game.simulation,game.camera.target);
             accumulator -= tick_seconds;
@@ -467,7 +529,10 @@ int game_run(const GameOptions* options)
             fflush(stdout); // Input checks wait for this frame boundary.
         }
         bool final_frame = options->frames && frames + 1 == options->frames;
-        if (!presentation_build(presentation.get(),&game.simulation,&game.camera,&config)) { success=false;break; }
+        if (interpolate) blend_motion(&game.simulation,&game.motion,(float)(accumulator/tick_seconds),&game.current_motion);
+        bool built=presentation_build(presentation.get(),&game.simulation,&game.camera,&config);
+        if (interpolate) restore_motion(&game.simulation,&game.current_motion);
+        if (!built) { success=false;break; }
         profiler_cpu(profile,PROFILE_SCENE,simulation_end,profiler_clock_ms());
         if (!renderer_render(&game.renderer,&presentation->scene,&game.camera,final_frame ? options->capture_path : 0))
         {

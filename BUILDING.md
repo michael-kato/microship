@@ -820,3 +820,14 @@ starves the device. A full ring drops the sound, as a full voice set does.
 `--audio-capture` still mixes synchronously per simulation tick for
 deterministic WAV output. Audible output has not been verified on Proton or
 native Windows.
+
+## Motion between simulation ticks
+
+The simulation stays a fixed 60 Hz. Interactive play renders faster, so
+before each scene build the game blends unit, projectile and limb-debris
+positions from the previous tick toward the current one by the leftover
+accumulator fraction, then restores the current positions; simulation
+results never see the blend. Motion therefore advances on every frame, at
+up to one tick (16.7 ms) of display delay. This is current simulation state,
+not image history. Bounded `--frames`, headless and capture runs draw the
+exact current tick, so diagnostics and references are unchanged.
