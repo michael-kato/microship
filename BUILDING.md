@@ -704,6 +704,15 @@ inside half-float range. `.pfm` captures convert the half floats to 32-bit
 values. Against RGBA32F, close-view GPU median fell from 7.52 to 7.09 ms and
 wide from 4.86 to 4.35 ms; mean relative HDR change was 0.08 percent.
 
+Fog blurs at quarter resolution: a 4x4 box downsample, two separable
+Gaussian passes in disjoint scratch tiles, then native composition only
+where current sight hides the map. Sigma stays a third of the authored
+radius; taps step one quarter-resolution pixel apart, so a 96-pixel radius
+is fully sampled instead of read every fourth native pixel. Fog/bloom/display
+time fell from 1.61 to 1.18 ms in the wide view and from 1.34 to 1.15 ms in
+the close view; `fog_memory_render.py` still passes with similar falloff,
+memory and decay changes.
+
 The scene keeps about 11,000 fixed instance slots; most are empty. Each
 frame compacts the slots with a nonzero mask and fully rebuilds the TLAS
 from them. Instance IDs index the compacted style and lighting arrays in the

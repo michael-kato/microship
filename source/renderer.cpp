@@ -2704,13 +2704,16 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
         vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->fog_pipeline);
         vkCmdBindDescriptorSets(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->bloom_layout,0,1,&state->bloom_descriptors,0,0);
-        for (int pass=0;pass<2;++pass)
+        uint32_t width=(state->config.width+FOG_DOWNSAMPLE-1)/FOG_DOWNSAMPLE,height=(state->config.height+FOG_DOWNSAMPLE-1)/FOG_DOWNSAMPLE;
+        for (int pass=0;pass<=FOG_COMPOSITE_PASS;++pass)
         {
             bloom.pass=pass;
             vkCmdPushConstants(state->command,state->bloom_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,sizeof(bloom),&bloom);
-            vkCmdDispatch(state->command,(state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,(state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,1);
-            image_barrier(state->command,pass ? state->hdr : state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
-                VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+            bool composite=pass==FOG_COMPOSITE_PASS;
+            vkCmdDispatch(state->command,((composite ? state->config.width : width)+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,
+                ((composite ? state->config.height : height)+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,1);
+            image_barrier(state->command,composite ? state->hdr : state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+                VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
         }
         image_barrier(state->command,state->hdr_scratch,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
             VK_ACCESS_SHADER_READ_BIT,VK_ACCESS_SHADER_WRITE_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);

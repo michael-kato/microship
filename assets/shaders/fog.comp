@@ -35,22 +35,58 @@ float fog_amount(ivec2 pixel)
     return 1.0-visibility;
 }
 
+// Quarter-resolution fog: box downsample, two separable Gaussian passes, then
+// native composition where current sight hides the map. Scratch holds two
+// disjoint quarter-size tiles; all inputs belong to this frame.
+const int FOG_HALF_TAPS = 24;
+vec3 blurred_fog(ivec2 pixel,ivec2 small)
+{
+    vec2 p=(vec2(pixel)+.5)/float(FOG_DOWNSAMPLE)-.5;
+    ivec2 low=ivec2(floor(p));vec2 f=fract(p);ivec2 last=small-1;
+    vec3 a=imageLoad(scratch,clamp(low,ivec2(0),last)).rgb;
+    vec3 b=imageLoad(scratch,clamp(low+ivec2(1,0),ivec2(0),last)).rgb;
+    vec3 c=imageLoad(scratch,clamp(low+ivec2(0,1),ivec2(0),last)).rgb;
+    vec3 d=imageLoad(scratch,clamp(low+ivec2(1,1),ivec2(0),last)).rgb;
+    return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);
+}
+
 void main()
 {
     ivec2 pixel=ivec2(gl_GlobalInvocationID.xy);
-    if (any(greaterThanEqual(pixel,fog_pass.extent))) return;
-    float amount=fog_pass.pass==1 ? fog_amount(pixel) : 1.0;
-    if (amount==0.0) return;
-    // Two full-resolution 49-tap passes. Scratch is overwritten in this logical frame.
-    vec3 sum=vec3(0);float weights=0;
-    for (int tap=-24;tap<=24;++tap)
+    ivec2 small=(fog_pass.extent+FOG_DOWNSAMPLE-1)/FOG_DOWNSAMPLE;
+    if (fog_pass.pass==FOG_COMPOSITE_PASS)
     {
-        int offset=int(round(float(tap)*render.fog.x/24));
-        float weight=exp(-.5*float(tap*tap)/64);
-        ivec2 sample_pixel=clamp(pixel+(fog_pass.pass==0 ? ivec2(offset,0) : ivec2(0,offset)),ivec2(0),fog_pass.extent-1);
-        sum+=(fog_pass.pass==0 ? imageLoad(beauty,sample_pixel).rgb : imageLoad(scratch,sample_pixel).rgb)*weight;weights+=weight;
+        if (any(greaterThanEqual(pixel,fog_pass.extent))) return;
+        float amount=fog_amount(pixel);
+        if (amount==0.0) return;
+        imageStore(beauty,pixel,vec4(mix(imageLoad(beauty,pixel).rgb,blurred_fog(pixel,small)*render.fog_tint.rgb,amount),1));
+        return;
     }
-    sum/=weights;
-    if (fog_pass.pass==0) imageStore(scratch,pixel,vec4(sum,1));
-    else imageStore(beauty,pixel,vec4(mix(imageLoad(beauty,pixel).rgb,sum*render.fog_tint.rgb,amount),1));
+    if (any(greaterThanEqual(pixel,small))) return;
+    if (fog_pass.pass==0)
+    {
+        vec3 sum=vec3(0);float count=0;
+        for (int y=0;y<FOG_DOWNSAMPLE;++y) for (int x=0;x<FOG_DOWNSAMPLE;++x)
+        {
+            ivec2 p=pixel*FOG_DOWNSAMPLE+ivec2(x,y);
+            if (any(greaterThanEqual(p,fog_pass.extent))) continue;
+            sum+=imageLoad(beauty,p).rgb;count+=1;
+        }
+        imageStore(scratch,pixel,vec4(sum/count,1));
+        return;
+    }
+    // Sigma is a third of the radius. Taps step one quarter pixel apart until
+    // the radius needs wider spacing; no tap repeats a texel.
+    float radius=render.fog.x/float(FOG_DOWNSAMPLE),sigma=max(.5,radius/3.0),spacing=max(1.0,radius/float(FOG_HALF_TAPS));
+    bool horizontal=fog_pass.pass==1;
+    vec3 sum=vec3(0);float weights=0;
+    for (int tap=-FOG_HALF_TAPS;tap<=FOG_HALF_TAPS;++tap)
+    {
+        float x=float(tap)*spacing;if (abs(x)>radius+.5) continue;
+        float weight=exp(-.5*x*x/(sigma*sigma));
+        ivec2 p=clamp(pixel+(horizontal ? ivec2(int(round(x)),0) : ivec2(0,int(round(x)))),ivec2(0),small-1);
+        if (!horizontal) p.y+=small.y;
+        sum+=imageLoad(scratch,p).rgb*weight;weights+=weight;
+    }
+    imageStore(scratch,pixel+(horizontal ? ivec2(0,small.y) : ivec2(0)),vec4(sum/weights,1));
 }
