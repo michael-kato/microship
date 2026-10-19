@@ -2,6 +2,7 @@
 #extension GL_GOOGLE_include_directive : require
 #include "render_bindings.glsl"
 #define NANOVA_DEBUG_BINDING BLOOM_BINDING_DEBUG
+#define NANOVA_GUIDE_BINDING BLOOM_BINDING_GUIDES
 #include "debug_buffers.glsl"
 
 const float SRGB_POWER_SCALE = 1.055;

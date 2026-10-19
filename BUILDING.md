@@ -713,6 +713,15 @@ time fell from 1.61 to 1.18 ms in the wide view and from 1.34 to 1.15 ms in
 the close view; `fog_memory_render.py` still passes with similar falloff,
 memory and decay changes.
 
+Effects, tilt shift and the spatial volume filter read a compact guide
+buffer: one vec4 per pixel (first-hit distance, hit code, log terminal
+depth) followed by two vec4 per volume stride cell. Normal frames no longer
+write or read the 96-byte F2 diagnostic record; only F2 fills it, and it is
+allocated full size only when buffer views can open (windowed or
+`--debug-views`). The guides use 37 MB at 1080p. GPU median fell from 6.90
+to 5.88 ms in the close view and from 3.92 to 2.71 ms in the wide view;
+captures are byte-identical.
+
 The scene keeps about 11,000 fixed instance slots; most are empty. Each
 frame compacts the slots with a nonzero mask and fully rebuilds the TLAS
 from them. Instance IDs index the compacted style and lighting arrays in the

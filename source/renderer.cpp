@@ -40,7 +40,7 @@ static const double BACKDROP_TIME_WRAP_SECONDS = 10000.0;
 static const int GPU_DEBUG_PIXEL_BYTES = 96;
 static const int COMPANION_SHADER_PATH_CAPACITY = 1024;
 static const double NANOSECONDS_PER_MILLISECOND = 1000000.0;
-static const int RENDER_STORAGE_BUFFER_BINDINGS = 16;
+static const int RENDER_STORAGE_BUFFER_BINDINGS = 17;
 static const int RENDER_DESCRIPTOR_SET_COUNT = 3;
 static const int RENDER_STORAGE_IMAGE_BINDINGS = 3;
 static const int RENDER_SAMPLER_BINDINGS = 4;
@@ -237,7 +237,9 @@ struct RendererState
     bool optical_depth_initialized;
     uint32_t optical_depth_size,optical_depth_layers,optical_depth_bakes;
     GpuBuffer energy;
-    GpuBuffer debug_pixels;
+    GpuBuffer debug_pixels; // Full F2 diagnostic records; minimal unless buffer views can open.
+    GpuBuffer guides; // Compact current-frame guides and spatial volume anchors.
+    bool debug_records;
 
     std::vector<float> style_data;
     uint32_t effect_count, effect_tile_count;
@@ -1368,16 +1370,20 @@ static bool create_lighting_texture(RendererState* state)
 
 static bool create_output(RendererState* state)
 {
-    // Five vec4 records per native pixel, only for interactive/buffer-view runs.
-    VkDeviceSize debug_bytes = state->debug_available
+    // Six vec4 records per native pixel, only when F2 buffer views can open.
+    VkDeviceSize debug_bytes = state->debug_records
         ? (VkDeviceSize)state->config.width*state->config.height*GPU_DEBUG_PIXEL_BYTES : GPU_DEBUG_PIXEL_BYTES;
     if (debug_bytes > state->properties.limits.maxStorageBufferRange)
     {
         fprintf(stderr,"Debug buffers exceed the device's storage-buffer range.\n");
         return false;
     }
+    uint32_t stride=std::max(1u,state->config.volume_spatial_stride);
+    VkDeviceSize anchors=(VkDeviceSize)((state->config.width+stride-1)/stride)*((state->config.height+stride-1)/stride);
+    VkDeviceSize guide_bytes=((VkDeviceSize)state->config.width*state->config.height+2*anchors)*4*sizeof(float);
     if (!create_buffer(state,&state->debug_pixels,debug_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+        || !create_buffer(state,&state->guides,guide_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
     for (uint32_t f=0;f<FRAMES_IN_FLIGHT;++f)
     {
         GpuBuffer& text=state->frames[f].debug_text;
@@ -1583,7 +1589,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
     if (state->properties.limits.maxPerStageDescriptorStorageBuffers < RENDER_STORAGE_BUFFER_BINDINGS ||
         state->properties.limits.maxDescriptorSetStorageBuffers < RENDER_STORAGE_BUFFER_BINDINGS)
     {
-        fprintf(stderr,"Renderer requires sixteen compute storage-buffer descriptors.\n");
+        fprintf(stderr,"Renderer requires seventeen compute storage-buffer descriptors.\n");
         return false;
     }
     VkDescriptorSetLayoutBinding bindings[RENDER_DESCRIPTOR_COUNT] = {};
@@ -1597,7 +1603,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
     for (uint32_t i = 0; i < RENDER_DESCRIPTOR_COUNT; ++i)
     {
         bindings[i].binding = i;
@@ -1695,6 +1701,8 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
         writes[RENDER_BINDING_LIGHTING_TEXTURE].pImageInfo=&lighting;
         VkDescriptorBufferInfo range_buffer={state->mesh_ranges.handle,0,state->mesh_ranges.size};
         writes[RENDER_BINDING_MESH_RANGES].pBufferInfo=&range_buffer;
+        VkDescriptorBufferInfo guide_buffer={state->guides.handle,0,state->guides.size};
+        writes[RENDER_BINDING_GUIDES].pBufferInfo=&guide_buffer;
         vkUpdateDescriptorSets(state->device, RENDER_DESCRIPTOR_COUNT, writes, 0, 0);
         for (uint32_t i=0;i<RENDER_DESCRIPTOR_COUNT;++i) writes[i].dstSet=frame.effect_descriptors;
         vkUpdateDescriptorSets(state->device,RENDER_DESCRIPTOR_COUNT,writes,0,0);
@@ -1737,7 +1745,7 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
     {
         bindings[i].binding = i;
         bindings[i].descriptorType = i==BLOOM_BINDING_UNIFORM ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER :
-            (i==BLOOM_BINDING_DEBUG || i==BLOOM_BINDING_SIGHT || i==BLOOM_BINDING_SHARP_LAYER) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            (i==BLOOM_BINDING_DEBUG || i==BLOOM_BINDING_SIGHT || i==BLOOM_BINDING_SHARP_LAYER || i==BLOOM_BINDING_GUIDES) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         bindings[i].descriptorCount = 1;
         bindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     }
@@ -1746,7 +1754,7 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
     layout.bindingCount = BLOOM_DESCRIPTOR_COUNT;
     layout.pBindings = bindings;
     if (!vk_ok(vkCreateDescriptorSetLayout(state->device, &layout, 0, &state->bloom_descriptor_layout), "Create bloom descriptor layout")) return false;
-    VkDescriptorPoolSize sizes[] = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,3*FRAMES_IN_FLIGHT},{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,3*FRAMES_IN_FLIGHT},{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,FRAMES_IN_FLIGHT}};
+    VkDescriptorPoolSize sizes[] = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,3*FRAMES_IN_FLIGHT},{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,4*FRAMES_IN_FLIGHT},{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,FRAMES_IN_FLIGHT}};
     VkDescriptorPoolCreateInfo pool = {};
     pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool.maxSets = FRAMES_IN_FLIGHT;
@@ -1784,8 +1792,9 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
         writes[BLOOM_BINDING_DEBUG].descriptorCount = 1;
         writes[BLOOM_BINDING_DEBUG].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         writes[BLOOM_BINDING_DEBUG].pBufferInfo = &debug_buffer;
-        VkDescriptorBufferInfo extra_buffers[]={{frame.uniform.handle,0,frame.uniform.size},{frame.sight.handle,0,frame.sight.size},{state->sharp_layer.handle,0,state->sharp_layer.size}};
-        for (uint32_t i=0;i<3;++i)
+        VkDescriptorBufferInfo extra_buffers[]={{frame.uniform.handle,0,frame.uniform.size},{frame.sight.handle,0,frame.sight.size},{state->sharp_layer.handle,0,state->sharp_layer.size},
+            {state->guides.handle,0,state->guides.size}};
+        for (uint32_t i=0;i<4;++i)
         {
             uint32_t binding=BLOOM_BINDING_UNIFORM+i;
             writes[binding].sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;writes[binding].dstSet=frame.bloom_descriptors;
@@ -2227,6 +2236,7 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
     state->headless = headless;
     state->no_activate = no_activate;
     state->debug_available = !headless || debug_views || scene->guides_required || config->focus_radius>0 || config->volume_spatial_filter;
+    state->debug_records = !headless || debug_views;
     state->custom_shader = strcmp(shader_path,builtin_shader_path) != 0;
     if (state->custom_shader && (scene->guides_required || config->volume_spatial_filter))
     {
@@ -2272,7 +2282,8 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
         state->lighting_extent.width,state->lighting_extent.height,state->lighting_extent.depth,
         (unsigned long long)state->lighting_extent.width*state->lighting_extent.height*state->lighting_extent.depth*4*sizeof(float),
         config->organelle_lighting_cache && state->uniform_data.scene[3] ? "baked with live fallback" : "live");
-    printf("Current-frame guides: %llu bytes; no frame history; native surfaces and output.\n",(unsigned long long)state->debug_pixels.size);
+    printf("Current-frame guides: %llu bytes; F2 records %llu bytes; no frame history; native surfaces and output.\n",
+        (unsigned long long)state->guides.size,(unsigned long long)state->debug_pixels.size);
     return true;
 }
 
@@ -2882,7 +2893,7 @@ bool renderer_shutdown(Renderer* renderer)
         GpuBuffer* buffers[] = { &state->vertices, &state->triangles, &state->indices, &state->mesh_ranges,
             &state->tlas_buffer, &state->tlas_scratch,
             &state->readback, &state->optical_depth_upload, &state->shadow_grid, &state->static_lighting, &state->surface_lighting, &state->dynamic_lighting, &state->sharp_layer, &state->energy,
-            &state->debug_pixels };
+            &state->debug_pixels, &state->guides };
         for (uint32_t i = 0; i < sizeof(buffers)/sizeof(buffers[0]); ++i) destroy_buffer(state, buffers[i]);
         for (uint32_t f=0;f<FRAMES_IN_FLIGHT;++f)
         {

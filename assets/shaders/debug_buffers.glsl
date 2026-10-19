@@ -16,3 +16,12 @@ struct DebugPixel
 #define NANOVA_DEBUG_BINDING RENDER_BINDING_DEBUG
 #endif
 layout(set = 0, binding = NANOVA_DEBUG_BINDING, std430) buffer DebugBuffer { DebugPixel debug_pixels[]; };
+
+// Compact current-frame guides used outside F2: x first-hit distance, y hit code
+// (0 background, 1 opaque surface, 3 thin membrane), z log2(1 + terminal depth).
+// Spatial volume anchors follow, two vec4 (volume + log depth, sharp scattering)
+// per stride cell. Every entry is overwritten each frame.
+#ifndef NANOVA_GUIDE_BINDING
+#define NANOVA_GUIDE_BINDING RENDER_BINDING_GUIDES
+#endif
+layout(set = 0, binding = NANOVA_GUIDE_BINDING, std430) buffer GuideBuffer { vec4 guides[]; };

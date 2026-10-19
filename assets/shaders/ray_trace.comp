@@ -1014,6 +1014,15 @@ vec3 integrate_volume(uvec2 pixel,out vec3 sharp_result,out float terminal)
     return volume_count>0u ? volume_sum/float(volume_count) : vec3(0);
 }
 
+#ifdef NANOVA_DEBUG_BUFFERS
+// Volume anchors follow the per-pixel guides: two entries per stride cell.
+uint volume_anchor(uvec2 cell)
+{
+    uint width=(render.settings.x+volume_grid_stride-1u)/volume_grid_stride;
+    return render.settings.x*render.settings.y+2u*(cell.y*width+cell.x);
+}
+#endif
+
 #ifdef NANOVA_SHADOW_GRID_PASS
 layout(push_constant) uniform GridPass { uint medium;uint pass;uint instance;uint triangle_count; } grid_pass;
 void main()
@@ -1102,26 +1111,26 @@ void main()
     vec3 sharp=vec3(0),volume=vec3(0);float terminal=RAY_MAX;
     uint index=pixel.y*render.settings.x+pixel.x;
     if (pixel_may_intersect_medium(pixel)) volume=integrate_volume(pixel,sharp,terminal);
-    else terminal=exp2(debug_pixels[index].surface.w)-1.0;
-    debug_pixels[index].volume=vec4(volume,log2(1.0+terminal));
-    debug_pixels[index].scatter_blur=vec4(sharp,0);
+    else terminal=exp2(guides[index].z)-1.0;
+    uint anchor=volume_anchor(pixel/volume_grid_stride);
+    guides[anchor]=vec4(volume,log2(1.0+terminal));
+    guides[anchor+1u]=vec4(sharp,0);
 #elif defined(NANOVA_VOLUME_FILTER)
     uint index=pixel.y*render.settings.x+pixel.x;
-    float depth=debug_pixels[index].surface.w;
+    float depth=guides[index].z;
     uvec2 low=pixel/volume_grid_stride,extent=(render.settings.xy+volume_grid_stride-1u)/volume_grid_stride;
     vec2 f=vec2(pixel%uvec2(volume_grid_stride))/float(volume_grid_stride);
     vec3 volume=vec3(0),sharp=vec3(0);float total=0;
     for (uint y=0u;y<2u;++y) for (uint x=0u;x<2u;++x)
     {
-        uvec2 anchor=min(low+uvec2(x,y),extent-1u)*volume_grid_stride;
-        uint source=anchor.y*render.settings.x+anchor.x;
+        uint source=volume_anchor(min(low+uvec2(x,y),extent-1u));
         vec2 w=mix(1.0-f,f,vec2(x,y));float weight=w.x*w.y;
         if (weight==0.0) continue;
-        vec4 value=debug_pixels[source].volume;
+        vec4 value=guides[source];
         // About two percent terminal-depth agreement. Thin silhouettes with
         // no matching sample use exact current-pixel camera integration below.
         if (abs(value.w-depth)>.03) continue;
-        volume+=weight*value.rgb;sharp+=weight*debug_pixels[source].scatter_blur.rgb;total+=weight;
+        volume+=weight*value.rgb;sharp+=weight*guides[source+1u].rgb;total+=weight;
     }
     if (total>0.0) { volume/=total;sharp/=total; }
     else { float terminal;volume=integrate_volume(pixel,sharp,terminal); }
@@ -1140,11 +1149,8 @@ void main()
         if (render.background_quality.w>0u) sharp_pixels[pixel.y*render.settings.x+pixel.x].a=0.0;
         vec3 background=texelFetch(soft_backdrop,ivec2(pixel),0).rgb;
 #ifdef NANOVA_DEBUG_BUFFERS
-#ifdef NANOVA_NO_QUERY_COUNTERS
-        debug_pixels[pixel.y*render.settings.x+pixel.x].vertex_hit=vec4(0);
-        debug_pixels[pixel.y*render.settings.x+pixel.x].normal_depth=vec4(0);
-        debug_pixels[pixel.y*render.settings.x+pixel.x].surface.w=texelFetch(soft_backdrop,ivec2(pixel),0).a;
-#else
+        guides[pixel.y*render.settings.x+pixel.x]=vec4(0,0,texelFetch(soft_backdrop,ivec2(pixel),0).a,0);
+#ifndef NANOVA_NO_QUERY_COUNTERS
         debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(vec4(0),vec4(0),
             vec4(background,0),vec4(background,0),vec4(0),vec4(0));
 #endif
@@ -1178,13 +1184,10 @@ void main()
         if (film_blur_max>0.0) radiance-=film_sharp_sum/float(sample_count);
     }
 #ifdef NANOVA_DEBUG_BUFFERS
-#ifdef NANOVA_NO_QUERY_COUNTERS
     // Effects and focus use first-hit guides. Spatial volume filtering also
-    // uses terminal depth. Diagnostic radiance sums are not needed here.
-    debug_pixels[pixel.y*render.settings.x+pixel.x].vertex_hit=debug_vertex_hit;
-    debug_pixels[pixel.y*render.settings.x+pixel.x].normal_depth=debug_normal_depth;
-    debug_pixels[pixel.y*render.settings.x+pixel.x].surface.w=log2(1.0+film_terminal_distance);
-#else
+    // uses terminal depth. Only F2 writes the full diagnostic record.
+    guides[pixel.y*render.settings.x+pixel.x]=vec4(debug_normal_depth.w,debug_vertex_hit.w,log2(1.0+film_terminal_distance),0);
+#ifndef NANOVA_NO_QUERY_COUNTERS
     debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(debug_vertex_hit,debug_normal_depth,
         vec4(debug_direct/float(sample_count),float(debug_primary_hits)/float(sample_count)),
         vec4(sum/float(sample_count),float(debug_closest_queries)),
