@@ -119,3 +119,10 @@ under `factories.virus`. `collar_points` sets the collar corners; `sheath_radius
 sets their reach; `head_radius` and `head_height_scale` set the capsid size;
 `fibre_spread` and `fibre_radius` set the tail fibres. Run the mesh authoring script
 after an edit. These controls do not change production or combat rules.
+
+Virus wall mutation uses 64 pointed displacement features, each with a
+12-degree angular width. Set these in `assets/gameplay/factions.json`, under
+`cell_appearance.displacement`. Raise `features` for more peaks. Lower
+`width_degrees` for narrower, steeper peaks. `height` sets the maximum height
+as a fraction of cell radius. This moves the existing wall vertices; it adds
+no geometry. `morph_seconds` sets the time to reach the faction shape.

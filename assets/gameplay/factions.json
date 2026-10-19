@@ -17,9 +17,9 @@
         "seconds": 180,
         "roughness": 0.18,
         "displacement": {
-          "features": 28,
+          "features": 64,
           "height": 0.19,
-          "width_degrees": 20,
+          "width_degrees": 12,
           "profile": "pointed",
           "seed": 7821
         },
