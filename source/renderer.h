@@ -20,6 +20,7 @@ struct Renderer
     bool running;
     uint32_t scene_submissions;
     bool debug_stats;
+    bool frame_log; // Per-frame diagnostic lines, only for bounded --frames runs.
     bool debug_views;
     uint32_t disabled_features,available_features;
     double previous_frame_ms;

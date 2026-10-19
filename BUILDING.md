@@ -19,6 +19,8 @@ python3 scripts/proton_run.py build/windows-cross/nanova.exe --world assets/leve
 
 `fungus-player-level.json` and `swarm-level.json` are faction trials. `--world-seed N` fixes the variation seed. `--smoke` loads assets, runs the simulation, builds render input, and shuts down without a GPU. `--state PATH.json` and `--scene-state PATH.json` export diagnostics.
 
+Per-frame diagnostic lines (`Scene time`, GPU stage times, `Application frame`) print only in bounded `--frames` runs. Interactive play writes startup lines only, so console output stays out of the frame.
+
 All checks use the real application. Short GPU checks keep native 1920×1080, at most six film samples, one volume film ray or grid sample, and one backdrop query. Each ordinary process uses at most two frames and two seconds, with five seconds per sequential batch. Longer startup and performance limits are described below. See [PROFILING.md](PROFILING.md) for commands and validation limits.
 
 To record flight paths, run `python3 tests/e2e/navigation.py build/windows-cross/nanova.exe --output build/navigation`. With Matplotlib installed, run `python3 scripts/plot_flight.py build/navigation/paths.json --output build/navigation/flight-paths.svg`. The plot joins measured half-second positions.

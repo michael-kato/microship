@@ -1988,7 +1988,7 @@ bool renderer_poll(Renderer* renderer, PointerInput* input)
 
 // The CPU scene changes vertex positions and normals, with fixed mesh topology.
 // Each mutable BLAS owns persistent scratch. Completed frame fences protect uploads.
-static bool update_meshes(RendererState* state,const Geometry& scene)
+static bool update_meshes(RendererState* state,const Geometry& scene,bool log)
 {
     if (scene.vertices.size()*sizeof(GpuVertex)!=state->vertices.size
         || scene.triangles.size()!=state->triangle_count)
@@ -2036,7 +2036,7 @@ static bool update_meshes(RendererState* state,const Geometry& scene)
         mesh.range=source;++updates;
     }
     // The following TLAS build barrier makes these BLAS writes visible.
-    printf("Deformed mesh updates: %u BLAS refits.\n",updates);
+    if (log) printf("Deformed mesh updates: %u BLAS refits.\n",updates);
     return true;
 }
 
@@ -2123,7 +2123,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     if (uniform->scene[3]) for (uint32_t i=0;i<state->instance_count;++i)
         if (state->surface_cache_meshes[i]!=(scene->instances[i].static_lighting ? scene->instances[i].mesh+1 : 0))
         { fprintf(stderr,"Static lighting instance layout changed after initialization.\n");return false; }
-    if (!update_meshes(state,scene->geometry)) return false;
+    if (!update_meshes(state,scene->geometry,renderer->frame_log)) return false;
     scene_instances(state,scene);
     if (state->medium_count) memcpy(state->media.mapped,scene->media.data(),state->medium_count*sizeof(RenderMedium));
     memcpy(state->lighting_instances.mapped,state->lighting_input.data(),state->lighting_input.size()*sizeof(LightingInstance));
@@ -2389,7 +2389,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     if (state->timestamp_bits < TIMESTAMP_WORD_BITS)
         difference &= (UINT64_C(1) << state->timestamp_bits) - 1;
     double milliseconds = difference * state->properties.limits.timestampPeriod / NANOSECONDS_PER_MILLISECOND;
-    printf("GPU trace: %.3f ms; %u spp; %u triangles\n", milliseconds,
+    if (renderer->frame_log) printf("GPU trace: %.3f ms; %u spp; %u triangles\n", milliseconds,
         state->config.samples_per_pixel, state->triangle_count);
     uint64_t surface_ticks = timestamps[GPU_TIME_SURFACE_END]-timestamps[GPU_TIME_SURFACE_BEGIN], volume_ticks = timestamps[GPU_TIME_VOLUME_END]-timestamps[GPU_TIME_SURFACE_END];
     if (state->timestamp_bits < TIMESTAMP_WORD_BITS)
@@ -2399,25 +2399,25 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     }
     uint64_t medium_blur_ticks=timestamps[GPU_TIME_MEDIUM_BLUR_END]-timestamps[GPU_TIME_EFFECTS_END];
     if (state->timestamp_bits<TIMESTAMP_WORD_BITS) medium_blur_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1;
-    printf("GPU medium blur: %.3f ms; native resolution; transmitted light and effects.\n",medium_blur_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND);
+    if (renderer->frame_log) printf("GPU medium blur: %.3f ms; native resolution; transmitted light and effects.\n",medium_blur_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND);
     uint64_t grid_ticks=timestamps[GPU_TIME_GRID_END]-timestamps[GPU_TIME_BACKDROP_END];
     if (state->timestamp_bits<TIMESTAMP_WORD_BITS) grid_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1;
-    printf("GPU shadow grid: %.3f ms; resolution %u; current dynamic blockers.\n",grid_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND,state->config.shadow_grid_resolution);
+    if (renderer->frame_log) printf("GPU shadow grid: %.3f ms; resolution %u; current dynamic blockers.\n",grid_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND,state->config.shadow_grid_resolution);
     uint64_t bake_ticks=timestamps[GPU_TIME_BAKE_END]-timestamps[GPU_TIME_BACKDROP_END];
     uint64_t dynamic_ticks=timestamps[GPU_TIME_GRID_END]-timestamps[GPU_TIME_BAKE_END];
     if (state->timestamp_bits<TIMESTAMP_WORD_BITS)
     { bake_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1;dynamic_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1; }
-    if (state->config.optical_depth_lut) printf("Optical depth tables: %u rebuilt.\n",state->optical_depth_bakes);
-    printf("GPU static lighting bake: %.3f ms; GPU dynamic lighting: %.3f ms.\n",
+    if (renderer->frame_log && state->config.optical_depth_lut) printf("Optical depth tables: %u rebuilt.\n",state->optical_depth_bakes);
+    if (renderer->frame_log) printf("GPU static lighting bake: %.3f ms; GPU dynamic lighting: %.3f ms.\n",
         bake_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND,
         dynamic_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND);
-    if (uniform->scene[3]) printf("Static lighting: %u baked, %u reused; %llu bytes; %u surface bakes; current dynamic shadows.\n",
+    if (renderer->frame_log && uniform->scene[3]) printf("Static lighting: %u baked, %u reused; %llu bytes; %u surface bakes; current dynamic shadows.\n",
         state->lighting_bakes,state->lighting_reuses,(unsigned long long)(state->static_lighting.size+state->surface_lighting.size+state->lighting_instances.size+state->dynamic_lighting.size+state->lighting_bounds.size),state->lighting_surface_bakes);
     uint64_t background_ticks=timestamps[GPU_TIME_BACKDROP_END]-timestamps[GPU_TIME_UPLOAD_END];
     if (state->timestamp_bits<TIMESTAMP_WORD_BITS) background_ticks &= (UINT64_C(1)<<state->timestamp_bits)-1;
-    printf("GPU backdrop: %.3f ms; separate current-frame layer %u.\n",
+    if (renderer->frame_log) printf("GPU backdrop: %.3f ms; separate current-frame layer %u.\n",
         background_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND,(scene->background_blur>0) ? 1u : 0u);
-    printf("GPU surface: %.3f ms; GPU volumes: %.3f ms.\n",
+    if (renderer->frame_log) printf("GPU surface: %.3f ms; GPU volumes: %.3f ms.\n",
         surface_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND,
         volume_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND);
     uint64_t bloom_ticks = timestamps[GPU_TIME_BLOOM_END] - timestamps[GPU_TIME_MEDIUM_BLUR_END];
@@ -2431,15 +2431,15 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     if (state->timestamp_bits<TIMESTAMP_WORD_BITS) { uint64_t mask=(UINT64_C(1)<<state->timestamp_bits)-1;gpu_ticks&=mask;as_ticks&=mask;fx_ticks&=mask; }
     double scale=state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND;
     renderer->gpu_frame_ms=gpu_ticks*scale;
-    printf("GPU acceleration update: %.3f ms; GPU effects: %.3f ms.\n",as_ticks*scale,fx_ticks*scale);
-    printf("GPU fog/bloom/display: %.3f ms; total render: %.3f ms\n",bloom_ms,renderer->gpu_frame_ms);
+    if (renderer->frame_log) printf("GPU acceleration update: %.3f ms; GPU effects: %.3f ms.\n",as_ticks*scale,fx_ticks*scale);
+    if (renderer->frame_log) printf("GPU fog/bloom/display: %.3f ms; total render: %.3f ms\n",bloom_ms,renderer->gpu_frame_ms);
     uint64_t halo_ticks=(timestamps[GPU_TIME_BLOOM_END]-timestamps[GPU_TIME_FOCUS_END]);
     if (state->timestamp_bits<TIMESTAMP_WORD_BITS) halo_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1;
-    printf("GPU halo/display: %.3f ms.\n",halo_ticks*scale);
-    printf("GPU debug overlay: %.3f ms; buffer views %u; FPS stats %u.\n",debug_ms,
+    if (renderer->frame_log) printf("GPU halo/display: %.3f ms.\n",halo_ticks*scale);
+    if (renderer->frame_log) printf("GPU debug overlay: %.3f ms; buffer views %u; FPS stats %u.\n",debug_ms,
         renderer->debug_views ? 1u : 0u,renderer->debug_stats ? 1u : 0u);
-    printf("Surface self-glow: %s; halo strength %.3f.\n",uniform->membrane_fade[3]>0 ? "ON" : "OFF",renderer->disabled_features&RENDER_GLOW ? 0.0f : state->config.bloom_strength);
-    printf("Render settings: disabled %u; SSS %s; volume rays %u; cell blur %u; tilt radius %.1f; fog radius %.1f.\n",
+    if (renderer->frame_log) printf("Surface self-glow: %s; halo strength %.3f.\n",uniform->membrane_fade[3]>0 ? "ON" : "OFF",renderer->disabled_features&RENDER_GLOW ? 0.0f : state->config.bloom_strength);
+    if (renderer->frame_log) printf("Render settings: disabled %u; SSS %s; volume rays %u; cell blur %u; tilt radius %.1f; fog radius %.1f.\n",
         renderer->disabled_features,feature_status(renderer,RENDER_SSS),uniform->quality[0],uniform->quality[3],uniform->focus_band[3],uniform->fog[0]);
     static const struct { ProfileNode node;int begin,end; } spans[]={
         {PROFILE_GPU_FRAME,GPU_TIME_FRAME_BEGIN,GPU_TIME_COPY_END},
@@ -2463,7 +2463,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     for (uint32_t i=0;i<sizeof(spans)/sizeof(spans[0]);++i)
         profiler_span(profile,spans[i].node,((timestamps[spans[i].begin]-timestamps[GPU_TIME_FRAME_BEGIN])&mask)*scale,
             ((timestamps[spans[i].end]-timestamps[spans[i].begin])&mask)*scale);
-    fflush(stdout);
+    if (renderer->frame_log) fflush(stdout);
     phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_READ_TIMES,phase_start,phase_end);phase_start=phase_end;
     state->trace_ms = milliseconds;
     state->volume_ms = volume_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND;
@@ -2489,10 +2489,10 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     }
     phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_PRESENT,phase_start,phase_end);phase_start=phase_end;
     renderer->acquire_ms=acquire_ms;renderer->present_ms=present_ms;
-    printf("Presentation waits: acquire %.3f ms; present %.3f ms; GPU work %.3f ms.\n",renderer->acquire_ms,renderer->present_ms,renderer->gpu_frame_ms);
+    if (renderer->frame_log) printf("Presentation waits: acquire %.3f ms; present %.3f ms; GPU work %.3f ms.\n",renderer->acquire_ms,renderer->present_ms,renderer->gpu_frame_ms);
     if (capture_path && !capture_image(state, capture_path))
         return false;
-    fflush(stdout);
+    if (renderer->frame_log) fflush(stdout);
     phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_CAPTURE,phase_start,phase_end);
     profiler_cpu(profile,PROFILE_RENDER,render_start,phase_end);
     ++renderer->scene_submissions;

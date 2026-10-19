@@ -404,6 +404,8 @@ int game_run(const GameOptions* options)
         || !renderer_initialize(&game.renderer,&presentation->scene,&config,options->shader_path,
             options->builtin_shader_path,options->headless,options->debug_views,options->no_activate)) return 1;
     game.renderer.debug_stats = options->stats_set ? options->show_stats : false;
+    // Console writes are synchronous; interactive play keeps them out of the frame.
+    game.renderer.frame_log = options->frames!=0;
     if (!options->headless && !audio_open(&audio)) { renderer_shutdown(&game.renderer);return 1; }
     game.renderer.debug_views = options->debug_views;
     printf("Left-drag to select; middle-drag or WASD/arrows to pan; wheel to zoom. F1 profiler; F2 render buffers; F5 SSS; F6 volume; F7 cell blur; F8 tilt shift; F9 fog blur; F10 self-glow and halo. Gameplay: F/B select fighters/bombers on screen; 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
@@ -454,13 +456,16 @@ int game_run(const GameOptions* options)
         overlay_enabled(&game,&config);
         audio_events(&audio,&game.simulation,game.camera.target);
         if (!audio_pump(&audio)) { success=false;break; }
-        if (input.pan_x || input.pan_y)
-            printf("Camera keyboard: pan %g %g; seconds %.9g.\n",input.pan_x,input.pan_y,input.pan_seconds);
-        if (input.drag_x || input.drag_y || input.wheel)
-            printf("Camera input: drag %g %g; wheel %g.\n", input.drag_x, input.drag_y, input.wheel);
-        printf("Scene time: %.6f; camera: %g %g %g.\n",game.simulation.time_seconds,
-            game.camera.position.x,game.camera.position.y,game.camera.position.z);
-        fflush(stdout); // Input checks wait for this frame boundary.
+        if (game.renderer.frame_log)
+        {
+            if (input.pan_x || input.pan_y)
+                printf("Camera keyboard: pan %g %g; seconds %.9g.\n",input.pan_x,input.pan_y,input.pan_seconds);
+            if (input.drag_x || input.drag_y || input.wheel)
+                printf("Camera input: drag %g %g; wheel %g.\n", input.drag_x, input.drag_y, input.wheel);
+            printf("Scene time: %.6f; camera: %g %g %g.\n",game.simulation.time_seconds,
+                game.camera.position.x,game.camera.position.y,game.camera.position.z);
+            fflush(stdout); // Input checks wait for this frame boundary.
+        }
         bool final_frame = options->frames && frames + 1 == options->frames;
         if (!presentation_build(presentation.get(),&game.simulation,&game.camera,&config)) { success=false;break; }
         profiler_cpu(profile,PROFILE_SCENE,simulation_end,profiler_clock_ms());
@@ -476,6 +481,7 @@ int game_run(const GameOptions* options)
         game.renderer.work_frame_ms=frame_ms-game.renderer.acquire_ms-game.renderer.present_ms;
         frame_total += frame_ms;
         ++frames;
+        if (!game.renderer.frame_log) continue;
         printf("Application frame: %.3f ms.\n", frame_ms);
         printf("Application cadence: %.3f ms.\n",game.renderer.previous_frame_ms);
         printf("Application work: %.3f ms; explicit acquire/present waits: %.3f ms.\n",game.renderer.work_frame_ms,game.renderer.acquire_ms+game.renderer.present_ms);
