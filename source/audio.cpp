@@ -26,11 +26,11 @@ static const int MAX_SOUND_COOLDOWN_SECONDS = 10;
 
 enum { WAV_RIFF_WORD=0, WAV_RIFF_BYTES_WORD=1, WAV_WAVE_WORD=2, WAV_FORMAT_WORD=3, WAV_FORMAT_BYTES_WORD=4, WAV_ENCODING_WORD=5, WAV_SAMPLE_RATE_WORD=6, WAV_BYTE_RATE_WORD=7, WAV_BLOCK_FORMAT_WORD=8, WAV_DATA_WORD=9, WAV_DATA_BYTES_WORD=10 };
 
-Audio::Audio():device(0),capture(0),captured(0),distance(1),valid(true)
+Audio::Audio():trigger_write(0),trigger_read(0),stopping(false),failed(false),device(0),capture(0),captured(0),distance(1),valid(true)
 {
-    memset(voices,0,sizeof(voices));memset(cooldown,0,sizeof(cooldown));
+    memset(voices,0,sizeof(voices));memset(cooldown,0,sizeof(cooldown));memset(triggers,0,sizeof(triggers));
 #ifdef _WIN32
-    memset(headers,0,sizeof(headers));
+    memset(headers,0,sizeof(headers));wake=0;thread=0;
 #endif
 }
 Audio::~Audio() { audio_close(this); }
@@ -73,34 +73,77 @@ bool audio_load(Audio* a,const char* manifest,const char* capture)
     }
     return doc.valid;
 }
+static void mix(Audio* a,int16_t* output,uint32_t count);
+static void start_voice(Audio* a,uint32_t clip,float gain)
+{
+    if (a->cooldown[clip]>0) return;
+    uint32_t slot=0;while (slot<AUDIO_VOICE_COUNT && a->voices[slot].active) ++slot;
+    if (slot==AUDIO_VOICE_COUNT) return;
+    a->voices[slot]=AudioVoice{clip,0,gain,true};a->cooldown[clip]=a->clips[clip].cooldown;
+}
+#ifdef _WIN32
+// Owns voices and cooldowns while the device is open. Refills every buffer the
+// device has finished, after starting the voices queued since the last wake.
+static DWORD WINAPI audio_thread(LPVOID context)
+{
+    Audio* a=(Audio*)context;
+    while (!a->stopping.load(std::memory_order_acquire))
+    {
+        WaitForSingleObject(a->wake,INFINITE);
+        uint32_t read=a->trigger_read.load(std::memory_order_relaxed),write=a->trigger_write.load(std::memory_order_acquire);
+        for (;read!=write;++read) start_voice(a,a->triggers[read%AUDIO_TRIGGER_CAPACITY].clip,a->triggers[read%AUDIO_TRIGGER_CAPACITY].gain);
+        a->trigger_read.store(read,std::memory_order_release);
+        for (uint32_t i=0;i<AUDIO_OUTPUT_BUFFER_COUNT && !a->stopping.load(std::memory_order_acquire);++i)
+            if (!(a->headers[i].dwFlags&WHDR_INQUEUE))
+            {
+                mix(a,a->buffers[i],AUDIO_OUTPUT_BUFFER_SAMPLES);
+                if (waveOutWrite(a->device,&a->headers[i],sizeof(WAVEHDR))!=MMSYSERR_NOERROR) { a->failed.store(true);return 1; }
+            }
+    }
+    return 0;
+}
+#endif
 bool audio_open(Audio* a)
 {
 #ifdef _WIN32
     WAVEFORMATEX format={WAVE_FORMAT_PCM,1,AUDIO_SAMPLE_RATE,WAV_BYTES_PER_SECOND,AUDIO_SAMPLE_BYTES,AUDIO_SAMPLE_BITS,0};
-    if (waveOutOpen(&a->device,WAVE_MAPPER,&format,0,0,CALLBACK_NULL)!=MMSYSERR_NOERROR)
+    a->wake=CreateEventA(0,FALSE,FALSE,0);
+    if (!a->wake) return false;
+    if (waveOutOpen(&a->device,WAVE_MAPPER,&format,(DWORD_PTR)a->wake,0,CALLBACK_EVENT)!=MMSYSERR_NOERROR)
     { a->device=0;fprintf(stderr,"Audio output unavailable; sound is muted.\n");return true; }
     for (uint32_t i=0;i<AUDIO_OUTPUT_BUFFER_COUNT;++i)
     {
         WAVEHDR* h=&a->headers[i];h->lpData=(LPSTR)a->buffers[i];h->dwBufferLength=sizeof(a->buffers[i]);
         if (waveOutPrepareHeader(a->device,h,sizeof(*h))!=MMSYSERR_NOERROR) return false;
     }
-    printf("Audio output: mono 48 kHz PCM; 16 voices.\n");return true;
+    a->thread=CreateThread(0,0,audio_thread,a,0,0);
+    if (!a->thread) { fprintf(stderr,"Cannot start the audio thread.\n");return false; }
+    SetThreadPriority(a->thread,THREAD_PRIORITY_TIME_CRITICAL);SetEvent(a->wake);
+    printf("Audio output: mono 48 kHz PCM; 16 voices; mixing thread; %u x %u-sample buffers.\n",
+        (unsigned)AUDIO_OUTPUT_BUFFER_COUNT,(unsigned)AUDIO_OUTPUT_BUFFER_SAMPLES);return true;
 #else
     (void)a;fprintf(stderr,"Native diagnostic has no live audio output.\n");return true;
 #endif
 }
 void audio_events(Audio* a,Simulation* s,Vec3 listener)
 {
+#ifdef _WIN32
+    bool live=a->thread!=0;
+#else
+    bool live=false;
+#endif
     for (uint32_t i=0;i<s->sounds.count;++i)
     {
         const SoundEvent& event=s->sounds.pending[i];uint32_t k=event.kind;
-        if (a->cooldown[k]>0) continue;
         float d=std::sqrt(dot(subtract(event.position,listener),subtract(event.position,listener)));
         bool global=k==SOUND_ORDER || k==SOUND_WIN || k==SOUND_LOSE;
         float gain=a->clips[k].gain*(global ? 1 : std::fmax(0.0f,1-d/a->distance));if (gain<=0) continue;
-        uint32_t slot=0;while (slot<AUDIO_VOICE_COUNT && a->voices[slot].active) ++slot;
-        if (slot==AUDIO_VOICE_COUNT) continue;
-        a->voices[slot]=AudioVoice{k,0,gain,true};a->cooldown[k]=a->clips[k].cooldown;
+        if (!live) { start_voice(a,k,gain);continue; }
+        // A full ring drops the trigger, as a busy voice set already does.
+        uint32_t write=a->trigger_write.load(std::memory_order_relaxed);
+        if (write-a->trigger_read.load(std::memory_order_acquire)>=AUDIO_TRIGGER_CAPACITY) continue;
+        a->triggers[write%AUDIO_TRIGGER_CAPACITY]=AudioTrigger{k,gain};
+        a->trigger_write.store(write+1,std::memory_order_release);
     }
     s->sounds.count=0;
 }
@@ -125,23 +168,19 @@ bool audio_tick(Audio* a)
     if (a->captured>UINT32_MAX-WAV_RIFF_OVERHEAD_BYTES-sizeof(samples)) return false;
     a->captured+=sizeof(samples);a->valid=a->valid && fwrite(samples,sizeof(samples),1,a->capture)==1;return a->valid;
 }
-bool audio_pump(Audio* a)
+bool audio_running(const Audio* a)
 {
-#ifdef _WIN32
-    if (!a->device) return true;
-    for (uint32_t i=0;i<AUDIO_OUTPUT_BUFFER_COUNT;++i) if (!(a->headers[i].dwFlags&WHDR_INQUEUE))
-    {
-        mix(a,a->buffers[i],AUDIO_OUTPUT_BUFFER_SAMPLES);
-        if (waveOutWrite(a->device,&a->headers[i],sizeof(WAVEHDR))!=MMSYSERR_NOERROR) return false;
-    }
-    return true;
-#else
-    (void)a;return true;
-#endif
+    return !a->failed.load(std::memory_order_acquire);
 }
 bool audio_close(Audio* a)
 {
 #ifdef _WIN32
+    if (a->thread)
+    {
+        a->stopping.store(true,std::memory_order_release);SetEvent(a->wake);
+        WaitForSingleObject(a->thread,INFINITE);CloseHandle(a->thread);a->thread=0;
+        if (a->failed.load()) a->valid=false;
+    }
     if (a->device)
     {
         if (waveOutReset(a->device)!=MMSYSERR_NOERROR) a->valid=false;
@@ -150,6 +189,7 @@ bool audio_close(Audio* a)
         if (waveOutClose(a->device)!=MMSYSERR_NOERROR) a->valid=false;
         a->device=0;
     }
+    if (a->wake) { CloseHandle(a->wake);a->wake=0; }
     #endif
     if (a->capture)
     {

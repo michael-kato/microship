@@ -455,7 +455,7 @@ int game_run(const GameOptions* options)
         profile->pointer_x=input.pointer_x;profile->pointer_y=input.pointer_y;
         overlay_enabled(&game,&config);
         audio_events(&audio,&game.simulation,game.camera.target);
-        if (!audio_pump(&audio)) { success=false;break; }
+        if (!audio_running(&audio)) { success=false;break; }
         if (game.renderer.frame_log)
         {
             if (input.pan_x || input.pan_y)
