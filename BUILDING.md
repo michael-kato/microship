@@ -673,3 +673,11 @@ sustained performance; the denser shape had a higher measured rendering cost.
 Images are `000850` through `000853`. The scene inputs, logs, measured report,
 and before/after sliders are in `build/fine_spikes_review/`. The existing local
 membrane settings were preserved and used for both sides of each comparison.
+
+## Frame pipeline and GPU memory
+
+Vertices, triangles and BLAS indices live in device-local memory. Startup
+uploads them once through a staging buffer and builds every BLAS in one
+submission; static meshes share temporary scratch. Deformable walls copy
+their changed vertex ranges from host staging into the device-local buffer
+before the refit, so shading never reads geometry over the PCIe BAR.
