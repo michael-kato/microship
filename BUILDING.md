@@ -604,3 +604,7 @@ The single-frame GPU times were 8.079 ms before and 8.105 ms after in the wide
 view, and 9.467 ms after in the close view. These are bounded capture results,
 not a sustained performance test. Images are `000835` through `000837` in
 `screenshots/`. CPU checks passed for data assets, colony forms, and SSS.
+
+New screenshot names use underscores, such as `000845_cell_animation_pose.png`.
+The archive tool counts both old hyphen names and new underscore names. It keeps
+the earlier images and continues the same numeric sequence.

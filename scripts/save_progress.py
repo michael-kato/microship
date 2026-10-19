@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Save a display screenshot as NUMBER-description.png in screenshots/."""
+"""Save a display screenshot as NUMBER_description.png in screenshots/."""
 
 import argparse
 from pathlib import Path
@@ -43,11 +43,11 @@ def archive_capture(capture, description=None):
         raise ValueError('Use a display .ppm or .png screenshot')
     if description is None:
         description = re.sub(r'^\d+[-_ ]*', '', capture.stem) or 'render'
-    description = re.sub(r'[^a-z0-9]+', '-', description.lower()).strip('-')[:MAX_DESCRIPTION_CHARACTERS].rstrip('-')
+    description = re.sub(r'[^a-z0-9]+', '_', description.lower()).strip('_')[:MAX_DESCRIPTION_CHARACTERS].rstrip('_')
     if not description:
         raise ValueError('Description must contain letters or numbers')
     ROOT.mkdir(parents=True, exist_ok=True)
-    numbers = (re.fullmatch(r'(\d+)(?:-[a-z0-9-]+)?\.png', path.name)
+    numbers = (re.fullmatch(r'(\d+)(?:[-_][a-z0-9_-]+)?\.png', path.name)
                for path in ROOT.glob('*.png'))
     number = max((int(match[1]) for match in numbers if match), default=0) + 1
     while True:
@@ -56,7 +56,7 @@ def archive_capture(capture, description=None):
         claim = ROOT / f'{number:06d}.png'
         try:
             with claim.open('xb') as output:
-                occupied = any(ROOT.glob(f'{number:06d}-*.png'))
+                occupied = any(ROOT.glob(f'{number:06d}[-_]*.png'))
                 if not occupied:
                     output.write(data)
         except FileExistsError:
@@ -66,7 +66,7 @@ def archive_capture(capture, description=None):
             claim.unlink()
             number += 1
             continue
-        path = ROOT / f'{number:06d}-{description}.png'
+        path = ROOT / f'{number:06d}_{description}.png'
         claim.rename(path)
         break
     print(f'Screenshot saved: {path}', flush=True)
