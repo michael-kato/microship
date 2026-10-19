@@ -22,7 +22,7 @@ args=parser.parse_args()
 check_gpu_environment()
 binary=args.binary.resolve();out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
-config=binary.parent/'assets/rendering/biology.json'
+config=binary.parent/'assets/rendering/renderer.json'
 values=json.loads(config.read_text())
 assert (values['output']['width'],values['output']['height'])==(1920,1080)
 budget=values['sampling']['samples_per_pixel']+values['volume']['rays_per_pixel']+1
@@ -32,7 +32,7 @@ baseline=None
 for side,home,enemy,ticks,frames in [('virus',0,1,1,1),('virus',0,1,1,2),('immune',1,0,1800,1)]:
     name=side+('-initial' if ticks==1 else '-growing-factory')+('-repeat' if frames==2 else '')
     image=out/(name+'.ppm');state=out/(name+'.json')
-    p=subprocess.Popen([*command,'--headless','--frames',str(frames),'--no-stats','--world',str(binary.parent/'assets/levels'/('biology-'+side+'.json')),
+    p=subprocess.Popen([*command,'--headless','--frames',str(frames),'--no-stats','--world',str(binary.parent/'assets/levels'/(side+'-player-level.json')),
                         '--config',str(config),'--ticks',str(ticks),'--capture',str(image),'--state',str(state)],
                        stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=sys.platform!='win32')
     try:stdout,stderr=p.communicate(timeout=min(10,max(.001,deadline-time.monotonic())))

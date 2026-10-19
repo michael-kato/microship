@@ -11,8 +11,8 @@ root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
 with tempfile.TemporaryDirectory(prefix='nanova-selection-') as directory:
-    out=Path(directory);world=root/'tests/e2e/scenes/biology-two-virus.json'
-    config=json.loads((root/'assets/rendering/biology.json').read_text());config['camera']['position']=[0,11,36]
+    out=Path(directory);world=root/'tests/e2e/scenes/virus-two-cell-test-level.json'
+    config=json.loads((root/'assets/rendering/renderer.json').read_text());config['camera']['position']=[0,11,36]
     path=out/'camera.json';path.write_text(json.dumps(config))
     def run(name,extra=()):
         global count

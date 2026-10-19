@@ -52,7 +52,7 @@ CAPILLARY_SPACING_FRACTION = .3
 BRANCH_Y_WAVE_AMPLITUDE = .035
 
 out=Path(sys.argv[sys.argv.index('--')+1]).resolve()
-p=json.loads((out/'source/background_profiles.json').read_text())['membrane']
+p=json.loads((out/'source/background-shape.json').read_text())['membrane']
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 def height(x,y):return p['fold_amplitude']*(math.sin(p['frequency'][0]*x+math.sin(FOLD_MODULATION_FREQUENCY*y))+.5*math.cos(p['frequency'][1]*y-x)+FINE_FOLD_WEIGHT*math.sin(FINE_FOLD_X_FREQUENCY*x+FINE_FOLD_Y_FREQUENCY*y))
 for mode,key in enumerate(('tissue','bloodstream')):

@@ -25,7 +25,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-ratio-') as directory:
         assert process.returncode==expected,(name,process.stdout,process.stderr)
         return (json.loads(state.read_text()) if expected==0 else None),process.stdout
     for side,home in [('virus',0),('immune',1)]:
-        base=established_world(root/'assets/levels'/('biology-'+side+'.json'),out)
+        base=established_world(root/'assets/levels'/(side+'-player-level.json'),out)
         fast=units(producers(branches(base,count=1),growth=.01,establishment_seconds=.01,collection=100),cost=.1)
         fast['rules']['economy']['manufacture_seconds']=.05
         fast['rules']['ai']['expansion_delay']=300
@@ -76,7 +76,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-ratio-') as directory:
         assert not last['colonies'][home]['building']
         for invalid in ('101','-1','nan','12.5'):
             run(side+'-invalid-'+invalid,base,orders=f'0 ratio {invalid}\n',expected=1)
-    fungus=established_world(root/'assets/levels/biology-fungus.json',out)
+    fungus=established_world(root/'assets/levels/fungus-player-level.json',out)
     original,_=run('automatic-original',fungus)
     changed,_=run('automatic-ratio',fungus,orders='0 cell 0\n0 ratio 50\n',extra=('--click','1676','1030'))
     assert original==changed,'Ratio controls changed automatic production'

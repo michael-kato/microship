@@ -57,11 +57,11 @@ with tempfile.TemporaryDirectory(prefix='nanova-startup-') as directory:
             assert 0<c['production']<1
         reset,_=run(path.stem+'-restart',data,2400,replay,('--restart',))
         assert reset['tick']==0 and reset['landings']==0 and not any(c['active'] for c in reset['colonies'])
-    base=stage_world(root/'assets/levels/biology-virus.json',out)
+    base=stage_world(root/'assets/levels/virus-player-level.json',out)
     early,_=run('no-early-victory',base,600,'0 select all\n0 order 0\n')
     assert early['colonies'][0]['active'] and not early['colonies'][1]['active'] and early['outcome']==0
     # Authored balance is inspected through produced application state.
-    immune=stage_world(root/'assets/levels/biology-immune.json',out)
+    immune=stage_world(root/'assets/levels/immune-player-level.json',out)
     initial,_=run('immune-durability',immune)
     types={u['name']:u for u in immune['content']['units']}
     assert types['immune_fighter']['health']==432 and types['immune_fighter']['hits']==24

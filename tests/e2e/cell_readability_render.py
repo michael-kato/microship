@@ -9,7 +9,7 @@ from authored_assets import stage_world,write_world
 from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/cell-readability');p.add_argument('--run',action='store_true');a=p.parse_args()
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
-base=stage_world(root/'assets/levels/biology-virus.json',out);base['match']['auto_colonize']=False
+base=stage_world(root/'assets/levels/virus-player-level.json',out);base['match']['auto_colonize']=False
 # A wall-only authored diagnostic cell exposes opaque depth markers to the real renderer.
 body=next(b for b in base['content']['bodies'] if b['name']=='unclaimed');raw=(out/body['model']).resolve().read_bytes();nv,nt=struct.unpack_from('<II',raw,8);stride=64 if raw[:8]==b'FLMESH02' else 48
 tri=raw[16+nv*stride:];wall=[tri[i*16:(i+1)*16] for i in range(nt) if struct.unpack_from('<I',tri,i*16+12)[0]==3]
@@ -23,12 +23,12 @@ center=base['bodies'][0]['position'];radius=base['bodies'][0]['radius'];n=[0,3/m
 for x,depth,tint in [(-1.3,.18,[.95,.25,.05]),(0,.5,[.1,.9,.2]),(1.3,.82,[.05,.3,1])]:
  half=math.sqrt(radius*radius-x*x);point=[center[i]+(x if i==0 else n[i]*half*(1-2*depth)) for i in range(3)];probes.append(point)
  base['bodies'].append(dict(type='depth_probe',owner='neutral',position=point,radius=.35,tint=tint))
-config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3;config['camera']['position']=[0,3,10];config.pop('tilt_shift')
+config=json.loads((root/'assets/rendering/renderer.json').read_text());config['sampling']['samples_per_pixel']=3;config['camera']['position']=[0,3,10];config.pop('tilt_shift')
 clear=deepcopy(base)
 for b in clear['bodies']:
  if 'medium' in b:b['medium']['depth_blur']['max_radius']=0
 legacy=deepcopy(clear);legacy['appearance']['thin_surface']['blur_radius']=18
-normal=stage_world(root/'assets/levels/biology-virus.json',out);normal['rules']['ai']['expansion_delay']=300
+normal=stage_world(root/'assets/levels/virus-player-level.json',out);normal['rules']['ai']['expansion_delay']=300
 without_sss=deepcopy(config);without_sss['subsurface']['strength']=0
 cases=[('depth-ramp',base,config,1,False),('depth-clear',clear,config,1,False),('depth-immediate',legacy,config,1,False),('sss-debug',normal,config,2400,True),('sss-disabled-debug',normal,without_sss,2400,True)]
 prefix=[str(a.binary.resolve())] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(a.binary.resolve())]

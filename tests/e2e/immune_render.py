@@ -8,8 +8,8 @@ from authored_assets import stage_world,write_world
 from save_progress import archive_capture
 from control_window import run_window
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/immune-appearance');p.add_argument('--run',action='store_true');a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
-data=stage_world(root/'assets/levels/biology-immune.json',out);data['match']['auto_colonize']=False;data['rules']['ai']['expansion_delay']=300
-config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3;cp=out/'render.json';cp.write_text(json.dumps(config))
+data=stage_world(root/'assets/levels/immune-player-level.json',out);data['match']['auto_colonize']=False;data['rules']['ai']['expansion_delay']=300
+config=json.loads((root/'assets/rendering/renderer.json').read_text());config['sampling']['samples_per_pixel']=3;cp=out/'render.json';cp.write_text(json.dumps(config))
 charge=deepcopy(data);charge['spawns']=[dict(type='immune_fighter',position=[44,14,6.4]),dict(type='virus_fighter',position=[48,14,6.4])]
 held=deepcopy(data);held['spawns']=[dict(type='immune_fighter',position=[47.65,14,6.4]),dict(type='virus_fighter',position=[48,14,6.4])]
 for world in (charge,held):

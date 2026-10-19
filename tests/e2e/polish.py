@@ -17,8 +17,8 @@ count=0
 with tempfile.TemporaryDirectory(prefix='nanova-polish-') as directory:
     out=Path(directory)
     config=out/'camera.json'
-    config.write_text(json.dumps(change(json.loads((root/'assets/rendering/biology.json').read_text()),'camera.position',[0,11,36])))
-    world=root/'tests/e2e/scenes/biology-two-virus.json'
+    config.write_text(json.dumps(change(json.loads((root/'assets/rendering/renderer.json').read_text()),'camera.position',[0,11,36])))
+    world=root/'tests/e2e/scenes/virus-two-cell-test-level.json'
     authored=established_world(world,out);definitions={u['name']:u for u in authored['content']['units']}
     acceleration=authored['rules']['flight']['acceleration']
     def speed_limit(u):

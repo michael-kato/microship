@@ -101,7 +101,7 @@ it bypasses the tilt-shift and fog filters. Changes last for the current
 application session and do not edit assets. R restarts the match with the
 current render switches.
 
-Self-glow strengths are in `assets/presentation/biology.json`, under `self_glow`.
+Self-glow strengths are in `assets/presentation/scene-appearance.json`, under `self_glow`.
 Cell internals, organelles, factory stems, leaves, and units have separate controls.
 These surfaces do not light nearby objects. The cell wall has no self-glow and
 does not feed the halo. Virus stalk ridges have dark pigment and no emission;

@@ -8,7 +8,7 @@ from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('binary',type=Path)
 p.add_argument('--baseline',type=Path)
-p.add_argument('--world',type=Path,default=root/'assets/levels/biology-virus.json')
+p.add_argument('--world',type=Path,default=root/'assets/levels/virus-player-level.json')
 p.add_argument('--case',choices=('near','normal','grown','inside','far','overlap','boundary','opaque'),default='near')
 p.add_argument('--variants',nargs='+',choices=('baseline','off','lookup','refresh','grid','grid-refresh','texture','texture-refresh','organelle','organelle-refresh','wrap'),default=('off','lookup'))
 p.add_argument('--shadow-grid',type=int,choices=(0,8,32,64),default=32)

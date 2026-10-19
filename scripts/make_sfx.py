@@ -26,9 +26,9 @@ def unique(pairs):
         if key in result:raise ValueError('Duplicate synthesis field: '+key)
         result[key]=value
     return result
-profiles=json.loads((root/'synthesis.json').read_text(),object_pairs_hook=unique)
+profiles=json.loads((root/'sound-synthesis.json').read_text(),object_pairs_hook=unique)
 if set(profiles)-{'$schema','sounds'}:raise ValueError('Unknown synthesis fields')
-bank=json.loads((root/'biology.json').read_text(),object_pairs_hook=unique)
+bank=json.loads((root/'sound-playback.json').read_text(),object_pairs_hook=unique)
 if set(profiles['sounds'])!=set(bank['events']):raise ValueError('Synthesis events must match the sound bank')
 ranges={'seconds':(.03,2),'start_hz':(20,20000),'end_hz':(20,20000),'noise':(0,1),'decay':(0,12),'seed':(0,16777215)}
 for name,p in profiles['sounds'].items():

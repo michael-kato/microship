@@ -1,9 +1,9 @@
 {
   "$schema": "../../../assets/schemas/world.schema.json",
-  "content": "../../../assets/gameplay/biology.json",
-  "rules": "biology-two-rules.json",
-  "appearance": "../../../assets/presentation/biology.json",
-  "effects": "../../../assets/presentation/combat.json",
+  "content": "../../../assets/gameplay/gameplay-content.json",
+  "rules": "two-cell-test-gameplay-rules.json",
+  "appearance": "../../../assets/presentation/scene-appearance.json",
+  "effects": "../../../assets/presentation/combat-effects.json",
   "match": {
     "player": "virus",
     "opponent": "immune"

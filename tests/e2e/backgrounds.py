@@ -12,7 +12,7 @@ from authored_assets import stage_world,write_world
 binary=Path(sys.argv[1]).resolve();prefix=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
 with tempfile.TemporaryDirectory(prefix='nanova-backgrounds-') as directory:
-    out=Path(directory);data=stage_world(root/'assets/levels/biology-virus.json',out)
+    out=Path(directory);data=stage_world(root/'assets/levels/virus-player-level.json',out)
     bank=[data['appearance']['backdrop']['model'],*data['appearance']['backdrop']['variants']]
     def run(name,world,seed=0,expected=0,restart=False):
         global count

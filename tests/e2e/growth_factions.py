@@ -16,7 +16,10 @@ command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(repo_roo
 count=0
 with tempfile.TemporaryDirectory(prefix='nanova-growth-') as directory:
     out=Path(directory)
-    def stage(side):return established_world(repo_root/'assets/levels'/('biology-'+side+'.json'),out)
+    def stage(side):
+        levels={'virus':'virus-player-level.json','immune':'immune-player-level.json','fungus':'fungus-player-level.json',
+                'immune-trial':'immune-trial-level.json','swarm':'swarm-level.json'}
+        return established_world(repo_root/'assets/levels'/levels[side],out)
     def run(name,data,ticks=1,extra=(),orders='',expected=0):
         global count
         level=out/(name+'-world.json');write_world(level,data)

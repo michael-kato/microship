@@ -10,7 +10,7 @@ p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 if a.diagnose and a.baseline:p.error('Use diagnosis or before/after comparison')
 if not a.diagnose and not a.baseline:p.error('Comparison requires --baseline')
-world=stage_world(root/'assets/levels/biology-virus.json',out);config=json.loads((root/'assets/rendering/biology-quality.json').read_text());config['sampling']['samples_per_pixel']=3
+world=stage_world(root/'assets/levels/virus-player-level.json',out);config=json.loads((root/'assets/rendering/renderer-quality.json').read_text());config['sampling']['samples_per_pixel']=3
 assert config['output']['width']==1920 and config['output']['height']==1080
 config['volume'].pop('optical_depth_lut',None);config['volume'].pop('lighting_grid',None)
 assert config['volume']==dict(rays_per_pixel=1,integration_steps=8)

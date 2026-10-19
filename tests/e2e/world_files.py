@@ -39,24 +39,27 @@ def failure(result,path):
 
 with tempfile.TemporaryDirectory(prefix='nanova-json-e2e-') as directory:
     out=Path(directory);scene=out/'editable.json'
-    base=established_world(root/'assets/levels/biology-virus.json',out)
+    base=established_world(root/'assets/levels/virus-player-level.json',out)
     minimal=dict(content=dict(bodies=[dict(name='fixture',label='BODY',geometry='sphere',hosts_site=False)],
                 factions=[dict(id=1,name='virus',label='VIRUS',color=[.45,.9,.75]),dict(id=2,name='immune',label='IMMUNE',color=[1,.55,.65])],
                 groups=[],units=[],buildings=[]),appearance=dict(ambient=[.07,.055,.065]),
                 match=dict(player='virus',opponent='immune'),
                 bodies=[dict(type='fixture',owner='neutral',position=[9,8,7],radius=2,tint=[.2,.3,.4])],spawns=[])
     success(run(binary,out),5)
-    success(run(binary,out,['--config',str(binary.parent/'assets/rendering/reference.json'),'--stats','--debug-views','--no-activate']))
+    success(run(binary,out,['--config',str(binary.parent/'assets/rendering/renderer-reference.json'),'--stats','--debug-views','--no-activate']))
     bundle=out/'relocated game';bundle.mkdir();relocated=bundle/binary.name
     shutil.copy2(binary,relocated);shutil.copytree(binary.parent/'assets',bundle/'assets')
+    names=[p.name for p in (bundle/'assets').rglob('*.json')]
+    assert len(names)==len(set(names)),'Configuration filenames must be unique across the bundle'
+    assert 'biology.json' not in names,'Generic configuration filename remains in the bundle'
     success(run(relocated,out),5)
     manifest=bundle/'assets/startup.json';startup=json.loads(manifest.read_text())
-    manifest.write_text(json.dumps(change(startup,'world','levels/biology-immune.json')))
+    manifest.write_text(json.dumps(change(startup,'world','levels/immune-player-level.json')))
     state=out/'manifest-state.json';success(run(relocated,out,['--state',str(state)]),5)
     assert json.loads(state.read_text())['player_faction']==2
     for bad in [change(startup,'unknown','anything'),change(startup,'world','/tmp/absent.json'),
                 remove(startup,'shader'),change(startup,'world',12),
-                '{"world":"levels/biology-virus.json","world":"levels/biology-immune.json"}']:
+                '{"world":"levels/virus-player-level.json","world":"levels/immune-player-level.json"}']:
         manifest.write_text(bad if isinstance(bad,str) else json.dumps(bad));failure(run(relocated,out),manifest)
     manifest.write_text(json.dumps(startup))
 
@@ -72,7 +75,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-json-e2e-') as directory:
     failure(run(binary,out,['--world',str(scene)]),mesh)
     mesh.unlink();failure(run(binary,out,['--world',str(scene)]),mesh)
 
-    config=bundle/'assets/rendering/biology.json';render=json.loads(config.read_text())
+    config=bundle/'assets/rendering/renderer.json';render=json.loads(config.read_text())
     for path,value in [('volume.rays_per_pixel',4097),('volume.integration_steps',1),
                        ('sampling.max_bounces',4),('lighting.microfacet_energy_compensation',2),
                        ('sampling.seed',4294967296),('output.width',1920.5),('output.width','1920'),

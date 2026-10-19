@@ -35,14 +35,14 @@ mode=parser.add_mutually_exclusive_group();mode.add_argument('--run',action='sto
 args=parser.parse_args();out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
 if 'baseline' in args.variants and not args.baseline:parser.error('--variants baseline requires --baseline PATH')
 binaries=dict(baseline=args.baseline.resolve() if args.baseline else None,current=args.binary.resolve())
-data=stage_world(root/'assets/levels/biology-virus.json',out)
+data=stage_world(root/'assets/levels/virus-player-level.json',out)
 if args.edge_fade=='off':data['appearance']['thin_surface'].pop('edge_fade',None)
 if args.wall_blur=='off':data['appearance']['thin_surface'].pop('blur_radius',None)
 for body in data['bodies']:
     if 'medium' not in body:continue
     if args.depth_blur=='off':body['medium'].pop('depth_blur',None)
     if args.weak_medium:body['medium'].update(scattering=[.035,.045,.04],absorption=.012)
-config=json.loads((root/'assets/rendering/biology-quality.json').read_text());config['sampling']['samples_per_pixel']=3
+config=json.loads((root/'assets/rendering/renderer-quality.json').read_text());config['sampling']['samples_per_pixel']=3
 # Keep strict legacy comparisons on the unbaked path.
 config['lighting'].pop('texture_grid',None);config['lighting'].pop('static_lighting_cache',None);config['lighting'].pop('force_lighting_rebuild',None)
 config['lighting'].pop('subgroup_size',None)

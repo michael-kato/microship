@@ -17,7 +17,7 @@ count=0
 with tempfile.TemporaryDirectory(prefix='nanova-gameplay-') as directory:
     out=Path(directory)
     def stage(side):
-        return established_world(root/'assets/levels'/('biology-'+side+'.json'),out)
+        return established_world(root/'assets/levels'/(side+'-player-level.json'),out)
     def run(name,text,ticks=1,orders='',extra=(),expected=0):
         global count
         scene=out/(name+'-world.json');write_world(scene,text)

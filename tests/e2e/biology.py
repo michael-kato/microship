@@ -37,7 +37,7 @@ def main():
             require(all('cell' in c and 'nutrients' in c for c in data['colonies']),name+': wrong resource/body contract')
             return data
         for side,player,home,enemy in [('virus',1,0,1),('immune',2,1,0)]:
-            text=stage(root/'tests/e2e/scenes'/('biology-two-'+side+'.json'))
+            text=stage(root/'tests/e2e/scenes'/(side+'-two-cell-test-level.json'))
             initial=run(side+'-initial',text)
             require(initial['player_faction']==player and len(initial['units'])==11,side+': wrong side')
             require(sum(u['faction']==player and u['kind']==0 for u in initial['units'])==6,side+': starting force')
@@ -58,7 +58,7 @@ def main():
             require(any(u['generation'] in left and left[u['generation']]!=u['position'] for u in mature['units'] if u['kind']==0),'Fighters did not orbit')
             require(mature['effects']['trails']>0,'No fighter trails')
 
-        text=stage(root/'tests/e2e/scenes/biology-two-virus.json')
+        text=stage(root/'tests/e2e/scenes/virus-two-cell-test-level.json')
         for name,bad in [
             ('unknown-light',change(text,'appearance.sun',{})),
             ('negative-ambient',change(text,'appearance.ambient',[-1,0,0])),

@@ -205,7 +205,7 @@ IMMUNE_SURFACE_ATTACHMENT_RADIUS_SCALE = .8
 BACKGROUND_PARTICLE_HALF_WIDTH = 1.2
 
 out=Path(sys.argv[sys.argv.index('--')+1]).resolve()
-profiles=json.loads((out/'source/biology_profiles.json').read_text())
+profiles=json.loads((out/'source/cell-unit-factory-shape.json').read_text())
 def unique_fields(pairs):
     result={}
     for key,value in pairs:
@@ -213,7 +213,7 @@ def unique_fields(pairs):
         result[key]=value
     return result
 
-materials=json.loads((out/'source/biology_materials.json').read_text(),object_pairs_hook=unique_fields)
+materials=json.loads((out/'source/surface-materials.json').read_text(),object_pairs_hook=unique_fields)
 if set(materials)!={'$schema','surfaces'}:raise ValueError('Invalid material document fields')
 materials=materials['surfaces']
 surface_names={'membrane','nucleus','nucleolus','mitochondrion','cristae','vesicle','reticulum','substrate',

@@ -53,7 +53,7 @@ def run_window(binary,out,limit=2,keys=('W','D'),axes=(1,1),issue_order=True,scr
  if axes!=(0,0):
   assert keyboard and tuple(map(float,keyboard[-1][:2]))==axes,(keyboard,output)
   seconds=float(keyboard[-1][2]);assert seconds>0
-  length=max(1,(axes[0]**2+axes[1]**2)**.5);speed=json.loads((root/'assets/rendering/biology.json').read_text())['camera']['keyboard_pan_speed'];expected=[speed*seconds*axes[0]/length,speed*seconds*axes[1]/length,0]
+  length=max(1,(axes[0]**2+axes[1]**2)**.5);speed=json.loads((root/'assets/rendering/renderer.json').read_text())['camera']['keyboard_pan_speed'];expected=[speed*seconds*axes[0]/length,speed*seconds*axes[1]/length,0]
   assert all(abs(a-b)<.0003 for a,b in zip(movement,expected)),(movement,expected,output)
  else:assert not keyboard and movement==[0,0,0],(movement,keyboard)
  result=json.loads(state.read_text());selected=[u for u in result['units'] if u['selected']]

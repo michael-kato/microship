@@ -1,19 +1,19 @@
 {
   "$schema": "../schemas/world.schema.json",
-  "content": "../gameplay/faction-trials.json",
-  "rules": "../gameplay/rules.json",
-  "appearance": "../presentation/biology.json",
-  "effects": "../presentation/combat.json",
+  "content": "../gameplay/gameplay-content.json",
+  "rules": "../gameplay/gameplay-rules.json",
+  "appearance": "../presentation/scene-appearance.json",
+  "effects": "../presentation/combat-effects.json",
   "match": {
-    "player": "fungus",
-    "opponent": "virus",
+    "player": "virus",
+    "opponent": "immune",
     "starts": [
       {
-        "faction": "fungus",
+        "faction": "virus",
         "cell": 0
       },
       {
-        "faction": "virus",
+        "faction": "immune",
         "cell": 1
       }
     ],
@@ -57,8 +57,7 @@
           "full_fraction": 0.6666666666666666,
           "max_radius": 18
         }
-      },
-      "seed": 51737
+      }
     },
     {
       "type": "unclaimed",
@@ -97,8 +96,7 @@
           "full_fraction": 0.6666666666666666,
           "max_radius": 18
         }
-      },
-      "seed": 59128
+      }
     },
     {
       "type": "unclaimed",
@@ -137,8 +135,7 @@
           "full_fraction": 0.6666666666666666,
           "max_radius": 18
         }
-      },
-      "seed": 66519
+      }
     },
     {
       "type": "unclaimed",
@@ -177,8 +174,7 @@
           "full_fraction": 0.6666666666666666,
           "max_radius": 18
         }
-      },
-      "seed": 73910
+      }
     },
     {
       "type": "unclaimed",
@@ -217,57 +213,96 @@
           "full_fraction": 0.6666666666666666,
           "max_radius": 18
         }
-      },
-      "seed": 81301
+      }
     }
   ],
   "spawns": [
     {
-      "type": "fungal_founder",
+      "type": "virus_bomber",
       "position": [
-        -52,
+        -52.0,
         -1.2,
         6.4
       ]
     },
     {
-      "type": "swarm_bomber",
-      "position": [
-        45.4,
-        19.5,
-        5.0
-      ]
-    },
-    {
-      "type": "swarm_fighter",
-      "position": [
-        46.7,
-        19.5,
-        5.0
-      ]
-    },
-    {
-      "type": "swarm_fighter",
+      "type": "immune_bomber",
       "position": [
         48.0,
-        19.5,
-        5.0
+        16.8,
+        6.4
       ]
     },
     {
-      "type": "swarm_fighter",
+      "type": "virus_fighter",
       "position": [
-        49.3,
-        19.5,
-        5.0
+        -52.85,
+        -2.4,
+        6.4
       ]
     },
     {
-      "type": "swarm_fighter",
+      "type": "virus_fighter",
       "position": [
-        50.6,
-        19.5,
-        5.0
+        -52.0,
+        -2.4,
+        6.4
+      ]
+    },
+    {
+      "type": "virus_fighter",
+      "position": [
+        -51.15,
+        -2.4,
+        6.4
+      ]
+    },
+    {
+      "type": "virus_fighter",
+      "position": [
+        -52.85,
+        -1.7,
+        6.4
+      ]
+    },
+    {
+      "type": "virus_fighter",
+      "position": [
+        -52.0,
+        -1.7,
+        6.4
+      ]
+    },
+    {
+      "type": "virus_fighter",
+      "position": [
+        -51.15,
+        -1.7,
+        6.4
+      ]
+    },
+    {
+      "type": "immune_fighter",
+      "position": [
+        47.15,
+        15.6,
+        6.4
+      ]
+    },
+    {
+      "type": "immune_fighter",
+      "position": [
+        48.0,
+        15.6,
+        6.4
+      ]
+    },
+    {
+      "type": "immune_fighter",
+      "position": [
+        48.85,
+        15.6,
+        6.4
       ]
     }
   ]

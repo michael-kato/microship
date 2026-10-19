@@ -13,7 +13,7 @@ def norm(a):return [x/math.sqrt(dot(a,a)) for x in a]
 def cross(a,b):return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]
 count=0
 with tempfile.TemporaryDirectory(prefix='nanova-trails-') as directory:
- out=Path(directory);data=stage_world(root/'assets/levels/biology-virus.json',out)
+ out=Path(directory);data=stage_world(root/'assets/levels/virus-player-level.json',out)
  for unit in data['content']['units']:unit.update(trails=unit['name']=='virus_fighter')
  data['spawns']=[dict(type='virus_fighter',position=[-45,0,6.4]),dict(type='immune_fighter',position=[48,14,6.4])]
  replay=out/'flight.orders';replay.write_text('0 select all\n0 move -10 10 6.4\n')

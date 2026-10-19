@@ -1,9 +1,9 @@
 {
   "$schema": "../schemas/world.schema.json",
-  "content": "../gameplay/faction-trials.json",
-  "rules": "../gameplay/rules.json",
-  "appearance": "../presentation/biology.json",
-  "effects": "../presentation/combat.json",
+  "content": "../gameplay/faction-trial-content.json",
+  "rules": "../gameplay/gameplay-rules.json",
+  "appearance": "../presentation/scene-appearance.json",
+  "effects": "../presentation/combat-effects.json",
   "match": {
     "player": "virus",
     "opponent": "immune",

@@ -22,17 +22,17 @@ parser.add_argument('binary',type=Path)
 parser.add_argument('--output',type=Path,default=root/'build/self-glow')
 parser.add_argument('--run',action='store_true')
 a=parser.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
-world=stage_world(root/'assets/levels/biology-virus.json',out)
+world=stage_world(root/'assets/levels/virus-player-level.json',out)
 for building in world['content']['buildings']:
     building['growth_seconds']=.01;building['establishment_seconds']=.01;building['branches']['seconds']=.01
-config=json.loads((root/'assets/rendering/biology.json').read_text())
+config=json.loads((root/'assets/rendering/renderer.json').read_text())
 binary=a.binary.resolve()
 prefix=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 commands=[]
 for view in ['near','wide']:
     for mode in ['off','surface','on']:
         name=view+'-'+mode;folder=out/name;folder.mkdir(exist_ok=True)
-        data=stage_world(root/'assets/levels/biology-virus.json',folder);settings=deepcopy(config)
+        data=stage_world(root/'assets/levels/virus-player-level.json',folder);settings=deepcopy(config)
         for building in data['content']['buildings']:
             building['growth_seconds']=.01;building['establishment_seconds']=.01;building['branches']['seconds']=.01
         if mode=='off':

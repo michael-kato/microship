@@ -22,8 +22,8 @@ parser.add_argument('--run',action='store_true')
 args=parser.parse_args();out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
 binary=args.binary.resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
-virus=stage_world(root/'assets/levels/biology-virus.json',out)
-immune=stage_world(root/'assets/levels/biology-immune.json',out)
+virus=stage_world(root/'assets/levels/virus-player-level.json',out)
+immune=stage_world(root/'assets/levels/immune-player-level.json',out)
 minimal=deepcopy(virus);minimal['appearance']['fog']['blur_radius']=1
 wide=('--camera-drag','-1748','0','--camera-zoom','-1000')
 cases=[('neutral-start',virus,1,'',()),

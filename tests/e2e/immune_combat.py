@@ -7,7 +7,7 @@ from asset_data import stage_world,write_world,change
 root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve();prefix=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
 with tempfile.TemporaryDirectory(prefix='nanova-engulf-') as directory:
- out=Path(directory);base=stage_world(root/'assets/levels/biology-virus.json',out)
+ out=Path(directory);base=stage_world(root/'assets/levels/virus-player-level.json',out)
  for start in base['match'].pop('starts'):base['bodies'][start['cell']]['owner']=start['faction']
  base['match'].pop('auto_colonize');base['bodies']=base['bodies'][:2];base['bodies'][0]['position']=[-40,0,0];base['bodies'][1]['position']=[40,0,0]
  base['rules'].pop('exploration');base['rules']['economy'].update(manufacture_seconds=1000,enemy_attack_seconds=300);base['rules']['ai']['expansion_delay']=300

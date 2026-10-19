@@ -9,7 +9,7 @@ import struct
 import sys
 
 root=Path(__file__).resolve().parents[1]
-profile=root/'assets/models/source/colony_forms.json'
+profile=root/'assets/models/source/factory-growth-shapes.json'
 def unique_fields(pairs):
     value={}
     for key,item in pairs:

@@ -24,8 +24,8 @@ parser.add_argument('--batch-seconds',type=float,default=5)
 mode=parser.add_mutually_exclusive_group();mode.add_argument('--cpu',action='store_true');mode.add_argument('--run',action='store_true')
 args=parser.parse_args();binary=args.binary.resolve();out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
-base=stage_world(root/'assets/levels/biology-virus.json',out)
-config=json.loads((root/'assets/rendering/biology-quality.json').read_text())
+base=stage_world(root/'assets/levels/virus-player-level.json',out)
+config=json.loads((root/'assets/rendering/renderer-quality.json').read_text())
 assert config['output']['width']==1920 and config['output']['height']==1080
 assert config['sampling']['samples_per_pixel']==6 and all(config['volume'][k]==v for k,v in dict(rays_per_pixel=1,integration_steps=8).items())
 if not 0<args.process_seconds<=10 or not 0<args.batch_seconds<=30:parser.error('Process and batch limits must be in (0,10] and (0,30] seconds')

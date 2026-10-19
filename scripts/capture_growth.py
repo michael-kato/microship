@@ -44,10 +44,10 @@ parser.add_argument('--case',action='append',choices=['organelle-growth','immune
 args=parser.parse_args();root=Path(__file__).resolve().parents[1];binary=args.binary.resolve();out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
 check_gpu_environment()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
-config=json.loads((root/'assets/rendering/biology.json').read_text())
+config=json.loads((root/'assets/rendering/renderer.json').read_text())
 assert (config['output']['width'],config['output']['height'])==(NATIVE_WIDTH,NATIVE_HEIGHT)
 assert config['sampling']['samples_per_pixel']+config['volume']['rays_per_pixel']+1<=MAX_SAMPLE_STARTS
-limbs=stage_world(root/'assets/levels/biology-virus.json',out);limbs['rules'].pop('exploration',None);limbs['spawns']=[]
+limbs=stage_world(root/'assets/levels/virus-player-level.json',out);limbs['rules'].pop('exploration',None);limbs['spawns']=[]
 limbs['rules']['economy']['manufacture_seconds']=DISABLED_MANUFACTURE_SECONDS;limbs['rules']['ai']['expansion_delay']=DISABLED_AI_EXPANSION_SECONDS
 for p in limbs['content']['buildings']:
     if p['faction']!='fungus':p['growth_seconds']=FAST_GROWTH_SECONDS;p['branches'].update(seconds=FAST_GROWTH_SECONDS,regrow_seconds=FIXTURE_REGROW_SECONDS)
@@ -63,15 +63,15 @@ damage_config=deepcopy(config);center=limbs['bodies'][0]['position'];damage_conf
 damage_config['camera']['position']=[center[0],center[1]+CAMERA_HEIGHT,center[2]+CAMERA_DISTANCE]
 camera=out/'limb-camera.json';camera.write_text(json.dumps(damage_config,indent=2)+'\n')
 regular=out/'render.json';regular.write_text(json.dumps(config,indent=2)+'\n')
-small=stage_world(root/'assets/levels/biology-virus.json',out);small['bodies'][0]['radius']=SMALL_CELL_RADIUS
+small=stage_world(root/'assets/levels/virus-player-level.json',out);small['bodies'][0]['radius']=SMALL_CELL_RADIUS
 small_level=out/'small-cell-world.json';write_world(small_level,small)
-cases=[('organelle-growth',binary.parent/'assets/levels/biology-virus.json',regular,GROWTH_CAPTURE_TICKS,1),
-       ('immune-factories',binary.parent/'assets/levels/biology-immune.json',regular,GROWTH_CAPTURE_TICKS,1),
+cases=[('organelle-growth',binary.parent/'assets/levels/virus-player-level.json',regular,GROWTH_CAPTURE_TICKS,1),
+       ('immune-factories',binary.parent/'assets/levels/immune-player-level.json',regular,GROWTH_CAPTURE_TICKS,1),
        ('small-cell-factories',small_level,regular,GROWTH_CAPTURE_TICKS,1),
-       ('fungal-seeking-spores',binary.parent/'assets/levels/biology-fungus.json',regular,SPORE_CAPTURE_TICKS,1),
+       ('fungal-seeking-spores',binary.parent/'assets/levels/fungus-player-level.json',regular,SPORE_CAPTURE_TICKS,1),
        ('immune-breaks-factory-limbs',level,camera,DAMAGE_CAPTURE_TICKS,2)]
 if args.case and 'fungal-blast' in args.case:
-    blast=stage_world(root/'assets/levels/biology-fungus.json',out);blast['rules'].pop('exploration',None)
+    blast=stage_world(root/'assets/levels/fungus-player-level.json',out);blast['rules'].pop('exploration',None)
     body=blast['bodies'][0];point=[c+n*body['radius']*BLAST_POSITION_RADIUS_SCALE for c,n in zip(body['position'],body['site']['normal'])]
     blast['spawns']=[dict(type='fungal_spore',position=point),dict(type='swarm_fighter',position=[point[0]+BLAST_TARGET_OFFSET,point[1],point[2]])]
     blast_level=out/'fungal-blast-world.json';write_world(blast_level,blast)

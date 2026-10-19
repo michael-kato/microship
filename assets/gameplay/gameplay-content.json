@@ -1,0 +1,8 @@
+{
+  "$schema": "../schemas/content.schema.json",
+  "bodies": "cell-types.json",
+  "factions": "factions.json",
+  "groups": "unit-groups.json",
+  "units": "unit-types.json",
+  "buildings": "factory-types.json"
+}

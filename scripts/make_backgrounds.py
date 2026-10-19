@@ -18,7 +18,7 @@ MEMBRANE_IOR = 1.35
 SOURCE_PREVIEW_SPACING = 4
 
 out=Path(sys.argv[sys.argv.index('--')+1]).resolve()
-profile=json.loads((out/'source/background_profiles.json').read_text())
+profile=json.loads((out/'source/background-shape.json').read_text())
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 for scene_index,key in enumerate(('tissue','bloodstream')):
     records=[];triangles=[];parts=[]

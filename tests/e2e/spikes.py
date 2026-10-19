@@ -16,7 +16,7 @@ count=0
 with tempfile.TemporaryDirectory(prefix='nanova-spikes-') as directory:
     out=Path(directory)
     def stage(side):
-        data=established_world(root/'tests/e2e/scenes'/('biology-two-'+side+'.json'),out)
+        data=established_world(root/'tests/e2e/scenes'/(side+'-two-cell-test-level.json'),out)
         # Symmetric projectile fixture for exact arrival, hit-count and recovery checks.
         # Default immune units use the separate digestion scenarios.
         for u in data['content']['units']:

@@ -7,14 +7,14 @@ root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
 from authored_assets import stage_world,write_world
 from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/fog-appearance');p.add_argument('--run',action='store_true');p.add_argument('--timing',action='store_true');p.add_argument('--frames',type=int,choices=[1,2],default=1);a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
-data=stage_world(root/'assets/levels/biology-virus.json',out)
+data=stage_world(root/'assets/levels/virus-player-level.json',out)
 data['spawns']=[dict(type='virus_fighter',position=[-45,0,6.4]),dict(type='immune_fighter',position=[-40,0,6.4])]
 for u in data['content']['units']:
  u['range']=.001
  if u['name']=='virus_fighter':u['speed']=6
  if u['name']=='immune_fighter':u['speed']=.001
 replay=out/'scout.orders';replay.write_text('0 select all\n0 move -45 200 6.4\n')
-config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3
+config=json.loads((root/'assets/rendering/renderer.json').read_text());config['sampling']['samples_per_pixel']=3
 cp=out/'render.json';cp.write_text(json.dumps(config,indent=2))
 narrow=deepcopy(data);narrow['appearance']['fog']['sight_feather']=2
 immediate=deepcopy(data);immediate['appearance']['fog']['memory_half_life_seconds']=0

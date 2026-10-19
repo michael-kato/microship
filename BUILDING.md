@@ -14,10 +14,10 @@ Build assets are copied beside the executable. Keep `build/` ignored. Remove `bu
 Select a level with `--world`:
 
 ```sh
-python3 scripts/proton_run.py build/windows-cross/nanova.exe --world assets/levels/biology-immune.json
+python3 scripts/proton_run.py build/windows-cross/nanova.exe --world assets/levels/immune-player-level.json
 ```
 
-`biology-fungus.json` and `biology-swarm.json` are faction trials. `--world-seed N` fixes the variation seed. `--smoke` loads assets, runs the simulation, builds render input, and shuts down without a GPU. `--state PATH.json` and `--scene-state PATH.json` export diagnostics.
+`fungus-player-level.json` and `swarm-level.json` are faction trials. `--world-seed N` fixes the variation seed. `--smoke` loads assets, runs the simulation, builds render input, and shuts down without a GPU. `--state PATH.json` and `--scene-state PATH.json` export diagnostics.
 
 All checks use the real application. Short GPU checks keep native 1920×1080, at most six film samples, one volume film ray or grid sample, and one backdrop query. Each ordinary process uses at most two frames and two seconds, with five seconds per sequential batch. Longer startup and performance limits are described below. See [PROFILING.md](PROFILING.md) for commands and validation limits.
 
@@ -257,7 +257,7 @@ Run the fixed-quality comparison with a saved executable and its assets:
 python3 tests/e2e/render_perf.py build/windows-cross/nanova.exe --baseline build/render-opt-baseline/nanova.exe --pairs 3 --timing --run
 ```
 
-Fixed-quality comparisons use `biology-quality.json` with six film samples
+Fixed-quality comparisons use `renderer-quality.json` with six film samples
 and eight midpoint steps at native 1080p. `--samples 3` reduces film sampling
 for those comparisons. The game default is described below. Each GPU process uses two frames and at most two seconds;
 the sequential batch has a five-second limit. Omit `--timing` for host
@@ -378,7 +378,7 @@ six-film/eight-step/32-cell setting was 0.860 RGB8 levels. The spatial
 filter reduced measured edge RMS error from 7.068 to 6.078 RGB8 levels
 against that reference (vertical contrast above eight levels, rows 1–849).
 This is one frozen scene, not a general motion-quality result. The former
-settings remain in `assets/rendering/biology-quality.json`.
+settings remain in `assets/rendering/renderer-quality.json`.
 
 The authored four-pixel backdrop blur uses five linear texture fetches
 per axis. The weights combine the original 49 fractional-position reads
@@ -443,7 +443,7 @@ these results do not establish a hard ten-millisecond bound.
 
 ## Default performance preset
 
-`assets/rendering/biology.json` now uses one native film sample, current-frame
+`assets/rendering/renderer.json` now uses one native film sample, current-frame
 directional edge filtering, three Gauss-Legendre volume points, a four-pixel
 volume grid and a 16-cell shadow field. SSS, scattering, cell blur, tilt shift,
 fog, atmosphere and backdrop highlights stay enabled. Static lighting bakes
@@ -452,7 +452,7 @@ keep their dependency checks. There is no temporal reconstruction.
 Use the former six-film/eight-step/32-cell settings with:
 
 ```sh
-python3 scripts/proton_run.py build/windows-cross/nanova.exe --config assets/rendering/biology-quality.json
+python3 scripts/proton_run.py build/windows-cross/nanova.exe --config assets/rendering/renderer-quality.json
 ```
 
 The fast preset trades subpixel coverage and scattering/shadow detail for
@@ -460,7 +460,7 @@ time. Its one ray cannot recover every feature covered by six film rays.
 The edge filter improves the measured silhouette error, but cannot replace
 all multisample detail. Use the quality config for visual comparisons.
 Fixed-quality test and profiling tools select that config explicitly.
-`platform_perf.py --config assets/rendering/biology.json` compares the new
+`platform_perf.py --config assets/rendering/renderer.json` compares the new
 default across platforms.
 
 `render_perf.py --frames 120 --timing --no-capture` uses 20 warm-up frames
@@ -549,3 +549,27 @@ The rendering-key check accepts `--case glow-off` or `glow-restore` for F10.
 The input probe sends Win32 system-key messages and held-key repeats. Use a
 fresh `baseline` folder with `--reference` to check exact restored output
 below the timing panel. A queued-input check does not verify physical input.
+
+
+## Configuration file names
+
+Edit source settings under `assets/`, then build to copy them into the game
+bundle. Restart the application to reload them. Filenames identify their purpose:
+
+| File | Purpose |
+| --- | --- |
+| `startup.json` | Default level, renderer, shader, sound, and menu paths |
+| `renderer.json` | Normal rendering quality, camera, SSS, and bloom |
+| `renderer-quality.json` | Higher-sample rendering preset |
+| `renderer-reference.json` | Reference renderer configuration |
+| `scene-appearance.json` | Lighting, membrane opacity, atmosphere, fog, and self-glow |
+| `gameplay-content.json` | Links cell, faction, unit, and factory definitions |
+| `gameplay-rules.json` | Simulation, exploration, and AI settings |
+| `combat-effects.json` | Projectile, trail, damage, and injury presentation |
+| `sound-playback.json` | Sound files, levels, cooldowns, and playback distance |
+| `sound-synthesis.json` | Procedural sound generation |
+| `start-menu.json` | Faction menu presentation and level paths |
+
+Cell, factory, faction, unit, level, and authoring settings also have explicit
+filenames. Configuration basenames must be unique across the active assets.
+The build removes only the listed obsolete names from its own asset bundle.

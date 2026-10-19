@@ -9,7 +9,7 @@ p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path
 prefix=[str(a.binary.resolve())] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(a.binary.resolve())]
 count=0
 with (contextlib.nullcontext(str(a.output.resolve())) if a.output else tempfile.TemporaryDirectory(prefix='nanova-fog-')) as directory:
- out=Path(directory);out.mkdir(parents=True,exist_ok=True);data=stage_world(root/'assets/levels/biology-virus.json',out)
+ out=Path(directory);out.mkdir(parents=True,exist_ok=True);data=stage_world(root/'assets/levels/virus-player-level.json',out)
  data['spawns']=[dict(type='virus_fighter',position=[-45,0,6.4]),dict(type='immune_fighter',position=[-40,0,6.4])]
  for unit in data['content']['units']:
   unit['range']=.001

@@ -18,7 +18,7 @@ command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'sc
 count=0
 with tempfile.TemporaryDirectory(prefix='nanova-navigation-') as directory:
     out=Path(directory)
-    base=established_world(root/'assets/levels/biology-virus.json',out)
+    base=established_world(root/'assets/levels/virus-player-level.json',out)
     base['rules']['economy']['manufacture_seconds']=1000
     base['rules']['ai']['expansion_delay']=300
     base['rules'].pop('exploration',None)

@@ -1,8 +1,0 @@
-{
-  "$schema": "../schemas/content.schema.json",
-  "bodies": "bodies.json",
-  "factions": "trial-factions.json",
-  "groups": "groups.json",
-  "units": "units.json",
-  "buildings": "buildings.json"
-}

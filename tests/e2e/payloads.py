@@ -13,7 +13,7 @@ command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'sc
 count=0
 with tempfile.TemporaryDirectory(prefix='nanova-payloads-') as directory:
     out=Path(directory)
-    data=branches(producers(established_world(root/'tests/e2e/scenes/biology-two-virus.json',out),collection=.0001),count=1)
+    data=branches(producers(established_world(root/'tests/e2e/scenes/virus-two-cell-test-level.json',out),collection=.0001),count=1)
     for u in data['content']['units']:
         u.update(speed=.01,colonizes=False)
         if u['name']=='virus_bomber':

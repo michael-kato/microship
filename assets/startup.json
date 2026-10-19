@@ -1,8 +1,8 @@
 {
   "$schema": "schemas/startup.schema.json",
-  "world": "levels/biology-virus.json",
-  "render": "rendering/biology.json",
+  "world": "levels/virus-player-level.json",
+  "render": "rendering/renderer.json",
   "shader": "shaders/ray_trace.comp.spv",
-  "audio": "audio/biology.json",
+  "audio": "audio/sound-playback.json",
   "menu": "presentation/start-menu.json"
 }

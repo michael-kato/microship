@@ -12,8 +12,8 @@ root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
 from authored_assets import stage_world,write_world
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--thickness-cache',action='store_true');p.add_argument('--run',action='store_true');p.add_argument('--output',type=Path,default=root/'build/static-lighting-live');a=p.parse_args()
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
-world=stage_world(root/'assets/levels/biology-virus.json',out);wp=out/'world.json';write_world(wp,world)
-cfg=json.loads((root/'assets/rendering/biology-quality.json').read_text());cfg['sampling']['samples_per_pixel']=3
+world=stage_world(root/'assets/levels/virus-player-level.json',out);wp=out/'world.json';write_world(wp,world)
+cfg=json.loads((root/'assets/rendering/renderer-quality.json').read_text());cfg['sampling']['samples_per_pixel']=3
 if a.thickness_cache:cfg['lighting']['organelle_cache']=True
 assert cfg['output']['width']==1920 and cfg['output']['height']==1080
 assert all(cfg['volume'][k]==v for k,v in dict(rays_per_pixel=1,integration_steps=8).items())

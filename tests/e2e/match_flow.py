@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-match-') as directory:
         p=subprocess.run([*invocation,'--smoke','--menu-select','1'],capture_output=True,text=True,timeout=10);count+=1
         assert p.returncode==1 and p.stderr and 'Application lifecycle smoke passed' not in p.stdout
     for side,home in (('virus',0),('immune',1)):
-        data=stage_world(root/'assets/levels'/('biology-'+side+'.json'),out)
+        data=stage_world(root/'assets/levels'/(side+'-player-level.json'),out)
         data['rules']['ai']['expansion_delay']=300;data['rules']['economy']['enemy_attack_seconds']=300
         early,_=run(side+'-early',data,5400,f'0 select all\n0 order {home}\n')
         c=early['colonies'][home]
@@ -64,7 +64,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-match-') as directory:
             if branch['terminal']:assert colony['leaf_births'][k]>0,(side,k,colony['leaf_births'])
         assert full==run(side+'-repeat',fast,1050,f'0 select all\n0 order {home}\n')[0]
     # A paid job must wait when a new child temporarily replaces the only ready tip.
-    waiting=branches(established_world(root/'assets/levels/biology-virus.json',out),count=2,seconds=3)
+    waiting=branches(established_world(root/'assets/levels/virus-player-level.json',out),count=2,seconds=3)
     waiting['rules']['ai']['expansion_delay']=300;waiting['rules']['economy'].update(manufacture_seconds=12,enemy_attack_seconds=300)
     for b in waiting['content']['buildings']:b.update(growth_seconds=2,collection=100)
     for u in waiting['content']['units']:u['cost']=.01
@@ -74,7 +74,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-match-') as directory:
     resumed,_=run('paid-job-resumes',waiting,1140)
     assert resumed['colonies'][0]['leaf_births'][1]>0,'The waiting job did not move and launch from the completed child'
     # Destroy a real enemy factory, then issue orders after the win.
-    won=established_world(root/'assets/levels/biology-virus.json',out)
+    won=established_world(root/'assets/levels/virus-player-level.json',out)
     won['bodies']=won['bodies'][:2];won['rules'].pop('exploration',None)
     for i,body in enumerate(won['bodies']):body['position']=[-8 if i==0 else 8,0,0]
     won['spawns']=[dict(type='virus_bomber',position=[-8,3,6]),dict(type='virus_fighter',position=[-8,2,6]),dict(type='immune_fighter',position=[1000,0,0])]

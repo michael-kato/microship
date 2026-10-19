@@ -1,12 +1,12 @@
 {
   "$schema": "../schemas/world.schema.json",
-  "content": "../gameplay/biology.json",
-  "rules": "../gameplay/rules.json",
-  "appearance": "../presentation/biology.json",
-  "effects": "../presentation/combat.json",
+  "content": "../gameplay/gameplay-content.json",
+  "rules": "../gameplay/gameplay-rules.json",
+  "appearance": "../presentation/scene-appearance.json",
+  "effects": "../presentation/combat-effects.json",
   "match": {
-    "player": "virus",
-    "opponent": "immune",
+    "player": "immune",
+    "opponent": "virus",
     "starts": [
       {
         "faction": "virus",
@@ -258,30 +258,6 @@
       ]
     },
     {
-      "type": "virus_fighter",
-      "position": [
-        -52.85,
-        -1.7,
-        6.4
-      ]
-    },
-    {
-      "type": "virus_fighter",
-      "position": [
-        -52.0,
-        -1.7,
-        6.4
-      ]
-    },
-    {
-      "type": "virus_fighter",
-      "position": [
-        -51.15,
-        -1.7,
-        6.4
-      ]
-    },
-    {
       "type": "immune_fighter",
       "position": [
         47.15,
@@ -302,6 +278,30 @@
       "position": [
         48.85,
         15.6,
+        6.4
+      ]
+    },
+    {
+      "type": "immune_fighter",
+      "position": [
+        47.15,
+        16.3,
+        6.4
+      ]
+    },
+    {
+      "type": "immune_fighter",
+      "position": [
+        48.0,
+        16.3,
+        6.4
+      ]
+    },
+    {
+      "type": "immune_fighter",
+      "position": [
+        48.85,
+        16.3,
         6.4
       ]
     }

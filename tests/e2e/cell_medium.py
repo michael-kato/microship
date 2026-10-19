@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-medium-') as directory:
         if expected:
             assert p.stderr and not state.exists();return None,None
         return json.loads(state.read_text()),json.loads(scene.read_text())
-    data=stage_world(root/'assets/levels/biology-virus.json',out)
+    data=stage_world(root/'assets/levels/virus-player-level.json',out)
     initial,scene=run('neutral',data)
     models={b['name']:b for b in data['content']['bodies']}
     for body,mesh in zip(data['bodies'],scene['meshes']):
@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-medium-') as directory:
     assert baseline==reference,'Membrane and medium presentation changed game state'
     for a,b in zip(view['meshes'],clear['meshes']):assert a==b,'Presentation settings changed geometry'
     assert clear['wall_blur_radius']==0 and clear['membrane_fade']==[0,0] and all(v==[0,0,0] for v in clear['medium_blur'])
-    settings=json.loads((root/'assets/rendering/biology.json').read_text())
+    settings=json.loads((root/'assets/rendering/renderer.json').read_text())
     for n in (0,8,64):
         config=deepcopy(settings);config['lighting']['shadow_grid_resolution']=n
         s,_=run('grid-'+str(n),data,4800,orders,config)

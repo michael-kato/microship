@@ -18,7 +18,7 @@ args=parser.parse_args();out=args.output.resolve();out.mkdir(parents=True,exist_
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 cases=[]
 for name,side,ticks,frames in [('virus-partial','virus',4800,1),('virus-wall','virus',12000,1),('fungal-wall','fungus',12000,1),('live-wall-refit','virus',4800,2)]:
-    data=stage_world(root/'assets/levels'/('biology-'+side+'.json'),out)
+    data=stage_world(root/'assets/levels'/(side+'-player-level.json'),out)
     world=out/(name+'-world.json');write_world(world,data)
     home=next(v['cell'] for v in data['match']['starts'] if v['faction']==data['match']['player'])
     orders=out/(name+'.orders');orders.write_text('' if side=='fungus' else f'0 select all\n0 order {home}\n600 ratio 65\n')

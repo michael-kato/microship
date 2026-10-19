@@ -15,7 +15,7 @@ from authored_assets import stage_world,write_world
 from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/subsurface-review');p.add_argument('--run',action='store_true')
 a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
-data=stage_world(root/'assets/levels/biology-virus.json',out)
+data=stage_world(root/'assets/levels/virus-player-level.json',out)
 for field in ('rules','effects'):data.pop(field,None)
 data['match']={'player':'virus','opponent':'immune'};data['bodies']=[]
 data['spawns']=[dict(type='virus_fighter',position=[0,0,0])]
@@ -24,7 +24,7 @@ data['appearance']={'ambient':[0,0,0],'gradient':{'top':[0,0,0],'bottom':[0,0,0]
     'fill':dict(direction=[0,1,0],color=[1,1,1],irradiance=0),
     'rim':dict(direction=[0,0,-1],color=[1,1,1],irradiance=6)}}
 unit=data['content']['units'][0];unit.update(model=Path(os.path.relpath(root/'assets/models/virus_leaf.fmesh',out)).as_posix(),scale=2,yaw_degrees=0)
-config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3
+config=json.loads((root/'assets/rendering/renderer.json').read_text());config['sampling']['samples_per_pixel']=3
 config['camera'].update(position=[0,0,8],target=[0,0,0]);config.pop('tilt_shift',None)
 # A non-scattering blocker must still block the light-entry side of the thin leaf.
 blocker=bytearray((root/'assets/models/virus_virion.fmesh').read_bytes());n=struct.unpack_from('<I',blocker,8)[0]

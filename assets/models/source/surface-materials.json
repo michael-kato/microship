@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/biology-materials.schema.json",
+  "$schema": "../../schemas/surface-materials.schema.json",
   "surfaces": {
     "membrane": {
       "roughness_min": 0.24,

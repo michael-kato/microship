@@ -4,7 +4,7 @@ from copy import deepcopy
 import json,math,re,subprocess,sys,tempfile
 from pathlib import Path
 root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve();prefix=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
-settings=json.loads((root/'assets/rendering/biology.json').read_text());count=0
+settings=json.loads((root/'assets/rendering/renderer.json').read_text());count=0
 with tempfile.TemporaryDirectory(prefix='nanova-keyboard-') as folder:
  out=Path(folder)
  def run(name,pan=None,config=settings,expected=0,extra=()):

@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
         assert p.returncode==expected,(name,p.stdout,p.stderr)
         return (json.loads(state.read_text()),json.loads(scene.read_text())) if expected==0 else (None,None)
     for side,home,faction in [('virus',0,1),('immune',1,2),('fungus',0,3)]:
-        data=stage_world(root/'assets/levels'/('biology-'+side+'.json'),out)
+        data=stage_world(root/'assets/levels'/(side+'-player-level.json'),out)
         for building in data['content']['buildings']:building.update(establishment_seconds=4,growth_seconds=.1)
         for profile in data['content']['factions']:
             if 'cell_appearance' in profile:profile['cell_appearance'].update(seconds=12,morph_seconds=12)

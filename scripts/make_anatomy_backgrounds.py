@@ -9,7 +9,7 @@ import sys
 from mathutils import Vector
 
 out=Path(sys.argv[sys.argv.index('--')+1]).resolve()
-p=json.loads((out/'source/anatomy_backgrounds.json').read_text())
+p=json.loads((out/'source/anatomy-background.json').read_text())
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 parts=[]
 

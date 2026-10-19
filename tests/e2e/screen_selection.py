@@ -8,11 +8,11 @@ root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
 with tempfile.TemporaryDirectory(prefix='nanova-screen-selection-') as folder:
- out=Path(folder);base=established_world(root/'tests/e2e/scenes/biology-two-virus.json',out)
+ out=Path(folder);base=established_world(root/'tests/e2e/scenes/virus-two-cell-test-level.json',out)
  # Include each screen edge, the bottom HUD, the rear half-space, and enemies.
  positions=[(0,0,0),(3,0,0),(-40,0,0),(40,0,0),(0,30,0),(0,-30,0),(0,-6,0),(0,0,30)]
  base['spawns']=[dict(type=side+'_'+role,position=p) for side in ('virus','immune') for role in ('fighter','bomber') for p in positions]
- config=json.loads((root/'assets/rendering/biology.json').read_text());config['camera']['position']=[0,0,20]
+ config=json.loads((root/'assets/rendering/renderer.json').read_text());config['camera']['position']=[0,0,20]
  def run(name,world,settings,extra=()):
   global count
   wp=out/(name+'-world.json');write_world(wp,world);cp=out/(name+'-render.json');cp.write_text(json.dumps(settings))

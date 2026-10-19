@@ -14,8 +14,8 @@ from authored_assets import stage_world,write_world
 from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/background-review');p.add_argument('--run',action='store_true');p.add_argument('--variants',default='flesh,bone,red_organs,blue_organs');p.add_argument('--view',choices=['wide','home','isolated','overview'],default='wide');p.add_argument('--timing',action='store_true');p.add_argument('--frames',type=int,choices=[1,2],default=1)
 a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
-base=stage_world(root/'assets/levels/biology-virus.json',out);base['appearance']['backdrop'].pop('variants')
-config=json.loads((root/'assets/rendering/biology.json').read_text());config['sampling']['samples_per_pixel']=3
+base=stage_world(root/'assets/levels/virus-player-level.json',out);base['appearance']['backdrop'].pop('variants')
+config=json.loads((root/'assets/rendering/renderer.json').read_text());config['sampling']['samples_per_pixel']=3
 if a.view=='wide':config['camera'].update(position=[0,24,95],target=[0,0,0])
 if a.view in ('isolated','overview'):
     base.pop('rules',None);base.pop('effects',None);base['match']={'player':'virus','opponent':'immune'};base['bodies']=[];base['spawns']=[dict(type='virus_fighter',position=[500,0,0])]
@@ -34,7 +34,7 @@ for name in a.variants.split(','):
     if name=='shadow':
         assert a.view=='isolated'
         # A real cell between the studio key and the folded bed must not cast onto it.
-        world['bodies']=[deepcopy(base_body) for base_body in stage_world(root/'assets/levels/biology-virus.json',out)['bodies'][:1]]
+        world['bodies']=[deepcopy(base_body) for base_body in stage_world(root/'assets/levels/virus-player-level.json',out)['bodies'][:1]]
         world['bodies'][0].update(position=[-24,30,-8],radius=15,owner='neutral');world['appearance'].pop('thin_surface',None)
     if name=='behind_medium':
         assert a.view=='isolated'

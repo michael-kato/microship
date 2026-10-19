@@ -116,6 +116,36 @@ foreach(legacy_asset IN ITEMS startup.game gameplay/biology.content
     gameplay/trial-units.json gameplay/trial-buildings.json)
     file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/assets/${legacy_asset}")
 endforeach()
+# Remove old configuration names from an existing active build bundle.
+foreach(old_settings IN ITEMS
+    audio/biology.json
+    audio/synthesis.json
+    gameplay/biology.json
+    gameplay/bodies.json
+    gameplay/buildings.json
+    gameplay/groups.json
+    gameplay/rules.json
+    gameplay/units.json
+    gameplay/faction-trials.json
+    presentation/biology.json
+    presentation/combat.json
+    rendering/biology.json
+    rendering/biology-quality.json
+    rendering/reference.json
+    models/source/biology_materials.json
+    models/source/biology_profiles.json
+    models/source/background_profiles.json
+    models/source/anatomy_backgrounds.json
+    models/source/colony_forms.json
+    schemas/biology-materials.schema.json
+    levels/biology-virus.json
+    levels/biology-immune.json
+    levels/biology-fungus.json
+    levels/biology-swarm.json
+    levels/biology-immune-trial.json
+)
+    file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/assets/${old_settings}")
+endforeach()
 file(GLOB_RECURSE authored_files CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/assets"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/*.json" "${CMAKE_CURRENT_SOURCE_DIR}/assets/*.wav")
 list(FILTER authored_files EXCLUDE REGEX "^models/source/")
