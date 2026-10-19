@@ -689,6 +689,11 @@ membrane settings were preserved and used for both sides of each comparison.
 
 ## Frame pipeline and GPU memory
 
+Across the October 19 changes, median frame cadence at the grown close view
+fell from 9.21 to 7.02 ms and at the wide view from 6.00 to 3.02 ms (tick
+600; 120-frame windows, live simulation), including the cost of exact
+receiver shadows and baked ambient visibility. See PROFILING.md for the table.
+
 Vertices, triangles and BLAS indices live in device-local memory. Startup
 uploads them once through a staging buffer and builds every BLAS in one
 submission; static meshes share temporary scratch. Deformable walls copy
@@ -831,3 +836,11 @@ results never see the blend. Motion therefore advances on every frame, at
 up to one tick (16.7 ms) of display delay. This is current simulation state,
 not image history. Bounded `--frames`, headless and capture runs draw the
 exact current tick, so diagnostics and references are unchanged.
+
+## Trials not kept
+
+Reusing per-segment medium intervals in volume quadrature gave no gain at
+default settings and slowed the fused quality path's surface stage from 8.90
+to 10.65 ms. Replacing duplicate rounded taps in the cell-blur and tilt-shift
+filters with whole-pixel taps slowed the cell blur from 0.261 to 0.312 ms;
+the repeated taps were cache hits. Both were reverted.
