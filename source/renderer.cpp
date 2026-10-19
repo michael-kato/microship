@@ -1861,9 +1861,10 @@ static void copy_output(RendererState* state, uint32_t image_index, const char* 
     if (state->headless)
         return;
     VkImage destination = state->swap_images[image_index];
+    // The acquire semaphore waits at TRANSFER; the transition must chain to that wait.
     image_barrier(state->command, destination, VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT,
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     VkImageBlit blit = {};
     blit.srcSubresource.aspectMask = blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     blit.srcSubresource.layerCount = blit.dstSubresource.layerCount = 1;
