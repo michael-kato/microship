@@ -76,6 +76,8 @@ const uint ENERGY_TABLE_LAST_CELL = 30u;
 const uint ENERGY_TABLE_ROW_STRIDE = 32u;
 const uint ENERGY_TABLE_DIAGONAL_OFFSET = 33u;
 const float DIFFUSE_ROUGHNESS_THRESHOLD = 0.999;
+const float SPECULAR_FADE_ROUGHNESS = 0.95;
+const float SPECULAR_FADE_IOR = 1.05;
 const float MIN_GGX_ALPHA = 0.002;
 const uint CONDUCTOR_MATERIAL = 2u;
 const float MIN_MEMBRANE_DIRECTION_COSINE = .2;
@@ -369,6 +371,14 @@ vec3 single_scattering(vec3 origin,vec3 direction,float distance,float sharp_lim
     return radiance;
 }
 
+// Authored roughness >= 0.999 or IOR <= 1 means a purely diffuse dielectric.
+// Specular presence fades smoothly toward those limits instead of switching,
+// so interpolated vertex materials do not draw a seam.
+float specular_presence(float roughness, float ior)
+{
+    return (1.0-smoothstep(SPECULAR_FADE_ROUGHNESS,DIFFUSE_ROUGHNESS_THRESHOLD,roughness))*smoothstep(1.0,SPECULAR_FADE_IOR,ior);
+}
+
 float fresnel(float cosine, float ior)
 {
     float f0 = (ior - 1.0) / (ior + 1.0);
@@ -414,7 +424,8 @@ vec3 evaluate_bsdf(vec3 normal, vec3 outgoing, vec3 incoming, vec3 albedo,
     interface_fresnel=0.0;
     float ni = max(0.0, dot(normal, incoming)), no = max(0.0, dot(normal, outgoing));
     if (ni <= 0.0 || no <= 0.0) return vec3(0.0);
-    if (!metal && (roughness >= DIFFUSE_ROUGHNESS_THRESHOLD || ior <= 1.0)) return diffuse_weight*albedo / PI;
+    float presence = metal ? 1.0 : specular_presence(roughness, ior);
+    if (presence <= 0.0) return diffuse_weight*albedo / PI;
     vec3 half_vector = normalize(incoming + outgoing);
     float nh = max(0.0, dot(normal, half_vector)), oh = max(MIN_SHADING_DENOMINATOR, dot(outgoing, half_vector));
     float alpha = max(MIN_GGX_ALPHA, roughness*roughness);
@@ -434,7 +445,7 @@ vec3 evaluate_bsdf(vec3 normal, vec3 outgoing, vec3 incoming, vec3 albedo,
         }
         return gain*f*distribution*ggx_mask(ni,alpha)*ggx_mask(no,alpha)/(4.0*ni*no);
     }
-    float f = fresnel(oh, ior);interface_fresnel=f;
+    float f = fresnel(oh, ior)*presence;interface_fresnel=f;
     float specular = f * distribution * ggx_mask(ni, alpha) * ggx_mask(no, alpha) / (4.0*ni*no);
     return diffuse_weight*albedo * ((1.0-f) / PI) + vec3(specular);
 }
@@ -724,7 +735,7 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
             {
                 vec3 half_vector=direction+outgoing;
                 float half_cosine=dot(outgoing,half_vector)*inversesqrt(max(MIN_SHADING_DENOMINATOR,dot(half_vector,half_vector)));
-                interface_fresnel=fresnel(clamp(half_cosine,0.0,1.0),s.ior);
+                interface_fresnel=fresnel(clamp(half_cosine,0.0,1.0),s.ior)*specular_presence(s.roughness,s.ior);
             }
             // Keep the interface response continuous across the light horizon.
             sss=s.color*((1.0-interface_fresnel)*scatter*(1.0-render.subsurface.z)*diffuse/PI);
@@ -811,8 +822,9 @@ vec3 evaluate_subsurface(Surface s,vec3 outgoing)
         if (!cached && !subsurface_exit(s,direction,8.0*radius,entry,thickness)) return vec3(0);
     }
     vec3 attenuation=exp(-thickness/max(s.subsurface.rgb,vec3(MIN_SHADING_DENOMINATOR)));
-    float exit_transmission=1.0-fresnel(max(0.0,dot(s.normal,outgoing)),s.ior);
-    float entry_transmission=1.0-fresnel(cosine,s.ior);
+    float presence=specular_presence(s.roughness,s.ior);
+    float exit_transmission=1.0-fresnel(max(0.0,dot(s.normal,outgoing)),s.ior)*presence;
+    float entry_transmission=1.0-fresnel(cosine,s.ior)*presence;
     float clear_budget=s.translucent ? 1.0-membrane_transmission(max(0.0,dot(s.normal,outgoing))) : 1.0;
     vec3 light=s.color*attenuation*(scatter*render.subsurface.z*clear_budget*entry_transmission*exit_transmission*cosine/PI)*render.studio_color[selected].rgb;
     // Query from the light-entry side. Other objects must still cast shadows.
@@ -837,7 +849,8 @@ vec3 ambient_surface(Surface s,vec3 outgoing)
     // Pre-integrated GGX albedo instead of a mirror Fresnel term, so rough surfaces
     // do not gain a bright grazing rim. Conductors keep their multiple-scattering gain.
     float f0=(s.ior-1.0)/(s.ior+1.0);f0*=f0;
-    vec3 f=directional_albedo(s.metal ? s.color : vec3(f0),cosine,s.roughness);
+    vec3 f=s.metal ? directional_albedo(s.color,cosine,s.roughness)
+        : directional_albedo(vec3(f0),cosine,s.roughness)*specular_presence(s.roughness,s.ior);
     if (s.metal && render.quality.z!=0u)
     { float energy=directional_energy(cosine,s.roughness);f*=vec3(1.0)+s.color*((1.0-energy)/energy); }
     vec3 result=s.metal ? f*reflected : (vec3(1)-f)*s.color*diffuse+f*reflected;

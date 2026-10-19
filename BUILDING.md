@@ -782,3 +782,9 @@ falls to zero at `cos = -wrap`. Surface reflection still requires the
 geometric front face. The previous solid form added a constant
 `wrap / (1 + 2 wrap)` floor that switched off per triangle at the geometric
 terminator, which drew faceted bands on organelles.
+
+Roughness at or above 0.999, or IOR at or below 1, still authors a purely
+diffuse dielectric, but specular reflection and the interface Fresnel split
+now fade out over roughness 0.95–0.999 and IOR 1.05–1.0 instead of switching
+off, so vertex materials interpolated across those limits shade without a
+seam. No current material is inside either band.
