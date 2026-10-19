@@ -693,6 +693,16 @@ once at startup and refit it every frame, so its tree kept the startup
 layout while units spread out. At tick 4,800 the acceleration stage fell
 from 0.29 to 0.25 ms; total GPU time changed by about 0.04 ms.
 
+Each BLAS has two geometries: opaque triangles (geometry 0, `OPAQUE`) and
+thin membranes (geometry 1, `NO_DUPLICATE_ANY_HIT`). The triangle buffer
+orders each mesh the same way, and instance custom indices name meshes; a
+small `mesh_ranges` table maps geometry and primitive back to a triangle.
+Shadow rays use `TerminateOnFirstHit`: traversal commits opaque blockers in
+hardware and stops, and only membranes reach the shader to multiply their
+transmission, each exactly once. Stationary and moving blockers carry
+instance mask bits 2 and 8, so the static and dynamic light bakes select
+them during traversal instead of rejecting candidates in the shader.
+
 Two frames are in flight. Each slot owns its command buffer, fence, acquire
 semaphore, timestamp queries, descriptor sets and every buffer the CPU
 writes per frame (uniform, TLAS instances, media, lighting instances and

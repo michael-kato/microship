@@ -40,7 +40,7 @@ static const double BACKDROP_TIME_WRAP_SECONDS = 10000.0;
 static const int GPU_DEBUG_PIXEL_BYTES = 96;
 static const int COMPANION_SHADER_PATH_CAPACITY = 1024;
 static const double NANOSECONDS_PER_MILLISECOND = 1000000.0;
-static const int RENDER_STORAGE_BUFFER_BINDINGS = 15;
+static const int RENDER_STORAGE_BUFFER_BINDINGS = 16;
 static const int RENDER_DESCRIPTOR_SET_COUNT = 3;
 static const int RENDER_STORAGE_IMAGE_BINDINGS = 3;
 static const int RENDER_SAMPLER_BINDINGS = 4;
@@ -50,6 +50,7 @@ static const int POOL_SAMPLER_DESCRIPTORS = RENDER_DESCRIPTOR_SET_COUNT*RENDER_S
 static const int DESCRIPTOR_POOL_TYPE_COUNT = 5;
 static const int BACKDROP_PUSH_BYTES = 16;
 static const int GPU_TRIANGLE_BYTES = 16;
+static const uint32_t THIN_MEMBRANE_TRIANGLE = 3; // GpuTriangle material tag.
 static const int HUD_MAX_LINE_CHARACTERS = HUD_LINE_CAPACITY-1;
 static const unsigned int STATS_TEXT_WIDTH_UNSIGNED = STATS_TEXT_WIDTH;
 static const unsigned int STATS_TEXT_HEIGHT_UNSIGNED = STATS_TEXT_HEIGHT;
@@ -139,6 +140,7 @@ struct MeshAllocation
     VkAccelerationStructureKHR acceleration;
     VkDeviceAddress address;
     MeshRange range;
+    uint32_t opaque_count; // Opaque triangles first, then thin membranes.
 };
 
 enum { FRAMES_IN_FLIGHT=2 };
@@ -193,8 +195,9 @@ struct RendererState
     VkCommandBuffer command;
     VkQueryPool queries;
     GpuBuffer vertices;
-    GpuBuffer triangles;
+    GpuBuffer triangles; // Each mesh orders its opaque triangles before its membranes.
     GpuBuffer indices;
+    GpuBuffer mesh_ranges; // Per mesh: first triangle, opaque count.
     std::vector<VkDeviceSize> vertex_upload_offsets;
     GpuBuffer tlas_buffer;
     GpuBuffer tlas_scratch;
@@ -891,33 +894,42 @@ static void scene_instances(RendererState* state,const RenderScene* scene)
         const RenderInstance* source=&scene->instances[i];if (!source->mask) continue;
         uint32_t j=active++;VkAccelerationStructureInstanceKHR* out=&state->instance_data[j];
         memcpy(out->transform.matrix,source->transform,sizeof(source->transform));
-        out->mask=source->mask;
+        bool stationary=source->static_lighting && (source->mask&SURFACE_RAY_MASK);
+        out->mask=source->mask | (source->mask&SURFACE_RAY_MASK ? (stationary ? STATIC_BLOCKER_RAY_MASK : DYNAMIC_BLOCKER_RAY_MASK) : 0u);
         out->flags=VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
         const MeshAllocation* mesh=&state->meshes[source->mesh];
-        out->instanceCustomIndex=mesh->range.first;out->accelerationStructureReference=mesh->address;
+        out->instanceCustomIndex=source->mesh;out->accelerationStructureReference=mesh->address;
         memcpy(&state->style_data[j*INSTANCE_STYLE_FLOATS],source->style,INSTANCE_STYLE_FLOATS*sizeof(float));
         LightingInstance& light=state->lighting_input[j];
         memcpy(light.transform,source->transform,sizeof(light.transform));
         light.first=mesh->range.first;light.count=mesh->range.count;light.cache_first=state->slot_cache_first[i];
-        light.active=source->static_lighting && (source->mask&1u) ? 1u : 0u;
+        light.active=stationary ? 1u : 0u;
     }
     state->active_count=active;
 }
 
-static VkAccelerationStructureGeometryKHR triangle_geometry(RendererState* state,uint32_t vertex_count,uint32_t first)
+// Geometry 0 is opaque and committed by traversal. Geometry 1 holds thin
+// membranes, which shadow rays inspect once each to multiply transmission.
+static void mesh_geometries(RendererState* state,uint32_t vertex_count,const MeshAllocation& mesh,
+    VkAccelerationStructureGeometryKHR* geometries,VkAccelerationStructureBuildRangeInfoKHR* ranges)
 {
-    VkAccelerationStructureGeometryKHR mesh = {};
-    mesh.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-    mesh.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-    mesh.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
-    mesh.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-    mesh.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-    mesh.geometry.triangles.vertexData.deviceAddress = state->vertices.address;
-    mesh.geometry.triangles.vertexStride = sizeof(GpuVertex);
-    mesh.geometry.triangles.maxVertex = vertex_count - 1;
-    mesh.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
-    mesh.geometry.triangles.indexData.deviceAddress = state->indices.address+(VkDeviceSize)first*3*sizeof(uint32_t);
-    return mesh;
+    uint32_t first[2]={mesh.range.first,mesh.range.first+mesh.opaque_count};
+    uint32_t counts[2]={mesh.opaque_count,mesh.range.count-mesh.opaque_count};
+    for (uint32_t g=0;g<2;++g)
+    {
+        VkAccelerationStructureGeometryKHR& geometry=geometries[g];geometry=VkAccelerationStructureGeometryKHR();
+        geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+        geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+        geometry.flags = g==MEMBRANE_GEOMETRY ? VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR : VK_GEOMETRY_OPAQUE_BIT_KHR;
+        geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+        geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+        geometry.geometry.triangles.vertexData.deviceAddress = state->vertices.address;
+        geometry.geometry.triangles.vertexStride = sizeof(GpuVertex);
+        geometry.geometry.triangles.maxVertex = vertex_count - 1;
+        geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
+        geometry.geometry.triangles.indexData.deviceAddress = state->indices.address+(VkDeviceSize)first[g]*3*sizeof(uint32_t);
+        ranges[g]=VkAccelerationStructureBuildRangeInfoKHR();ranges[g].primitiveCount=counts[g];
+    }
 }
 
 // Device-local geometry is uploaded once through staging. All BLAS builds share
@@ -927,43 +939,58 @@ static bool upload_geometry(RendererState* state,const Geometry& geometry)
     VkBufferUsageFlags input = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
         | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     VkDeviceSize vertex_bytes=geometry.vertices.size()*sizeof(GpuVertex),triangle_bytes=geometry.triangles.size()*sizeof(GpuTriangle);
-    VkDeviceSize index_bytes=geometry.triangles.size()*3*sizeof(uint32_t);
+    VkDeviceSize index_bytes=geometry.triangles.size()*3*sizeof(uint32_t),range_bytes=(VkDeviceSize)state->mesh_count*2*sizeof(uint32_t);
     GpuBuffer staging={},scratch={};
+    // Stable partition inside each mesh: opaque triangles, then thin membranes.
+    std::vector<GpuTriangle> ordered(geometry.triangles);
+    for (uint32_t i=0;i<state->mesh_count;++i)
+    {
+        const MeshRange& range=geometry.meshes[i];uint32_t next=range.first;
+        for (uint32_t pass=0;pass<2;++pass)
+            for (uint32_t t=range.first;t<range.first+range.count;++t)
+                if ((geometry.triangles[t].index[3]==THIN_MEMBRANE_TRIANGLE)==(pass==1)) ordered[next++]=geometry.triangles[t];
+        uint32_t membranes=0;
+        for (uint32_t t=range.first;t<range.first+range.count;++t) membranes+=geometry.triangles[t].index[3]==THIN_MEMBRANE_TRIANGLE;
+        state->meshes[i].opaque_count=range.count-membranes;
+    }
     if (!create_buffer(state, &state->vertices, vertex_bytes, input | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
         || !create_buffer(state, &state->triangles, triangle_bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
         || !create_buffer(state, &state->indices, index_bytes, input, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
-        || !create_buffer(state, &staging, vertex_bytes+triangle_bytes+index_bytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        || !create_buffer(state, &state->mesh_ranges, range_bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+        || !create_buffer(state, &staging, vertex_bytes+triangle_bytes+index_bytes+range_bytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
     { destroy_buffer(state,&staging);return false; }
     char* bytes=(char*)staging.mapped;
     memcpy(bytes, geometry.vertices.data(), vertex_bytes);
-    memcpy(bytes+vertex_bytes, geometry.triangles.data(), triangle_bytes);
+    memcpy(bytes+vertex_bytes, ordered.data(), triangle_bytes);
     uint32_t* indices = (uint32_t*)(bytes+vertex_bytes+triangle_bytes);
     for (uint32_t i = 0; i < state->triangle_count; ++i)
         for (uint32_t j = 0; j < 3; ++j)
-            indices[i*3+j] = geometry.triangles[i].index[j];
+            indices[i*3+j] = ordered[i].index[j];
+    uint32_t* mesh_ranges=indices+3*state->triangle_count;
+    for (uint32_t i=0;i<state->mesh_count;++i) { mesh_ranges[2*i]=geometry.meshes[i].first;mesh_ranges[2*i+1]=state->meshes[i].opaque_count; }
     VkDeviceSize deformable_bytes=0;
     std::vector<VkAccelerationStructureBuildGeometryInfoKHR> builds(state->mesh_count);
-    std::vector<VkAccelerationStructureGeometryKHR> meshes(state->mesh_count);
-    std::vector<VkAccelerationStructureBuildRangeInfoKHR> ranges(state->mesh_count);
+    std::vector<VkAccelerationStructureGeometryKHR> meshes(2*state->mesh_count);
+    std::vector<VkAccelerationStructureBuildRangeInfoKHR> ranges(2*state->mesh_count);
     std::vector<const VkAccelerationStructureBuildRangeInfoKHR*> range_pointers(state->mesh_count);
     std::vector<VkDeviceSize> scratch_offsets(state->mesh_count);
     VkDeviceSize scratch_bytes=0;
     for (uint32_t i=0;i<state->mesh_count;++i)
     {
         MeshAllocation* allocation=&state->meshes[i];allocation->range=geometry.meshes[i];
+        mesh_geometries(state,(uint32_t)geometry.vertices.size(),*allocation,&meshes[2*i],&ranges[2*i]);
         state->vertex_upload_offsets[i]=deformable_bytes;
         if (allocation->range.deformable) deformable_bytes+=(VkDeviceSize)allocation->range.vertex_count*sizeof(GpuVertex);
-        meshes[i]=triangle_geometry(state,(uint32_t)geometry.vertices.size(),allocation->range.first);
         VkAccelerationStructureBuildGeometryInfoKHR& build=builds[i];build=VkAccelerationStructureBuildGeometryInfoKHR();
         build.sType=VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
         build.type=VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
         build.flags=VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR
             | (allocation->range.deformable ? VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR : 0);
-        build.mode=VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;build.geometryCount=1;build.pGeometries=&meshes[i];
+        build.mode=VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;build.geometryCount=2;build.pGeometries=&meshes[2*i];
         VkAccelerationStructureBuildSizesInfoKHR sizes={};sizes.sType=VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
-        uint32_t count=allocation->range.count;
-        state->get_as_sizes(state->device,VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,&build,&count,&sizes);
+        uint32_t counts[2]={ranges[2*i].primitiveCount,ranges[2*i+1].primitiveCount};
+        state->get_as_sizes(state->device,VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,&build,counts,&sizes);
         if (!create_buffer(state,&allocation->storage,sizes.accelerationStructureSize,
             VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
         { destroy_buffer(state,&staging);return false; }
@@ -980,7 +1007,7 @@ static bool upload_geometry(RendererState* state,const Geometry& geometry)
             scratch_offsets[i]=UINT64_MAX;
         }
         else { scratch_offsets[i]=scratch_bytes;scratch_bytes+=sizes.buildScratchSize+state->scratch_alignment; }
-        ranges[i]=VkAccelerationStructureBuildRangeInfoKHR();ranges[i].primitiveCount=count;range_pointers[i]=&ranges[i];
+        range_pointers[i]=&ranges[2*i];
     }
     if (!create_buffer(state,&scratch,std::max<VkDeviceSize>(scratch_bytes,4),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
         )
@@ -995,10 +1022,12 @@ static bool upload_geometry(RendererState* state,const Geometry& geometry)
     bool success=begin_commands(state);
     if (success)
     {
-        VkBufferCopy copies[3]={{0,0,vertex_bytes},{vertex_bytes,0,triangle_bytes},{vertex_bytes+triangle_bytes,0,index_bytes}};
+        VkBufferCopy copies[4]={{0,0,vertex_bytes},{vertex_bytes,0,triangle_bytes},{vertex_bytes+triangle_bytes,0,index_bytes},
+            {vertex_bytes+triangle_bytes+index_bytes,0,range_bytes}};
         state->copy_buffer(state->command,staging.handle,state->vertices.handle,1,&copies[0]);
         state->copy_buffer(state->command,staging.handle,state->triangles.handle,1,&copies[1]);
         state->copy_buffer(state->command,staging.handle,state->indices.handle,1,&copies[2]);
+        state->copy_buffer(state->command,staging.handle,state->mesh_ranges.handle,1,&copies[3]);
         VkMemoryBarrier uploaded={};uploaded.sType=VK_STRUCTURE_TYPE_MEMORY_BARRIER;
         uploaded.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;uploaded.dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
         vkCmdPipelineBarrier(state->command,VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -1480,7 +1509,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
     if (state->properties.limits.maxPerStageDescriptorStorageBuffers < RENDER_STORAGE_BUFFER_BINDINGS ||
         state->properties.limits.maxDescriptorSetStorageBuffers < RENDER_STORAGE_BUFFER_BINDINGS)
     {
-        fprintf(stderr,"Renderer requires fifteen compute storage-buffer descriptors.\n");
+        fprintf(stderr,"Renderer requires sixteen compute storage-buffer descriptors.\n");
         return false;
     }
     VkDescriptorSetLayoutBinding bindings[RENDER_DESCRIPTOR_COUNT] = {};
@@ -1493,7 +1522,8 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
     for (uint32_t i = 0; i < RENDER_DESCRIPTOR_COUNT; ++i)
     {
         bindings[i].binding = i;
@@ -1589,6 +1619,8 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
         writes[RENDER_BINDING_OPTICAL_DEPTH].pImageInfo=&optical;
         VkDescriptorImageInfo lighting={state->backdrop_sampler,state->lighting_view,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
         writes[RENDER_BINDING_LIGHTING_TEXTURE].pImageInfo=&lighting;
+        VkDescriptorBufferInfo range_buffer={state->mesh_ranges.handle,0,state->mesh_ranges.size};
+        writes[RENDER_BINDING_MESH_RANGES].pBufferInfo=&range_buffer;
         vkUpdateDescriptorSets(state->device, RENDER_DESCRIPTOR_COUNT, writes, 0, 0);
         for (uint32_t i=0;i<RENDER_DESCRIPTOR_COUNT;++i) writes[i].dstSet=frame.effect_descriptors;
         vkUpdateDescriptorSets(state->device,RENDER_DESCRIPTOR_COUNT,writes,0,0);
@@ -2201,15 +2233,15 @@ static bool update_meshes(RendererState* state,const Geometry& scene,bool log)
     {
         MeshAllocation& mesh=state->meshes[i];const MeshRange& source=scene.meshes[i];
         if (source.revision==mesh.range.revision) continue;
-        VkAccelerationStructureGeometryKHR geometry=triangle_geometry(state,(uint32_t)scene.vertices.size(),source.first);
+        VkAccelerationStructureGeometryKHR geometries[2];VkAccelerationStructureBuildRangeInfoKHR ranges[2];
+        mesh_geometries(state,(uint32_t)scene.vertices.size(),mesh,geometries,ranges);
         VkAccelerationStructureBuildGeometryInfoKHR build={};build.sType=VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
         build.type=VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
         build.flags=VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
         build.mode=VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;build.srcAccelerationStructure=build.dstAccelerationStructure=mesh.acceleration;
-        build.geometryCount=1;build.pGeometries=&geometry;
+        build.geometryCount=2;build.pGeometries=geometries;
         build.scratchData.deviceAddress=aligned_scratch(state,mesh.scratch.address);
-        VkAccelerationStructureBuildRangeInfoKHR range={};range.primitiveCount=source.count;
-        const VkAccelerationStructureBuildRangeInfoKHR* ranges=&range;state->build_as(state->command,1,&build,&ranges);
+        const VkAccelerationStructureBuildRangeInfoKHR* pointer=ranges;state->build_as(state->command,1,&build,&pointer);
         mesh.range=source;
     }
     // The following TLAS build barrier makes these BLAS writes visible.
@@ -2741,7 +2773,7 @@ bool renderer_shutdown(Renderer* renderer)
             destroy_buffer(state,&mesh->scratch);
         }
         if (state->tlas) state->destroy_as(state->device, state->tlas, 0);
-        GpuBuffer* buffers[] = { &state->vertices, &state->triangles, &state->indices,
+        GpuBuffer* buffers[] = { &state->vertices, &state->triangles, &state->indices, &state->mesh_ranges,
             &state->tlas_buffer, &state->tlas_scratch,
             &state->readback, &state->optical_depth_upload, &state->shadow_grid, &state->static_lighting, &state->surface_lighting, &state->dynamic_lighting, &state->sharp_layer, &state->energy,
             &state->debug_pixels };

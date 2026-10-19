@@ -9,7 +9,6 @@ const float BLUR_HALF_TAPS_FLOAT = 24.0;
 const float BLUR_GAUSSIAN_FALLOFF = 4.5;
 const float WAVE_CROSS_AXIS_SCALE = .7;
 const float ENVIRONMENT_FILL_SCALE = 0.025;
-const uint BACKDROP_RAY_MASK = 4u;
 const float RAY_MAX = 3.402823466e38;
 const float SILHOUETTE_FADE_COSINE = 0.45;
 const float PULSE_SPATIAL_FREQUENCY = 4.0;
@@ -30,6 +29,7 @@ layout(set=0,binding = RENDER_BINDING_ACCELERATION) uniform accelerationStructur
 struct Vertex { vec4 position,normal,color,subsurface; };
 layout(set=0,binding = RENDER_BINDING_VERTICES,std430) readonly buffer Vertices { Vertex vertices[]; };
 layout(set=0,binding = RENDER_BINDING_TRIANGLES,std430) readonly buffer Triangles { uvec4 triangles[]; };
+layout(set=0,binding = RENDER_BINDING_MESH_RANGES,std430) readonly buffer MeshRanges { uvec2 mesh_ranges[]; };
 layout(set=0,binding = RENDER_BINDING_BACKGROUND_A,rgba16f) uniform writeonly image2D background_a;
 layout(set=0,binding = RENDER_BINDING_BACKGROUND_B,rgba16f) uniform writeonly image2D background_b;
 layout(set=0,binding = RENDER_BINDING_SOURCE_A) uniform sampler2D source_a;
@@ -92,7 +92,8 @@ void main()
     if (rayQueryGetIntersectionTypeEXT(query,true)!=gl_RayQueryCommittedIntersectionNoneEXT)
     {
         distance=log2(1.0+rayQueryGetIntersectionTEXT(query,true));
-        uint index=rayQueryGetIntersectionPrimitiveIndexEXT(query,true)+rayQueryGetIntersectionInstanceCustomIndexEXT(query,true);
+        uvec2 range=mesh_ranges[rayQueryGetIntersectionInstanceCustomIndexEXT(query,true)];
+        uint index=range.x+(rayQueryGetIntersectionGeometryIndexEXT(query,true)==MEMBRANE_GEOMETRY ? range.y : 0u)+rayQueryGetIntersectionPrimitiveIndexEXT(query,true);
         uvec3 triangle=triangles[index].xyz;
         Vertex a=vertices[triangle.x],b=vertices[triangle.y],c=vertices[triangle.z];
         vec2 bary=rayQueryGetIntersectionBarycentricsEXT(query,true);

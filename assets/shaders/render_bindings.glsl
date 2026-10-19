@@ -27,7 +27,8 @@
 #define RENDER_BINDING_DYNAMIC_LIGHTING 21
 #define RENDER_BINDING_OPTICAL_DEPTH 22
 #define RENDER_BINDING_LIGHTING_TEXTURE 23
-#define RENDER_DESCRIPTOR_COUNT 24
+#define RENDER_BINDING_MESH_RANGES 24
+#define RENDER_DESCRIPTOR_COUNT 25
 #define LIGHTING_TEXTURE_SPECIALIZATION_ID 4
 #define OPTICAL_DEPTH_TABLE_SIZE 256
 #define OPTICAL_DEPTH_SPECIALIZATION_ID 2
@@ -40,6 +41,14 @@
 #define SPATIAL_AA_SPECIALIZATION_ID 9
 #define VOLUME_GRID_STRIDE_SPECIALIZATION_ID 10
 #define LIGHTING_STATIC_ONLY 1
+// Instance mask bits. Surface rays see every scene instance; light transport
+// bakes select stationary or moving blockers during traversal.
+#define SURFACE_RAY_MASK 1u
+#define STATIC_BLOCKER_RAY_MASK 2u
+#define BACKDROP_RAY_MASK 4u
+#define DYNAMIC_BLOCKER_RAY_MASK 8u
+// BLAS geometry 0 holds opaque triangles; geometry 1 holds thin membranes.
+#define MEMBRANE_GEOMETRY 1u
 #define LIGHTING_DYNAMIC_ONLY 2
 #define COMPUTE_GROUP_SIZE 8
 #define VOLUME_STEPS_SPECIALIZATION_ID 0

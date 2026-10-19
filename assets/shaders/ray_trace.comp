@@ -36,6 +36,13 @@ layout(set = 0, binding = RENDER_BINDING_TRIANGLES, std430) readonly buffer Tria
 {
     uvec4 triangles[]; // XYZ vertex indices; W: 0 dielectric, 2 conductor, 3 thin membrane.
 };
+// Per mesh: first triangle and opaque triangle count. Instance custom indices name meshes.
+layout(set = 0, binding = RENDER_BINDING_MESH_RANGES, std430) readonly buffer MeshRanges { uvec2 mesh_ranges[]; };
+uint hit_triangle(uint mesh, uint geometry, uint primitive)
+{
+    uvec2 range = mesh_ranges[mesh];
+    return range.x + (geometry == MEMBRANE_GEOMETRY ? range.y : 0u) + primitive;
+}
 #include "render_uniform.glsl"
 
 // Zero keeps the runtime loop bound for external shader compatibility.
@@ -61,7 +68,6 @@ uint integration_steps()
 const float MIN_RAY_ORIGIN_OFFSET = 0.0001;
 const float RELATIVE_RAY_ORIGIN_OFFSET = 0.00001;
 const uint THIN_MEMBRANE_MATERIAL = 3u;
-const uint SURFACE_RAY_MASK = 0x1u;
 const float MIN_SHADING_DENOMINATOR = 0.000001;
 const float SCHLICK_EXPONENT = 5.0;
 const float MIN_ENERGY_TABLE_COSINE = 0.001;
@@ -158,8 +164,8 @@ bool closest_hit(vec3 origin, vec3 direction, out uint triangle_index,
         return false;
     }
 
-    triangle_index = uint(rayQueryGetIntersectionPrimitiveIndexEXT(query, true)) +
-                     rayQueryGetIntersectionInstanceCustomIndexEXT(query, true);
+    triangle_index = hit_triangle(rayQueryGetIntersectionInstanceCustomIndexEXT(query, true),
+        rayQueryGetIntersectionGeometryIndexEXT(query, true), rayQueryGetIntersectionPrimitiveIndexEXT(query, true));
     uint instance_id=rayQueryGetIntersectionInstanceIdEXT(query,true);
     hit_instance=instance_id;
     hit_to_world=rayQueryGetIntersectionObjectToWorldEXT(query,true);
@@ -518,26 +524,23 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
 struct LightingInstance { vec4 row0,row1,row2;uvec4 range; };
 layout(set=0,binding=RENDER_BINDING_LIGHTING_INSTANCES,std430) readonly buffer LightingInstances { LightingInstance lighting_instances[]; };
 
-// Evaluate all authored directional lights. Transmitting shadow intersections
-// multiply attenuation; opaque intersections stop the query.
+// Evaluate all authored directional lights. Opaque blockers are committed by
+// traversal, which then stops; only thin membranes reach this loop and multiply
+// attenuation. The subset selects stationary or moving blockers by instance mask.
 vec3 light_visibility(vec3 origin,vec3 direction,uint subset,bool medium_attenuation)
 {
 #if defined(NANOVA_DEBUG_BUFFERS) && !defined(NANOVA_NO_QUERY_COUNTERS)
     ++debug_shadow_queries;
 #endif
-    rayQueryEXT q;rayQueryInitializeEXT(q,scene_acceleration,gl_RayFlagsNoOpaqueEXT,SURFACE_RAY_MASK,origin,0.0,direction,RAY_MAX);
+    uint mask=subset==LIGHTING_STATIC_ONLY ? STATIC_BLOCKER_RAY_MASK : subset==LIGHTING_DYNAMIC_ONLY ? DYNAMIC_BLOCKER_RAY_MASK : SURFACE_RAY_MASK;
+    rayQueryEXT q;rayQueryInitializeEXT(q,scene_acceleration,gl_RayFlagsTerminateOnFirstHitEXT,mask,origin,0.0,direction,RAY_MAX);
     vec3 visibility=vec3(1);
     while (rayQueryProceedEXT(q))
     {
         if (rayQueryGetIntersectionTypeEXT(q,false)!=gl_RayQueryCandidateIntersectionTriangleEXT) continue;
-        if (subset>0u)
-        {
-            bool stationary=lighting_instances[rayQueryGetIntersectionInstanceIdEXT(q,false)].range.w>0u;
-            if (stationary!=(subset==LIGHTING_STATIC_ONLY)) continue;
-        }
-        uint index=rayQueryGetIntersectionPrimitiveIndexEXT(q,false)+rayQueryGetIntersectionInstanceCustomIndexEXT(q,false);
+        if (render.thin_material.x<=0.0) return vec3(0);
+        uint index=hit_triangle(rayQueryGetIntersectionInstanceCustomIndexEXT(q,false),MEMBRANE_GEOMETRY,rayQueryGetIntersectionPrimitiveIndexEXT(q,false));
         uvec4 triangle=triangles[index];
-        if (triangle.w!=THIN_MEMBRANE_MATERIAL || render.thin_material.x<=0.0) return vec3(0);
         vec2 uv=rayQueryGetIntersectionBarycentricsEXT(q,false);vec3 w=vec3(1.0-uv.x-uv.y,uv);
         vec3 pigment=vertices[triangle.x].color.rgb*w.x+vertices[triangle.y].color.rgb*w.y+vertices[triangle.z].color.rgb*w.z;
         float clarity=render.thin_material.w,cosine=1.0;
@@ -551,6 +554,7 @@ vec3 light_visibility(vec3 origin,vec3 direction,uint subset,bool medium_attenua
         float clear=clarity>0.0 ? membrane_clear(cosine) : render.thin_material.x;
         visibility*=mix(vec3(1),pigment,(clarity>0.0 ? CLEAR_MEMBRANE_PIGMENT_WEIGHT : DIFFUSE_MEMBRANE_PIGMENT_WEIGHT)*opacity)*clear*exp(-render.thin_material.y*opacity/cosine);
     }
+    if (rayQueryGetIntersectionTypeEXT(q,true)!=gl_RayQueryCommittedIntersectionNoneEXT) return vec3(0);
     return medium_attenuation ? visibility*transmittance(origin,direction,RAY_MAX) : visibility;
 }
 vec3 studio_visibility(vec3 origin,vec3 direction)
@@ -739,7 +743,8 @@ bool subsurface_exit(Surface s,vec3 direction,float limit,out vec3 exit_point,ou
     {
         if (rayQueryGetIntersectionTypeEXT(query,false)!=gl_RayQueryCandidateIntersectionTriangleEXT) continue;
         if (rayQueryGetIntersectionInstanceIdEXT(query,false)!=s.instance || rayQueryGetIntersectionFrontFaceEXT(query,false)==s.front_face) continue;
-        uint triangle=rayQueryGetIntersectionPrimitiveIndexEXT(query,false)+rayQueryGetIntersectionInstanceCustomIndexEXT(query,false);
+        uint triangle=hit_triangle(rayQueryGetIntersectionInstanceCustomIndexEXT(query,false),
+            rayQueryGetIntersectionGeometryIndexEXT(query,false),rayQueryGetIntersectionPrimitiveIndexEXT(query,false));
         // A cell mesh contains both a hollow wall and solid organelles. The wall is not an organelle exit.
         if (triangles[triangle].w!=0u) continue;
         rayQueryConfirmIntersectionEXT(query);
