@@ -310,6 +310,14 @@ float membrane_clear(float cosine)
     // The covered rim must not retain the baseline clear transmission.
     return base>0.0 ? 1.0-membrane_opacity(cosine)+base*(1.0-render.membrane_fade.x) : 0.0;
 }
+// As the rim closes, use the opaque material response for the covered light.
+float membrane_transmission(float cosine)
+{
+    float strength=render.membrane_fade.x;
+    if (strength<=0.0) return render.thin_material.x;
+    float edge=clamp(membrane_opacity(cosine)-(1.0-strength),0.0,1.0);
+    return render.thin_material.x*(1.0-edge);
+}
 vec3 studio_visibility(vec3 origin,vec3 direction);
 vec3 sampled_visibility(vec3 point,vec3 normal,int light);
 
@@ -659,7 +667,7 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
     if (render.studio_direction[selected].w<=0.0) return vec3(0);
     vec3 direction=render.studio_direction[selected].xyz;
     float cosine=dot(s.normal,direction),geometric_cosine=dot(s.geometric_normal,direction);
-    float transmission=s.translucent ? render.thin_material.x : 0.0;
+    float transmission=s.translucent ? membrane_transmission(max(0.0,dot(s.normal,outgoing))) : 0.0;
     float scatter=scattering_weight(s);vec3 weighted=vec3(0);
     if (geometric_cosine>0.0 && (cosine>0.0 || scatter>0.0))
     {
@@ -757,7 +765,7 @@ vec3 evaluate_subsurface(Surface s,vec3 outgoing)
     vec3 attenuation=exp(-thickness/max(s.subsurface.rgb,vec3(MIN_SHADING_DENOMINATOR)));
     float exit_transmission=1.0-fresnel(max(0.0,dot(s.normal,outgoing)),s.ior);
     float entry_transmission=1.0-fresnel(cosine,s.ior);
-    float clear_budget=s.translucent ? 1.0-render.thin_material.x : 1.0;
+    float clear_budget=s.translucent ? 1.0-membrane_transmission(max(0.0,dot(s.normal,outgoing))) : 1.0;
     vec3 light=s.color*attenuation*(scatter*render.subsurface.z*clear_budget*entry_transmission*exit_transmission*cosine/PI)*render.studio_color[selected].rgb;
     // Query from the light-entry side. Other objects must still cast shadows.
     vec3 visibility=s.translucent && lighting_cached() && lighting_instances[s.instance].range.w>0u ? baked_surface_visibility(s,selected,true,entry+direction*point_epsilon(entry))
@@ -774,7 +782,7 @@ vec3 ambient_surface(Surface s,vec3 outgoing)
     vec3 diffuse=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5+s.normal.y/COSINE_GRADIENT_DENOMINATOR);
     vec3 reflected=environment_radiance(reflect(-outgoing,s.normal));
     float cosine=max(0.0,dot(s.normal,outgoing));
-    float transmission=s.translucent ? render.thin_material.x : 0.0;
+    float transmission=s.translucent ? membrane_transmission(max(0.0,dot(s.normal,outgoing))) : 0.0;
     vec3 f=s.metal ? s.color+(vec3(1)-s.color)*pow(1.0-cosine,SCHLICK_EXPONENT) : vec3(fresnel(cosine,s.ior));
     vec3 result=s.metal ? f*reflected : (vec3(1)-f)*s.color*diffuse+f*reflected;
     result*=1.0-transmission;
