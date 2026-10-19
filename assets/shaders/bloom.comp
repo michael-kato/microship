@@ -15,8 +15,8 @@ const float MIN_BLOOM_PEAK = 0.000001;
 // Current-frame halo: downsample, two separable quarter-size blurs, then
 // native display composition. Two disjoint tiles reuse HDR scratch storage.
 layout(local_size_x = COMPUTE_GROUP_SIZE, local_size_y = COMPUTE_GROUP_SIZE) in;
-layout(set = 0, binding = BLOOM_BINDING_BEAUTY, rgba32f) uniform readonly image2D beauty;
-layout(set = 0, binding = BLOOM_BINDING_HORIZONTAL, rgba32f) uniform image2D horizontal;
+layout(set = 0, binding = BLOOM_BINDING_BEAUTY, rgba16f) uniform readonly image2D beauty;
+layout(set = 0, binding = BLOOM_BINDING_HORIZONTAL, rgba16f) uniform image2D horizontal;
 layout(set = 0, binding = BLOOM_BINDING_DISPLAY, rgba8) uniform writeonly image2D display_image;
 layout(push_constant) uniform Bloom
 {

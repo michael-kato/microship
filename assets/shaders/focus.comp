@@ -5,8 +5,8 @@
 #define NANOVA_DEBUG_BINDING BLOOM_BINDING_DEBUG
 #include "debug_buffers.glsl"
 layout(local_size_x=COMPUTE_GROUP_SIZE,local_size_y=COMPUTE_GROUP_SIZE) in;
-layout(set=0,binding=BLOOM_BINDING_BEAUTY,rgba32f) uniform image2D beauty;
-layout(set=0,binding=BLOOM_BINDING_HORIZONTAL,rgba32f) uniform image2D scratch;
+layout(set=0,binding=BLOOM_BINDING_BEAUTY,rgba16f) uniform image2D beauty;
+layout(set=0,binding=BLOOM_BINDING_HORIZONTAL,rgba16f) uniform image2D scratch;
 layout(push_constant) uniform FocusPass
 {
     ivec2 extent;int radius;int pass;

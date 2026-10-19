@@ -24,9 +24,9 @@ struct Vertex
 
 layout(set = 0, binding = RENDER_BINDING_ACCELERATION) uniform accelerationStructureEXT scene_acceleration;
 #ifdef NANOVA_VOLUME_PASS
-layout(set = 0, binding = RENDER_BINDING_BEAUTY, rgba32f) uniform image2D output_image;
+layout(set = 0, binding = RENDER_BINDING_BEAUTY, rgba16f) uniform image2D output_image;
 #else
-layout(set = 0, binding = RENDER_BINDING_BEAUTY, rgba32f) uniform writeonly image2D output_image;
+layout(set = 0, binding = RENDER_BINDING_BEAUTY, rgba16f) uniform writeonly image2D output_image;
 #endif
 layout(set = 0, binding = RENDER_BINDING_VERTICES, std430) readonly buffer VertexBuffer
 {

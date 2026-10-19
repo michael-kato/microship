@@ -697,6 +697,13 @@ before the refit, so shading never reads geometry over the PCIe BAR.
 Effect tile lists upload only the offsets and the references the frame
 uses, not the 2.1 MB reference capacity.
 
+The HDR beauty and scratch images are RGBA16F. Each frame writes them once
+and every post pass reads them several times, so half floats halve that
+traffic without accumulating error. Alpha holds blur radii in pixels, well
+inside half-float range. `.pfm` captures convert the half floats to 32-bit
+values. Against RGBA32F, close-view GPU median fell from 7.52 to 7.09 ms and
+wide from 4.86 to 4.35 ms; mean relative HDR change was 0.08 percent.
+
 The scene keeps about 11,000 fixed instance slots; most are empty. Each
 frame compacts the slots with a nonzero mask and fully rebuilds the TLAS
 from them. Instance IDs index the compacted style and lighting arrays in the

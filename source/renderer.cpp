@@ -1385,8 +1385,9 @@ static bool create_output(RendererState* state)
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) return false;
         memcpy(text.mapped,debug_glyphs,sizeof(debug_glyphs));
     }
-    if (!create_render_image(state, VK_FORMAT_R32G32B32A32_SFLOAT, &state->hdr, &state->hdr_memory, &state->hdr_view)
-        || !create_render_image(state, VK_FORMAT_R32G32B32A32_SFLOAT, &state->hdr_scratch, &state->hdr_scratch_memory, &state->hdr_scratch_view)
+    // Half-float HDR halves post-pass bandwidth; each frame writes it once, so no accumulation precision is lost.
+    if (!create_render_image(state, VK_FORMAT_R16G16B16A16_SFLOAT, &state->hdr, &state->hdr_memory, &state->hdr_view)
+        || !create_render_image(state, VK_FORMAT_R16G16B16A16_SFLOAT, &state->hdr_scratch, &state->hdr_scratch_memory, &state->hdr_scratch_view)
         || !create_render_image(state, VK_FORMAT_R8G8B8A8_UNORM, &state->output, &state->output_memory, &state->output_view))
         return false;
     VkSamplerCreateInfo sampler={};sampler.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -2155,6 +2156,23 @@ static void copy_output(RendererState* state, uint32_t image_index, const char* 
         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
 }
 
+static float half_to_float(uint16_t value)
+{
+    uint32_t sign=(uint32_t)(value>>15)<<31,exponent=(value>>10)&31u,mantissa=value&1023u,bits;
+    if (!exponent)
+    {
+        if (!mantissa) bits=sign;
+        else
+        {
+            exponent=113;while (!(mantissa&1024u)) { mantissa<<=1;--exponent; }
+            bits=sign|(exponent<<23)|((mantissa&1023u)<<13);
+        }
+    }
+    else if (exponent==31) bits=sign|0x7f800000u|(mantissa<<13);
+    else bits=sign|((exponent+112)<<23)|(mantissa<<13);
+    float result;memcpy(&result,&bits,sizeof(result));return result;
+}
+
 static bool capture_image(RendererState* state, const char* path)
 {
     FILE* file = fopen(path, "wb");
@@ -2171,10 +2189,11 @@ static bool capture_image(RendererState* state, const char* path)
     {
         if (linear)
         {
-            const float* source = (const float*)state->readback.mapped;
+            const uint16_t* source = (const uint16_t*)state->readback.mapped; // RGBA16F texels.
             uint32_t row = state->config.height-1-y; // PFM rows are bottom to top.
             for (uint32_t x = 0; x < state->config.width; ++x)
-                memcpy(&state->capture_hdr_row[x*3],&source[((size_t)row*state->config.width+x)*4],3*sizeof(float));
+                for (uint32_t c = 0; c < 3; ++c)
+                    state->capture_hdr_row[x*3+c] = half_to_float(source[((size_t)row*state->config.width+x)*4+c]);
             success = fwrite(state->capture_hdr_row.data(),sizeof(float),state->capture_hdr_row.size(),file)
                 == state->capture_hdr_row.size();
         }

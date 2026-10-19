@@ -3,8 +3,8 @@
 #include "render_bindings.glsl"
 #include "render_uniform.glsl"
 layout(local_size_x=COMPUTE_GROUP_SIZE,local_size_y=COMPUTE_GROUP_SIZE) in;
-layout(set=0,binding=BLOOM_BINDING_BEAUTY,rgba32f) uniform image2D beauty;
-layout(set=0,binding=BLOOM_BINDING_HORIZONTAL,rgba32f) uniform image2D scratch;
+layout(set=0,binding=BLOOM_BINDING_BEAUTY,rgba16f) uniform image2D beauty;
+layout(set=0,binding=BLOOM_BINDING_HORIZONTAL,rgba16f) uniform image2D scratch;
 layout(set=0,binding=BLOOM_BINDING_SIGHT,std430) readonly buffer Sight { float reveal[FOG_FIELD_SIZE*FOG_FIELD_SIZE];vec4 spheres[]; };
 layout(push_constant) uniform Filter
 {

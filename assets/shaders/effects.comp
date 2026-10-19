@@ -23,7 +23,7 @@ const float TRAIL_LIGHT_GAIN = 1.5;
 const float BURST_HALO_VARIANCE_SCALE = 3.0;
 
 layout(local_size_x=COMPUTE_GROUP_SIZE,local_size_y=COMPUTE_GROUP_SIZE) in;
-layout(set=0,binding = RENDER_BINDING_BEAUTY,rgba32f) uniform image2D beauty;
+layout(set=0,binding = RENDER_BINDING_BEAUTY,rgba16f) uniform image2D beauty;
 struct Segment { vec4 a,b,color; };
 layout(set=0,binding = RENDER_BINDING_EFFECTS,std430) readonly buffer Segments { Segment segments[]; };
 layout(set=0,binding = RENDER_BINDING_EFFECT_TILES,std430) readonly buffer Tiles { uint tiles[]; };
