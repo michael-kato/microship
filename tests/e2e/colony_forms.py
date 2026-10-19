@@ -73,6 +73,22 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
         assert not any(reset['colonies'][home]['appearance']['factions']) and not reset['colonies'][home]['active']
         assert reset_scene['meshes'][home]['deformation']['vertices']==base['vertices'],'Restart did not restore the original wall'
         if side=='virus':
+            coarse=deepcopy(data)
+            coarse['content']['factions'][0]['cell_appearance']['displacement'].update(features=64,width_degrees=12)
+            coarse_game,coarse_scene=run('virus-coarse-wall',coarse,1800,orders)
+            assert coarse_game==mature,'Spike frequency changed the game'
+            old=coarse_scene['meshes'][home]['deformation']
+            assert old['indices']==full['indices'] and len(old['vertices'])==len(full['vertices'])
+            neighbors={i:set() for i in wall}
+            for triangle in base['indices']:
+                if triangle[3]!=3:continue
+                for i in triangle[:3]:neighbors[i].update(j for j in triangle[:3] if j!=i)
+            def peaks(deformation):
+                heights={i:math.dist(base['vertices'][i][:3],deformation['vertices'][i][:3]) for i in wall}
+                return sum(heights[i]>1e-5 and all(heights[i]>heights[j]+1e-6 for j in neighbors[i]) for i in wall)
+            coarse_peaks=peaks(old);fine_peaks=peaks(full)
+            assert fine_peaks>=3*coarse_peaks,(coarse_peaks,fine_peaks)
+            print(f'Virus wall peaks measured in application geometry: {coarse_peaks} before, {fine_peaks} after; unchanged topology.')
             colony=mature['colonies'][home];structures=colony['structures'];roots=colony['root_count']
             assert len(structures)==roots*7==70
             depths=[]
@@ -129,7 +145,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
     assert after_scene['meshes'][0]['deformation']['vertices']==neutral_scene['meshes'][0]['deformation']['vertices'],'Immune control did not restore the neutral wall'
     for field,value in [('children',1),('levels',0),('length_scale',1.1),('width_scale',0),('angle_degrees',0),('bend',0)]:
         run('bad-tree-'+field,change(virus,'content.buildings.0.branches.tree.'+field,value),expected=1)
-    for field,value in [('roughness',-1),('displacement.features',65),('displacement.height',0),('displacement.profile','missing')]:
+    for field,value in [('roughness',-1),('displacement.features',257),('displacement.features',0),('displacement.width_degrees',5),('displacement.height',0),('displacement.profile','missing')]:
         run('bad-surface-'+field.replace('.','-'),change(virus,'content.factions.0.cell_appearance.'+field,value),expected=1)
     run('tree-capacity',change(virus,'content.buildings.0.branches.count',12),expected=1)
     run('old-surface-pieces',change(virus,'content.factions.0.cell_appearance.surface',dict(model='missing.fmesh')),expected=1)

@@ -647,3 +647,27 @@ BLAS geometry stays fixed for this motion. Moving objects use current lighting
 and shadows. Static membrane lighting remains cached while its inputs are valid.
 Faction displacement remains a separate vertex morph with its existing refit
 and cache invalidation. Membrane ripples change visible shading normals only.
+
+## Finer virus wall spikes
+
+The default virus displacement now requests 256 peaks with a six-degree width,
+up from 64 peaks with a twelve-degree width. Height remains 0.19 of cell radius.
+The field is prepared at startup. Per-frame interpolation uses the same vertices
+and triangles. The loader and JSON schema accept up to 256 features and widths
+from six degrees.
+
+The colony-forms check measured 64 and 256 local peaks in the real application
+exports. Its 38 application runs passed, including partial morph interpolation,
+unit normals, unflipped wall triangles, restored neutral geometry, unchanged game
+state, and rejected out-of-range settings. The cross-build and smoke check passed.
+
+Four native 1920 x 1080 captures passed Khronos host validation through Proton.
+All four game states matched. Total mesh storage remained 108,028 triangles.
+The two-frame wide captures measured 8.237/6.054 ms before and 8.756/6.471 ms
+after. Close captures measured 10.488/8.955 ms before and 12.048/9.715 ms after.
+The first frame includes static bakes. These short captures do not establish
+sustained performance; the denser shape had a higher measured rendering cost.
+
+Images are `000850` through `000853`. The scene inputs, logs, measured report,
+and before/after sliders are in `build/fine_spikes_review/`. The existing local
+membrane settings were preserved and used for both sides of each comparison.

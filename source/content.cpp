@@ -38,6 +38,8 @@ static const int MAX_UNIT_LIFETIME = 300;
 static const int MAX_UNIT_BLAST_RADIUS = 100;
 static const int MAX_UNIT_SEEK_RADIUS = 10000;
 static const int MAX_CELL_TINT_SECONDS = 3600;
+static const int MAX_CELL_DISPLACEMENT_FEATURES = 256;
+static const float MIN_CELL_DISPLACEMENT_WIDTH_DEGREES = 6;
 static const double MAX_CELL_INTERIOR_VARIATION = .15;
 static const double MAX_CELL_SHAPE_VARIATION = .12;
 static const int MAX_NORMAL_COMPONENT = 100;
@@ -145,10 +147,10 @@ static bool load_factions(Content* c,Json root)
             if (json_present(displacement))
             {
                 json_object(displacement,"features|height|width_degrees|profile|seed");
-                f.displacement_features=json_uint(json_get(displacement,"features"),1,64);
+                f.displacement_features=json_uint(json_get(displacement,"features"),1,MAX_CELL_DISPLACEMENT_FEATURES);
                 f.displacement_seed=json_uint(json_get(displacement,"seed"),0,16777215);
                 f.displacement_height=json_positive(json_get(displacement,"height"),.2f);
-                f.displacement_width=json_float(json_get(displacement,"width_degrees"),10,75)*.01745329252f;
+                f.displacement_width=json_float(json_get(displacement,"width_degrees"),MIN_CELL_DISPLACEMENT_WIDTH_DEGREES,75)*.01745329252f;
                 char profile[ASSET_NAME_CAPACITY]={};json_string(json_get(displacement,"profile"),profile,sizeof(profile));
                 f.displacement_pointed=!strcmp(profile,"pointed");
                 if (!f.displacement_pointed && strcmp(profile,"rounded")) json_error(displacement,"profile must be pointed or rounded");
