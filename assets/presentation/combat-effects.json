@@ -11,16 +11,8 @@
     "trail_length_scale": 0.67
   },
   "damage": {
-    "flash": [
-      1.0,
-      0.94,
-      0.78
-    ],
-    "injured": [
-      1.0,
-      0.035,
-      0.055
-    ]
+    "flash": [1.0, 0.94, 0.78],
+    "injured": [1.0, 0.035, 0.055]
   },
   "spikes": {
     "model": "../models/virus_spike.fmesh",
@@ -29,16 +21,8 @@
     "projectile_scale": 0.18
   },
   "injury": {
-    "first": [
-      0.26,
-      0.105,
-      0.035
-    ],
-    "later": [
-      0.045,
-      0.018,
-      0.009
-    ]
+    "first": [0.26, 0.105, 0.035],
+    "later": [0.045, 0.018, 0.009]
   },
   "limb_break": {
     "seconds": 2,

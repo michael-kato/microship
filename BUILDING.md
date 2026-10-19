@@ -573,3 +573,20 @@ bundle. Restart the application to reload them. Filenames identify their purpose
 Cell, factory, faction, unit, level, and authoring settings also have explicit
 filenames. Configuration basenames must be unique across the active assets.
 The build removes only the listed obsolete names from its own asset bundle.
+
+## JSON formatting
+
+Use two spaces for indentation. Keep an array on one line when the complete
+line fits within 100 characters, including indentation, the field name,
+and the trailing comma. Longer arrays use multiple lines. Long strings
+and other indivisible values can exceed the limit.
+
+Run `python3 scripts/format_json.py` to format project JSON files, or add
+`--check` to check without writing. Use `--line-width N` to select another
+limit for a manual run; project checks use 100. Both build check scripts
+check JSON formatting before they build. The command rejects duplicate
+keys and non-JSON numbers, and preserves number precision and field order.
+
+VS Code tasks provide **nanova: format JSON** and **nanova: check JSON formatting**.
+The built-in JSON formatter keeps existing line breaks; use the format
+task to apply the array width rule. No additional packages are needed.

@@ -98,19 +98,11 @@
               },
               "roots": {
                 "type": "string",
-                "enum": [
-                  "single",
-                  "organelles"
-                ]
+                "enum": ["single", "organelles"]
               },
               "grammar": {
                 "type": "string",
-                "enum": [
-                  "axial",
-                  "fan",
-                  "hypha",
-                  "tree"
-                ]
+                "enum": ["axial", "fan", "hypha", "tree"]
               },
               "tree": {
                 "type": "object",
@@ -163,14 +155,7 @@
                 "additionalProperties": false
               }
             },
-            "required": [
-              "seconds",
-              "count",
-              "spacing",
-              "production",
-              "seed",
-              "normal"
-            ],
+            "required": ["seconds", "count", "spacing", "production", "seed", "normal"],
             "additionalProperties": false
           },
           "growth_meshes": {
@@ -183,10 +168,7 @@
                 "$ref": "shared.schema.json#/$defs/path"
               }
             },
-            "required": [
-              "segment",
-              "tip"
-            ],
+            "required": ["segment", "tip"],
             "additionalProperties": false
           },
           "navigation": {
@@ -203,10 +185,7 @@
                 "maximum": 10
               }
             },
-            "required": [
-              "stem_radius",
-              "head_radius"
-            ],
+            "required": ["stem_radius", "head_radius"],
             "additionalProperties": false
           },
           "establishment_seconds": {
@@ -226,10 +205,7 @@
                 "maximum": 1
               }
             },
-            "required": [
-              "normal",
-              "depth_ratio"
-            ],
+            "required": ["normal", "depth_ratio"],
             "additionalProperties": false
           }
         },
@@ -250,8 +226,6 @@
       "maxItems": 8
     }
   },
-  "required": [
-    "buildings"
-  ],
+  "required": ["buildings"],
   "additionalProperties": false
 }

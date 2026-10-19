@@ -17,6 +17,8 @@ elif [[ $# != 0 ]]; then
     exit 2
 fi
 
+python3 "$script_dir/format_json.py" --check
+
 cmake_args=(-S "$repo_root" -B "$build_dir" -DCMAKE_BUILD_TYPE=Release
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
     -DCMAKE_TOOLCHAIN_FILE="$repo_root/cmake/windows-mingw.cmake"

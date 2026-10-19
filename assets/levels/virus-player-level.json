@@ -7,49 +7,24 @@
   "match": {
     "player": "virus",
     "opponent": "immune",
-    "starts": [
-      {
-        "faction": "virus",
-        "cell": 0
-      },
-      {
-        "faction": "immune",
-        "cell": 1
-      }
-    ],
+    "starts": [{"faction": "virus", "cell": 0}, {"faction": "immune", "cell": 1}],
     "auto_colonize": true
   },
   "bodies": [
     {
       "type": "unclaimed",
       "owner": "neutral",
-      "position": [
-        -52.0,
-        -4.0,
-        0.0
-      ],
+      "position": [-52.0, -4.0, 0.0],
       "radius": 4.2,
-      "tint": [
-        1.0,
-        1.0,
-        1.0
-      ],
+      "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [
-          0.0,
-          0.29,
-          0.957
-        ]
+        "normal": [0.0, 0.29, 0.957]
       },
       "medium": {
         "radius_fraction": 0.94,
         "edge_fade": 0.28,
-        "scattering": [
-          0.1,
-          0.075,
-          0.085
-        ],
+        "scattering": [0.1, 0.075, 0.085],
         "absorption": 0.018,
         "anisotropy": 0.2,
         "depth_blur": {
@@ -62,33 +37,17 @@
     {
       "type": "unclaimed",
       "owner": "neutral",
-      "position": [
-        48.0,
-        14.0,
-        0.0
-      ],
+      "position": [48.0, 14.0, 0.0],
       "radius": 4.2,
-      "tint": [
-        1.0,
-        1.0,
-        1.0
-      ],
+      "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [
-          0.0,
-          0.29,
-          0.957
-        ]
+        "normal": [0.0, 0.29, 0.957]
       },
       "medium": {
         "radius_fraction": 0.94,
         "edge_fade": 0.28,
-        "scattering": [
-          0.1,
-          0.075,
-          0.085
-        ],
+        "scattering": [0.1, 0.075, 0.085],
         "absorption": 0.018,
         "anisotropy": 0.2,
         "depth_blur": {
@@ -101,33 +60,17 @@
     {
       "type": "unclaimed",
       "owner": "neutral",
-      "position": [
-        -30.0,
-        0.0,
-        0.0
-      ],
+      "position": [-30.0, 0.0, 0.0],
       "radius": 2.1,
-      "tint": [
-        1.0,
-        1.0,
-        1.0
-      ],
+      "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 0.75,
-        "normal": [
-          0.0,
-          0.29,
-          0.957
-        ]
+        "normal": [0.0, 0.29, 0.957]
       },
       "medium": {
         "radius_fraction": 0.94,
         "edge_fade": 0.28,
-        "scattering": [
-          0.1,
-          0.075,
-          0.085
-        ],
+        "scattering": [0.1, 0.075, 0.085],
         "absorption": 0.018,
         "anisotropy": 0.2,
         "depth_blur": {
@@ -140,33 +83,17 @@
     {
       "type": "unclaimed",
       "owner": "neutral",
-      "position": [
-        -3.0,
-        -6.0,
-        0.0
-      ],
+      "position": [-3.0, -6.0, 0.0],
       "radius": 2.7,
-      "tint": [
-        1.0,
-        1.0,
-        1.0
-      ],
+      "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [
-          0.0,
-          0.29,
-          0.957
-        ]
+        "normal": [0.0, 0.29, 0.957]
       },
       "medium": {
         "radius_fraction": 0.94,
         "edge_fade": 0.28,
-        "scattering": [
-          0.1,
-          0.075,
-          0.085
-        ],
+        "scattering": [0.1, 0.075, 0.085],
         "absorption": 0.018,
         "anisotropy": 0.2,
         "depth_blur": {
@@ -179,33 +106,17 @@
     {
       "type": "unclaimed",
       "owner": "neutral",
-      "position": [
-        24.0,
-        9.0,
-        0.0
-      ],
+      "position": [24.0, 9.0, 0.0],
       "radius": 2.1,
-      "tint": [
-        1.0,
-        1.0,
-        1.0
-      ],
+      "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 0.75,
-        "normal": [
-          0.0,
-          0.29,
-          0.957
-        ]
+        "normal": [0.0, 0.29, 0.957]
       },
       "medium": {
         "radius_fraction": 0.94,
         "edge_fade": 0.28,
-        "scattering": [
-          0.1,
-          0.075,
-          0.085
-        ],
+        "scattering": [0.1, 0.075, 0.085],
         "absorption": 0.018,
         "anisotropy": 0.2,
         "depth_blur": {
@@ -219,91 +130,47 @@
   "spawns": [
     {
       "type": "virus_bomber",
-      "position": [
-        -52.0,
-        -1.2,
-        6.4
-      ]
+      "position": [-52.0, -1.2, 6.4]
     },
     {
       "type": "immune_bomber",
-      "position": [
-        48.0,
-        16.8,
-        6.4
-      ]
+      "position": [48.0, 16.8, 6.4]
     },
     {
       "type": "virus_fighter",
-      "position": [
-        -52.85,
-        -2.4,
-        6.4
-      ]
+      "position": [-52.85, -2.4, 6.4]
     },
     {
       "type": "virus_fighter",
-      "position": [
-        -52.0,
-        -2.4,
-        6.4
-      ]
+      "position": [-52.0, -2.4, 6.4]
     },
     {
       "type": "virus_fighter",
-      "position": [
-        -51.15,
-        -2.4,
-        6.4
-      ]
+      "position": [-51.15, -2.4, 6.4]
     },
     {
       "type": "virus_fighter",
-      "position": [
-        -52.85,
-        -1.7,
-        6.4
-      ]
+      "position": [-52.85, -1.7, 6.4]
     },
     {
       "type": "virus_fighter",
-      "position": [
-        -52.0,
-        -1.7,
-        6.4
-      ]
+      "position": [-52.0, -1.7, 6.4]
     },
     {
       "type": "virus_fighter",
-      "position": [
-        -51.15,
-        -1.7,
-        6.4
-      ]
+      "position": [-51.15, -1.7, 6.4]
     },
     {
       "type": "immune_fighter",
-      "position": [
-        47.15,
-        15.6,
-        6.4
-      ]
+      "position": [47.15, 15.6, 6.4]
     },
     {
       "type": "immune_fighter",
-      "position": [
-        48.0,
-        15.6,
-        6.4
-      ]
+      "position": [48.0, 15.6, 6.4]
     },
     {
       "type": "immune_fighter",
-      "position": [
-        48.85,
-        15.6,
-        6.4
-      ]
+      "position": [48.85, 15.6, 6.4]
     }
   ]
 }

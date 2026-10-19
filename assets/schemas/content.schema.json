@@ -22,12 +22,6 @@
       "$ref": "shared.schema.json#/$defs/path"
     }
   },
-  "required": [
-    "bodies",
-    "factions",
-    "groups",
-    "units",
-    "buildings"
-  ],
+  "required": ["bodies", "factions", "groups", "units", "buildings"],
   "additionalProperties": false
 }

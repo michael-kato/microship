@@ -41,19 +41,11 @@
             "maximum": 10000
           }
         },
-        "required": [
-          "first",
-          "count",
-          "pivot",
-          "movable"
-        ],
+        "required": ["first", "count", "pivot", "movable"],
         "additionalProperties": false
       }
     }
   },
-  "required": [
-    "vertices",
-    "parts"
-  ],
+  "required": ["vertices", "parts"],
   "additionalProperties": false
 }

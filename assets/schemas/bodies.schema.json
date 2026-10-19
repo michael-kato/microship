@@ -18,10 +18,7 @@
             "$ref": "shared.schema.json#/$defs/name"
           },
           "geometry": {
-            "enum": [
-              "mesh",
-              "sphere"
-            ]
+            "enum": ["mesh", "sphere"]
           },
           "model": {
             "$ref": "shared.schema.json#/$defs/path"
@@ -65,29 +62,15 @@
                     "$ref": "shared.schema.json#/$defs/color"
                   }
                 },
-                "required": [
-                  "strength",
-                  "frequency",
-                  "warm",
-                  "cool"
-                ],
+                "required": ["strength", "frequency", "warm", "cool"],
                 "additionalProperties": false
               }
             },
-            "required": [
-              "parts",
-              "shape",
-              "interior"
-            ],
+            "required": ["parts", "shape", "interior"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "name",
-          "label",
-          "geometry",
-          "hosts_site"
-        ],
+        "required": ["name", "label", "geometry", "hosts_site"],
         "additionalProperties": false,
         "allOf": [
           {
@@ -99,15 +82,11 @@
               }
             },
             "then": {
-              "required": [
-                "model"
-              ]
+              "required": ["model"]
             },
             "else": {
               "not": {
-                "required": [
-                  "model"
-                ]
+                "required": ["model"]
               }
             }
           }
@@ -116,8 +95,6 @@
       "maxItems": 32
     }
   },
-  "required": [
-    "bodies"
-  ],
+  "required": ["bodies"],
   "additionalProperties": false
 }

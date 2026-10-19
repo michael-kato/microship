@@ -71,10 +71,7 @@
           "$ref": "shared.schema.json#/$defs/color"
         }
       },
-      "required": [
-        "flash",
-        "injured"
-      ],
+      "required": ["flash", "injured"],
       "additionalProperties": false
     },
     "injury": {
@@ -87,10 +84,7 @@
           "$ref": "shared.schema.json#/$defs/color"
         }
       },
-      "required": [
-        "first",
-        "later"
-      ],
+      "required": ["first", "later"],
       "additionalProperties": false
     },
     "spikes": {
@@ -115,12 +109,7 @@
           "maximum": 1
         }
       },
-      "required": [
-        "model",
-        "root_radius",
-        "length",
-        "projectile_scale"
-      ],
+      "required": ["model", "root_radius", "length", "projectile_scale"],
       "additionalProperties": false
     },
     "limb_break": {
@@ -152,13 +141,7 @@
           "maximum": 10
         }
       },
-      "required": [
-        "seconds",
-        "speed",
-        "drag",
-        "spin",
-        "shrink_seconds"
-      ],
+      "required": ["seconds", "speed", "drag", "spin", "shrink_seconds"],
       "additionalProperties": false
     },
     "target_line": {
@@ -185,10 +168,7 @@
           "maximum": 60
         }
       },
-      "required": [
-        "width",
-        "alpha"
-      ],
+      "required": ["width", "alpha"],
       "additionalProperties": false
     }
   },

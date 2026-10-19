@@ -43,10 +43,7 @@
                 "maximum": 15
               }
             },
-            "required": [
-              "faction",
-              "cell"
-            ],
+            "required": ["faction", "cell"],
             "additionalProperties": false
           }
         },
@@ -54,10 +51,7 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "player",
-        "opponent"
-      ],
+      "required": ["player", "opponent"],
       "additionalProperties": false
     },
     "bodies": {
@@ -94,10 +88,7 @@
                 "maximum": 1
               }
             },
-            "required": [
-              "normal",
-              "availability"
-            ],
+            "required": ["normal", "availability"],
             "additionalProperties": false
           },
           "medium": {
@@ -162,61 +153,25 @@
                     "maximum": 1
                   }
                 },
-                "required": [
-                  "max_radius"
-                ],
+                "required": ["max_radius"],
                 "additionalProperties": false,
                 "oneOf": [
                   {
-                    "required": [
-                      "pixels_per_unit",
-                      "sharp_distance"
-                    ],
+                    "required": ["pixels_per_unit", "sharp_distance"],
                     "not": {
-                      "anyOf": [
-                        {
-                          "required": [
-                            "start_fraction"
-                          ]
-                        },
-                        {
-                          "required": [
-                            "full_fraction"
-                          ]
-                        }
-                      ]
+                      "anyOf": [{"required": ["start_fraction"]}, {"required": ["full_fraction"]}]
                     }
                   },
                   {
-                    "required": [
-                      "start_fraction",
-                      "full_fraction"
-                    ],
+                    "required": ["start_fraction", "full_fraction"],
                     "not": {
-                      "anyOf": [
-                        {
-                          "required": [
-                            "pixels_per_unit"
-                          ]
-                        },
-                        {
-                          "required": [
-                            "sharp_distance"
-                          ]
-                        }
-                      ]
+                      "anyOf": [{"required": ["pixels_per_unit"]}, {"required": ["sharp_distance"]}]
                     }
                   }
                 ]
               }
             },
-            "required": [
-              "radius_fraction",
-              "edge_fade",
-              "scattering",
-              "absorption",
-              "anisotropy"
-            ],
+            "required": ["radius_fraction", "edge_fade", "scattering", "absorption", "anisotropy"],
             "additionalProperties": false
           },
           "seed": {
@@ -225,13 +180,7 @@
             "maximum": 16777215
           }
         },
-        "required": [
-          "type",
-          "owner",
-          "position",
-          "radius",
-          "tint"
-        ],
+        "required": ["type", "owner", "position", "radius", "tint"],
         "additionalProperties": false
       },
       "maxItems": 16
@@ -248,22 +197,13 @@
             "$ref": "shared.schema.json#/$defs/position"
           }
         },
-        "required": [
-          "type",
-          "position"
-        ],
+        "required": ["type", "position"],
         "additionalProperties": false
       },
       "maxItems": 64
     }
   },
-  "required": [
-    "content",
-    "appearance",
-    "match",
-    "bodies",
-    "spawns"
-  ],
+  "required": ["content", "appearance", "match", "bodies", "spawns"],
   "additionalProperties": false,
   "anyOf": [
     {

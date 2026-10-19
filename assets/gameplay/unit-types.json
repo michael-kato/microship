@@ -8,20 +8,14 @@
       "model": "../models/virus_virion.fmesh",
       "scale": 0.15,
       "yaw_degrees": 0.0,
-      "tint": [
-        1.0,
-        1.0,
-        1.0
-      ],
+      "tint": [1.0, 1.0, 1.0],
       "speed": 2.8,
       "health": 36.0,
       "range": 3.2,
       "cost": 12.0,
       "shot_interval": 1.0,
       "separation": 1.0,
-      "targets": [
-        "units"
-      ],
+      "targets": ["units"],
       "colonizes": true,
       "detaches": true,
       "trails": true,
@@ -29,9 +23,7 @@
       "cue_radius": 0.22,
       "hits": 3,
       "secondary_attack": {
-        "targets": [
-          "structures"
-        ],
+        "targets": ["structures"],
         "interval_factor": 8
       },
       "autonomy": {
@@ -42,11 +34,7 @@
         "response_seconds": 0.7,
         "cruise_fraction": 0.65
       },
-      "trail_origin": [
-        0,
-        0,
-        -0.66
-      ]
+      "trail_origin": [0, 0, -0.66]
     },
     {
       "name": "virus_bomber",
@@ -55,20 +43,14 @@
       "model": "../models/virus_bomber.fmesh",
       "scale": 0.65,
       "yaw_degrees": 0.0,
-      "tint": [
-        1.0,
-        1.0,
-        1.0
-      ],
+      "tint": [1.0, 1.0, 1.0],
       "speed": 2.0,
       "health": 60.0,
       "range": 3.2,
       "cost": 30.0,
       "shot_interval": 3.0,
       "separation": 2.0,
-      "targets": [
-        "structures"
-      ],
+      "targets": ["structures"],
       "colonizes": true,
       "detaches": false,
       "trails": false,
@@ -76,9 +58,7 @@
       "cue_radius": 0.65,
       "hits": 3,
       "secondary_attack": {
-        "targets": [
-          "units"
-        ],
+        "targets": ["units"],
         "interval_factor": 8
       },
       "autonomy": {
@@ -93,36 +73,12 @@
         "model": "../models/virus_bomb.fmesh",
         "reload_seconds": 12,
         "sockets": [
-          [
-            -0.34,
-            -0.1,
-            -0.4
-          ],
-          [
-            -0.34,
-            -0.1,
-            0.0
-          ],
-          [
-            -0.34,
-            -0.1,
-            0.4
-          ],
-          [
-            0.34,
-            -0.1,
-            -0.4
-          ],
-          [
-            0.34,
-            -0.1,
-            0.0
-          ],
-          [
-            0.34,
-            -0.1,
-            0.4
-          ]
+          [-0.34, -0.1, -0.4],
+          [-0.34, -0.1, 0.0],
+          [-0.34, -0.1, 0.4],
+          [0.34, -0.1, -0.4],
+          [0.34, -0.1, 0.0],
+          [0.34, -0.1, 0.4]
         ]
       }
     },
@@ -133,20 +89,14 @@
       "model": "../models/immune_leukocyte.fmesh",
       "scale": 0.38,
       "yaw_degrees": 0.0,
-      "tint": [
-        1.0,
-        1.0,
-        1.0
-      ],
+      "tint": [1.0, 1.0, 1.0],
       "speed": 2.0,
       "health": 432,
       "range": 0.65,
       "cost": 28,
       "shot_interval": 0.8,
       "separation": 0.7,
-      "targets": [
-        "units"
-      ],
+      "targets": ["units"],
       "colonizes": true,
       "detaches": false,
       "trails": true,
@@ -162,9 +112,7 @@
         "release_seconds": 2.5
       },
       "secondary_attack": {
-        "targets": [
-          "structures"
-        ],
+        "targets": ["structures"],
         "interval_factor": 8
       },
       "autonomy": {
@@ -175,17 +123,9 @@
         "response_seconds": 0.7,
         "cruise_fraction": 0.65
       },
-      "trail_origin": [
-        0,
-        0,
-        -0.772
-      ],
+      "trail_origin": [0, 0, -0.772],
       "rear_tint": {
-        "color": [
-          0.58,
-          0.42,
-          0.51
-        ],
+        "color": [0.58, 0.42, 0.51],
         "strength": 0.7
       }
     },
@@ -196,20 +136,14 @@
       "model": "../models/immune_bomber.fmesh",
       "scale": 0.75,
       "yaw_degrees": 0.0,
-      "tint": [
-        1.0,
-        1.0,
-        1.0
-      ],
+      "tint": [1.0, 1.0, 1.0],
       "speed": 1.52,
       "health": 720,
       "range": 0.85,
       "cost": 52,
       "shot_interval": 1.3,
       "separation": 1,
-      "targets": [
-        "structures"
-      ],
+      "targets": ["structures"],
       "colonizes": true,
       "detaches": false,
       "trails": false,
@@ -225,9 +159,7 @@
         "release_seconds": 2.5
       },
       "secondary_attack": {
-        "targets": [
-          "units"
-        ],
+        "targets": ["units"],
         "interval_factor": 8
       },
       "autonomy": {
@@ -239,11 +171,7 @@
         "cruise_fraction": 0.65
       },
       "rear_tint": {
-        "color": [
-          0.58,
-          0.42,
-          0.51
-        ],
+        "color": [0.58, 0.42, 0.51],
         "strength": 0.7
       }
     },
@@ -254,21 +182,14 @@
       "model": "../models/fungal_spore.fmesh",
       "scale": 0.28,
       "yaw_degrees": 0.0,
-      "tint": [
-        1.0,
-        1.0,
-        1.0
-      ],
+      "tint": [1.0, 1.0, 1.0],
       "speed": 6.4,
       "health": 24,
       "range": 0.65,
       "cost": 1,
       "shot_interval": 1,
       "separation": 0.5,
-      "targets": [
-        "units",
-        "structures"
-      ],
+      "targets": ["units", "structures"],
       "colonizes": false,
       "detaches": false,
       "trails": true,
@@ -282,11 +203,7 @@
         "lifetime": 24,
         "friendly_fire": true
       },
-      "trail_origin": [
-        0,
-        0,
-        -0.78919
-      ]
+      "trail_origin": [0, 0, -0.78919]
     },
     {
       "name": "swarm_fighter",
@@ -295,20 +212,14 @@
       "model": "../models/virus_virion.fmesh",
       "scale": 0.13,
       "yaw_degrees": 0.0,
-      "tint": [
-        1.0,
-        1.0,
-        1.0
-      ],
+      "tint": [1.0, 1.0, 1.0],
       "speed": 3.84,
       "health": 24,
       "range": 3.2,
       "cost": 7,
       "shot_interval": 0.8,
       "separation": 1.0,
-      "targets": [
-        "units"
-      ],
+      "targets": ["units"],
       "colonizes": true,
       "detaches": true,
       "trails": true,
@@ -316,9 +227,7 @@
       "cue_radius": 0.22,
       "hits": 2,
       "secondary_attack": {
-        "targets": [
-          "structures"
-        ],
+        "targets": ["structures"],
         "interval_factor": 8
       },
       "autonomy": {
@@ -329,11 +238,7 @@
         "response_seconds": 0.7,
         "cruise_fraction": 0.65
       },
-      "trail_origin": [
-        0,
-        0,
-        -0.66
-      ]
+      "trail_origin": [0, 0, -0.66]
     },
     {
       "name": "swarm_bomber",
@@ -342,20 +247,14 @@
       "model": "../models/virus_bomber.fmesh",
       "scale": 0.52,
       "yaw_degrees": 0.0,
-      "tint": [
-        1.0,
-        1.0,
-        1.0
-      ],
+      "tint": [1.0, 1.0, 1.0],
       "speed": 2.8,
       "health": 40,
       "range": 3.2,
       "cost": 18,
       "shot_interval": 2.4,
       "separation": 2.0,
-      "targets": [
-        "structures"
-      ],
+      "targets": ["structures"],
       "colonizes": true,
       "detaches": false,
       "trails": false,
@@ -363,9 +262,7 @@
       "cue_radius": 0.65,
       "hits": 2,
       "secondary_attack": {
-        "targets": [
-          "units"
-        ],
+        "targets": ["units"],
         "interval_factor": 8
       },
       "autonomy": {
@@ -380,36 +277,12 @@
         "model": "../models/virus_bomb.fmesh",
         "reload_seconds": 12,
         "sockets": [
-          [
-            -0.34,
-            -0.1,
-            -0.4
-          ],
-          [
-            -0.34,
-            -0.1,
-            0.0
-          ],
-          [
-            -0.34,
-            -0.1,
-            0.4
-          ],
-          [
-            0.34,
-            -0.1,
-            -0.4
-          ],
-          [
-            0.34,
-            -0.1,
-            0.0
-          ],
-          [
-            0.34,
-            -0.1,
-            0.4
-          ]
+          [-0.34, -0.1, -0.4],
+          [-0.34, -0.1, 0.0],
+          [-0.34, -0.1, 0.4],
+          [0.34, -0.1, -0.4],
+          [0.34, -0.1, 0.0],
+          [0.34, -0.1, 0.4]
         ]
       }
     },
@@ -420,21 +293,14 @@
       "model": "../models/fungal_head.fmesh",
       "scale": 0.6,
       "yaw_degrees": 0.0,
-      "tint": [
-        1.0,
-        1.0,
-        1.0
-      ],
+      "tint": [1.0, 1.0, 1.0],
       "speed": 1.6,
       "health": 120,
       "range": 0.65,
       "cost": 10,
       "shot_interval": 1,
       "separation": 0.5,
-      "targets": [
-        "units",
-        "structures"
-      ],
+      "targets": ["units", "structures"],
       "colonizes": true,
       "detaches": false,
       "trails": true,
@@ -444,11 +310,7 @@
       "attack": {
         "mode": "projectile"
       },
-      "trail_origin": [
-        0,
-        0,
-        -0.51
-      ]
+      "trail_origin": [0, 0, -0.51]
     }
   ]
 }

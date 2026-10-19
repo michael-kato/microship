@@ -43,14 +43,7 @@
               "maximum": 16777215
             }
           },
-          "required": [
-            "seconds",
-            "start_hz",
-            "end_hz",
-            "noise",
-            "decay",
-            "seed"
-          ],
+          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
           "additionalProperties": false
         },
         "growth": {
@@ -87,14 +80,7 @@
               "maximum": 16777215
             }
           },
-          "required": [
-            "seconds",
-            "start_hz",
-            "end_hz",
-            "noise",
-            "decay",
-            "seed"
-          ],
+          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
           "additionalProperties": false
         },
         "mature": {
@@ -131,14 +117,7 @@
               "maximum": 16777215
             }
           },
-          "required": [
-            "seconds",
-            "start_hz",
-            "end_hz",
-            "noise",
-            "decay",
-            "seed"
-          ],
+          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
           "additionalProperties": false
         },
         "birth": {
@@ -175,14 +154,7 @@
               "maximum": 16777215
             }
           },
-          "required": [
-            "seconds",
-            "start_hz",
-            "end_hz",
-            "noise",
-            "decay",
-            "seed"
-          ],
+          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
           "additionalProperties": false
         },
         "shot": {
@@ -219,14 +191,7 @@
               "maximum": 16777215
             }
           },
-          "required": [
-            "seconds",
-            "start_hz",
-            "end_hz",
-            "noise",
-            "decay",
-            "seed"
-          ],
+          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
           "additionalProperties": false
         },
         "hit": {
@@ -263,14 +228,7 @@
               "maximum": 16777215
             }
           },
-          "required": [
-            "seconds",
-            "start_hz",
-            "end_hz",
-            "noise",
-            "decay",
-            "seed"
-          ],
+          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
           "additionalProperties": false
         },
         "death": {
@@ -307,14 +265,7 @@
               "maximum": 16777215
             }
           },
-          "required": [
-            "seconds",
-            "start_hz",
-            "end_hz",
-            "noise",
-            "decay",
-            "seed"
-          ],
+          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
           "additionalProperties": false
         },
         "colonize": {
@@ -351,14 +302,7 @@
               "maximum": 16777215
             }
           },
-          "required": [
-            "seconds",
-            "start_hz",
-            "end_hz",
-            "noise",
-            "decay",
-            "seed"
-          ],
+          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
           "additionalProperties": false
         },
         "heal": {
@@ -395,14 +339,7 @@
               "maximum": 16777215
             }
           },
-          "required": [
-            "seconds",
-            "start_hz",
-            "end_hz",
-            "noise",
-            "decay",
-            "seed"
-          ],
+          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
           "additionalProperties": false
         },
         "win": {
@@ -439,14 +376,7 @@
               "maximum": 16777215
             }
           },
-          "required": [
-            "seconds",
-            "start_hz",
-            "end_hz",
-            "noise",
-            "decay",
-            "seed"
-          ],
+          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
           "additionalProperties": false
         },
         "lose": {
@@ -483,14 +413,7 @@
               "maximum": 16777215
             }
           },
-          "required": [
-            "seconds",
-            "start_hz",
-            "end_hz",
-            "noise",
-            "decay",
-            "seed"
-          ],
+          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
           "additionalProperties": false
         },
         "break": {
@@ -527,14 +450,7 @@
               "maximum": 16777215
             }
           },
-          "required": [
-            "seconds",
-            "start_hz",
-            "end_hz",
-            "noise",
-            "decay",
-            "seed"
-          ],
+          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
           "additionalProperties": false
         }
       },
@@ -555,8 +471,6 @@
       "additionalProperties": false
     }
   },
-  "required": [
-    "sounds"
-  ],
+  "required": ["sounds"],
   "additionalProperties": false
 }

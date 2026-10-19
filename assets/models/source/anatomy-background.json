@@ -1,33 +1,16 @@
 {
   "$schema": "../../schemas/anatomy-backgrounds.schema.json",
-  "extent": [
-    1.46,
-    1.46
-  ],
-  "grid": [
-    80,
-    64
-  ],
+  "extent": [1.46, 1.46],
+  "grid": [80, 64],
   "base_z": -0.26,
   "fold_amplitude": 0.035,
-  "fold_frequency": [
-    7,
-    9
-  ],
+  "fold_frequency": [7, 9],
   "ior": 1.35,
   "profiles": [
     {
       "name": "flesh",
-      "color": [
-        0.48,
-        0.18,
-        0.24
-      ],
-      "accent": [
-        0.56,
-        0.25,
-        0.29
-      ],
+      "color": [0.48, 0.18, 0.24],
+      "accent": [0.56, 0.25, 0.29],
       "roughness": 0.24,
       "count": 8,
       "radius": 0.14,
@@ -35,16 +18,8 @@
     },
     {
       "name": "bone",
-      "color": [
-        0.33,
-        0.09,
-        0.13
-      ],
-      "accent": [
-        0.8,
-        0.72,
-        0.55
-      ],
+      "color": [0.33, 0.09, 0.13],
+      "accent": [0.8, 0.72, 0.55],
       "roughness": 0.23,
       "count": 6,
       "radius": 0.075,
@@ -52,16 +27,8 @@
     },
     {
       "name": "red_organs",
-      "color": [
-        0.19,
-        0.025,
-        0.045
-      ],
-      "accent": [
-        0.34,
-        0.045,
-        0.065
-      ],
+      "color": [0.19, 0.025, 0.045],
+      "accent": [0.34, 0.045, 0.065],
       "roughness": 0.21,
       "count": 14,
       "radius": 0.29,
@@ -69,16 +36,8 @@
     },
     {
       "name": "blue_organs",
-      "color": [
-        0.025,
-        0.045,
-        0.12
-      ],
-      "accent": [
-        0.055,
-        0.1,
-        0.24
-      ],
+      "color": [0.025, 0.045, 0.12],
+      "accent": [0.055, 0.1, 0.24],
       "roughness": 0.22,
       "count": 13,
       "radius": 0.29,
@@ -86,16 +45,8 @@
     },
     {
       "name": "veins",
-      "color": [
-        0.43,
-        0.15,
-        0.2
-      ],
-      "accent": [
-        0.025,
-        0.1,
-        0.32
-      ],
+      "color": [0.43, 0.15, 0.2],
+      "accent": [0.025, 0.1, 0.32],
       "roughness": 0.19,
       "count": 7,
       "radius": 0.026,
@@ -103,16 +54,8 @@
     },
     {
       "name": "ligaments",
-      "color": [
-        0.32,
-        0.1,
-        0.15
-      ],
-      "accent": [
-        0.77,
-        0.79,
-        0.69
-      ],
+      "color": [0.32, 0.1, 0.15],
+      "accent": [0.77, 0.79, 0.69],
       "roughness": 0.25,
       "count": 20,
       "radius": 0.024,
@@ -120,16 +63,8 @@
     },
     {
       "name": "intestines",
-      "color": [
-        0.24,
-        0.065,
-        0.085
-      ],
-      "accent": [
-        0.57,
-        0.22,
-        0.24
-      ],
+      "color": [0.24, 0.065, 0.085],
+      "accent": [0.57, 0.22, 0.24],
       "roughness": 0.22,
       "count": 7,
       "radius": 0.115,
@@ -137,16 +72,8 @@
     },
     {
       "name": "villi",
-      "color": [
-        0.32,
-        0.07,
-        0.11
-      ],
-      "accent": [
-        0.59,
-        0.23,
-        0.27
-      ],
+      "color": [0.32, 0.07, 0.11],
+      "accent": [0.59, 0.23, 0.27],
       "roughness": 0.23,
       "count": 18,
       "radius": 0.033,

@@ -55,24 +55,11 @@
             "$ref": "shared.schema.json#/$defs/color"
           }
         },
-        "required": [
-          "label",
-          "description",
-          "world",
-          "color"
-        ],
+        "required": ["label", "description", "world", "color"],
         "additionalProperties": false
       }
     }
   },
-  "required": [
-    "title",
-    "prompt",
-    "width",
-    "height",
-    "background",
-    "text",
-    "choices"
-  ],
+  "required": ["title", "prompt", "width", "height", "background", "text", "choices"],
   "additionalProperties": false
 }

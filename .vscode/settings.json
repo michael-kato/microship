@@ -1,11 +1,14 @@
 {
-    "C_Cpp.default.compileCommands": [
-        "${workspaceFolder}/build/windows-cross/compile_commands.json"
-    ],
-    "C_Cpp.default.includePath": ["${workspaceFolder}/source"],
-    "C_Cpp.default.browse.path": ["${workspaceFolder}/source/*"],
-    "C_Cpp.default.cppStandard": "c++11",
-    "C_Cpp.files.exclude": {
-        "**/build": true
-    }
+  "C_Cpp.default.compileCommands": ["${workspaceFolder}/build/windows-cross/compile_commands.json"],
+  "C_Cpp.default.includePath": ["${workspaceFolder}/source"],
+  "C_Cpp.default.browse.path": ["${workspaceFolder}/source/*"],
+  "C_Cpp.default.cppStandard": "c++11",
+  "C_Cpp.files.exclude": {
+    "**/build": true
+  },
+  "json.format.keepLines": true,
+  "[json]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true
+  }
 }

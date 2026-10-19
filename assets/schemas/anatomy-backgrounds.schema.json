@@ -96,15 +96,7 @@
             "maximum": 1
           }
         },
-        "required": [
-          "name",
-          "color",
-          "accent",
-          "roughness",
-          "count",
-          "radius",
-          "height"
-        ],
+        "required": ["name", "color", "accent", "roughness", "count", "radius", "height"],
         "additionalProperties": false
       }
     }

@@ -33,12 +33,7 @@
           "maximum": 10000
         }
       },
-      "required": [
-        "storage",
-        "manufacture_seconds",
-        "landing_seconds",
-        "enemy_attack_seconds"
-      ],
+      "required": ["storage", "manufacture_seconds", "landing_seconds", "enemy_attack_seconds"],
       "additionalProperties": false
     },
     "ai": {
@@ -55,10 +50,7 @@
           "maximum": 300
         }
       },
-      "required": [
-        "production_rate",
-        "expansion_delay"
-      ],
+      "required": ["production_rate", "expansion_delay"],
       "additionalProperties": false
     },
     "exploration": {
@@ -70,9 +62,7 @@
           "maximum": 1000
         }
       },
-      "required": [
-        "sight_radius"
-      ],
+      "required": ["sight_radius"],
       "additionalProperties": false
     },
     "flight": {
@@ -109,12 +99,7 @@
           "maximum": 5
         }
       },
-      "required": [
-        "acceleration",
-        "turn_rate",
-        "separation",
-        "bank"
-      ],
+      "required": ["acceleration", "turn_rate", "separation", "bank"],
       "additionalProperties": false
     },
     "orbit": {
@@ -141,10 +126,7 @@
           "maximum": 5
         }
       },
-      "required": [
-        "clearance",
-        "speed"
-      ],
+      "required": ["clearance", "speed"],
       "additionalProperties": false
     },
     "recovery": {
@@ -166,11 +148,7 @@
           "maximum": 10
         }
       },
-      "required": [
-        "heal_interval",
-        "damage_delay",
-        "orbit_clearance"
-      ],
+      "required": ["heal_interval", "damage_delay", "orbit_clearance"],
       "additionalProperties": false
     },
     "spikes": {
@@ -187,15 +165,10 @@
           "maximum": 60
         }
       },
-      "required": [
-        "count",
-        "regrow_seconds"
-      ],
+      "required": ["count", "regrow_seconds"],
       "additionalProperties": false
     }
   },
-  "required": [
-    "resource_label"
-  ],
+  "required": ["resource_label"],
   "additionalProperties": false
 }

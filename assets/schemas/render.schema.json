@@ -25,11 +25,7 @@
           "maximum": 100
         }
       },
-      "required": [
-        "width",
-        "height",
-        "exposure"
-      ],
+      "required": ["width", "height", "exposure"],
       "additionalProperties": false
     },
     "sampling": {
@@ -54,11 +50,7 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "samples_per_pixel",
-        "seed",
-        "max_transmission_layers"
-      ],
+      "required": ["samples_per_pixel", "seed", "max_transmission_layers"],
       "additionalProperties": false
     },
     "geometry": {
@@ -75,10 +67,7 @@
           "maximum": 256
         }
       },
-      "required": [
-        "sphere_segments",
-        "sphere_rings"
-      ],
+      "required": ["sphere_segments", "sphere_rings"],
       "additionalProperties": false
     },
     "camera": {
@@ -131,16 +120,7 @@
           "type": "boolean"
         },
         "shadow_grid_resolution": {
-          "anyOf": [
-            {
-              "const": 0
-            },
-            {
-              "type": "integer",
-              "minimum": 8,
-              "maximum": 64
-            }
-          ]
+          "anyOf": [{"const": 0}, {"type": "integer", "minimum": 8, "maximum": 64}]
         },
         "static_lighting_cache": {
           "type": "boolean"
@@ -156,16 +136,10 @@
         },
         "subgroup_size": {
           "type": "integer",
-          "enum": [
-            0,
-            32,
-            64
-          ]
+          "enum": [0, 32, 64]
         }
       },
-      "required": [
-        "microfacet_energy_compensation"
-      ],
+      "required": ["microfacet_energy_compensation"],
       "additionalProperties": false
     },
     "bloom": {
@@ -187,11 +161,7 @@
           "maximum": 1000000
         }
       },
-      "required": [
-        "radius",
-        "strength",
-        "threshold"
-      ],
+      "required": ["radius", "strength", "threshold"],
       "additionalProperties": false
     },
     "volume": {
@@ -214,32 +184,21 @@
           "type": "boolean"
         },
         "quadrature": {
-          "enum": [
-            "midpoint",
-            "gauss_legendre"
-          ]
+          "enum": ["midpoint", "gauss_legendre"]
         },
         "spatial_filter": {
           "type": "boolean"
         },
         "spatial_stride": {
-          "enum": [
-            2,
-            4
-          ]
+          "enum": [2, 4]
         }
       },
-      "required": [
-        "rays_per_pixel",
-        "integration_steps"
-      ],
+      "required": ["rays_per_pixel", "integration_steps"],
       "additionalProperties": false,
       "allOf": [
         {
           "if": {
-            "required": [
-              "quadrature"
-            ],
+            "required": ["quadrature"],
             "properties": {
               "quadrature": {
                 "const": "gauss_legendre"
@@ -249,19 +208,14 @@
           "then": {
             "properties": {
               "integration_steps": {
-                "enum": [
-                  2,
-                  3
-                ]
+                "enum": [2, 3]
               }
             }
           }
         },
         {
           "if": {
-            "required": [
-              "spatial_filter"
-            ],
+            "required": ["spatial_filter"],
             "properties": {
               "spatial_filter": {
                 "const": true
@@ -302,12 +256,7 @@
           "maximum": 64
         }
       },
-      "required": [
-        "focus_center",
-        "focus_half_width",
-        "falloff",
-        "max_radius"
-      ],
+      "required": ["focus_center", "focus_half_width", "falloff", "max_radius"],
       "additionalProperties": false
     },
     "subsurface": {
@@ -339,24 +288,10 @@
           "maximum": 4096
         }
       },
-      "required": [
-        "strength",
-        "wrap",
-        "transmission",
-        "membrane_thickness",
-        "samples_per_pixel"
-      ],
+      "required": ["strength", "wrap", "transmission", "membrane_thickness", "samples_per_pixel"],
       "additionalProperties": false
     }
   },
-  "required": [
-    "output",
-    "sampling",
-    "geometry",
-    "camera",
-    "lighting",
-    "bloom",
-    "volume"
-  ],
+  "required": ["output", "sampling", "geometry", "camera", "lighting", "bloom", "volume"],
   "additionalProperties": false
 }

@@ -69,10 +69,7 @@
           "targets": {
             "type": "array",
             "items": {
-              "enum": [
-                "units",
-                "structures"
-              ]
+              "enum": ["units", "structures"]
             },
             "maxItems": 2,
             "uniqueItems": true
@@ -105,11 +102,7 @@
             "type": "object",
             "properties": {
               "mode": {
-                "enum": [
-                  "projectile",
-                  "digest",
-                  "spore"
-                ]
+                "enum": ["projectile", "digest", "spore"]
               },
               "seek_radius": {
                 "type": "number",
@@ -155,9 +148,7 @@
                 "maximum": 10
               }
             },
-            "required": [
-              "mode"
-            ],
+            "required": ["mode"],
             "additionalProperties": false,
             "allOf": [
               {
@@ -169,35 +160,22 @@
                   }
                 },
                 "then": {
-                  "required": [
-                    "seek_radius",
-                    "blast_radius",
-                    "lifetime",
-                    "friendly_fire"
-                  ]
+                  "required": ["seek_radius", "blast_radius", "lifetime", "friendly_fire"]
                 },
                 "else": {
                   "not": {
                     "anyOf": [
                       {
-                        "required": [
-                          "seek_radius"
-                        ]
+                        "required": ["seek_radius"]
                       },
                       {
-                        "required": [
-                          "blast_radius"
-                        ]
+                        "required": ["blast_radius"]
                       },
                       {
-                        "required": [
-                          "lifetime"
-                        ]
+                        "required": ["lifetime"]
                       },
                       {
-                        "required": [
-                          "friendly_fire"
-                        ]
+                        "required": ["friendly_fire"]
                       }
                     ]
                   }
@@ -215,29 +193,19 @@
                   "not": {
                     "anyOf": [
                       {
-                        "required": [
-                          "charge_radius"
-                        ]
+                        "required": ["charge_radius"]
                       },
                       {
-                        "required": [
-                          "charge_speed"
-                        ]
+                        "required": ["charge_speed"]
                       },
                       {
-                        "required": [
-                          "charge_acceleration"
-                        ]
+                        "required": ["charge_acceleration"]
                       },
                       {
-                        "required": [
-                          "release_hits"
-                        ]
+                        "required": ["release_hits"]
                       },
                       {
-                        "required": [
-                          "release_seconds"
-                        ]
+                        "required": ["release_seconds"]
                       }
                     ]
                   }
@@ -245,12 +213,8 @@
               }
             ],
             "dependentRequired": {
-              "release_hits": [
-                "release_seconds"
-              ],
-              "release_seconds": [
-                "release_hits"
-              ]
+              "release_hits": ["release_seconds"],
+              "release_seconds": ["release_hits"]
             }
           },
           "secondary_attack": {
@@ -259,10 +223,7 @@
               "targets": {
                 "type": "array",
                 "items": {
-                  "enum": [
-                    "units",
-                    "structures"
-                  ]
+                  "enum": ["units", "structures"]
                 },
                 "maxItems": 2,
                 "uniqueItems": true
@@ -273,10 +234,7 @@
                 "maximum": 100
               }
             },
-            "required": [
-              "targets",
-              "interval_factor"
-            ],
+            "required": ["targets", "interval_factor"],
             "additionalProperties": false
           },
           "autonomy": {
@@ -350,11 +308,7 @@
                 }
               }
             },
-            "required": [
-              "model",
-              "reload_seconds",
-              "sockets"
-            ],
+            "required": ["model", "reload_seconds", "sockets"],
             "additionalProperties": false
           },
           "trail_origin": {
@@ -379,10 +333,7 @@
                 "maximum": 1
               }
             },
-            "required": [
-              "color",
-              "strength"
-            ],
+            "required": ["color", "strength"],
             "additionalProperties": false
           }
         },
@@ -413,8 +364,6 @@
       "maxItems": 32
     }
   },
-  "required": [
-    "units"
-  ],
+  "required": ["units"],
   "additionalProperties": false
 }

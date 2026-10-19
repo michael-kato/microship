@@ -38,17 +38,10 @@
                 "$ref": "shared.schema.json#/$defs/name"
               },
               "mode": {
-                "enum": [
-                  "manufacture",
-                  "spores"
-                ]
+                "enum": ["manufacture", "spores"]
               }
             },
-            "required": [
-              "building",
-              "default_unit",
-              "assault_unit"
-            ],
+            "required": ["building", "default_unit", "assault_unit"],
             "additionalProperties": false
           },
           "cell_appearance": {
@@ -91,10 +84,7 @@
                     "maximum": 75
                   },
                   "profile": {
-                    "enum": [
-                      "pointed",
-                      "rounded"
-                    ]
+                    "enum": ["pointed", "rounded"]
                   },
                   "seed": {
                     "type": "integer",
@@ -102,13 +92,7 @@
                     "maximum": 16777215
                   }
                 },
-                "required": [
-                  "features",
-                  "height",
-                  "width_degrees",
-                  "profile",
-                  "seed"
-                ],
+                "required": ["features", "height", "width_degrees", "profile", "seed"],
                 "additionalProperties": false
               },
               "morph_seconds": {
@@ -117,27 +101,16 @@
                 "maximum": 3600
               }
             },
-            "required": [
-              "tint",
-              "strength",
-              "seconds"
-            ],
+            "required": ["tint", "strength", "seconds"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "id",
-          "name",
-          "label",
-          "color"
-        ],
+        "required": ["id", "name", "label", "color"],
         "additionalProperties": false
       },
       "maxItems": 8
     }
   },
-  "required": [
-    "factions"
-  ],
+  "required": ["factions"],
   "additionalProperties": false
 }

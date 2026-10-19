@@ -14,9 +14,7 @@
             "$ref": "shared.schema.json#/$defs/name"
           },
           "shape": {
-            "enum": [
-              "leaf"
-            ]
+            "enum": ["leaf"]
           },
           "color": {
             "$ref": "shared.schema.json#/$defs/color"
@@ -50,27 +48,15 @@
                 "maxItems": 3
               }
             },
-            "required": [
-              "weight",
-              "radius"
-            ],
+            "required": ["weight", "radius"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "name",
-          "shape",
-          "color",
-          "roughness",
-          "ior",
-          "subsurface"
-        ],
+        "required": ["name", "shape", "color", "roughness", "ior", "subsurface"],
         "additionalProperties": false
       }
     }
   },
-  "required": [
-    "forms"
-  ],
+  "required": ["forms"],
   "additionalProperties": false
 }

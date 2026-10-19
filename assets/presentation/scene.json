@@ -1,35 +1,15 @@
 {
   "$schema": "../schemas/appearance.schema.json",
-  "ambient": [
-    0.04,
-    0.032,
-    0.038
-  ],
+  "ambient": [0.04, 0.032, 0.038],
   "gradient": {
-    "top": [
-      1.0,
-      1.0,
-      1.0
-    ],
-    "bottom": [
-      0.5,
-      0.5,
-      0.6
-    ]
+    "top": [1.0, 1.0, 1.0],
+    "bottom": [0.5, 0.5, 0.6]
   },
   "backdrop": {
     "model": "../models/anatomy_flesh.fmesh",
-    "position": [
-      0.0,
-      2.0,
-      -14.0
-    ],
+    "position": [0.0, 2.0, -14.0],
     "scale": 110.0,
-    "tint": [
-      1.0,
-      1.0,
-      1.0
-    ],
+    "tint": [1.0, 1.0, 1.0],
     "soft": {
       "blur_radius": 4,
       "glow": 0.25,
@@ -54,42 +34,18 @@
   },
   "lights": {
     "key": {
-      "direction": [
-        -0.55,
-        0.7,
-        0.6
-      ],
-      "color": [
-        1.0,
-        0.76,
-        0.68
-      ],
+      "direction": [-0.55, 0.7, 0.6],
+      "color": [1.0, 0.76, 0.68],
       "irradiance": 6.5
     },
     "fill": {
-      "direction": [
-        0.65,
-        0.2,
-        0.75
-      ],
-      "color": [
-        0.68,
-        0.8,
-        1.0
-      ],
+      "direction": [0.65, 0.2, 0.75],
+      "color": [0.68, 0.8, 1.0],
       "irradiance": 0.75
     },
     "rim": {
-      "direction": [
-        0.4,
-        0.45,
-        -0.8
-      ],
-      "color": [
-        1.0,
-        0.38,
-        0.5
-      ],
+      "direction": [0.4, 0.45, -0.8],
+      "color": [1.0, 0.38, 0.5],
       "irradiance": 6
     }
   },
@@ -103,18 +59,10 @@
     }
   },
   "atmosphere": {
-    "center": [
-      0,
-      0,
-      0
-    ],
+    "center": [0, 0, 0],
     "radius": 160,
     "edge_fade": 0.2,
-    "scattering": [
-      0.0045,
-      0.0013,
-      0.0018
-    ],
+    "scattering": [0.0045, 0.0013, 0.0018],
     "absorption": 0.0007,
     "anisotropy": 0.45,
     "shadows": false
@@ -123,11 +71,7 @@
     "blur_radius": 96,
     "sight_feather": 12,
     "plane_z": 0,
-    "tint": [
-      0.34,
-      0.09,
-      0.13
-    ],
+    "tint": [0.34, 0.09, 0.13],
     "memory_half_life_seconds": 3
   },
   "self_glow": {

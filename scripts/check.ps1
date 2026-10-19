@@ -7,6 +7,8 @@ $repo = Split-Path -Parent $PSScriptRoot
 $build = Join-Path $repo 'build/windows-dev'
 if ($Cpu -and $Gpu) { throw 'Choose -Cpu or -Gpu, not both.' }
 $gpuTests = if ($Gpu) { 'ON' } else { 'OFF' }
+& python (Join-Path $PSScriptRoot 'format_json.py') --check
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 if ($Gpu) {
     & python (Join-Path $PSScriptRoot 'gpu_environment.py')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -1,186 +1,199 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "nanova: configure Windows",
-            "type": "process",
-            "command": "cmake",
-            "args": [
-                "-S",
-                "${workspaceFolder}",
-                "-B",
-                "${workspaceFolder}/build/windows-cross",
-                "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/windows-mingw.cmake",
-                "-DCMAKE_BUILD_TYPE=Release",
-                "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-                "-DCMAKE_CROSSCOMPILING_EMULATOR=python3;${workspaceFolder}/scripts/proton_run.py",
-                "-DNANOVA_GPU_TESTS=OFF"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": [],
-            "hide": true
-        },
-        {
-            "label": "nanova: build Windows",
-            "type": "process",
-            "command": "cmake",
-            "args": [
-                "--build",
-                "${workspaceFolder}/build/windows-cross",
-                "--config",
-                "Release",
-                "--target",
-                "nanova",
-                "--parallel"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "dependsOn": "nanova: configure Windows",
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
-        },
-        {
-            "label": "nanova: run (Proton)",
-            "detail": "Play the virus-side biological prototype with ambient lighting.",
-            "type": "process",
-            "command": "python3",
-            "args": [
-                "${workspaceFolder}/scripts/proton_run.py",
-                "${workspaceFolder}/build/windows-cross/nanova.exe"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "dependsOn": "nanova: build Windows",
-            "problemMatcher": [],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "presentation": {
-                "reveal": "always",
-                "panel": "dedicated",
-                "clear": true
-            }
-        },
-        {
-            "label": "nanova: CPU E2E checks (Proton)",
-            "type": "process",
-            "command": "bash",
-            "args": [
-                "${workspaceFolder}/scripts/check.sh",
-                "--cpu"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "group": {
-                "kind": "test",
-                "isDefault": true
-            }
-        },
-        {
-            "label": "nanova: gameplay E2E (Proton)",
-            "detail": "Incremental build and CPU-only biological gameplay checks for both sides.",
-            "type": "process",
-            "command": "python3",
-            "args": [
-                "${workspaceFolder}/tests/e2e/biology.py",
-                "${workspaceFolder}/build/windows-cross/nanova.exe"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "dependsOn": "nanova: build Windows",
-            "problemMatcher": []
-        },
-        {
-            "label": "nanova: play as virus (Proton)",
-            "type": "process",
-            "command": "python3",
-            "args": [
-                "${workspaceFolder}/scripts/proton_run.py",
-                "${workspaceFolder}/build/windows-cross/nanova.exe",
-                "--world",
-                "${workspaceFolder}/assets/levels/biology-virus.world",
-                "--config",
-                "${workspaceFolder}/assets/rendering/biology.render"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "dependsOn": "nanova: build Windows",
-            "problemMatcher": [],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "presentation": {
-                "reveal": "always",
-                "panel": "dedicated",
-                "clear": true
-            }
-        },
-        {
-            "label": "nanova: play as white blood cells (Proton)",
-            "type": "process",
-            "command": "python3",
-            "args": [
-                "${workspaceFolder}/scripts/proton_run.py",
-                "${workspaceFolder}/build/windows-cross/nanova.exe",
-                "--world",
-                "${workspaceFolder}/assets/levels/biology-immune.world",
-                "--config",
-                "${workspaceFolder}/assets/rendering/biology.render"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "dependsOn": "nanova: build Windows",
-            "problemMatcher": [],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "presentation": {
-                "reveal": "always",
-                "panel": "dedicated",
-                "clear": true
-            }
-        },
-        {
-            "label": "nanova: planetary prototype (Proton)",
-            "type": "process",
-            "command": "python3",
-            "args": [
-                "${workspaceFolder}/scripts/proton_run.py",
-                "${workspaceFolder}/build/windows-cross/nanova.exe",
-                "--world",
-                "${workspaceFolder}/assets/levels/prototype.world",
-                "--config",
-                "${workspaceFolder}/assets/rendering/first.render"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "dependsOn": "nanova: build Windows",
-            "problemMatcher": [],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "presentation": {
-                "reveal": "always",
-                "panel": "dedicated",
-                "clear": true
-            }
-        }
-    ]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "nanova: configure Windows",
+      "type": "process",
+      "command": "cmake",
+      "args": [
+        "-S",
+        "${workspaceFolder}",
+        "-B",
+        "${workspaceFolder}/build/windows-cross",
+        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/windows-mingw.cmake",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+        "-DCMAKE_CROSSCOMPILING_EMULATOR=python3;${workspaceFolder}/scripts/proton_run.py",
+        "-DNANOVA_GPU_TESTS=OFF"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "hide": true
+    },
+    {
+      "label": "nanova: build Windows",
+      "type": "process",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "${workspaceFolder}/build/windows-cross",
+        "--config",
+        "Release",
+        "--target",
+        "nanova",
+        "--parallel"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "nanova: configure Windows",
+      "problemMatcher": ["$gcc"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "nanova: run (Proton)",
+      "detail": "Play the virus-side biological prototype with ambient lighting.",
+      "type": "process",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/scripts/proton_run.py",
+        "${workspaceFolder}/build/windows-cross/nanova.exe"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "nanova: build Windows",
+      "problemMatcher": [],
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "nanova: CPU E2E checks (Proton)",
+      "type": "process",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/check.sh", "--cpu"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": ["$gcc"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "nanova: gameplay E2E (Proton)",
+      "detail": "Incremental build and CPU-only biological gameplay checks for both sides.",
+      "type": "process",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/tests/e2e/biology.py",
+        "${workspaceFolder}/build/windows-cross/nanova.exe"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "nanova: build Windows",
+      "problemMatcher": []
+    },
+    {
+      "label": "nanova: play as virus (Proton)",
+      "type": "process",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/scripts/proton_run.py",
+        "${workspaceFolder}/build/windows-cross/nanova.exe",
+        "--world",
+        "${workspaceFolder}/assets/levels/biology-virus.world",
+        "--config",
+        "${workspaceFolder}/assets/rendering/biology.render"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "nanova: build Windows",
+      "problemMatcher": [],
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "nanova: play as white blood cells (Proton)",
+      "type": "process",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/scripts/proton_run.py",
+        "${workspaceFolder}/build/windows-cross/nanova.exe",
+        "--world",
+        "${workspaceFolder}/assets/levels/biology-immune.world",
+        "--config",
+        "${workspaceFolder}/assets/rendering/biology.render"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "nanova: build Windows",
+      "problemMatcher": [],
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "nanova: planetary prototype (Proton)",
+      "type": "process",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/scripts/proton_run.py",
+        "${workspaceFolder}/build/windows-cross/nanova.exe",
+        "--world",
+        "${workspaceFolder}/assets/levels/prototype.world",
+        "--config",
+        "${workspaceFolder}/assets/rendering/first.render"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "nanova: build Windows",
+      "problemMatcher": [],
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "nanova: format JSON",
+      "type": "process",
+      "command": "python3",
+      "args": ["${workspaceFolder}/scripts/format_json.py"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "nanova: check JSON formatting",
+      "type": "process",
+      "command": "python3",
+      "args": ["${workspaceFolder}/scripts/format_json.py", "--check"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
 }

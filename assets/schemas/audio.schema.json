@@ -31,11 +31,7 @@
               "maximum": 10
             }
           },
-          "required": [
-            "file",
-            "gain",
-            "cooldown"
-          ],
+          "required": ["file", "gain", "cooldown"],
           "additionalProperties": false
         },
         "growth": {
@@ -55,11 +51,7 @@
               "maximum": 10
             }
           },
-          "required": [
-            "file",
-            "gain",
-            "cooldown"
-          ],
+          "required": ["file", "gain", "cooldown"],
           "additionalProperties": false
         },
         "mature": {
@@ -79,11 +71,7 @@
               "maximum": 10
             }
           },
-          "required": [
-            "file",
-            "gain",
-            "cooldown"
-          ],
+          "required": ["file", "gain", "cooldown"],
           "additionalProperties": false
         },
         "birth": {
@@ -103,11 +91,7 @@
               "maximum": 10
             }
           },
-          "required": [
-            "file",
-            "gain",
-            "cooldown"
-          ],
+          "required": ["file", "gain", "cooldown"],
           "additionalProperties": false
         },
         "shot": {
@@ -127,11 +111,7 @@
               "maximum": 10
             }
           },
-          "required": [
-            "file",
-            "gain",
-            "cooldown"
-          ],
+          "required": ["file", "gain", "cooldown"],
           "additionalProperties": false
         },
         "hit": {
@@ -151,11 +131,7 @@
               "maximum": 10
             }
           },
-          "required": [
-            "file",
-            "gain",
-            "cooldown"
-          ],
+          "required": ["file", "gain", "cooldown"],
           "additionalProperties": false
         },
         "death": {
@@ -175,11 +151,7 @@
               "maximum": 10
             }
           },
-          "required": [
-            "file",
-            "gain",
-            "cooldown"
-          ],
+          "required": ["file", "gain", "cooldown"],
           "additionalProperties": false
         },
         "colonize": {
@@ -199,11 +171,7 @@
               "maximum": 10
             }
           },
-          "required": [
-            "file",
-            "gain",
-            "cooldown"
-          ],
+          "required": ["file", "gain", "cooldown"],
           "additionalProperties": false
         },
         "heal": {
@@ -223,11 +191,7 @@
               "maximum": 10
             }
           },
-          "required": [
-            "file",
-            "gain",
-            "cooldown"
-          ],
+          "required": ["file", "gain", "cooldown"],
           "additionalProperties": false
         },
         "win": {
@@ -247,11 +211,7 @@
               "maximum": 10
             }
           },
-          "required": [
-            "file",
-            "gain",
-            "cooldown"
-          ],
+          "required": ["file", "gain", "cooldown"],
           "additionalProperties": false
         },
         "lose": {
@@ -271,11 +231,7 @@
               "maximum": 10
             }
           },
-          "required": [
-            "file",
-            "gain",
-            "cooldown"
-          ],
+          "required": ["file", "gain", "cooldown"],
           "additionalProperties": false
         },
         "break": {
@@ -295,11 +251,7 @@
               "maximum": 10
             }
           },
-          "required": [
-            "file",
-            "gain",
-            "cooldown"
-          ],
+          "required": ["file", "gain", "cooldown"],
           "additionalProperties": false
         }
       },
@@ -320,9 +272,6 @@
       "additionalProperties": false
     }
   },
-  "required": [
-    "distance",
-    "events"
-  ],
+  "required": ["distance", "events"],
   "additionalProperties": false
 }

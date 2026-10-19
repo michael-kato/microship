@@ -18,11 +18,7 @@
         "spacing": 1.4,
         "production": 0.011,
         "seed": 4721,
-        "normal": [
-          0.0,
-          0.29,
-          0.957
-        ],
+        "normal": [0.0, 0.29, 0.957],
         "health": 150,
         "hits": 8,
         "regrow_seconds": 48,
@@ -47,11 +43,7 @@
         "head_radius": 0.85
       },
       "growth_plane": {
-        "normal": [
-          0,
-          0.28734789,
-          0.95782629
-        ],
+        "normal": [0, 0.28734789, 0.95782629],
         "depth_ratio": 0.15
       }
     },
@@ -72,11 +64,7 @@
         "spacing": 1.15,
         "production": 0.12,
         "seed": 4721,
-        "normal": [
-          0.0,
-          0.29,
-          0.957
-        ],
+        "normal": [0.0, 0.29, 0.957],
         "health": 300,
         "hits": 16,
         "regrow_seconds": 48,
@@ -92,11 +80,7 @@
         "head_radius": 0.55
       },
       "growth_plane": {
-        "normal": [
-          0,
-          0.28734789,
-          0.95782629
-        ],
+        "normal": [0, 0.28734789, 0.95782629],
         "depth_ratio": 0.15
       }
     },
@@ -117,11 +101,7 @@
         "spacing": 1.15,
         "production": 0.12,
         "seed": 4721,
-        "normal": [
-          0.0,
-          0.29,
-          0.957
-        ],
+        "normal": [0.0, 0.29, 0.957],
         "health": 150,
         "hits": 8,
         "regrow_seconds": 48,
@@ -137,11 +117,7 @@
         "head_radius": 0.55
       },
       "growth_plane": {
-        "normal": [
-          0,
-          0.28734789,
-          0.95782629
-        ],
+        "normal": [0, 0.28734789, 0.95782629],
         "depth_ratio": 0.15
       }
     }

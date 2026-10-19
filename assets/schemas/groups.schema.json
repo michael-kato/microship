@@ -29,20 +29,12 @@
             "$ref": "shared.schema.json#/$defs/name"
           }
         },
-        "required": [
-          "id",
-          "key",
-          "selection",
-          "singular",
-          "plural"
-        ],
+        "required": ["id", "key", "selection", "singular", "plural"],
         "additionalProperties": false
       },
       "maxItems": 8
     }
   },
-  "required": [
-    "groups"
-  ],
+  "required": ["groups"],
   "additionalProperties": false
 }

@@ -6,23 +6,11 @@
       "roughness_max": 0.58,
       "ior": 1.38,
       "frequency": 7,
-      "pigment_low": [
-        0.72,
-        0.87,
-        0.76
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.72, 0.87, 0.76],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.48,
-        "radius": [
-          0.12,
-          0.075,
-          0.055
-        ]
+        "radius": [0.12, 0.075, 0.055]
       }
     },
     "nucleus": {
@@ -30,23 +18,11 @@
       "roughness_max": 0.72,
       "ior": 1.4,
       "frequency": 13,
-      "pigment_low": [
-        0.58,
-        0.66,
-        0.76
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.58, 0.66, 0.76],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.55,
-        "radius": [
-          0.08,
-          0.045,
-          0.1
-        ]
+        "radius": [0.08, 0.045, 0.1]
       }
     },
     "nucleolus": {
@@ -54,23 +30,11 @@
       "roughness_max": 0.3,
       "ior": 1.44,
       "frequency": 22,
-      "pigment_low": [
-        0.72,
-        0.56,
-        0.68
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.72, 0.56, 0.68],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.48,
-        "radius": [
-          0.055,
-          0.075,
-          0.1
-        ]
+        "radius": [0.055, 0.075, 0.1]
       }
     },
     "mitochondrion": {
@@ -78,23 +42,11 @@
       "roughness_max": 0.73,
       "ior": 1.42,
       "frequency": 17,
-      "pigment_low": [
-        0.66,
-        0.77,
-        0.58
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.66, 0.77, 0.58],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.58,
-        "radius": [
-          0.1,
-          0.05,
-          0.025
-        ]
+        "radius": [0.1, 0.05, 0.025]
       }
     },
     "cristae": {
@@ -102,23 +54,11 @@
       "roughness_max": 0.4,
       "ior": 1.45,
       "frequency": 24,
-      "pigment_low": [
-        0.54,
-        0.67,
-        0.8
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.54, 0.67, 0.8],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.4,
-        "radius": [
-          0.04,
-          0.025,
-          0.05
-        ]
+        "radius": [0.04, 0.025, 0.05]
       }
     },
     "vesicle": {
@@ -126,23 +66,11 @@
       "roughness_max": 0.32,
       "ior": 1.4,
       "frequency": 18,
-      "pigment_low": [
-        0.74,
-        0.63,
-        0.78
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.74, 0.63, 0.78],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.68,
-        "radius": [
-          0.1,
-          0.075,
-          0.065
-        ]
+        "radius": [0.1, 0.075, 0.065]
       }
     },
     "reticulum": {
@@ -150,23 +78,11 @@
       "roughness_max": 0.8,
       "ior": 1.38,
       "frequency": 12,
-      "pigment_low": [
-        0.62,
-        0.76,
-        0.66
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.62, 0.76, 0.66],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.55,
-        "radius": [
-          0.045,
-          0.07,
-          0.09
-        ]
+        "radius": [0.045, 0.07, 0.09]
       }
     },
     "substrate": {
@@ -174,23 +90,11 @@
       "roughness_max": 0.96,
       "ior": 1.35,
       "frequency": 11,
-      "pigment_low": [
-        0.54,
-        0.69,
-        0.61
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.54, 0.69, 0.61],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.38,
-        "radius": [
-          0.055,
-          0.08,
-          0.065
-        ]
+        "radius": [0.055, 0.08, 0.065]
       }
     },
     "virus_capsid": {
@@ -198,23 +102,11 @@
       "roughness_max": 0.48,
       "ior": 1.48,
       "frequency": 9,
-      "pigment_low": [
-        0.6,
-        0.74,
-        0.9
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.6, 0.74, 0.9],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.46,
-        "radius": [
-          0.1,
-          0.14,
-          0.18
-        ]
+        "radius": [0.1, 0.14, 0.18]
       }
     },
     "virus_sheath": {
@@ -222,23 +114,11 @@
       "roughness_max": 0.67,
       "ior": 1.42,
       "frequency": 17,
-      "pigment_low": [
-        0.52,
-        0.83,
-        0.7
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.52, 0.83, 0.7],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.46,
-        "radius": [
-          0.075,
-          0.12,
-          0.1
-        ]
+        "radius": [0.075, 0.12, 0.1]
       }
     },
     "virus_fibre": {
@@ -246,23 +126,11 @@
       "roughness_max": 0.93,
       "ior": 1.36,
       "frequency": 10,
-      "pigment_low": [
-        0.74,
-        0.64,
-        0.84
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.74, 0.64, 0.84],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.38,
-        "radius": [
-          0.04,
-          0.07,
-          0.055
-        ]
+        "radius": [0.04, 0.07, 0.055]
       }
     },
     "immune_surface": {
@@ -270,23 +138,11 @@
       "roughness_max": 0.78,
       "ior": 1.4,
       "frequency": 13,
-      "pigment_low": [
-        0.77,
-        0.67,
-        0.59
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.77, 0.67, 0.59],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.65,
-        "radius": [
-          0.22,
-          0.12,
-          0.15
-        ]
+        "radius": [0.22, 0.12, 0.15]
       }
     },
     "immune_granule": {
@@ -294,23 +150,11 @@
       "roughness_max": 0.36,
       "ior": 1.46,
       "frequency": 20,
-      "pigment_low": [
-        0.71,
-        0.53,
-        0.68
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.71, 0.53, 0.68],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.55,
-        "radius": [
-          0.1,
-          0.06,
-          0.08
-        ]
+        "radius": [0.1, 0.06, 0.08]
       }
     },
     "fungal_stalk": {
@@ -318,23 +162,11 @@
       "roughness_max": 0.96,
       "ior": 1.38,
       "frequency": 14,
-      "pigment_low": [
-        0.58,
-        0.69,
-        0.45
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.58, 0.69, 0.45],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.45,
-        "radius": [
-          0.13,
-          0.08,
-          0.035
-        ]
+        "radius": [0.13, 0.08, 0.035]
       }
     },
     "fungal_cap": {
@@ -342,23 +174,11 @@
       "roughness_max": 0.62,
       "ior": 1.44,
       "frequency": 10,
-      "pigment_low": [
-        0.76,
-        0.63,
-        0.43
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.76, 0.63, 0.43],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.58,
-        "radius": [
-          0.2,
-          0.12,
-          0.06
-        ]
+        "radius": [0.2, 0.12, 0.06]
       }
     },
     "fungal_spore": {
@@ -366,23 +186,11 @@
       "roughness_max": 0.42,
       "ior": 1.46,
       "frequency": 16,
-      "pigment_low": [
-        0.61,
-        0.78,
-        0.53
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.61, 0.78, 0.53],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.6,
-        "radius": [
-          0.16,
-          0.11,
-          0.05
-        ]
+        "radius": [0.16, 0.11, 0.05]
       }
     },
     "spike": {
@@ -390,23 +198,11 @@
       "roughness_max": 0.43,
       "ior": 1.48,
       "frequency": 12,
-      "pigment_low": [
-        0.77,
-        0.92,
-        0.84
-      ],
-      "pigment_high": [
-        1,
-        1,
-        1
-      ],
+      "pigment_low": [0.77, 0.92, 0.84],
+      "pigment_high": [1, 1, 1],
       "subsurface": {
         "weight": 0.35,
-        "radius": [
-          0.06,
-          0.09,
-          0.075
-        ]
+        "radius": [0.06, 0.09, 0.075]
       }
     }
   }

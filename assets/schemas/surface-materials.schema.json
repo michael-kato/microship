@@ -83,9 +83,7 @@
       "additionalProperties": false
     }
   },
-  "required": [
-    "surfaces"
-  ],
+  "required": ["surfaces"],
   "additionalProperties": false,
   "$defs": {
     "surface": {
@@ -150,10 +148,7 @@
               "maxItems": 3
             }
           },
-          "required": [
-            "weight",
-            "radius"
-          ],
+          "required": ["weight", "radius"],
           "additionalProperties": false
         }
       },
