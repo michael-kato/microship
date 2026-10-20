@@ -7,6 +7,7 @@ import subprocess,sys,tempfile
 from asset_data import stage_world,write_world
 root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
+quick='--quick' in sys.argv[2:]
 count=0
 with tempfile.TemporaryDirectory(prefix='nanova-factory-repair-') as directory:
     out=Path(directory);base=stage_world(root/'assets/levels/virus-player-level.json',out)
@@ -40,6 +41,9 @@ with tempfile.TemporaryDirectory(prefix='nanova-factory-repair-') as directory:
     for b in poor['content']['buildings']:b['collection']=.00001
     unfunded=run('no_nutrients',poor,ticks=300)['colonies'][0]
     assert unfunded['wounds']==1 and unfunded['repairing'] and unfunded['produced']==[0,0],unfunded
+    if quick:
+        print(f'Factory repair quick check passed: {count} application runs; wounds, nutrient cost, production priority and empty supply.')
+        raise SystemExit(0)
     # A dead root remains dead until its full replacement cost has been paid.
     broken=deepcopy(damaged);broken['content']['units'][-1]['attack']['damage']=1000
     lost=run('broken_root',broken,ticks=15)['colonies'][0]

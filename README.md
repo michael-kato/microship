@@ -11,6 +11,6 @@ Simulation rules remain separate from rendering. The project uses direct functio
 C++ and Vulkan target Windows. Linux builds use MinGW, `glslc`, and an initialized Steam Proton 11 prefix:
 
 ```sh
-bash scripts/check.sh --cpu
+bash scripts/check.sh
 python3 scripts/proton_run.py build/windows-cross/nanova.exe
 ```

@@ -5,9 +5,24 @@ The target is Windows. Linux cross-compiles with MinGW and `glslc`. Application 
 A clean build needs the compiler, Vulkan headers and import library, `glslc`, and an initialized Proton prefix. Local tools are in `build/toolchains/`. Set `NANOVA_PROTON` and `STEAM_COMPAT_DATA_PATH` to use another Proton installation and prefix. The default prefix is `build/proton11-prefix`; it must contain `pfx/system.reg`. A normal Proton `run` command initializes it.
 
 ```sh
-bash scripts/check.sh --cpu
+bash scripts/check.sh
 python3 scripts/proton_run.py build/windows-cross/nanova.exe
 ```
+
+`check.sh` defaults to an incremental build and short CPU application checks.
+It starts no GPU work. Use `--quick fungal` or `--quick repair` to check one
+changed area. Use `--quick smoke` for build, asset loading, render-input
+creation and shutdown only. These short checks cover selected scenarios;
+they do not replace the full suite. Run `bash scripts/check.sh --cpu` for
+all CPU checks. Keep the full suite out of each edit cycle. Use the existing
+bounded GPU checks when a visual change requires them.
+
+On this host, an unchanged incremental build plus the 13 focused application
+runs took 7.44 seconds. The full 30-group CPU suite took 525 seconds. The
+short path checks factory repair, fungal growth, production, contact damage,
+haze range and healing. It excludes capacity, broad combat, other controls
+and renderer regressions covered by the full suite. These are different
+coverage levels. Timing records are in `build/iteration_review/`.
 
 Build assets are copied beside the executable. Keep `build/` ignored. Remove `build/windows-cross/` for a clean game build; keep local tools in `build/toolchains/`.
 
