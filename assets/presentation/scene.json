@@ -106,6 +106,7 @@
     "emission_fresnel": {
       "strength": 1.0,
       "power": 0.5
-    }
+    },
+    "emission_color": [1.0, 0.55, 0.25]
   }
 }

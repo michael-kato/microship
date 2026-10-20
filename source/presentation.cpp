@@ -169,6 +169,7 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
     catch (const std::bad_alloc&) { fprintf(stderr,"Cannot allocate game presentation storage.\n");return false; }
     memcpy(scene->organelle_style,w->organelle_style,sizeof(scene->organelle_style));
     memcpy(scene->emission_fresnel,w->factory_emission_fresnel,sizeof(scene->emission_fresnel));
+    memcpy(scene->emission_color,w->factory_emission_color,sizeof(scene->emission_color));
     scene->ambient=w->ambient;scene->ambient_top=w->ambient_top;scene->ambient_bottom=w->ambient_bottom;
     for (uint32_t i=0;i<3;++i) scene->lights[i]=RenderLight{w->studio[i].direction,w->studio[i].color,w->studio[i].irradiance};
     scene->lights_enabled=w->studio_mask!=0;scene->guides_required=w->combat.enabled;

@@ -144,7 +144,14 @@ the emission level. Stems, leaf heads and their debris use this mask. Surface
 pigment and reflected light remain visible at the rim. Build and restart after
 editing source assets to load the new bundled values.
 
-Virus factories use faceted phage heads, six pointed tail fibres, and tapered
+`factory_appearance.emission_color` sets the factory glow independently of its
+surface pigment. The default `[1.0, 0.55, 0.25]` is warm amber in linear RGB.
+Lower blue or raise red for a warmer glow. The existing self-glow controls set
+brightness, and the Fresnel controls still set the dark rim. The color also
+applies to detached factory parts. Omit `emission_color` to use the surface color
+for emission again. Setting Fresnel strength to zero keeps the color override.
+
+Virus factories use faceted phage heads, six pointed tail fibres, and
 continuous tapered shafts with irregular surfaces. Growth follows the forked
 tree.
 Factory stems and heads have zero SSS. Cells, organelles, and units retain SSS.

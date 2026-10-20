@@ -478,6 +478,17 @@
           },
           "required": ["strength", "power"],
           "additionalProperties": false
+        },
+        "emission_color": {
+          "type": "array",
+          "description": "Factory emission RGB in linear color. Does not change surface pigment. Omit to use the surface color.",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "minItems": 3,
+          "maxItems": 3
         }
       },
       "required": ["emission_fresnel"],

@@ -930,7 +930,7 @@ sampling and Khronos host validation. They do not measure sustained play.
 ## Factory emission mask
 
 Run `ctest --test-dir build/windows-cross --output-on-failure -R '^factory_emission$'`
-after a build. Thirteen real-application runs check the controls, optional and
+after a build. Nineteen real-application runs check the color and rim controls, optional and
 disabled settings, all three factions, instance scope, unchanged game results,
 and invalid settings. `natural_factory` also checks the mask flag on leaf heads
 and stems through growth, damage and regrowth.
@@ -952,3 +952,14 @@ Prepared inputs, logs, report and comparison viewers are in
 `build/factory_fresnel_review/`. Its `run_review.py` prepares inputs by default;
 `--run` starts the bounded GPU batch. `wide_comparison.html` and
 `near_comparison.html` compare the disabled and enabled images.
+
+The warm factory color update passed `data_assets` and `factory_emission` on
+Oct 20. Three native 1080p two-frame captures passed host validation at default
+sampling, with no tracing. With the color override omitted, the wide image
+matched its prior capture pixel for pixel. The warm color preserved the game
+state, geometry, poses and Fresnel settings. The warm close view measured
+10.927/7.378 ms GPU time; these short checks do not establish sustained cost.
+Screenshots `000938_warm_wide_factory_emission.png` and
+`000939_warm_near_factory_emission.png` show the final color. Inputs, logs, report
+and before/after viewers are in `build/warm_factory_review/`. Its `run_review.py`
+prepares inputs by default; `--run` starts the bounded GPU batch.

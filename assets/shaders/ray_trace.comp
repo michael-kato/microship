@@ -992,7 +992,10 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
             }
         }
 #endif
-        vec3 direct=s.color*s.emission;
+        vec3 glow_color=s.color;
+        if ((uint(instance_style[s.instance].material.w)&8u)!=0u && render.emission_color.w>0.0)
+            glow_color=render.emission_color.rgb;
+        vec3 direct=glow_color*s.emission;
         vec3 sss=vec3(0);
         for (int light=0;light<3;++light)
         { vec3 contribution;direct+=evaluate_studio(s,-direction,light,contribution);sss+=contribution; }
@@ -1000,7 +1003,7 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
         { vec3 contribution=subsurface_sample_weight*evaluate_subsurface(s,-direction);direct+=contribution;sss+=contribution; }
         float view_cosine=abs(dot(s.normal,direction));
         float opacity=s.translucent ? membrane_opacity(view_cosine) : 1.0;
-        film_emission+=weight*s.color*s.emission*opacity;
+        film_emission+=weight*glow_color*s.emission*opacity;
         vec3 contribution=weight*(direct+ambient_surface(s,-direction))*opacity;
         radiance+=contribution;
         if (blur_radius<=0.0) film_sharp_sum+=contribution;

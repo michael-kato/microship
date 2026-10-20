@@ -35,19 +35,25 @@ with tempfile.TemporaryDirectory(prefix='nanova-factory-emission-') as directory
             tagged+=factory
         assert tagged>0,name
         return game,render
-    game,scene=run('default');assert scene['emission_fresnel']==[1,.5]
+    game,scene=run('default');assert scene['emission_fresnel']==[1,.5] and scene['emission_color']==[1,.55,.25,1]
     off=change(base,'appearance.factory_appearance.emission_fresnel.strength',0)
     same,disabled=run('off',off);assert same==game and disabled['emission_fresnel']==[0,.5]
     absent=deepcopy(base);absent['appearance'].pop('factory_appearance')
-    same,optional=run('absent',absent);assert same==game and optional['emission_fresnel']==[0,1]
+    same,optional=run('absent',absent);assert same==game and optional['emission_fresnel']==[0,1] and optional['emission_color']==[0,0,0,0]
+    inherited=deepcopy(base);inherited['appearance']['factory_appearance'].pop('emission_color')
+    same,render=run('surface_color',inherited);assert same==game and render['emission_color']==[0,0,0,0]
+    same,render=run('black_emission',change(base,'appearance.factory_appearance.emission_color',[0,0,0]))
+    assert same==game and render['emission_color']==[0,0,0,1]
     for power in (.01,16):
         same,render=run('power_'+str(power),change(base,'appearance.factory_appearance.emission_fresnel.power',power))
         assert same==game and render['emission_fresnel']==[1,power]
     for side in ('immune','fungus'):
         data=stage_world(root/'assets/levels'/(side+'-player-level.json'),out)
-        _,render=run(side,data);assert render['emission_fresnel']==[1,.5]
+        _,render=run(side,data);assert render['emission_fresnel']==[1,.5] and render['emission_color']==[1,.55,.25,1]
     for field,value in [('strength',-.01),('strength',1.01),('power',0),('power',16.01),('extra',1)]:
         run('invalid_'+str(count),change(base,'appearance.factory_appearance.emission_fresnel.'+field,value),expected=1)
+    for color in ([1,.5],[1,.5,.25,1],[-.01,.5,.25],[1,1.01,.25]):
+        run('invalid_color_'+str(count),change(base,'appearance.factory_appearance.emission_color',color),expected=1)
     missing=deepcopy(base);missing['appearance']['factory_appearance']['emission_fresnel'].pop('power')
     run('missing_power',missing,expected=1)
 print(f'Factory emission E2E passed: {count} application runs; controls, disabled and absent defaults, all factions, instance scope, unchanged game results, and rejected settings.')

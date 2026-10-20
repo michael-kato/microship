@@ -278,7 +278,14 @@ static bool load_appearance(World* w,const char* path,uint32_t seed)
     Json factory=json_find(root,"factory_appearance");
     if (json_present(factory))
     {
-        json_object(factory,"emission_fresnel");
+        json_object(factory,"emission_fresnel|emission_color");
+        Json emission_color=json_find(factory,"emission_color");
+        if (json_present(emission_color))
+        {
+            Color color=json_color(emission_color);
+            w->factory_emission_color[0]=color.r;w->factory_emission_color[1]=color.g;w->factory_emission_color[2]=color.b;
+            w->factory_emission_color[3]=1;
+        }
         Json fresnel=json_get(factory,"emission_fresnel");json_object(fresnel,"strength|power");
         w->factory_emission_fresnel[0]=json_float(json_get(fresnel,"strength"),0,1);
         w->factory_emission_fresnel[1]=json_float(json_get(fresnel,"power"),.01f,16);

@@ -47,7 +47,7 @@ struct RenderScene
     float background_blur, background_glow, background_ambient;
     Vec3 background_wave;
     float background_animation[4];
-    float organelle_style[4],membrane_ripple[4],emission_fresnel[4];
+    float organelle_style[4],membrane_ripple[4],emission_fresnel[4],emission_color[4];
     float bounds_min[3],bounds_max[3],foreground_min[3],foreground_max[3];
     double time_seconds;
 };
