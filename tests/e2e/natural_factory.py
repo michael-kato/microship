@@ -66,23 +66,35 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
         state,_=run(side,d,ticks=120);home=1 if side=='immune' else 0;c=state['colonies'][home]
         definition=next(b for b in d['content']['buildings'] if b['faction']==side)
         check_roots(c,definition['branches']);assert len(c['structures'])==9
-    # One expendable spore removes one root, then leaves the factory alone to regrow.
-    regrow=deepcopy(data)
-    for start in regrow['match'].pop('starts'):regrow['bodies'][start['cell']]['owner']=start['faction']
-    regrow['match']['opponent']='fungus';regrow['bodies'][1]['owner']='fungus';regrow['spawns']=[];regrow['rules'].pop('exploration',None)
-    for b in regrow['content']['buildings']:b['hits']=1;b['branches']['regrow_seconds']=.5
-    initial,_=run('regrow_probe',regrow,ticks=120);original=initial['colonies'][0]['structures'];tip=original[0]['position']
-    regrow['spawns']=[dict(type='fungal_spore',position=[tip[0],tip[1],tip[2]+.1])]
-    for unit in regrow['content']['units']:
-        if unit['name']=='fungal_spore':unit.update(range=.4,speed=.01);unit['attack'].update(damage=1000,lifetime=.4,cloud=dict(radius=.25,seconds=.1,damage=.001))
-    lost,_=run('lost_root',regrow,ticks=10);assert lost['colonies'][0]['health']==0 and lost['colonies'][0]['active']
-    rebuilt,_=run('regrown',regrow,ticks=120);c=rebuilt['colonies'][0];check_roots(c,branch);check_stems(c)
-    assert c['structures'][0]['generation']==2 and c['structures'][0]['health']==profile['health']
-    assert c['structures'][0]['stem']!=original[0]['stem'],'Regrowth reused the dead branch shape'
-    assert c['structures'][1]['stem']==original[1]['stem'] and c['structures'][1]['generation']==1,'An unrelated tree moved'
-    stable,_=run('regrown_stable',regrow,ticks=180)
-    assert stable['colonies'][0]['structures']==c['structures'],'Regrown branches did not remain stable'
-    assert run('regrown_repeat',regrow,ticks=120)[0]==rebuilt
+    # One expendable attacker removes one root, then leaves each faction to regrow.
+    for side in ('virus','immune','fungus'):
+        regrow=deepcopy(data);enemy='virus' if side=='fungus' else 'fungus'
+        regrow['match'].pop('starts');regrow['match'].update(player=side,opponent=enemy)
+        regrow['bodies'][0]['owner']=side;regrow['bodies'][1]['owner']=enemy
+        regrow['spawns']=[];regrow['rules'].pop('exploration',None)
+        for b in regrow['content']['buildings']:b['hits']=1;b['branches']['regrow_seconds']=.5
+        definition=next(b for b in regrow['content']['buildings'] if b['faction']==side)
+        initial,_=run(side+'_regrow_probe',regrow,ticks=120)
+        original=initial['colonies'][0]['structures'];tip=original[0]['position']
+        attacker=deepcopy(next(u for u in regrow['content']['units'] if u['name']=='fungal_spore'))
+        attacker.update(name='root_breaker',faction=enemy,range=.4,speed=.01)
+        attacker['attack'].update(damage=1000,lifetime=.4,cloud=dict(radius=.25,seconds=.1,damage=.001))
+        regrow['content']['units'].append(attacker)
+        regrow['spawns']=[dict(type='root_breaker',position=[tip[0],tip[1],tip[2]+.1])]
+        lost,_=run(side+'_lost_root',regrow,ticks=10)
+        assert lost['colonies'][0]['health']==0 and lost['colonies'][0]['active'],side
+        rebuilt,_=run(side+'_regrown',regrow,ticks=120);c=rebuilt['colonies'][0]
+        check_roots(c,definition['branches'])
+        if side=='virus':check_stems(c)
+        for limb in c['structures']:
+            if limb['parent']>=0:assert limb['stem'][0]==c['structures'][limb['parent']]['stem'][3],side
+        assert c['structures'][0]['generation']==2 and c['structures'][0]['health']==definition['health'],side
+        assert c['structures'][0]['stem']!=original[0]['stem'],(side,'Regrowth reused the dead branch shape')
+        for k in range(1,c['root_count']):
+            assert c['structures'][k]['stem']==original[k]['stem'] and c['structures'][k]['generation']==1,(side,'An unrelated root moved')
+        stable,_=run(side+'_regrown_stable',regrow,ticks=180)
+        assert stable['colonies'][0]['structures']==c['structures'],(side,'Regrown branches did not remain stable')
+        assert run(side+'_regrown_repeat',regrow,ticks=120)[0]==rebuilt,side
     for path,value in [('root_limit',0),('root_limit',129),('root_minimum_radius',1.4),('tree.branch_probability',1.1),('tree.angle_jitter_degrees',31),('tree.length_jitter',.41),('tree.width_jitter',.31)]:
         run('invalid_'+str(count),change(data,'content.buildings.0.branches.'+path,value),expected=1)
 print(f'Natural factory E2E passed: {count} application runs; largest roots, fewer seeded branches, stable mature shapes, new regrowth shapes, connected joints, scale bounds, faction roots, and rejected settings.')

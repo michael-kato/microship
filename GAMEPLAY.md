@@ -14,6 +14,23 @@ Factory deployment takes 180 seconds. Every factory root starts growing when the
 
 Each virus organelle root grows a curved trunk, two forked sub-trunks, and four smaller branches with terminal leaves. Factories root on the three largest organelles, so a virus cell has at most twenty-one structures; each fork has a 72 percent chance of a second branch. Child lengths and widths use a 0.62 scale at each level. Child production contribution is 0.05 per mature limb, so a full virus tree roughly matches an immune fan's nutrient income. Immune and fungal factories have nine structures and a 0.12 child contribution. Storage supports 128 structures per cell.
 
+Factory roots use `branches.root_limit` and `root_minimum_radius` in
+`assets/gameplay/factory-types.json`. The defaults select up to three of the
+largest eligible organelles. Small cells have two eligible roots. The radius
+threshold is 0.1 in local mesh units, before cell scale. Small vesicles do not
+produce roots. Mesh-part `attachment_radius` records the size used for selection;
+startup organelle size variation also changes that value.
+
+Virus branch controls are under `branches.tree`. `branch_probability` sets the
+chance of a second child; the first child is always present. The first child of
+the first root stays a leaf for early production. `angle_jitter_degrees`,
+`length_jitter`, and `width_jitter` vary split angle, length, and width. Current
+settings are 16 degrees, 25 percent, and 15 percent. `bend` adds direction variation
+along the four stem segments. The world seed and branch seed select the shape.
+All factions choose a new shape when a damaged branch regrows. Only that branch
+and its descendants change; other roots keep their shapes. Shapes stay fixed
+after growth. The separate slow sway animation still moves the tree.
+
 Virus trees grow side by side. New units grow at terminal leaves. Support damage removes descendants. The growth plane is authored to match the startup view. Moving the camera does not change geometry or gameplay.
 
 Ownership changes the existing cell wall shape over 24 seconds. Its tint changes over 180 seconds. Seeded pigment variation changes the wall brightness and shifts its hue between pink and blue-green. Virus control blends in a pointed radial displacement and a shinier blue-green material. Fungal control blends in broad rounded displacement and a rougher brown material. Immune control returns the wall to its neutral shape and moves its material toward pink and white. Vertex and triangle counts stay fixed. Normals and render bounds follow the current positions. No separate spines or lobes appear. Organelle geometry, collision rules, attachment points, and game outcomes do not change.
@@ -108,19 +125,21 @@ current render switches.
 Self-glow strengths are in `assets/presentation/scene.json`, under `self_glow`.
 Cell internals, organelles, factory stems, leaves, and units have separate controls.
 These surfaces do not light nearby objects. The cell wall has no self-glow and
-does not feed the halo. Virus stalk ridges have dark pigment and no emission;
-the shaft beneath them glows. Bloom uses the current visible emissive strength,
+does not feed the halo. Virus shafts use their authored emission mask. Bloom
+uses the current visible emissive strength,
 a brightness threshold, and a quarter-resolution blur. Surfaces and display
 output stay at native resolution. F10 switches self-glow and the halo together.
 
-Virus factories use faceted phage heads, six pointed tail fibres, and dark,
-pointed collars around the glowing shaft. Growth still follows the forked tree.
+Virus factories use faceted phage heads, six pointed tail fibres, and tapered
+continuous tapered shafts with irregular surfaces. Growth follows the forked
+tree.
 Factory stems and heads have zero SSS. Cells, organelles, and units retain SSS.
 Factory shape controls are in `assets/models/source/cell-unit-factory-shape.json`,
-under `factories.virus`. `collar_points` sets the collar corners; `sheath_radius`
-sets their reach; `head_radius` and `head_height_scale` set the capsid size;
-`fibre_spread` and `fibre_radius` set the tail fibres. Run the mesh authoring script
-after an edit. These controls do not change production or combat rules.
+under `factories.virus`. `shaft_radius` sets the shaft width; `shaft_sides` and
+`stem_sections` set its mesh density; `surface_jitter` sets its surface variation.
+`head_radius` and `head_height_scale` set the capsid size. `fibre_spread` and
+`fibre_radius` set the tail fibres. Run the mesh authoring script after an edit.
+These mesh controls do not change production or combat rules.
 
 Virus wall mutation uses 256 pointed displacement features, each with a
 6-degree angular width. Set these in `assets/gameplay/factions.json`, under
@@ -140,7 +159,7 @@ Organelle color and glow controls are in `assets/presentation/scene.json`, under
 | `center_glow` | Multiplies `self_glow.organelles` at the center. Zero removes organelle emission. |
 | `center_power` | Concentrates emission toward the center. Higher values make the bright area smaller. Zero gives uniform emission. |
 
-The defaults are 1.8, 0.65, 2.5, and 2.5. Rim color and center glow depend on the
+The defaults are 1.8, 0.65, 4.5, and 2.5. Rim color and center glow depend on the
 current viewing angle. The organelle keeps its pigment color. Its glow does not
 cast light onto other surfaces. F10 removes emission and bloom; rim color remains.
 

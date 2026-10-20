@@ -897,3 +897,23 @@ tick in a full fight. Bounded 1080p GPU frames through Proton with the
 with no units, 10.5 ms close up. Virus fighters (1256 triangles, eleven
 spikes each) cost 6.8 and 13.9 ms in the same views.
 
+
+## Factory shape checks
+
+Run `ctest --test-dir build/windows-cross --output-on-failure -R '^natural_factory$'`
+after a build. This starts the real Windows application through Proton. It checks
+large-organelle root selection, seeded branch counts and dimensions, connected
+joints, mature shape stability, and rejected settings. Damage scenarios check
+new regrowth shapes for virus, immune and fungal factories. Other roots must
+keep their shapes, and a repeated seed must produce the same result.
+
+On Oct 20, the Windows cross-build and four application check groups passed:
+`natural_factory`, `growth_factions`, `colony_forms`, and `cell_animation`.
+Two native 1920×1080 captures through Proton passed with Khronos host validation
+and no tracing. Each used two frozen frames with default sampling. The grown
+virus cell had three roots and fifteen structures at seed 1234. GPU times were
+6.572/4.166 ms in the full-factory view and 9.356/7.297 ms in the close view.
+The first frame includes initial bake work. These are short appearance checks,
+not sustained performance or native Windows results. Screenshots are
+`000927_natural_factory_current_wide.png` and
+`000928_natural_factory_current_near.png` in `screenshots/`.

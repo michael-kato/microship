@@ -431,7 +431,6 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
 static void regrow_factory_stems(Simulation* s,uint32_t p,uint32_t root,uint32_t generation)
 {
     const BranchRules& f=simulation_producer_definition(s,p)->branches;
-    if (f.grammar!=GROWTH_TREE || (f.angle_jitter==0 && f.length_jitter==0 && f.width_jitter==0)) return;
     Colony& c=s->colonies[p];
     for (uint32_t k=root;k<c.structure_count;++k)
     {
@@ -495,7 +494,7 @@ static void prepare_factory(Simulation* s,uint32_t p)
     if (simulation_producer_definition(s,p)->segment_path[0])
     {
         seed^=body.seed;
-        if (f->branch_probability<1 || f->angle_jitter>0 || f->length_jitter>0 || f->width_jitter>0) seed^=(c->generation-1)*TARGET_SEED_MULTIPLIER;
+        seed^=(c->generation-1)*TARGET_SEED_MULTIPLIER;
         for (uint32_t k=0;k<c->structure_count;++k) build_factory_stem(s,p,k,&seed);
         return;
     }
