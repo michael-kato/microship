@@ -517,6 +517,8 @@ static void establish_colony(Simulation* s,uint32_t p,Faction faction)
     c->type=s->world.content.factions[faction].producer;
     c->health=simulation_producer_definition(s,p)->health;c->growth=INITIAL_FACTORY_GROWTH;c->priority=s->world.content.factions[faction].default_unit;
     c->fighter_percent=s->world.content.units[c->priority].group==0 ? 100 : 0;c->production_error=50;
+    if (s->world.gameplay.production_ratio_default && content_product(&s->world.content,faction,0)>=0 && content_product(&s->world.content,faction,1)>=0)
+    { c->fighter_percent=s->world.gameplay.default_fighter_percent;c->ratio_enabled=true; }
     c->active=true;c->root_generation=1;
     s->world.bodies[p].owner=faction;s->faction_established[faction]=true;++s->faction_stats[faction].colonies_gained;
     if (s->world.gameplay.enabled) prepare_factory(s,p);

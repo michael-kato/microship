@@ -91,11 +91,13 @@ static bool load_rules(World* w,const char* path)
     Json economy=json_find(root,"economy");
     if (json_present(economy))
     {
-        Json j=economy;json_object(j,"storage|manufacture_seconds|landing_seconds|enemy_attack_seconds");
+        Json j=economy;json_object(j,"storage|manufacture_seconds|landing_seconds|enemy_attack_seconds|fighter_percent");
         w->gameplay.storage=json_positive(json_get(j,"storage"),MAX_RULES_STORAGE);
         w->gameplay.manufacture_seconds=json_positive(json_get(j,"manufacture_seconds"),MAX_RULES_MANUFACTURE_SECONDS);
         w->gameplay.landing_seconds=json_positive(json_get(j,"landing_seconds"),MAX_RULES_LANDING_SECONDS);
         w->gameplay.enemy_attack_seconds=json_positive(json_get(j,"enemy_attack_seconds"),MAX_RULES_ENEMY_ATTACK_SECONDS);
+        Json ratio=json_find(j,"fighter_percent");
+        if (json_present(ratio)) { w->gameplay.default_fighter_percent=json_uint(ratio,0,100);w->gameplay.production_ratio_default=true; }
         w->gameplay.enabled=true;
     }
     Json ai=json_find(root,"ai");

@@ -204,3 +204,7 @@ Cell organs use a fixed arrangement for each world seed.
 of random arrangement rotation. The default is 180 degrees. Existing
 per-organ position, size, and orientation variation still applies.
 Factory roots use the same transform as the organs. Restart keeps the seed.
+
+New colonies use an 80/20 fighter/bomber mix when both roles exist.
+`economy.fighter_percent` in `gameplay-rules.json` sets this default.
+Each cell retains its own slider value. Fungal cells produce spores only.

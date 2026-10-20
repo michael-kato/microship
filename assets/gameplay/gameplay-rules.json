@@ -5,7 +5,8 @@
     "storage": 180.0,
     "manufacture_seconds": 12,
     "landing_seconds": 1.5,
-    "enemy_attack_seconds": 140.0
+    "enemy_attack_seconds": 140.0,
+    "fighter_percent": 80
   },
   "ai": {
     "production_rate": 1,

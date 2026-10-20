@@ -31,6 +31,11 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 10000
+        },
+        "fighter_percent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
         }
       },
       "required": ["storage", "manufacture_seconds", "landing_seconds", "enemy_attack_seconds"],

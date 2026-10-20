@@ -9,6 +9,7 @@ from authored_assets import stage_world, write_world
 def established_world(source,directory):
     """Stage the prior axial factory fixture. Current startup and tree checks use stage_world."""
     data=stage_world(source,directory)
+    data['rules']['economy'].pop('fighter_percent',None)
     for start in data['match'].pop('starts',[]):data['bodies'][start['cell']]['owner']=start['faction']
     for building in data['content']['buildings']:
         building['branches'].pop('root_limit',None);building['branches'].pop('root_minimum_radius',None)

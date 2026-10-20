@@ -46,6 +46,7 @@ struct GameplayRules
 {
     bool enabled;
     float storage,manufacture_seconds,landing_seconds,enemy_attack_seconds;
+    uint32_t default_fighter_percent;bool production_ratio_default;
 };
 enum { COMBAT_FIELD_PROJECTILE=1, COMBAT_FIELD_ORBIT=2, COMBAT_FIELD_DAMAGE=4, COMBAT_FIELDS_COMPLETE=7, STUDIO_LIGHTS_COMPLETE=7 };
 struct StudioLight { Vec3 direction; Color color; float irradiance; };

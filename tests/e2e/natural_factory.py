@@ -49,6 +49,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
         for k in range(colony['root_count']):assert colony['structures'][k]['stem'][0]==colony['attachments'][indices[k]],'A factory missed its large organelle'
     game,scene=run('default');colony=game['colonies'][0];profile=data['content']['buildings'][0];branch=profile['branches'];tree=branch['tree']
     check_roots(colony,branch);assert 9<=len(colony['structures'])<=21<70
+    assert colony['fighter_percent']==80 and colony['ratio_enabled'],'New colonies do not use the 80/20 mix'
     # Disable the layout rotation with the same seed. Anchors must move without
     # changing organ sizes or the branch-to-organ connection.
     aligned=deepcopy(data)
