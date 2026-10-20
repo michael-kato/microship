@@ -16,7 +16,7 @@
         "seconds": 32,
         "count": 21,
         "spacing": 1.4,
-        "production": 0.011,
+        "production": 0.05,
         "seed": 4721,
         "normal": [0.0, 0.29, 0.957],
         "health": 150,
