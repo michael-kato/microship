@@ -133,6 +133,9 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
             previous=end;remaining-=used;
         }
     }
+    bool held[MAX_UNITS]={};
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+        if (!s->units[i].latch_colony && simulation_attachment_valid(s,&s->units[i])) held[s->units[i].latch]=true;
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         const Unit* u=&s->units[i];if (u->health<=0 || !s->visible_units[i]) continue;
@@ -142,7 +145,7 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
             Vec3 point;
             float age=(s->tick_count-u->path_marker_tick)/SIMULATION_TICKS_PER_SECOND_FLOAT;
             float fade=v->target_line_fade>0 ? 1-std::fmin(1.0f,std::fmax(0.0f,(age-v->target_line_hold)/v->target_line_fade)) : 1;
-            if (v->target_line_alpha*fade>0 && simulation_held_by(s,i)<0 && target_point(s,*u,&point))
+            if (v->target_line_alpha*fade>0 && !held[i] && target_point(s,*u,&point))
                 segment(output,count,p,u->position,point,v->target_line_width,color,v->target_line_alpha*fade,4);
             segment(output,count,p,u->position,u->position,simulation_unit_definition(s,u)->cue_radius,color,SELECTION_CUE_ALPHA,3);
         }

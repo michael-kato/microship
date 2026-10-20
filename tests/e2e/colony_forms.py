@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
         mature,scene=run(side+'-mature',data,1800,orders)
         a=initial['colonies'][home]['appearance'];b=middle['colonies'][home]['appearance'];c=mature['colonies'][home]['appearance']
         assert a['factions'][faction]==0 and 0<b['factions'][faction]<1 and c['factions'][faction]==1,(side,a,b,c)
-        body_slot=256+home
+        body_slot=mature['unit_capacity']+home
         style=next(v['style'] for v in scene['instances'] if v['slot']==body_slot)
         profile=next(f for f in data['content']['factions'] if f['id']==faction)
         assert abs(style[5]-profile['cell_appearance']['roughness'])<1e-5 and style[6]==1

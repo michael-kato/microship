@@ -21,7 +21,6 @@ import time
 from asset_data import stage_world, write_world
 
 TICKS_PER_SECOND = 60
-UNIT_CAPACITY = 256
 
 root = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
@@ -97,7 +96,8 @@ def play(job):
             decided = None
         matches.append(dict(name=name, player=player, opponent=opponent, cell=cell, seed=data['seed'], outcome=data['outcome'],
                             winner=winner, decided_seconds=decided, colonies=colonies, alive=alive,
-                            stats={n: stats[n] for n in (player, opponent)}, capacity_blocked=data['capacity_blocked']))
+                            stats={n: stats[n] for n in (player, opponent)}, capacity_blocked=data['capacity_blocked'],
+                            unit_capacity=data['unit_capacity']))
     assert len(matches) == a.seeds, (name, result.stdout[-2000:])
     return matches
 
@@ -143,7 +143,7 @@ for r in results:
     for side in (r['player'], r['opponent']):
         s = r['stats'][side]
         if s['built'] == 0: issues.append(f'{r["name"]} seed {r["seed"]}: {side} built no units.')
-        if s['peak_units'] >= UNIT_CAPACITY*.9 and not r['outcome']: issues.append(f'{r["name"]} seed {r["seed"]}: {side} reached {s["peak_units"]} units (storage capacity {UNIT_CAPACITY}).')
+        if s['peak_units'] >= r['unit_capacity']*.9 and not r['outcome']: issues.append(f'{r["name"]} seed {r["seed"]}: {side} reached {s["peak_units"]} units (storage capacity {r["unit_capacity"]}).')
     if r['decided_seconds'] is not None and r['decided_seconds'] < attack_seconds:
         issues.append(f'{r["name"]} seed {r["seed"]}: decided at {r["decided_seconds"]:.0f} s, before the {attack_seconds:g} s assault time.')
     if r['capacity_blocked'] and not r['outcome']: issues.append(f'{r["name"]} seed {r["seed"]}: {r["capacity_blocked"]} sites blocked by unit storage at the end.')

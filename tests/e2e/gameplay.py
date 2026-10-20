@@ -124,7 +124,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-gameplay-') as directory:
     capacity=producers(capacity,growth=1,collection=100)
     capacity=change(capacity,'rules.ai.expansion_delay',300)
     full,_=run('capacity-holds-production',capacity,1500)
-    assert len(full['units'])==256 and any(c['capacity_blocked'] for c in full['colonies'])
+    assert len(full['units'])==full['unit_capacity'] and any(c['capacity_blocked'] for c in full['colonies'])
     for name,bad in [
         ('unsupported-bio-owner',change(text,'bodies.1.owner','robotic')),
         ('missing-factory-side',remove(text,'content.buildings.1')),

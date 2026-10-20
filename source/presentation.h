@@ -23,7 +23,7 @@ struct Presentation
     uint32_t payload_meshes[MAX_UNIT_TYPES];
     bool stem_glow_mask[MAX_PRODUCER_TYPES];
     uint32_t segment_meshes[MAX_PRODUCER_TYPES],tip_meshes[MAX_PRODUCER_TYPES],stem_base,bud_base,debris_base;
-    uint32_t unit_base,body_base,factory_base,attached_base,flying_base,embedded_base,background_slot;
+    uint32_t unit_base,body_base,factory_base,attached_base,flying_base,embedded_base,structure_embedded_base,background_slot;
     int32_t medium_bodies[MAX_BODIES+1];
     uint32_t attached_spikes,flying_spikes,embedded_spikes;
 };

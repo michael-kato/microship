@@ -46,6 +46,7 @@ void simulation_update_fog(Simulation* s,float dt)
     for (uint32_t p=0;p<w.body_count;++p)
         if (s->colonies[p].active && s->colonies[p].faction==w.player_faction)
             sources[count++]=FogSource{w.bodies[p].position,w.sight_radius+w.bodies[p].radius};
+    uint32_t colony_sources=count;
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (s->units[i].health>0 && s->units[i].faction==w.player_faction)
             sources[count++]=FogSource{s->units[i].position,w.sight_radius};
@@ -77,5 +78,18 @@ void simulation_update_fog(Simulation* s,float dt)
     if (span>field->spacing*(SIGHT_FIELD_SIDE-1)*1.001f) resize_field(field,low_x,low_y,span);
     float decay=w.fog_half_life>0 ? std::exp2(-dt/w.fog_half_life) : 0;
     for (int i=0;i<SIGHT_FIELD_CELLS;++i) field->reveal[i]*=decay;
-    for (uint32_t i=0;i<count;++i) stamp_source(field,sources[i],w.fog_feather,w.fog_plane_z);
+    // Units in one field cell share a stamp: the first one's disc stands for the
+    // rest, which lie within one cell diagonal of it. Swarms stamp per occupied cell.
+    bool stamped[SIGHT_FIELD_CELLS]={};
+    for (uint32_t i=0;i<count;++i)
+    {
+        if (i>=colony_sources)
+        {
+            int x=std::min(SIGHT_FIELD_SIDE-1,std::max(0,(int)((sources[i].center.x-field->low_x)/field->spacing)));
+            int y=std::min(SIGHT_FIELD_SIDE-1,std::max(0,(int)((sources[i].center.y-field->low_y)/field->spacing)));
+            bool& cell=stamped[y*SIGHT_FIELD_SIDE+x];if (cell) continue;
+            cell=true;
+        }
+        stamp_source(field,sources[i],w.fog_feather,w.fog_plane_z);
+    }
 }

@@ -42,9 +42,10 @@ for name,world,settings,ticks,debug in cases:
 if not a.run:print('Prepared five 1920x1080 one-frame application cases. No GPU work started.');sys.exit(0)
 # CPU preflight catches invisible or misplaced markers before any GPU work.
 probe=out/'probe-scene.json'
-check=subprocess.run([*prefix,'--smoke','--world',str(out/'depth-ramp-world.json'),'--config',str(out/'depth-ramp-render.json'),'--ticks','1','--scene-state',str(probe)],capture_output=True,text=True,timeout=10)
+check=subprocess.run([*prefix,'--smoke','--world',str(out/'depth-ramp-world.json'),'--config',str(out/'depth-ramp-render.json'),'--ticks','1','--scene-state',str(probe),'--state',str(out/'probe-state.json')],capture_output=True,text=True,timeout=10)
 assert check.returncode==0,(check.stdout,check.stderr)
-scene=json.loads(probe.read_text());assert all(any(i['slot']==256+n for i in scene['instances']) for n in (0,2,3,4))
+base=json.loads((out/'probe-state.json').read_text())['unit_capacity']
+scene=json.loads(probe.read_text());assert all(any(i['slot']==base+n for i in scene['instances']) for n in (0,2,3,4))
 env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1';images={};report={};start=time.monotonic()
 for (name,*_),cmd in zip(cases,commands):
  remaining=5-(time.monotonic()-start);assert remaining>0,'Five-second GPU batch limit expired'

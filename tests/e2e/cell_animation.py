@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-animation-') as directory:
         assert stationary[organ['slot']]['transform']==[1,0,0,0,0,1,0,0,0,0,1,0]
         assert matrix!=stationary[organ['slot']]['transform']
     assert anchored==len(roots)==34,'An organelle moved its factory attachment'
-    body_base=256;factory_base=body_base+len(data['bodies']);stem_base=factory_base+len(data['bodies'])*128
+    body_base=game['unit_capacity'];factory_base=body_base+len(data['bodies']);stem_base=factory_base+len(data['bodies'])*128
     for body,colony in enumerate(game['colonies']):
         assert instances[body_base+body]['transform']==stationary[body_base+body]['transform']
         if not colony['active'] or not colony['visible']:continue

@@ -864,3 +864,23 @@ State exports and match summaries carry `outcome_tick` and per-faction
 `faction_stats` (current colonies and units, then match totals).
 Matches with heavy parallel CPU load can exceed the per-process timeout of
 the ordinary checks; run those with lower `ctest -j`.
+
+## Unit storage and swarm budget
+
+Unit storage holds 2048 units (`MAX_UNITS`; state exports report
+`unit_capacity`). The simulation finds neighbors through two grids rebuilt
+each phase: a clamped world grid keyed by cell and faction, for targets,
+site defense and sight, and a hashed grid as wide as the largest
+separation spacing, for separation. Factory avoidance skips cells and limb
+capsules that cannot come within reach. Unit spikes, payload sacs and
+embedded spikes draw from fixed per-frame instance pools (16384 attached,
+2048 embedded); parts past a full pool are not drawn and gameplay is
+unaffected. Fog memory stamps one disc per occupied sight-field cell.
+
+Measured Oct 20 with 2048 units (1024 per side, packed around the two
+homes): native diagnostic simulation about 2 ms per tick idle and 2.2 ms per
+tick in a full fight. Bounded 1080p GPU frames through Proton with the
+20-triangle `fungal_swarm_spore` mesh: 5.9 ms at a home view against 4.7 ms
+with no units, 10.5 ms close up. Virus fighters (1256 triangles, eleven
+spikes each) cost 6.8 and 13.9 ms in the same views.
+

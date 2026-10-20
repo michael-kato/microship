@@ -5,13 +5,18 @@
 #include "flight.h"
 #include <stdio.h>
 #include <string.h>
+#include <stddef.h>
 #include <algorithm>
+#include <new>
 
 static const float GOLDEN_ANGLE_RADIANS = 2.39996323f;
 static const float UNIT_GRID_CELL_SIZE = 4;
-static const float UNIT_GRID_MARGIN = 32;
+static const float UNIT_GRID_MARGIN = 16;
 static const float UNIT_GRID_CELL_GROWTH = 1.25f;
 static const float UNIT_GRID_MOTION_MARGIN = 1;
+static const uint32_t NEIGHBOR_HASH_X = 73856093u;
+static const uint32_t NEIGHBOR_HASH_Y = 19349663u;
+static const uint32_t NEIGHBOR_HASH_Z = 83492791u;
 static const float UNIT_UP_AXIS_PARALLEL_LIMIT = .95f;
 static const unsigned int BRANCH_RANDOM_MULTIPLIER = 1664525u;
 static const unsigned int BRANCH_RANDOM_INCREMENT = 1013904223u;
@@ -155,8 +160,11 @@ static int32_t grid_axis(const UnitGrid& g,float value,uint32_t axis)
     float cell=std::floor((value-low)*g.inverse_cell);
     return cell<0 ? 0 : cell>=g.size[axis] ? g.size[axis]-1 : (int32_t)cell;
 }
-static uint32_t grid_cell(const UnitGrid& g,Vec3 p)
-{ return ((uint32_t)grid_axis(g,p.z,2)*g.size[1]+grid_axis(g,p.y,1))*g.size[0]+grid_axis(g,p.x,0); }
+static uint32_t grid_key(const UnitGrid& g,const Unit& u)
+{
+    uint32_t cell=((uint32_t)grid_axis(g,u.position.z,2)*g.size[1]+grid_axis(g,u.position.y,1))*g.size[0]+grid_axis(g,u.position.x,0);
+    return cell*g.slots+g.slot[u.faction];
+}
 // Covers the cells and a margin; units outside clamp to the border cells.
 static void grid_bounds(Simulation* s)
 {
@@ -167,33 +175,75 @@ static void grid_bounds(Simulation* s)
         low=Vec3{std::fmin(low.x,c.x-r),std::fmin(low.y,c.y-r),std::fmin(low.z,c.z-r)};
         high=Vec3{std::fmax(high.x,c.x+r),std::fmax(high.y,c.y+r),std::fmax(high.z,c.z+r)};
     }
-    UnitGrid& g=s->grid;g.low=subtract(low,Vec3{UNIT_GRID_MARGIN,UNIT_GRID_MARGIN,UNIT_GRID_MARGIN});
+    UnitGrid& g=s->grid;g.low=subtract(low,Vec3{UNIT_GRID_MARGIN,UNIT_GRID_MARGIN,UNIT_GRID_MARGIN});g.slots=0;
+    for (uint32_t f=1;f<MAX_FACTIONS;++f) if (w.content.factions[f].name[0]) { g.slot[f]=g.slots;g.slot_faction[g.slots++]=f; }
     Vec3 span=add(subtract(high,low),scale(Vec3{1,1,1},2*UNIT_GRID_MARGIN));
     for (float cell=UNIT_GRID_CELL_SIZE;;cell*=UNIT_GRID_CELL_GROWTH)
     {
         g.size[0]=(int32_t)std::ceil(span.x/cell);g.size[1]=(int32_t)std::ceil(span.y/cell);g.size[2]=(int32_t)std::ceil(span.z/cell);
-        if ((uint32_t)g.size[0]*g.size[1]*g.size[2]<=MAX_UNIT_GRID_CELLS) { g.inverse_cell=1/cell;break; }
+        if ((uint32_t)g.size[0]*g.size[1]*g.size[2]*g.slots<=MAX_UNIT_GRID_KEYS) { g.inverse_cell=1/cell;break; }
     }
+    float spacing=w.combat.separation*w.content.max_unit_separation;
+    s->neighbors.inverse_cell=spacing>0 ? 1/spacing : 0;
 }
 static void grid_build(Simulation* s)
 {
-    UnitGrid& g=s->grid;uint32_t cells=(uint32_t)g.size[0]*g.size[1]*g.size[2];
-    memset(g.start,0,(cells+1)*sizeof(g.start[0]));
-    for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) ++g.start[grid_cell(g,s->units[i].position)+1];
-    for (uint32_t c=0;c<cells;++c) { g.start[c+1]+=g.start[c];g.cursor[c]=g.start[c]; }
-    for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) g.units[g.cursor[grid_cell(g,s->units[i].position)]++]=(uint16_t)i;
+    UnitGrid& g=s->grid;uint32_t keys=(uint32_t)g.size[0]*g.size[1]*g.size[2]*g.slots;
+    memset(g.start,0,(keys+1)*sizeof(g.start[0]));
+    for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) ++g.start[grid_key(g,s->units[i])+1];
+    for (uint32_t k=0;k<keys;++k) { g.start[k+1]+=g.start[k];g.cursor[k]=g.start[k]; }
+    for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) g.units[g.cursor[grid_key(g,s->units[i])]++]=(uint16_t)i;
 }
-// Live units in the cells overlapping the sphere: a superset that callers test by distance.
-static uint32_t grid_query(const UnitGrid& g,Vec3 center,float radius,uint16_t* out)
+// Live units of the given factions (a bit per faction) in the cells overlapping
+// the sphere: a superset that callers test by distance.
+static uint32_t grid_query(const UnitGrid& g,Vec3 center,float radius,uint32_t factions,uint16_t* out)
 {
-    radius+=UNIT_GRID_MOTION_MARGIN;uint32_t count=0;
+    radius+=UNIT_GRID_MOTION_MARGIN;uint32_t count=0,wanted=0;
+    for (uint32_t k=0;k<g.slots;++k) if (factions&(1u<<g.slot_faction[k])) wanted|=1u<<k;
+    if (!wanted) return 0;
+    bool all=wanted==(1u<<g.slots)-1;
     int32_t x0=grid_axis(g,center.x-radius,0),x1=grid_axis(g,center.x+radius,0);
     int32_t y0=grid_axis(g,center.y-radius,1),y1=grid_axis(g,center.y+radius,1);
     int32_t z0=grid_axis(g,center.z-radius,2),z1=grid_axis(g,center.z+radius,2);
     for (int32_t z=z0;z<=z1;++z) for (int32_t y=y0;y<=y1;++y)
     {
         uint32_t row=((uint32_t)z*g.size[1]+y)*g.size[0];
-        for (uint32_t k=g.start[row+x0];k<g.start[row+x1+1];++k) out[count++]=g.units[k];
+        if (all) { for (uint32_t k=g.start[(row+x0)*g.slots];k<g.start[(row+x1+1)*g.slots];++k) out[count++]=g.units[k];continue; }
+        for (int32_t x=x0;x<=x1;++x) for (uint32_t slot=0;slot<g.slots;++slot) if (wanted&(1u<<slot))
+        {
+            uint32_t key=(row+x)*g.slots+slot;
+            for (uint32_t k=g.start[key];k<g.start[key+1];++k) out[count++]=g.units[k];
+        }
+    }
+    return count;
+}
+static uint32_t enemies_of(Faction faction) { return ~(1u<<faction); }
+static uint32_t neighbor_bucket(int32_t x,int32_t y,int32_t z)
+{ return ((uint32_t)x*NEIGHBOR_HASH_X^(uint32_t)y*NEIGHBOR_HASH_Y^(uint32_t)z*NEIGHBOR_HASH_Z)&(NEIGHBOR_BUCKETS-1); }
+static int32_t neighbor_axis(const NeighborGrid& g,float value) { return (int32_t)std::floor(value*g.inverse_cell); }
+static uint32_t neighbor_key(const NeighborGrid& g,Vec3 p) { return neighbor_bucket(neighbor_axis(g,p.x),neighbor_axis(g,p.y),neighbor_axis(g,p.z)); }
+static void neighbors_build(Simulation* s)
+{
+    NeighborGrid& g=s->neighbors;if (g.inverse_cell<=0) return;
+    memset(g.start,0,sizeof(g.start));
+    for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) ++g.start[neighbor_key(g,s->units[i].position)+1];
+    for (uint32_t k=0;k<NEIGHBOR_BUCKETS;++k) { g.start[k+1]+=g.start[k];g.cursor[k]=g.start[k]; }
+    for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) g.units[g.cursor[neighbor_key(g,s->units[i].position)]++]=(uint16_t)i;
+}
+// Units in the 27 cells around the point, a superset of every unit within one
+// cell width. Hash collisions within the block are visited once.
+static uint32_t neighbors_query(const NeighborGrid& g,Vec3 center,uint16_t* out)
+{
+    if (g.inverse_cell<=0) return 0;
+    int32_t x=neighbor_axis(g,center.x),y=neighbor_axis(g,center.y),z=neighbor_axis(g,center.z);
+    uint32_t seen[27],seen_count=0,count=0;
+    for (int32_t dz=-1;dz<=1;++dz) for (int32_t dy=-1;dy<=1;++dy) for (int32_t dx=-1;dx<=1;++dx)
+    {
+        uint32_t bucket=neighbor_bucket(x+dx,y+dy,z+dz);bool repeated=false;
+        for (uint32_t k=0;k<seen_count;++k) repeated=repeated || seen[k]==bucket;
+        if (repeated) continue;
+        seen[seen_count++]=bucket;
+        for (uint32_t k=g.start[bucket];k<g.start[bucket+1];++k) out[count++]=g.units[k];
     }
     return count;
 }
@@ -205,7 +255,7 @@ bool simulation_in_sight(const Simulation* s,Vec3 position,float radius)
     for (uint32_t p=0;p<s->world.body_count;++p)
         if (s->colonies[p].active && s->colonies[p].faction==s->world.player_faction
             && length(subtract(position,s->world.bodies[p].position))<reach+s->world.bodies[p].radius) return true;
-    uint16_t near[MAX_UNITS];uint32_t count=grid_query(s->grid,position,reach,near);
+    uint16_t near[MAX_UNITS];uint32_t count=grid_query(s->grid,position,reach,1u<<s->world.player_faction,near);
     for (uint32_t n=0;n<count;++n)
     {
         const Unit& u=s->units[near[n]];
@@ -501,7 +551,8 @@ static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,const 
 
 bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
 {
-    *s=Simulation();s->selected_body=s->order_body=NO_BODY;
+    // Construct in place: a temporary of this size would not fit the 2 MB stack.
+    s->~Simulation();new (s) Simulation();s->selected_body=s->order_body=NO_BODY;
     if (!world_load(&s->world,world_path,seed)) return false;
     grid_bounds(s);
     if (seed) for (uint32_t i=0;i<s->world.body_count;++i) s->world.bodies[i].seed^=seed;
@@ -664,7 +715,7 @@ static bool defended(const Simulation* s, uint32_t p, Faction faction)
 {
     const Body* cell=&s->world.bodies[p];
     if (s->colonies[p].active && s->colonies[p].faction!=faction) return true;
-    uint16_t near[MAX_UNITS];uint32_t count=grid_query(s->grid,cell->position,cell->radius+s->world.content.max_unit_range,near);
+    uint16_t near[MAX_UNITS];uint32_t count=grid_query(s->grid,cell->position,cell->radius+s->world.content.max_unit_range,enemies_of(faction),near);
     for (uint32_t n=0;n<count;++n)
     {
         const Unit& u=s->units[near[n]];
@@ -729,7 +780,7 @@ static void local_task(Simulation* s,Unit* u,const Vec3* positions,const int32_t
     for (uint32_t pass=0;pass<2;++pass)
     {
         uint32_t mask=pass ? d.secondary_targets : d.targets;float nearest=d.unit_radius;
-        uint16_t near[MAX_UNITS];uint32_t count=mask&TARGET_UNITS ? grid_query(s->grid,u->position,nearest,near) : 0;
+        uint16_t near[MAX_UNITS];uint32_t count=mask&TARGET_UNITS ? grid_query(s->grid,u->position,nearest,enemies_of(u->faction),near) : 0;
         for (uint32_t n=0;n<count;++n)
         {
             uint32_t j=near[n];const Unit& other=s->units[j];if (other.health<=0 || other.faction==u->faction) continue;
@@ -795,7 +846,7 @@ static void move_units(Simulation* s, float dt)
     Vec3 positions[MAX_UNITS],velocities[MAX_UNITS];int32_t held_by[MAX_UNITS];
     for (uint32_t i=0;i<MAX_UNITS;++i)
     { positions[i]=s->units[i].position;velocities[i]=s->units[i].velocity;held_by[i]=-1;s->units[i].charging=false; }
-    grid_build(s);
+    grid_build(s);neighbors_build(s);
     uint16_t near[MAX_UNITS];
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
@@ -892,7 +943,7 @@ static void move_units(Simulation* s, float dt)
         if (definition->attack==ATTACK_SPORE)
         {
             float nearest=definition->seek_radius;bool found=false;
-            uint32_t count=grid_query(s->grid,u->position,definition->seek_radius,near);
+            uint32_t count=grid_query(s->grid,u->position,definition->seek_radius,enemies_of(u->faction),near);
             for (uint32_t n=0;n<count;++n) if (s->units[near[n]].health>0 && s->units[near[n]].faction!=u->faction)
             {
                 uint32_t j=near[n];
@@ -926,15 +977,16 @@ static void move_units(Simulation* s, float dt)
                 }
             }
             // Read a stable pass input: separation must not depend on unit update order.
-            uint32_t count=grid_query(s->grid,positions[i],flight->separation*s->world.content.max_unit_separation,near);
+            uint32_t count=neighbors_query(s->neighbors,positions[i],near);float own=definition->separation;
             for (uint32_t n=0;n<count;++n)
-                if (near[n]!=i && s->units[near[n]].health>0 && !(colonizing && s->units[near[n]].faction==u->faction && s->units[near[n]].target==u->target))
-                {
-                    uint32_t j=near[n];
-                    Vec3 apart=subtract(positions[i],positions[j]);float d=length(apart);
-                    float spacing=flight->separation*std::fmax(simulation_unit_definition(s,u)->separation,simulation_unit_definition(s,&s->units[j])->separation);
-                    if (d<spacing && d>POSITION_EPSILON) desired=add(desired,scale(apart,speed*(1-d/spacing)/d));
-                }
+            {
+                uint32_t j=near[n];const Unit& other=s->units[j];
+                if (j==i || other.health<=0 || (colonizing && other.faction==u->faction && other.target==u->target)) continue;
+                Vec3 apart=subtract(positions[i],positions[j]);float squared=dot(apart,apart);
+                float spacing=flight->separation*std::fmax(own,simulation_unit_definition(s,&other)->separation);
+                if (squared>=spacing*spacing || squared<=POSITION_EPSILON*POSITION_EPSILON) continue;
+                float d=std::sqrt(squared);desired=add(desired,scale(apart,speed*(1-d/spacing)/d));
+            }
             // Steer around a cell before the hard collision shell becomes necessary.
             for (uint32_t j=0;j<s->world.body_count;++j)
             {
@@ -1102,14 +1154,12 @@ static void fracture_limb(Simulation* s,uint32_t p,uint32_t k,float old_growth,f
 static void projectile_combat(Simulation* s,float dt)
 {
     const CombatVisuals* v=&s->world.combat;
-    uint32_t hit_count[MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES]={};
-    EmbeddedSpike landed[MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES][2]={};
-    bool digest_heal[MAX_UNITS]={},burst[MAX_UNITS]={},expired[MAX_UNITS]={};
-    bool held[MAX_UNITS]={};
+    CombatScratch& scratch=s->combat_scratch;memset(&scratch,0,offsetof(CombatScratch,landed));
+    uint32_t* hit_count=scratch.hit_count;uint32_t* incoming=scratch.incoming;EmbeddedSpike (*landed)[2]=scratch.landed;
+    bool* digest_heal=scratch.digest_heal;bool* burst=scratch.burst;bool* expired=scratch.expired;bool* held=scratch.held;
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (!s->units[i].latch_colony && simulation_attachment_valid(s,&s->units[i])) held[s->units[i].latch]=true;
     grid_build(s);uint16_t near[MAX_UNITS];
-    uint32_t incoming[MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES]={};
     if (s->world.spikes.enabled) for (uint32_t i=0;i<MAX_PROJECTILES;++i)
     {
         const Projectile* p=&s->projectiles[i];if (!p->active) continue;
@@ -1134,7 +1184,7 @@ static void projectile_combat(Simulation* s,float dt)
         {
         uint32_t targets=pass ? definition->secondary_targets : definition->targets;
         secondary=pass!=0;
-        uint32_t count=targets&TARGET_UNITS ? grid_query(s->grid,u->position,nearest,near) : 0;
+        uint32_t count=targets&TARGET_UNITS ? grid_query(s->grid,u->position,nearest,enemies_of(u->faction),near) : 0;
         for (uint32_t n=0;n<count;++n)
             if (s->units[near[n]].health>0 && s->units[near[n]].faction!=u->faction)
             {
@@ -1168,7 +1218,7 @@ static void projectile_combat(Simulation* s,float dt)
         if (definition->attack==ATTACK_SPORE)
         {
             burst[i]=true;++s->spore_bursts;sound(s,SOUND_HIT,u->position);
-            uint32_t count=grid_query(s->grid,u->position,definition->blast_radius,near);
+            uint32_t count=grid_query(s->grid,u->position,definition->blast_radius,definition->friendly_fire ? ~0u : enemies_of(u->faction),near);
             for (uint32_t n=0;n<count;++n)
             {
                 uint32_t j=near[n];
@@ -1258,6 +1308,7 @@ static void projectile_combat(Simulation* s,float dt)
                 uint32_t slot=hit_count[index]++;
                 if (slot<2 && !p->payload)
                 {
+                    scratch.landed_mask[index]|=(uint8_t)(1u<<slot);
                     Vec3 outward=scale(p->direction,-1);
                     landed[index][slot].direction=p->colony ? outward : local_direction(&s->units[p->target],outward);
                     landed[index][slot].faction=p->faction;landed[index][slot].anchor=p->anchor;
@@ -1277,7 +1328,7 @@ static void projectile_combat(Simulation* s,float dt)
             {
                 uint32_t old=u->wounds;u->wounds=std::min(simulation_unit_definition(s,u)->hits,old+hit_count[i]);
                 if (burst[i] || expired[i]) u->wounds=simulation_unit_definition(s,u)->hits;
-                for (uint32_t j=old;j<u->wounds && j<2;++j) u->embedded[j]=landed[i][j-old];
+                for (uint32_t j=old;j<u->wounds && j<2;++j) u->embedded[j]=(scratch.landed_mask[i]>>(j-old))&1u ? landed[i][j-old] : EmbeddedSpike();
                 if (digest_heal[i] && u->wounds>0 && u->wounds<simulation_unit_definition(s,u)->hits)
                 {
                     --u->wounds;if (u->wounds<MAX_EMBEDDED) u->embedded[u->wounds]=EmbeddedSpike{};
@@ -1322,7 +1373,7 @@ static void projectile_combat(Simulation* s,float dt)
             uint32_t maximum=root ? definition.hits : definition.branches.hits;
             float maximum_health=root ? definition.health : definition.branches.health;
             uint32_t old=*wounds;*wounds=std::min(maximum,old+hit_count[index]);
-            for (uint32_t j=old;j<*wounds && j<2;++j) embedded[j]=landed[index][j-old];
+            for (uint32_t j=old;j<*wounds && j<2;++j) embedded[j]=(scratch.landed_mask[index]>>(j-old))&1u ? landed[index][j-old] : EmbeddedSpike();
             *health=maximum_health*(maximum-*wounds)/maximum;
             float retained=simulation_structure_growth(s,i,k);
             if (retained<before) fracture_limb(s,i,k,before,retained);
@@ -1624,15 +1675,15 @@ static void write_faction_stats(const Simulation* s,FILE* file)
 void simulation_write_summary(const Simulation* s,uint32_t seed,FILE* file)
 {
     uint32_t blocked=0;for (uint32_t p=0;p<s->world.body_count;++p) blocked+=s->colonies[p].capacity_blocked;
-    fprintf(file,"{\"seed\":%u,\"tick\":%u,\"outcome\":%d,\"outcome_tick\":%u,\"capacity_blocked\":%u,",seed,s->tick_count,s->outcome,s->outcome_tick,blocked);
+    fprintf(file,"{\"seed\":%u,\"tick\":%u,\"unit_capacity\":%u,\"outcome\":%d,\"outcome_tick\":%u,\"capacity_blocked\":%u,",seed,s->tick_count,(uint32_t)MAX_UNITS,s->outcome,s->outcome_tick,blocked);
     write_faction_stats(s,file);fprintf(file,"}\n");
 }
 
 bool simulation_write_state(const Simulation* s, const char* path)
 {
     FILE* file=fopen(path,"wb");if (!file) { fprintf(stderr,"Cannot write state '%s'.\n",path);return false; }
-    fprintf(file,"{\"tick\":%u,\"time\":%.9f,\"outcome\":%d,\"outcome_tick\":%u,\"births\":%u,\"losses\":%u,\"landings\":%u,\"blocked_landings\":%u,",
-        s->tick_count,s->time_seconds,s->outcome,s->outcome_tick,s->births,s->losses,s->landings,s->blocked_landings);
+    fprintf(file,"{\"tick\":%u,\"time\":%.9f,\"unit_capacity\":%u,\"outcome\":%d,\"outcome_tick\":%u,\"births\":%u,\"losses\":%u,\"landings\":%u,\"blocked_landings\":%u,",
+        s->tick_count,s->time_seconds,(uint32_t)MAX_UNITS,s->outcome,s->outcome_tick,s->births,s->losses,s->landings,s->blocked_landings);
     write_faction_stats(s,file);
     fprintf(file,",\"faction_events\":{\"digestions\":%u,\"digest_heals\":%u,\"spore_bursts\":%u,\"captures\":%u,\"releases\":%u},\"sound_events\":{",s->digestions,s->digest_heals,s->spore_bursts,s->captures,s->releases);
     for (uint32_t i=0;i<SOUND_COUNT;++i) fprintf(file,"%s\"%s\":%u",i ? "," : "",sound_name(i),s->sounds.totals[i]);

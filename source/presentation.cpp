@@ -12,6 +12,10 @@
 #include <algorithm>
 
 static const float MIN_VISIBLE_SPIKE_GROWTH = .001f;
+// Unit spikes, payload sacs and embedded spikes share per-frame pools. When a
+// pool is full, further unit parts are not drawn; gameplay is unaffected.
+static const uint32_t MAX_ATTACHED_INSTANCES = 16384;
+static const uint32_t MAX_UNIT_EMBEDDED_INSTANCES = 2048;
 static const float MIN_EMBEDDED_DIRECTION_SQUARED = .01f;
 static const float EMBEDDED_SPIKE_LENGTH_SCALE = .45f;
 static const float PROJECTILE_SHRINK_SECONDS = .06f;
@@ -133,9 +137,10 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
         p->bud_base=p->stem_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES*GROWTH_SEGMENTS : 0);
         p->debris_base=p->bud_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES : 0);
         p->attached_base=p->debris_base+(w->gameplay.enabled ? MAX_LIMB_DEBRIS : 0);
-        p->flying_base=p->attached_base+(w->spikes.enabled ? MAX_UNITS*(w->spikes.count+MAX_UNIT_PAYLOADS) : 0);
+        p->flying_base=p->attached_base+(w->spikes.enabled ? MAX_ATTACHED_INSTANCES : 0);
         p->embedded_base=p->flying_base+(w->spikes.enabled ? MAX_PROJECTILES : 0);
-        p->background_slot=p->embedded_base+(w->spikes.enabled ? MAX_EMBEDDED*(MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES) : 0);
+        p->structure_embedded_base=p->embedded_base+(w->spikes.enabled ? MAX_UNIT_EMBEDDED_INSTANCES : 0);
+        p->background_slot=p->structure_embedded_base+(w->spikes.enabled ? MAX_EMBEDDED*MAX_BODIES*MAX_FACTORY_STRUCTURES : 0);
         p->organelle_base=p->background_slot;
         for (uint32_t body=0;body<w->body_count;++body) if (w->content.bodies[w->bodies[body].type].hosts_site)
         {
@@ -185,7 +190,8 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
 {
     const Simulation* s=simulation;const SpikeRules* r=&s->world.spikes;if (!r->enabled) return;
     state->attached_spikes=state->flying_spikes=state->embedded_spikes=0;
-    uint32_t flying=state->flying_base,embedded=state->embedded_base;
+    uint32_t flying=state->flying_base,attached=state->attached_base,attached_end=attached+MAX_ATTACHED_INSTANCES;
+    uint32_t embedded=state->embedded_base,embedded_end=embedded+MAX_UNIT_EMBEDDED_INSTANCES;
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         const Unit* u=&s->units[i];if (u->health<=0 || !s->visible_units[i]) continue;
@@ -194,25 +200,25 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
         if (simulation_unit_definition(s,u)->detaches)
             for (uint32_t j=0;j<r->count;++j)
             {
-                float growth=u->spikes[j];if (growth<=MIN_VISIBLE_SPIKE_GROWTH) continue;
+                float growth=u->spikes[j];if (growth<=MIN_VISIBLE_SPIKE_GROWTH || attached==attached_end) continue;
                 Vec3 dir=posed_direction(simulation_spike_direction(j,r->count),x,y,z);
-                spike_instance(state,state->attached_base+i*(r->count+MAX_UNIT_PAYLOADS)+j,add(u->position,scale(dir,r->root*size)),dir,
+                spike_instance(state,attached++,add(u->position,scale(dir,r->root*size)),dir,
                     size*r->length*growth,size*.5f*growth,color);++state->attached_spikes;
             }
         const UnitDefinition* definition=simulation_unit_definition(s,u);
         for (uint32_t j=0;j<definition->payload_count;++j)
         {
-            float growth=u->payloads[j];if (growth<=MIN_VISIBLE_SPIKE_GROWTH) continue;
+            float growth=u->payloads[j];if (growth<=MIN_VISIBLE_SPIKE_GROWTH || attached==attached_end) continue;
             Vec3 position=add(u->position,scale(posed_direction(definition->payload_sockets[j],x,y,z),size));
-            set_instance(state,state->attached_base+i*(r->count+MAX_UNIT_PAYLOADS)+r->count+j,state->payload_meshes[u->type],position,
+            set_instance(state,attached++,state->payload_meshes[u->type],position,
                 scale(x,size*growth),scale(y,size*growth),scale(z,size*growth));
         }
         for (uint32_t j=0;j<u->wounds && j<MAX_EMBEDDED;++j)
         {
-            if (dot(u->embedded[j].direction,u->embedded[j].direction)<MIN_EMBEDDED_DIRECTION_SQUARED) continue;
+            if (dot(u->embedded[j].direction,u->embedded[j].direction)<MIN_EMBEDDED_DIRECTION_SQUARED || embedded==embedded_end) continue;
             Vec3 outward=posed_direction(u->embedded[j].direction,x,y,z);float length=std::fmax(r->scale,size*EMBEDDED_SPIKE_LENGTH_SCALE);
             Vec3 root=add(add(u->position,scale(posed_direction(u->embedded[j].anchor,x,y,z),size)),scale(outward,length*EMBEDDED_SPIKE_OUTWARD_SCALE));
-            spike_instance(state,embedded+i*MAX_EMBEDDED+j,root,scale(outward,-1),length,length*.5f,content_color(&s->world.content,u->embedded[j].faction));++state->embedded_spikes;
+            spike_instance(state,embedded++,root,scale(outward,-1),length,length*.5f,content_color(&s->world.content,u->embedded[j].faction));++state->embedded_spikes;
         }
     }
     for (uint32_t i=0;i<MAX_PROJECTILES;++i)
@@ -243,7 +249,7 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
             {
                 if (dot(spikes[j].direction,spikes[j].direction)<MIN_EMBEDDED_DIRECTION_SQUARED) continue;
                 Vec3 outward=spikes[j].direction;float length=r->scale*2;
-                spike_instance(state,embedded+MAX_UNITS*MAX_EMBEDDED+(i*MAX_FACTORY_STRUCTURES+k)*MAX_EMBEDDED+j,
+                spike_instance(state,state->structure_embedded_base+(i*MAX_FACTORY_STRUCTURES+k)*MAX_EMBEDDED+j,
                     add(add(tip,spikes[j].anchor),scale(outward,length*EMBEDDED_SPIKE_OUTWARD_SCALE)),scale(outward,-1),length,length*.5f,
                     content_color(&s->world.content,spikes[j].faction));++state->embedded_spikes;
             }
@@ -288,7 +294,7 @@ static void animate_factories(Presentation* p,const Simulation* s)
             for (uint32_t j=0;j<GROWTH_SEGMENTS;++j) sway_factory_instance(p,p->stem_base+(body*MAX_FACTORY_STRUCTURES+k)*GROWTH_SEGMENTS+j,pivot,sine,cosine);
             sway_factory_instance(p,p->bud_base+body*MAX_FACTORY_STRUCTURES+k,pivot,sine,cosine);
             if (s->world.spikes.enabled) for (uint32_t j=0;j<MAX_EMBEDDED;++j)
-                sway_factory_instance(p,p->embedded_base+MAX_UNITS*MAX_EMBEDDED+(body*MAX_FACTORY_STRUCTURES+k)*MAX_EMBEDDED+j,pivot,sine,cosine);
+                sway_factory_instance(p,p->structure_embedded_base+(body*MAX_FACTORY_STRUCTURES+k)*MAX_EMBEDDED+j,pivot,sine,cosine);
         }
     }
 }
@@ -405,6 +411,9 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
 static void add_sight(RenderScene* scene,Vec3 center,float radius)
 {
     // Keep the same union of spheres. Remove only spheres fully contained in another.
+    // A full list drops further sources; the fog shader reads this list only for
+    // maps too large for its sight field, which then miss some unit sight.
+    if (scene->sight_count==MAX_RENDER_SIGHT) return;
     for (uint32_t i=0;i<scene->sight_count;)
     {
         const float* v=scene->sight[i].center_radius;
@@ -420,7 +429,6 @@ static void add_sight(RenderScene* scene,Vec3 center,float radius)
 bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera,const RenderConfig* config)
 {
     RenderScene* scene=&p->scene;const World* w=&s->world;
-    static_assert(MAX_RENDER_SIGHT>=MAX_UNITS+MAX_BODIES,"Sight source capacity");
     if (!presentation_update_membranes(p,s)) return false;
     scene->membrane_ripple[0]=w->membrane_ripple;scene->membrane_ripple[1]=(float)(FULL_TURN_RADIANS/w->membrane_wavelength);
     scene->membrane_ripple[2]=(float)(std::fmod(s->time_seconds/w->membrane_period,1.0)*FULL_TURN_RADIANS);
