@@ -48,6 +48,9 @@ struct UnitDefinition
     float cloud_radius,cloud_seconds,cloud_damage; // A bursting spore leaves this toxic cloud; damage per second.
     uint32_t brood; // Units hatched by one manufacture job.
     float charge_radius,charge_speed,charge_acceleration,release_seconds;
+    char blob_model[ASSET_PATH_CAPACITY]; // Digesters may first incapacitate a unit at range with a blob.
+    float blob_scale,blob_range,blob_interval,blob_stun;
+    float aura_radius,aura_seconds,aura_interval; // After devouring a unit, heal friendly units nearby.
     uint32_t release_hits;
     Color rear_tint;float rear_tint_strength;
     bool friendly_fire;

@@ -40,5 +40,9 @@
   "spore_cloud": {
     "color": [0.72, 0.64, 0.22],
     "alpha": 0.08
+  },
+  "heal_aura": {
+    "color": [0.3, 1.0, 0.42],
+    "alpha": 0.1
   }
 }

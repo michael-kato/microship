@@ -39,6 +39,7 @@ static const int MAX_UNIT_CLOUD_RADIUS = 20;
 static const int MAX_UNIT_CLOUD_SECONDS = 120;
 static const int MAX_UNIT_CLOUD_DAMAGE = 1000;
 static const int MAX_UNIT_BROOD = 64;
+static const int MAX_UNIT_STUN_SECONDS = 60;
 static const int MAX_CELL_TINT_SECONDS = 3600;
 static const float MIN_CELL_DISPLACEMENT_WIDTH_DEGREES = 6;
 static const double MAX_CELL_INTERIOR_VARIATION = .15;
@@ -210,7 +211,7 @@ static bool load_units(Content* c,Json root,const char* path)
         Json attack=json_find(j,"attack");
         if (json_present(attack))
         {
-            json_object(attack,"mode|lifetime|friendly_fire|damage|cloud|charge_radius|charge_speed|charge_acceleration|release_hits|release_seconds");char mode[ASSET_NAME_CAPACITY]={};json_string(json_get(attack,"mode"),mode,ASSET_NAME_CAPACITY);
+            json_object(attack,"mode|lifetime|friendly_fire|damage|cloud|charge_radius|charge_speed|charge_acceleration|release_hits|release_seconds|blob|aura");char mode[ASSET_NAME_CAPACITY]={};json_string(json_get(attack,"mode"),mode,ASSET_NAME_CAPACITY);
             if (!strcmp(mode,"digest")) u.attack=ATTACK_DIGEST;
             else if (!strcmp(mode,"spore"))
             {
@@ -234,6 +235,19 @@ static bool load_units(Content* c,Json root,const char* path)
             if (json_present(hits)) u.release_hits=json_uint(hits,1,MAX_HIT_COUNT);
             if (json_present(seconds)) u.release_seconds=json_positive(seconds,10);
             if (json_present(hits)!=json_present(seconds)) json_error(attack,"release requires both hits and seconds");
+            Json blob=json_find(attack,"blob"),aura=json_find(attack,"aura");
+            if (u.attack!=ATTACK_DIGEST && (json_present(blob) || json_present(aura))) json_error(attack,"blob and aura require digest mode");
+            if (json_present(blob))
+            {
+                json_object(blob,"model|scale|range|interval|stun_seconds");json_path(json_get(blob,"model"),path,u.blob_model);
+                u.blob_scale=json_positive(json_get(blob,"scale"),MAX_UNIT_SCALE);u.blob_range=json_positive(json_get(blob,"range"),MAX_UNIT_RANGE);
+                u.blob_interval=json_positive(json_get(blob,"interval"),MAX_UNIT_SHOT_INTERVAL);u.blob_stun=json_positive(json_get(blob,"stun_seconds"),MAX_UNIT_STUN_SECONDS);
+            }
+            if (json_present(aura))
+            {
+                json_object(aura,"radius|seconds|heal_interval");u.aura_radius=json_positive(json_get(aura,"radius"),MAX_UNIT_CLOUD_RADIUS);
+                u.aura_seconds=json_positive(json_get(aura,"seconds"),MAX_UNIT_CLOUD_SECONDS);u.aura_interval=json_positive(json_get(aura,"heal_interval"),MAX_UNIT_STUN_SECONDS);
+            }
             if (u.attack!=ATTACK_SPORE && (json_present(json_find(attack,"cloud")) || json_present(json_find(attack,"damage")) || json_present(json_find(attack,"lifetime")) || json_present(json_find(attack,"friendly_fire"))))
                 json_error(attack,"spore parameters require spore mode");
         }

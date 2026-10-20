@@ -109,7 +109,19 @@
         "charge_speed": 3.5,
         "charge_acceleration": 3,
         "release_hits": 3,
-        "release_seconds": 2.5
+        "release_seconds": 2.5,
+        "blob": {
+          "model": "../models/immune_blob.fmesh",
+          "scale": 0.22,
+          "range": 3,
+          "interval": 6,
+          "stun_seconds": 1.5
+        },
+        "aura": {
+          "radius": 3,
+          "seconds": 8,
+          "heal_interval": 1.5
+        }
       },
       "secondary_attack": {
         "targets": ["structures"],

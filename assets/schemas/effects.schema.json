@@ -192,6 +192,28 @@
       },
       "required": ["color", "alpha"],
       "additionalProperties": false
+    },
+    "heal_aura": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "alpha": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": ["color", "alpha"],
+      "additionalProperties": false
     }
   },
   "required": [],

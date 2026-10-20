@@ -21,6 +21,7 @@ def stage_world(source, directory):
         for item in content[name]:
             model(item,'model',definition.parent)
             if 'payload' in item:model(item['payload'],'model',definition.parent)
+            if 'blob' in item.get('attack',{}):model(item['attack']['blob'],'model',definition.parent)
             if 'variation' in item:model(item['variation'],'parts',definition.parent)
             if 'growth_meshes' in item:
                 for key in ('segment','tip'):model(item['growth_meshes'],key,definition.parent)

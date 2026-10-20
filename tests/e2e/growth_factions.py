@@ -90,6 +90,19 @@ with tempfile.TemporaryDirectory(prefix='nanova-growth-') as directory:
     fed,_=run('digest-heal',fungus,240)
     assert fed['faction_events']['digest_heals']>0,'Digestion did not heal wounds'
     assert all(u['faction']!=2 or u['ready_spikes']==11 for u in fed['units'])
+    # A white blood cell incapacitates a unit with a blob, devours it, then heals friendly units near it.
+    cells=stage('immune');cells['rules'].pop('exploration',None);cells['rules']['ai']['expansion_delay']=300
+    for u in cells['content']['units']:
+        if u['name']=='immune_fighter':u['attack']['blob'].update(range=4.5,stun_seconds=3,interval=3);u['attack']['aura']['heal_interval']=1
+    cells['rules']['economy'].update(manufacture_seconds=1000,enemy_attack_seconds=300)
+    home=next(b['position'] for b in cells['bodies'] if b.get('owner')=='immune')
+    cells['spawns']=[dict(type='immune_fighter',position=[home[0],home[1]+7,2]),dict(type='immune_fighter',position=[home[0]+1.2,home[1]+7,2]),
+                     dict(type='virus_fighter',position=[home[0],home[1]+11,2]),dict(type='virus_fighter',position=[home[0]+2,home[1]+12,2])]
+    stuck,_=run('blob-incapacitates',cells,30)
+    assert stuck['faction_events']['blobs']>0 and any(u['faction']==1 and u['stun']>0 for u in stuck['units']),stuck['faction_events']
+    fed,_=run('devour-heals-nearby',cells,360)
+    events=fed['faction_events']
+    assert events['devoured']==2 and events['aura_heals']>0 and any(u['aura']>0 for u in fed['units']),events
     body=duel('fungus');body['spawns']=[dict(type='fungal_spore',position=[0,0,6]),dict(type='swarm_fighter',position=[2,0,6])]
     for u in body['content']['units']:
         if u['name']=='swarm_fighter':u.update(shot_interval=.1,detaches=False)

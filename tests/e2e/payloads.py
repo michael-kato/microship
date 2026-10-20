@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-payloads-') as directory:
         u.update(speed=.01,colonizes=False)
         if u['name']=='virus_bomber':
             u.update(targets=['units'],shot_interval=.2);u.pop('secondary_attack',None)
-        if u['name']=='immune_fighter':u.update(range=.01,hits=32,health=384)
+        if u['name']=='immune_fighter':u.update(range=.01,hits=32,health=384);u['attack'].pop('blob',None)  # A passive target.
     data['spawns']=[dict(type='virus_bomber',position=[-.6,0,5.2]),dict(type='immune_fighter',position=[.6,0,5.2])]
     bomber_index=next(i for i,u in enumerate(data['content']['units']) if u['name']=='virus_bomber')
     def run(name,d,ticks,expected=0,extra=()):

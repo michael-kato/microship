@@ -168,6 +168,59 @@
                 },
                 "required": ["radius", "seconds", "damage"],
                 "additionalProperties": false
+              },
+              "blob": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "scale": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000
+                  },
+                  "range": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 10000
+                  },
+                  "interval": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 10000
+                  },
+                  "stun_seconds": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 60
+                  }
+                },
+                "required": ["model", "scale", "range", "interval", "stun_seconds"],
+                "additionalProperties": false
+              },
+              "aura": {
+                "type": "object",
+                "properties": {
+                  "radius": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 20
+                  },
+                  "seconds": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 120
+                  },
+                  "heal_interval": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 60
+                  }
+                },
+                "required": ["radius", "seconds", "heal_interval"],
+                "additionalProperties": false
               }
             },
             "required": ["mode"],
@@ -228,6 +281,12 @@
                       },
                       {
                         "required": ["release_seconds"]
+                      },
+                      {
+                        "required": ["blob"]
+                      },
+                      {
+                        "required": ["aura"]
                       }
                     ]
                   }

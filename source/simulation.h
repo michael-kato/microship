@@ -41,6 +41,7 @@ struct CombatScratch
     uint32_t hit_count[COMBAT_TARGETS],incoming[COMBAT_TARGETS];
     uint8_t landed_mask[COMBAT_TARGETS]; // Bit k: landed[target][k] was written this tick.
     bool digest_heal[MAX_UNITS],burst[MAX_UNITS],expired[MAX_UNITS],held[MAX_UNITS];
+    uint16_t holder[MAX_UNITS]; // One more than the index of the unit holding this one; zero when free.
     EmbeddedSpike landed[COMBAT_TARGETS][2]; // Not cleared between ticks; see landed_mask.
 };
 enum UnitTask { TASK_PATROL,TASK_MOVE,TASK_ATTACK_UNIT,TASK_ATTACK_STRUCTURE,TASK_COLONIZE,TASK_LAUNCH };
@@ -68,6 +69,7 @@ struct Unit
     float spikes[MAX_SPIKES],payloads[MAX_UNIT_PAYLOADS],damage_age,heal_timer;
     uint32_t wounds;
     float exposure; // Toxic cloud damage that has not yet added up to a hit.
+    float blob_cooldown,stun,aura; // Seconds: next blob, incapacitated by a blob, healing aura after devouring.
     EmbeddedSpike embedded[MAX_EMBEDDED];
     int32_t latch;
     uint32_t latch_generation,latch_structure,latch_root_generation,latch_hits;
@@ -91,6 +93,7 @@ struct Projectile
     float launch_scale;
     uint32_t unit_type;
     bool payload;
+    bool blob; float stun; // A blob incapacitates its unit target for stun seconds instead of wounding it.
 };
 struct Pop { Vec3 position; float age, duration,blast_radius; Faction faction; };
 struct Impact { Vec3 position; float age,duration; Faction faction; };
@@ -183,7 +186,7 @@ struct Simulation
     char message[SIMULATION_MESSAGE_CAPACITY];
     uint32_t shots, hits, deaths;
     uint32_t avoidance_events,factory_contacts;
-    uint32_t digestions,spore_bursts,digest_heals,captures,releases;
+    uint32_t digestions,spore_bursts,digest_heals,captures,releases,blobs,devoured,aura_heals;
     uint32_t last_flash_tick,last_low_tick,last_death_tick;
 };
 

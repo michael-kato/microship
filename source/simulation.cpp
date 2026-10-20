@@ -872,7 +872,7 @@ static void move_units(Simulation* s, float dt)
     {
         Unit* u=&s->units[i];
         if (u->health<=0) continue;
-        if (held_by[i]>=0) { u->velocity=Vec3{};u->flight_goal=u->position;continue; }
+        if (held_by[i]>=0 || u->stun>0) { u->velocity=Vec3{};u->flight_goal=u->position;continue; }
         if (u->target<0 && !u->moving) continue;
         const UnitDefinition* definition=simulation_unit_definition(s,u);
         if (u->latch>=0 && !u->moving)
@@ -1054,6 +1054,7 @@ static void advance_visuals(Simulation* s,float dt)
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         Unit* u=&s->units[i];if (u->health>0) u->age+=dt;u->flash=std::fmax(0.0f,u->flash-dt);u->cooldown=std::fmax(0.0f,u->cooldown-dt);u->latch_recovery=std::fmax(0.0f,u->latch_recovery-dt);
+        u->blob_cooldown=std::fmax(0.0f,u->blob_cooldown-dt);u->stun=std::fmax(0.0f,u->stun-dt);u->aura=std::fmax(0.0f,u->aura-dt);
         Trail* t=&s->trails[i];if (u->health<=0 || !simulation_unit_definition(s,u)->trails) { t->count=0;continue; }
         t->timer+=dt;if (t->timer<v->trail_lifetime/(TRAIL_POINTS-1)) continue;
         t->timer=0;uint32_t count=t->count<TRAIL_POINTS ? t->count : TRAIL_POINTS-1;
@@ -1065,6 +1066,20 @@ static void advance_visuals(Simulation* s,float dt)
 static void recover_units(Simulation* s,float dt)
 {
     const SpikeRules* r=&s->world.spikes;if (!r->enabled) return;
+    // A unit glowing after devouring heals friendly units near it, even in combat. The
+    // shortest interval among overlapping auras applies.
+    float aura_interval[MAX_UNITS]={};uint16_t near[MAX_UNITS];
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    {
+        const Unit& e=s->units[i];if (e.health<=0 || e.aura<=0) continue;
+        const UnitDefinition& d=*simulation_unit_definition(s,&e);
+        uint32_t count=grid_query(s->grid,e.position,d.aura_radius,1u<<e.faction,near);
+        for (uint32_t n=0;n<count;++n)
+        {
+            const Unit& f=s->units[near[n]];float& interval=aura_interval[near[n]];
+            if (f.health>0 && length(subtract(f.position,e.position))<d.aura_radius && (interval<=0 || d.aura_interval<interval)) interval=d.aura_interval;
+        }
+    }
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         Unit* u=&s->units[i];if (u->health<=0) continue;
@@ -1081,11 +1096,12 @@ static void recover_units(Simulation* s,float dt)
             const Body* c=&s->world.bodies[u->target];
             friendly=c->owner==u->faction && length(subtract(u->position,c->position))<c->radius+r->heal_clearance;
         }
-        if (!friendly || !u->wounds || u->damage_age<r->heal_delay) { u->heal_timer=0;continue; }
+        bool aura=aura_interval[i]>0;float interval=aura ? aura_interval[i] : r->heal_interval;
+        if (!u->wounds || (!aura && (!friendly || u->damage_age<r->heal_delay))) { u->heal_timer=0;continue; }
         u->heal_timer+=dt;
-        if (u->heal_timer>=r->heal_interval)
+        if (u->heal_timer>=interval)
         {
-            u->heal_timer=0;--u->wounds;if (u->wounds<MAX_EMBEDDED) u->embedded[u->wounds]=EmbeddedSpike();
+            s->aura_heals+=aura;u->heal_timer=0;--u->wounds;if (u->wounds<MAX_EMBEDDED) u->embedded[u->wounds]=EmbeddedSpike();
             u->health=simulation_unit_definition(s,u)->health*(simulation_unit_definition(s,u)->hits-u->wounds)/simulation_unit_definition(s,u)->hits;++s->healed;
             sound(s,SOUND_HEAL,u->position);
         }
@@ -1177,6 +1193,19 @@ static void spore_clouds(Simulation* s,float dt,uint32_t* hit_count)
     }
 }
 
+static void launch_blob(Simulation* s,Unit* u,const UnitDefinition& d,uint32_t victim)
+{
+    uint32_t slot=0;while (slot<MAX_PROJECTILES && s->projectiles[slot].active) ++slot;
+    if (slot==MAX_PROJECTILES) return; // Wait for capacity.
+    const Unit& t=s->units[victim];Vec3 aim=subtract(t.position,u->position);float distance=length(aim);
+    Projectile p={};p.blob=true;p.stun=d.blob_stun;p.unit_type=u->type;p.position=p.previous=u->position;p.target=(int32_t)victim;
+    p.faction=u->faction;p.direction=distance>POSITION_EPSILON ? scale(aim,1/distance) : u->forward;p.launch_scale=d.blob_scale;
+    p.generation=t.generation;p.active=true;s->projectiles[slot]=p;
+    u->blob_cooldown=d.blob_interval;++s->blobs;sound(s,SOUND_SHOT,u->position);
+    // Without a move order, the cell goes to devour what it incapacitated.
+    if (!u->moving) { u->task=TASK_ATTACK_UNIT;u->attention=(int32_t)victim;u->attention_generation=t.generation; }
+}
+
 static void projectile_combat(Simulation* s,float dt)
 {
     const CombatVisuals* v=&s->world.combat;
@@ -1184,14 +1213,15 @@ static void projectile_combat(Simulation* s,float dt)
     uint32_t* hit_count=scratch.hit_count;uint32_t* incoming=scratch.incoming;EmbeddedSpike (*landed)[2]=scratch.landed;
     bool* digest_heal=scratch.digest_heal;bool* burst=scratch.burst;bool* expired=scratch.expired;bool* held=scratch.held;
     for (uint32_t i=0;i<MAX_UNITS;++i)
-        if (!s->units[i].latch_colony && simulation_attachment_valid(s,&s->units[i])) held[s->units[i].latch]=true;
+        if (!s->units[i].latch_colony && simulation_attachment_valid(s,&s->units[i]))
+        { held[s->units[i].latch]=true;scratch.holder[s->units[i].latch]=(uint16_t)(i+1); }
     grid_build(s);uint16_t near[MAX_UNITS];
     if (s->world.spikes.enabled) for (uint32_t i=0;i<MAX_PROJECTILES;++i)
     {
         const Projectile* p=&s->projectiles[i];if (!p->active) continue;
         bool valid=p->colony ? s->colonies[p->target].generation==p->generation
             && structure_generation(&s->colonies[p->target],p->structure)==p->structure_generation : s->units[p->target].generation==p->generation;
-        if (valid) ++incoming[p->colony ? structure_slot(p->target,p->structure) : p->target];
+        if (valid && !p->blob) ++incoming[p->colony ? structure_slot(p->target,p->structure) : p->target];
     }
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
@@ -1201,7 +1231,21 @@ static void projectile_combat(Simulation* s,float dt)
         { expired[i]=true;continue; }
         // A held victim cannot fire. Supporting units must break the hold.
         // Read the phase input: a newly captured victim stops on the next tick.
-        if (held[i] || u->cooldown>0 || (definition->attack==ATTACK_DIGEST && u->latch_recovery>0)) continue;
+        if (held[i] || u->stun>0) continue;
+        // A free white blood cell first incapacitates a unit beyond contact with a blob, then devours it.
+        if (definition->blob_range>0 && u->blob_cooldown<=0 && !simulation_attachment_valid(s,u))
+        {
+            int32_t victim=-1;float nearest=definition->blob_range;
+            uint32_t count=grid_query(s->grid,u->position,nearest,enemies_of(u->faction),near);
+            for (uint32_t n=0;n<count;++n)
+            {
+                const Unit& t=s->units[near[n]];if (t.health<=0 || t.stun>0 || held[near[n]]) continue;
+                float d=length(subtract(t.position,u->position));
+                if (d>definition->range && d<nearest && clear_shot(s,u->position,t.position)) { nearest=d;victim=(int32_t)near[n]; }
+            }
+            if (victim>=0) launch_blob(s,u,*definition,(uint32_t)victim);
+        }
+        if (u->cooldown>0 || (definition->attack==ATTACK_DIGEST && u->latch_recovery>0)) continue;
         int target=-1;bool colony=false;uint32_t structure=0;float nearest=simulation_unit_definition(s,u)->range;
         bool secondary=false;
         if (definition->attack==ATTACK_DIGEST && simulation_attachment_valid(s,u))
@@ -1328,7 +1372,8 @@ static void projectile_combat(Simulation* s,float dt)
         if (d>POSITION_EPSILON) p->direction=scale(delta,1/d);
         if (d<=step)
         {
-            if (s->world.spikes.enabled)
+            if (p->blob) { Unit& t=s->units[p->target];t.stun=std::fmax(t.stun,p->stun);t.velocity=Vec3{}; }
+            else if (s->world.spikes.enabled)
             {
                 uint32_t index=p->colony ? structure_slot(p->target,p->structure) : (uint32_t)p->target;
                 uint32_t slot=hit_count[index]++;
@@ -1379,6 +1424,11 @@ static void projectile_combat(Simulation* s,float dt)
             {
                 s->last_flash_tick=s->tick_count;
                 if (u->wounds+1>=simulation_unit_definition(s,u)->hits) s->last_low_tick=s->tick_count;
+            }
+            if (u->health==0 && scratch.holder[i])
+            {
+                // Devoured: the holder glows and heals friendly units near it.
+                Unit& eater=s->units[scratch.holder[i]-1];eater.aura=simulation_unit_definition(s,&eater)->aura_seconds;++s->devoured;
             }
             if (u->health==0)
             {
@@ -1721,7 +1771,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
         s->tick_count,s->time_seconds,(uint32_t)MAX_UNITS,s->outcome,s->outcome_tick,s->births,s->losses,s->landings,s->blocked_landings);
     write_faction_stats(s,file);
     uint32_t clouds=0;for (uint32_t i=0;i<MAX_SPORE_CLOUDS;++i) clouds+=s->clouds[i].age<s->clouds[i].seconds;
-    fprintf(file,",\"faction_events\":{\"digestions\":%u,\"digest_heals\":%u,\"spore_bursts\":%u,\"spore_clouds\":%u,\"captures\":%u,\"releases\":%u},\"sound_events\":{",s->digestions,s->digest_heals,s->spore_bursts,clouds,s->captures,s->releases);
+    fprintf(file,",\"faction_events\":{\"digestions\":%u,\"digest_heals\":%u,\"spore_bursts\":%u,\"spore_clouds\":%u,\"captures\":%u,\"releases\":%u,\"blobs\":%u,\"devoured\":%u,\"aura_heals\":%u},\"sound_events\":{",s->digestions,s->digest_heals,s->spore_bursts,clouds,s->captures,s->releases,s->blobs,s->devoured,s->aura_heals);
     for (uint32_t i=0;i<SOUND_COUNT;++i) fprintf(file,"%s\"%s\":%u",i ? "," : "",sound_name(i),s->sounds.totals[i]);
     uint32_t fragments=0;for (uint32_t i=0;i<MAX_LIMB_DEBRIS;++i) fragments+=s->debris[i].seconds>0;
     fprintf(file,"},\"sound_dropped\":%u,\"fractures\":{\"limbs\":%u,\"fragments\":%u,\"replaced\":%u},\"colonies\":[",s->sounds.dropped,s->limbs_broken,fragments,s->debris_replaced);
@@ -1779,7 +1829,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
             uint32_t ready=0;for (uint32_t j=0;j<s->world.spikes.count;++j) ready+=u->spikes[j]>=1;
             fprintf(file,"%s{\"slot\":%u,\"generation\":%u,\"faction\":%d,\"kind\":%d,\"health\":%.6f,\"target\":%d,\"position\":[%.6f,%.6f,%.6f],\"velocity\":[%.6f,%.6f,%.6f],\"bank\":%.6f,\"selected\":%s,\"wounds\":%u,\"ready_spikes\":%u,\"flash\":%.6f,\"visible\":%s,\"moving\":%s",
                 first ? "" : ",",i,u->generation,(int)u->faction,(int)simulation_unit_definition(s,u)->group,u->health,u->target,u->position.x,u->position.y,u->position.z,u->velocity.x,u->velocity.y,u->velocity.z,u->bank,u->selected ? "true" : "false",u->wounds,ready,u->flash,s->visible_units[i] ? "true" : "false",u->moving ? "true" : "false");
-            fprintf(file,",\"exposure\":%.6f",u->exposure);
+            fprintf(file,",\"exposure\":%.6f,\"stun\":%.6f,\"aura\":%.6f",u->exposure,u->stun,u->aura);
             uint32_t pods=0;const UnitDefinition* definition=simulation_unit_definition(s,u);
             for (uint32_t j=0;j<definition->payload_count;++j) pods+=u->payloads[j]>=1;
             fprintf(file,",\"ready_payloads\":%u,\"payload_growth\":[",pods);
