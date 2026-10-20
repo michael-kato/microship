@@ -255,11 +255,10 @@ static uint32_t factory_count(const BranchRules& f,uint32_t roots)
     for (uint32_t i=0;i<f.levels;++i) { count+=level;level*=f.children; }
     return count;
 }
-static void schedule_tree(Colony* c,uint32_t node,float root_seconds,float child_seconds,float* time)
+static void depth_first(const Colony* c,uint32_t node,uint32_t* order,uint32_t* count)
 {
-    c->deployment_start[node]=*time;c->deployment_seconds[node]=c->parents[node]<0 ? root_seconds : child_seconds;
-    *time+=c->deployment_seconds[node];
-    for (uint32_t j=node+1;j<c->structure_count;++j) if (c->parents[j]==(int32_t)node) schedule_tree(c,j,root_seconds,child_seconds,time);
+    order[(*count)++]=node;
+    for (uint32_t j=node+1;j<c->structure_count;++j) if (c->parents[j]==(int32_t)node) depth_first(c,j,order,count);
 }
 static uint32_t select_factory_roots(const Body& body,const BranchRules& f,uint32_t* indices)
 {
@@ -353,14 +352,15 @@ static void prepare_factory(Simulation* s,uint32_t p)
         else c->parents[k]=f->grammar==GROWTH_AXIAL ? k-c->root_count : (k-c->root_count)%c->root_count;
         c->limb_scale[k]=c->parents[k]<0 ? 1 : c->limb_scale[c->parents[k]]*f->width_scale;
     }
-    if (f->grammar==GROWTH_TREE && f->branch_probability<1)
+    if (f->grammar==GROWTH_TREE)
     {
         uint32_t topology_seed=seed^body.seed^((c->generation-1)*TARGET_SEED_MULTIPLIER);
         c->structure_count=c->root_count;
         for (uint32_t parent=0;parent<c->structure_count;++parent)
         {
             uint32_t depth=0;for (int32_t node=c->parents[parent];node>=0;node=c->parents[node]) ++depth;
-            if (depth+1>=f->levels) continue;
+            // The first child of the first root stays a leaf, so production can start soon after colonization.
+            if (depth+1>=f->levels || parent==c->root_count) continue;
             uint32_t children=1;
             for (uint32_t child=1;child<f->children;++child) if ((signed_random(&topology_seed)+1)*.5f<f->branch_probability) ++children;
             for (uint32_t child=0;child<children;++child)
@@ -370,14 +370,20 @@ static void prepare_factory(Simulation* s,uint32_t p)
             }
         }
     }
+    // Every root starts at colonization; later roots may start up to the authored offset after it.
+    // Each structure grows for sprout_seconds. A root's limbs emerge depth first at even intervals,
+    // so its first child follows the mature trunk and its last limb matures when establishment ends.
     float seconds=simulation_producer_definition(s,p)->establishment_seconds;
-    if (f->grammar==GROWTH_TREE)
+    float grow=std::fmin(simulation_producer_definition(s,p)->sprout_seconds,seconds);
+    uint32_t timing_seed=seed^body.seed^(c->generation*TARGET_SEED_MULTIPLIER);
+    for (uint32_t r=0;r<c->root_count;++r)
     {
-        float time=0,root_seconds=seconds*f->root_share/c->root_count,child_seconds=seconds*(1-f->root_share)/(c->structure_count-c->root_count);
-        for (uint32_t k=0;k<c->root_count;++k) schedule_tree(c,k,root_seconds,child_seconds,&time);
+        uint32_t order[MAX_FACTORY_STRUCTURES],count=0;depth_first(c,r,order,&count);
+        float start=r ? (signed_random(&timing_seed)+1)*.5f*f->root_offset_seconds : 0;
+        float first=start+grow,interval=count>2 ? std::fmax(0.0f,seconds-grow-first)/(count-2) : 0;
+        for (uint32_t i=0;i<count;++i)
+        { c->deployment_start[order[i]]=i ? first+(i-1)*interval : start;c->deployment_seconds[order[i]]=grow; }
     }
-    else for (uint32_t k=0;k<c->structure_count;++k)
-    { c->deployment_start[k]=k*seconds/c->structure_count;c->deployment_seconds[k]=seconds/c->structure_count; }
     if (simulation_producer_definition(s,p)->segment_path[0])
     {
         seed^=body.seed;

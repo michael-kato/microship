@@ -166,20 +166,22 @@ with tempfile.TemporaryDirectory(prefix='nanova-growth-') as directory:
         c=initial['colonies'][cell];assert initial['landings']==1 and c['active']
         start=360-round(c['establishment_age']*60)
         previous=0
-        for seconds in (20,60,121,178,182):
-            state,_=run(name+'-'+str(seconds),colony,start+seconds*60)
-            c=state['colonies'][cell];structures=c['structures']
+        definition=next(b for b in colony['content']['buildings'] if b['faction']==side)
+        offset=definition['branches']['root_offset_seconds'];sprout=definition['sprout_seconds'];assert offset<sprout
+        for seconds in ((offset+sprout)/2,60,121,178,182):
+            state,_=run(name+'-'+str(seconds),colony,start+round(seconds*60))
+            c=state['colonies'][cell];structures=c['structures'];roots=structures[:c['root_count']]
             alive=[v for v in structures if v['health']>0]
             growing=[v for v in alive if v['growth']<1]
-            assert len(growing)<=1,(name,seconds,'Parallel emergence',structures)
-            assert all(v['health']==0 and v['growth']==0 for v in structures[len(alive):]),'A later factory emerged first'
             assert all(v['parent']<0 or structures[v['parent']]['growth']==1 for v in alive),'A child grew before its support'
-            definition=next(b for b in colony['content']['buildings'] if b['faction']==side)
             maximum=1+(len(structures)-c['root_count'])*definition['branches']['production']
             assert previous<c['production']<=maximum+.00001,(name,seconds,c['production'])
             previous=c['production']
-            if seconds<180:
-                assert len(alive)==math.ceil(seconds/(180/len(structures))), (name,seconds,len(alive))
+            if seconds<sprout:
+                # Every factory root starts within the authored offset of colonization and grows at once.
+                assert seconds>offset and len(alive)==c['root_count']>1 and len(growing)==len(roots),(name,seconds,structures)
+            elif seconds<180:
+                assert all(v['growth']==1 for v in roots) and (growing or len(alive)<len(structures)),(name,seconds,len(alive))
                 assert c['production']<maximum
             else:
                 assert len(alive)==len(structures) and not growing
@@ -191,7 +193,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-growth-') as directory:
         for producer in tuned['content']['buildings']:producer['establishment_seconds']=seconds
         midpoint,_=run('establish-tuned-half-'+str(seconds),tuned,start+seconds*30)
         complete,_=run('establish-tuned-full-'+str(seconds),tuned,start+(seconds+1)*60)
-        assert sum(v['growth']==1 for v in midpoint['colonies'][cell]['structures']) in (7,8)
+        assert 0<sum(v['growth']==1 for v in midpoint['colonies'][cell]['structures'])<len(midpoint['colonies'][cell]['structures'])
         assert all(v['growth']==1 for v in complete['colonies'][cell]['structures'])
     productive=deepcopy(colony);productive['rules']['economy']['manufacture_seconds']=12
     producing,_=run('establish-produces-before-full',productive,start+90*60)

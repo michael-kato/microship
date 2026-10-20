@@ -60,14 +60,14 @@ struct BranchRules
     Vec3 normal;
     uint32_t children,levels,root_limit;
     float root_minimum_radius,branch_probability,angle_jitter,length_jitter,width_jitter;
-    float length_scale,width_scale,angle,bend,root_share;
+    float length_scale,width_scale,angle,bend,root_offset_seconds;
 };
 struct ProducerDefinition
 {
     char name[ASSET_NAME_CAPACITY],faction_name[ASSET_NAME_CAPACITY],model_path[ASSET_PATH_CAPACITY];
     char segment_path[ASSET_PATH_CAPACITY],tip_path[ASSET_PATH_CAPACITY];
     Faction faction;
-    float growth_seconds,establishment_seconds,health,collection,height,width;
+    float growth_seconds,sprout_seconds,establishment_seconds,health,collection,height,width;
     float stem_radius,head_radius;
     Vec3 growth_plane_normal;
     float growth_depth_ratio;

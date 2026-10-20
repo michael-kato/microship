@@ -25,6 +25,11 @@
             "exclusiveMinimum": 0,
             "maximum": 10000
           },
+          "sprout_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
+          },
           "health": {
             "type": "number",
             "exclusiveMinimum": 0,
@@ -137,11 +142,6 @@
                     "minimum": 0.05,
                     "maximum": 0.5
                   },
-                  "root_share": {
-                    "type": "number",
-                    "minimum": 0.1,
-                    "maximum": 0.9
-                  },
                   "branch_probability": {
                     "type": "number",
                     "minimum": 0,
@@ -169,8 +169,7 @@
                   "length_scale",
                   "width_scale",
                   "angle_degrees",
-                  "bend",
-                  "root_share"
+                  "bend"
                 ],
                 "additionalProperties": false
               },
@@ -183,6 +182,11 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1.5
+              },
+              "root_offset_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10000
               }
             },
             "required": ["seconds", "count", "spacing", "production", "seed", "normal"],

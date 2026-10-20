@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-match-') as directory:
         assert any(v['growth']<1 for v in c['structures'])
         # Each mature terminal leaf gets a job, with no whole-cell completion gate.
         fast=deepcopy(data);fast['rules']['economy']['manufacture_seconds']=2
-        for building in fast['content']['buildings']:building.update(establishment_seconds=4,growth_seconds=.1,collection=100)
+        for building in fast['content']['buildings']:building.update(establishment_seconds=4,growth_seconds=.1,sprout_seconds=.1,collection=100)
         for unit in fast['content']['units']:unit['cost']=.01
         full,_=run(side+'-all-leaves',fast,1050,f'0 select all\n0 order {home}\n')
         colony=full['colonies'][home]

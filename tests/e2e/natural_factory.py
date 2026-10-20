@@ -36,7 +36,8 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
             if parent>=0:assert limb['stem'][0]==colony['structures'][parent]['stem'][3],'A branch joint opened'
             while parent>=0:depth+=1;parent=colony['structures'][parent]['parent']
             children=sum(child['parent']==k for child in colony['structures'])
-            assert children==(0 if depth==2 else max(1,children)) and children<=2
+            low=k==colony['root_count']  # The first child of the first root stays a low leaf.
+            assert children==(0 if depth==2 or low else max(1,children)) and children<=2
             assert limb['terminal']==(children==0)
             length=sum(math.dist(a,b) for a,b in zip(limb['stem'],limb['stem'][1:]));nominal=profile['height']*tree['length_scale']**depth
             assert nominal*(1-tree['length_jitter'])-1e-4<=length<=nominal*(1+tree['length_jitter'])+1e-4
@@ -54,9 +55,9 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
     other,_=run('branch_seed',changed);assert other['colonies'][0]['attachments']==colony['attachments']
     assert other['colonies'][0]['structures']!=colony['structures'],'The branch seed was ignored'
     sparse=change(data,'content.buildings.0.branches.tree.branch_probability',0);c=run('single_children',sparse)[0]['colonies'][0]
-    assert len(c['structures'])==c['root_count']*3
+    assert len(c['structures'])==c['root_count']*3-1
     full=change(data,'content.buildings.0.branches.tree.branch_probability',1);c=run('full_children',full)[0]['colonies'][0]
-    assert len(c['structures'])==c['root_count']*7
+    assert len(c['structures'])==c['root_count']*7-2
     small=change(data,'bodies.0.radius',2.1);c=run('small_cell',small)[0]['colonies'][0];check_roots(c,branch);assert c['root_count']==2
     for side,faction in [('immune',2),('fungus',3)]:
         d=stage_world(root/'assets/levels'/(side+'-player-level.json'),out)

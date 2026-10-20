@@ -54,7 +54,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-startup-') as directory:
         for cell in (home,enemy):
             c=settled['colonies'][cell]
             assert 0<c['establishment_age']<180
-            assert 0<c['production']<1
+            assert c['production']>0 and any(v['health']<=0 or v['growth']<1 for v in c['structures'])
         reset,_=run(path.stem+'-restart',data,2400,replay,('--restart',))
         assert reset['tick']==0 and reset['landings']==0 and not any(c['active'] for c in reset['colonies'])
     base=stage_world(root/'assets/levels/virus-player-level.json',out)

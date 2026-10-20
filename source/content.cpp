@@ -298,7 +298,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
     json_object(root,"$schema|buildings");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|model|growth_seconds|establishment_seconds|health|collection|height|width|hits|branches|growth_meshes|navigation|growth_plane");ProducerDefinition p={};
+        json_object(j,"name|faction|model|growth_seconds|sprout_seconds|establishment_seconds|health|collection|height|width|hits|branches|growth_meshes|navigation|growth_plane");ProducerDefinition p={};
         Json plane=json_find(j,"growth_plane");
         if (json_present(plane))
         {
@@ -320,6 +320,8 @@ static bool load_buildings(Content* c,Json root,const char* path)
         }
         definition_name(j,p.name);json_string(json_get(j,"faction"),p.faction_name,ASSET_NAME_CAPACITY);json_path(json_get(j,"model"),path,p.model_path);
         p.growth_seconds=json_positive(json_get(j,"growth_seconds"),MAX_BUILDING_GROWTH_SECONDS);
+        Json sprout=json_find(j,"sprout_seconds");
+        p.sprout_seconds=json_present(sprout) ? json_positive(sprout,MAX_BUILDING_GROWTH_SECONDS) : p.growth_seconds;
         Json establishment=json_find(j,"establishment_seconds");
         if (json_present(establishment)) p.establishment_seconds=json_positive(establishment,MAX_ESTABLISHMENT_SECONDS);
         p.health=json_positive(json_get(j,"health"),MAX_BUILDING_HEALTH);
@@ -327,7 +329,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
         p.height=json_positive(json_get(j,"height"),MAX_BUILDING_HEIGHT);
         p.width=json_positive(json_get(j,"width"),MAX_BUILDING_WIDTH);
         p.hits=json_uint(json_get(j,"hits"),1,MAX_HIT_COUNT);Json b=json_get(j,"branches");
-        json_object(b,"seconds|count|spacing|production|seed|normal|health|hits|regrow_seconds|roots|root_limit|root_minimum_radius|grammar|tree");
+        json_object(b,"seconds|count|spacing|production|seed|normal|health|hits|regrow_seconds|roots|root_limit|root_minimum_radius|root_offset_seconds|grammar|tree");
         char roots[ASSET_NAME_CAPACITY]={},grammar[ASSET_NAME_CAPACITY]={};
         Json roots_json=json_find(b,"roots"),grammar_json=json_find(b,"grammar");
         if (json_present(roots_json))
@@ -340,6 +342,8 @@ static bool load_buildings(Content* c,Json root,const char* path)
         if (json_present(root_limit)) p.branches.root_limit=json_uint(root_limit,1,MAX_FACTORY_STRUCTURES);
         if (json_present(root_radius)) p.branches.root_minimum_radius=json_float(root_radius,0,1.5f);
         if (!p.branches.organelle_roots && (json_present(root_limit) || json_present(root_radius))) json_error(b,"root filters require organelle roots");
+        Json root_offset=json_find(b,"root_offset_seconds");
+        if (json_present(root_offset)) p.branches.root_offset_seconds=json_float(root_offset,0,MAX_ESTABLISHMENT_SECONDS);
         p.branches.branch_probability=1;
         if (json_present(grammar_json))
         {
@@ -352,11 +356,10 @@ static bool load_buildings(Content* c,Json root,const char* path)
         Json tree=json_find(b,"tree");
         if (p.branches.grammar==GROWTH_TREE)
         {
-            json_object(tree,"children|levels|length_scale|width_scale|angle_degrees|bend|root_share|branch_probability|angle_jitter_degrees|length_jitter|width_jitter");
+            json_object(tree,"children|levels|length_scale|width_scale|angle_degrees|bend|branch_probability|angle_jitter_degrees|length_jitter|width_jitter");
             p.branches.children=json_uint(json_get(tree,"children"),2,3);p.branches.levels=json_uint(json_get(tree,"levels"),2,5);
             p.branches.length_scale=json_float(json_get(tree,"length_scale"),.2f,.9f);p.branches.width_scale=json_float(json_get(tree,"width_scale"),.2f,.9f);
             p.branches.angle=json_float(json_get(tree,"angle_degrees"),10,65)*.01745329252f;p.branches.bend=json_float(json_get(tree,"bend"),.05f,.5f);
-            p.branches.root_share=json_float(json_get(tree,"root_share"),.1f,.9f);
             Json probability=json_find(tree,"branch_probability"),angle=json_find(tree,"angle_jitter_degrees");
             Json length=json_find(tree,"length_jitter"),width=json_find(tree,"width_jitter");
             if (json_present(probability)) p.branches.branch_probability=json_float(probability,0,1);
