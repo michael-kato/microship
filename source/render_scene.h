@@ -7,7 +7,7 @@
 #include <vector>
 
 // CPU render input. No game rules or graphics API resources are stored here.
-enum { INSTANCE_STYLE_FLOATS=8, INSTANCE_UNSHADOWED=1, INSTANCE_TINT_THIN_ONLY=2, INSTANCE_ORGANELLE=4 };
+enum { INSTANCE_STYLE_FLOATS=8, INSTANCE_UNSHADOWED=1, INSTANCE_TINT_THIN_ONLY=2, INSTANCE_ORGANELLE=4, INSTANCE_EMISSION_FRESNEL=8 };
 struct RenderInstance
 {
     float transform[3][4];
@@ -47,7 +47,7 @@ struct RenderScene
     float background_blur, background_glow, background_ambient;
     Vec3 background_wave;
     float background_animation[4];
-    float organelle_style[4],membrane_ripple[4];
+    float organelle_style[4],membrane_ripple[4],emission_fresnel[4];
     float bounds_min[3],bounds_max[3],foreground_min[3],foreground_max[3];
     double time_seconds;
 };

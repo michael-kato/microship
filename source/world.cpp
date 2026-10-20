@@ -232,7 +232,7 @@ static bool load_effects(World* w,const char* path)
 static bool load_appearance(World* w,const char* path,uint32_t seed)
 {
     JsonDocument d;if (!json_load(&d,path)) return false;Json root=json_root(&d);
-    json_object(root,"$schema|ambient|gradient|lights|thin_surface|backdrop|atmosphere|fog|self_glow|organelle_appearance|animation");
+    json_object(root,"$schema|ambient|gradient|lights|thin_surface|backdrop|atmosphere|fog|self_glow|organelle_appearance|factory_appearance|animation");
     w->ambient=json_color(json_get(root,"ambient"),MAX_AMBIENT_RADIANCE);w->ambient_enabled=true;
     Json gradient=json_find(root,"gradient");
     if (json_present(gradient))
@@ -273,6 +273,15 @@ static bool load_appearance(World* w,const char* path,uint32_t seed)
         w->organelle_style[1]=json_float(json_get(organelles,"edge_width"),.01f,1);
         w->organelle_style[2]=json_float(json_get(organelles,"center_glow"),0,8);
         w->organelle_style[3]=json_float(json_get(organelles,"center_power"),0,16);
+    }
+    w->factory_emission_fresnel[1]=1;
+    Json factory=json_find(root,"factory_appearance");
+    if (json_present(factory))
+    {
+        json_object(factory,"emission_fresnel");
+        Json fresnel=json_get(factory,"emission_fresnel");json_object(fresnel,"strength|power");
+        w->factory_emission_fresnel[0]=json_float(json_get(fresnel,"strength"),0,1);
+        w->factory_emission_fresnel[1]=json_float(json_get(fresnel,"power"),.01f,16);
     }
     Json animation=json_find(root,"animation");
     if (json_present(animation))

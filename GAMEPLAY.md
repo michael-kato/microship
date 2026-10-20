@@ -134,6 +134,16 @@ uses the current visible emissive strength,
 a brightness threshold, and a quarter-resolution blur. Surfaces and display
 output stay at native resolution. F10 switches self-glow and the halo together.
 
+Factory emission uses an inverse Fresnel mask in `assets/presentation/scene.json`,
+under `factory_appearance.emission_fresnel`. `strength` ranges from zero to one;
+zero disables the mask, and one removes emission at the grazing-angle limit.
+`power` sets the rim width. Lower values make the dark rim wider; higher values
+make it narrower. The defaults are `strength: 1` and `power: 0.5`. Face-on emission
+keeps its full strength. `self_glow.factory_stems` and `factory_leaves` still set
+the emission level. Stems, leaf heads and their debris use this mask. Surface
+pigment and reflected light remain visible at the rim. Build and restart after
+editing source assets to load the new bundled values.
+
 Virus factories use faceted phage heads, six pointed tail fibres, and tapered
 continuous tapered shafts with irregular surfaces. Growth follows the forked
 tree.

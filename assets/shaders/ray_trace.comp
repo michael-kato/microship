@@ -536,6 +536,12 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
         surface.color=clamp(mix(vec3(grey),surface.color,saturation),vec3(0),vec3(1));
         surface.emission*=render.organelle_style.z*pow(max(facing,1e-6),render.organelle_style.w);
     }
+    if ((flags&8u)!=0u && render.emission_fresnel.x>0.0)
+    {
+        float facing=clamp(dot(normal,-direction),0.0,1.0);
+        float edge=pow(1.0-facing,render.emission_fresnel.y);
+        surface.emission*=1.0-render.emission_fresnel.x*edge;
+    }
     surface.unshadowed=(flags&1u)!=0u;
     if (surface.translucent) surface.roughness=mix(surface.roughness,instance_style[hit_instance].material.y,instance_style[hit_instance].material.z);
     return true;

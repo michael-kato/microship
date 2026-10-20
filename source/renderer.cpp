@@ -29,7 +29,7 @@
 static_assert(SIGHT_FIELD_SIDE==FOG_FIELD_SIZE,"Fog CPU/GPU grid layout");
 static const int GPU_VERTEX_BYTES = 64;
 static const int GPU_MEDIUM_BYTES = 80;
-static const int GPU_RENDER_UNIFORM_BYTES = 560;
+static const int GPU_RENDER_UNIFORM_BYTES = 576;
 static const int GPU_DEBUG_PUSH_BYTES = 128;
 static const double MILLISECONDS_PER_SECOND = 1000.0;
 static const double BINARY_UNIT_SCALE = 1024.0;
@@ -101,7 +101,7 @@ struct RenderUniform
     float fog[4],fog_tint[4],membrane_fade[4],focus_band[4],subsurface[4];
     uint32_t subsurface_quality[4];
     float fog_grid[4];
-    float organelle_style[4],membrane_ripple[4];
+    float organelle_style[4],membrane_ripple[4],emission_fresnel[4];
 };
 
 static_assert(sizeof(GpuVertex) == GPU_VERTEX_BYTES, "Vertex shader layout");
@@ -801,6 +801,7 @@ static void store_vector(float* destination, Vec3 value)
 static void scene_uniform(RenderUniform* uniform,const RenderScene* scene)
 {
     memcpy(uniform->organelle_style,scene->organelle_style,sizeof(uniform->organelle_style));
+    memcpy(uniform->emission_fresnel,scene->emission_fresnel,sizeof(uniform->emission_fresnel));
     memcpy(uniform->membrane_ripple,scene->membrane_ripple,sizeof(uniform->membrane_ripple));
     uniform->background[0]=scene->ambient.r;uniform->background[1]=scene->ambient.g;uniform->background[2]=scene->ambient.b;
     uniform->ambient_top[0]=scene->ambient_top.r;uniform->ambient_top[1]=scene->ambient_top.g;uniform->ambient_top[2]=scene->ambient_top.b;

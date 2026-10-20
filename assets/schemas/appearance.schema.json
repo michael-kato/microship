@@ -457,6 +457,31 @@
       },
       "required": ["organelles", "membrane", "factories"],
       "additionalProperties": false
+    },
+    "factory_appearance": {
+      "type": "object",
+      "properties": {
+        "emission_fresnel": {
+          "type": "object",
+          "description": "Reduce factory emission at grazing view angles. Larger power narrows the dark rim.",
+          "properties": {
+            "strength": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "power": {
+              "type": "number",
+              "minimum": 0.01,
+              "maximum": 16
+            }
+          },
+          "required": ["strength", "power"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["emission_fresnel"],
+      "additionalProperties": false
     }
   },
   "required": ["ambient"],

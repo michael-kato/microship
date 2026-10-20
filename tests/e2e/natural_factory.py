@@ -31,6 +31,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
                 position=[leaf['transform'][j] for j in (3,7,11)]
                 assert math.dist(tip,position)<.001,(p,k,'A leaf detached from its stem',tip,position)
                 assert leaf['mesh']!=stems[-1]['mesh'],'A stem was used in place of a leaf'
+                assert int(leaf['style'][7])&8 and all(int(stem['style'][7])&8 for stem in stems),'A factory part lost its emission mask'
     def run(name,world=data,ticks=600,seed=1234,expected=0):
         global count
         source=out/(name+'_world.json');write_world(source,world);state=out/(name+'_state.json');scene=out/(name+'_scene.json')

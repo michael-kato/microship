@@ -266,7 +266,7 @@ add_test(NAME startup COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/startup.py $<TARGET_FILE:nanova>)
 set_tests_properties(startup PROPERTIES TIMEOUT 60)
 
-foreach(group IN ITEMS selection colony_forms cell_animation natural_factory)
+foreach(group IN ITEMS selection colony_forms cell_animation natural_factory factory_emission)
     add_test(NAME ${group} COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/${group}.py $<TARGET_FILE:nanova>)
     set_tests_properties(${group} PROPERTIES TIMEOUT 60)

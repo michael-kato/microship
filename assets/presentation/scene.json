@@ -101,5 +101,11 @@
       "sway_degrees": 1.8,
       "period_seconds": 28
     }
+  },
+  "factory_appearance": {
+    "emission_fresnel": {
+      "strength": 1.0,
+      "power": 0.5
+    }
   }
 }

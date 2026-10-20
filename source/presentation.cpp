@@ -168,6 +168,7 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
     }
     catch (const std::bad_alloc&) { fprintf(stderr,"Cannot allocate game presentation storage.\n");return false; }
     memcpy(scene->organelle_style,w->organelle_style,sizeof(scene->organelle_style));
+    memcpy(scene->emission_fresnel,w->factory_emission_fresnel,sizeof(scene->emission_fresnel));
     scene->ambient=w->ambient;scene->ambient_top=w->ambient_top;scene->ambient_bottom=w->ambient_bottom;
     for (uint32_t i=0;i<3;++i) scene->lights[i]=RenderLight{w->studio[i].direction,w->studio[i].color,w->studio[i].irradiance};
     scene->lights_enabled=w->studio_mask!=0;scene->guides_required=w->combat.enabled;
@@ -371,7 +372,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                         uint32_t wounds=k ? colony->branches[k-1].wounds : colony->wounds;
                         Color tint=wounds ? s->world.spikes.injury[std::min(1u,wounds-1)] : color;
                         float* style=state->scene.instances[slot].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=wounds ? INJURY_TINT_STRENGTH : FACTORY_FACTION_TINT_STRENGTH;
-                        style[4]=state->stem_glow_mask[colony->type] ? 0 : s->world.glow_stems;
+                        style[4]=state->stem_glow_mask[colony->type] ? 0 : s->world.glow_stems;style[7]=INSTANCE_EMISSION_FRESNEL;
                     }
                     float size=definition->width*(definition->branches.grammar==GROWTH_TREE ? simulation_structure_scale(s,p,k) : (colony->parents[k]>=0 ? FACTORY_CHILD_HEAD_WIDTH_SCALE : 1))*(FACTORY_HEAD_START_WIDTH_SCALE+FACTORY_HEAD_GROWTH_WIDTH_SCALE*growth);
                     uint32_t slot=factory_instance_slot(state,p,k);
@@ -381,7 +382,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                     if (growth>=(k ? colony->branches[k-1].growth : colony->growth))
                         set_instance(state,slot,state->tip_meshes[colony->type],tip,scale(x,size),scale(y,size),scale(z,size));
                     float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=FACTORY_FACTION_TINT_STRENGTH;
-                    style[4]=s->world.glow_leaves;
+                    style[4]=s->world.glow_leaves;style[7]=INSTANCE_EMISSION_FRESNEL;
                 }
                 for (uint32_t k=0;k<colony->structure_count;++k) if (colony->leaves[k].active)
                 {
@@ -404,6 +405,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                 float width=simulation_producer_definition(s,p)->width*growth;
                 set_instance(state,factory_instance_slot(state,p,k),state->factory_meshes[colony->type],position,
                     scale(right,width),scale(up,simulation_producer_definition(s,p)->height*growth),scale(normal,width));
+                state->scene.instances[factory_instance_slot(state,p,k)].style[7]=INSTANCE_EMISSION_FRESNEL;
             }
             continue;
         }
@@ -417,7 +419,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
         set_instance(state,slot,d.tip ? state->tip_meshes[d.producer] : state->segment_meshes[d.producer],d.start,
             scale(x,d.radius*shrink),d.tip ? scale(y,d.radius*shrink) : scale(delta,shrink),scale(z,d.radius*shrink));
         Color color=content_color(&s->world.content,d.faction);float* style=state->scene.instances[slot].style;
-        style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=FACTORY_FACTION_TINT_STRENGTH;
+        style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=FACTORY_FACTION_TINT_STRENGTH;style[7]=INSTANCE_EMISSION_FRESNEL;
     }
     update_spike_instances(state,simulation);
 }

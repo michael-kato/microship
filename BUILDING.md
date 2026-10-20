@@ -926,3 +926,29 @@ The intact-leaf check passed after the leaf-placement change on Oct 20. Frozen
 branches, up from eight. Simulation exports, mesh geometry and existing poses
 matched the prior captures. The checks used two frames per process, default
 sampling and Khronos host validation. They do not measure sustained play.
+
+## Factory emission mask
+
+Run `ctest --test-dir build/windows-cross --output-on-failure -R '^factory_emission$'`
+after a build. Thirteen real-application runs check the controls, optional and
+disabled settings, all three factions, instance scope, unchanged game results,
+and invalid settings. `natural_factory` also checks the mask flag on leaf heads
+and stems through growth, damage and regrowth.
+
+On Oct 20, four CPU application check groups passed: `data_assets`,
+`cell_animation`, `natural_factory` and `factory_emission`. The control check
+passed again with the final default power of 0.5. Frozen native 1920×1080
+captures passed Khronos host validation at default sampling, with two frames per
+process and no tracing. Disabled output matched the prior image pixel for pixel.
+Enabling the mask preserved simulation exports, mesh geometry and poses. The
+final close view measured 9.584/7.563 ms GPU time for its two frames; the disabled
+view measured 9.221/7.249 ms. These short checks do not establish sustained cost
+or native Windows behavior.
+
+Screenshots `000931_factory_fresnel_wide_off.png` and
+`000935_factory_fresnel_wide_on.png` show the full factory. The close views are
+`000933_factory_fresnel_near_off.png` and `000936_factory_fresnel_near_on.png`.
+Prepared inputs, logs, report and comparison viewers are in
+`build/factory_fresnel_review/`. Its `run_review.py` prepares inputs by default;
+`--run` starts the bounded GPU batch. `wide_comparison.html` and
+`near_comparison.html` compare the disabled and enabled images.
