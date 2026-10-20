@@ -1128,7 +1128,7 @@ static void fracture_limb(Simulation* s,uint32_t p,uint32_t k,float old_growth,f
         bool tip=j==GROWTH_SEGMENTS;
         float amount=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_SEGMENTS-j));
         if (tip)
-        { if (growth<(k ? c.branches[k-1].growth : c.growth) || (definition.branches.grammar==GROWTH_TREE && !simulation_structure_terminal(s,p,k))) continue; }
+        { if (growth<=0 || growth<(k ? c.branches[k-1].growth : c.growth)) continue; }
         else if (j<retained*GROWTH_SEGMENTS || amount<=MIN_FRACTURE_SEGMENT_FRACTION) continue;
         uint32_t slot=0;while (slot<MAX_LIMB_DEBRIS && s->debris[slot].seconds>0) ++slot;
         if (slot==MAX_LIMB_DEBRIS)

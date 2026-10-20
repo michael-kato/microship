@@ -904,7 +904,9 @@ Run `ctest --test-dir build/windows-cross --output-on-failure -R '^natural_facto
 after a build. This starts the real Windows application through Proton. It checks
 large-organelle root selection, seeded branch counts and dimensions, connected
 joints, mature shape stability, and rejected settings. Damage scenarios check
-new regrowth shapes for virus, immune and fungal factories. Other roots must
+new regrowth shapes for virus, immune and fungal factories. The check also verifies
+that every intact stem ends in an attached leaf, including stems with children.
+Cut tips can remain bare. Other roots must
 keep their shapes, and a repeated seed must produce the same result.
 
 On Oct 20, the Windows cross-build and four application check groups passed:
@@ -917,3 +919,10 @@ The first frame includes initial bake work. These are short appearance checks,
 not sustained performance or native Windows results. Screenshots are
 `000927_natural_factory_current_wide.png` and
 `000928_natural_factory_current_near.png` in `screenshots/`.
+
+The intact-leaf check passed after the leaf-placement change on Oct 20. Frozen
+1080p captures `000929_all_branches_leaf_wide.png` and
+`000930_all_branches_leaf_near.png` show fifteen leaves on fifteen intact
+branches, up from eight. Simulation exports, mesh geometry and existing poses
+matched the prior captures. The checks used two frames per process, default
+sampling and Khronos host validation. They do not measure sustained play.

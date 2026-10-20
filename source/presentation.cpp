@@ -358,6 +358,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                 {
                     if ((k ? colony->branches[k-1].health : colony->health)<=0) continue;
                     float growth=simulation_structure_growth(s,p,k);
+                    if (growth*GROWTH_SEGMENTS<=MIN_VISIBLE_STEM_EXTENSION) continue;
                     for (uint32_t j=0;j<GROWTH_SEGMENTS;++j)
                     {
                         float extension=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_SEGMENTS-j));
@@ -376,7 +377,8 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                     uint32_t slot=factory_instance_slot(state,p,k);
                     Vec3 tip=simulation_structure_position(s,p,k),y=normalize(subtract(tip,colony->stems[k][0]));
                     Vec3 x=normalize(cross(std::fabs(y.z)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
-                    if (growth>=(k ? colony->branches[k-1].growth : colony->growth) && (definition->branches.grammar!=GROWTH_TREE || simulation_structure_terminal(s,p,k)))
+                    // Children join before the stem end; an intact end keeps its leaf past the fork.
+                    if (growth>=(k ? colony->branches[k-1].growth : colony->growth))
                         set_instance(state,slot,state->tip_meshes[colony->type],tip,scale(x,size),scale(y,size),scale(z,size));
                     float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=FACTORY_FACTION_TINT_STRENGTH;
                     style[4]=s->world.glow_leaves;

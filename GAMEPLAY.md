@@ -35,6 +35,10 @@ Virus trees grow side by side. New units grow at terminal leaves. Support damage
 
 Ownership changes the existing cell wall shape over 24 seconds. Its tint changes over 180 seconds. Seeded pigment variation changes the wall brightness and shifts its hue between pink and blue-green. Virus control blends in a pointed radial displacement and a shinier blue-green material. Fungal control blends in broad rounded displacement and a rougher brown material. Immune control returns the wall to its neutral shape and moves its material toward pink and white. Vertex and triangle counts stay fixed. Normals and render bounds follow the current positions. No separate spines or lobes appear. Organelle geometry, collision rules, attachment points, and game outcomes do not change.
 
+Every intact factory branch ends in a faction leaf head. This includes trunks
+that extend past their forks. The head follows the stem during sway. Tips exposed
+by growth or damage do not require a leaf; cut tips stay bare until regrowth.
+
 Damage removes stem sections and can remove descendants of a damaged support. Other roots keep working. Geometry and BLAS stay fixed during growth; instance transforms expose the current sections. Unit manufacture occurs at mature tips.
 
 Fog uses a severe current-frame spatial blur and a dark red tint outside current sight. It also covers previously discovered cells after sight is lost. Neutral cell forms remain visible through the blur. Enemy units and factories still require current sight. Discovery persists for orders. Camera movement changes neither sight nor discovery. The HUD remains clear.
