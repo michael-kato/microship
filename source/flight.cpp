@@ -20,11 +20,14 @@ static Vec3 nearest(Vec3 point,const FlightObstacle& o)
     float t=squared>MIN_OBSTACLE_SEGMENT_SQUARED_LENGTH ? std::fmax(0.0f,std::fmin(1.0f,dot(subtract(point,o.start),delta)/squared)) : 0;
     return add(o.start,scale(delta,t));
 }
+// Contact attackers must reach their target. A digester attacking a structure
+// ignores every limb of that colony: dense trees surround each head with other
+// limbs, whose clearance would otherwise hold it outside its attach range.
 static bool contact_task(const Simulation* s,const Unit& u,const FlightObstacle& o)
 {
     const UnitDefinition& d=*simulation_unit_definition(s,&u);
     return d.attack==ATTACK_SPORE || (u.hatched && u.age<UNIT_LAUNCH_SECONDS)
-        || (d.attack==ATTACK_DIGEST && u.task==TASK_ATTACK_STRUCTURE && u.attention==(int32_t)o.cell && u.attention_structure==o.structure);
+        || (d.attack==ATTACK_DIGEST && u.task==TASK_ATTACK_STRUCTURE && u.attention==(int32_t)o.cell);
 }
 void flight_obstacles(const Simulation* s,FlightObstacles* out)
 {
