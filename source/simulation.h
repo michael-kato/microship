@@ -68,6 +68,7 @@ struct Unit
     float bank,age;
     float spikes[MAX_SPIKES],payloads[MAX_UNIT_PAYLOADS],damage_age,heal_timer;
     uint32_t wounds;
+    float haze_recovery; // Healing credit toward one whole wound.
     float exposure; // Toxic cloud damage that has not yet added up to a hit.
     float blob_cooldown,stun,aura; // Seconds: next blob, incapacitated by a blob, healing aura after devouring.
     EmbeddedSpike embedded[MAX_EMBEDDED];
@@ -170,6 +171,7 @@ struct Simulation
     Impact impacts[MAX_POPS];
     SporeCloud clouds[MAX_SPORE_CLOUDS]; // When full, a new cloud replaces the oldest slot in turn.
     uint32_t cloud_cursor;
+    float haze_damage,haze_healing;
     Colony colonies[MAX_BODIES];
     CellAppearance cell_appearance[MAX_BODIES];
     LimbDebris debris[MAX_LIMB_DEBRIS];

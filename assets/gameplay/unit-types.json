@@ -195,10 +195,10 @@
       "scale": 0.12,
       "yaw_degrees": 0.0,
       "tint": [1.0, 1.0, 1.0],
-      "speed": 4.2,
+      "speed": 5.04,
       "health": 6,
       "range": 0.45,
-      "cost": 1.5,
+      "cost": 0.1,
       "shot_interval": 1,
       "separation": 0.35,
       "targets": ["units", "structures"],
@@ -208,15 +208,15 @@
       "pick_radius": 0.3,
       "cue_radius": 0.15,
       "hits": 1,
-      "brood": 16,
+      "brood": 1,
       "attack": {
         "mode": "spore",
         "friendly_fire": false,
-        "damage": 6,
+        "damage": 3,
         "cloud": {
           "radius": 1.4,
           "seconds": 5,
-          "damage": 2
+          "damage": 1
         }
       },
       "autonomy": {
@@ -226,7 +226,8 @@
         "leash_radius": 12,
         "response_seconds": 0.5,
         "cruise_fraction": 0.6
-      }
+      },
+      "manufacture_seconds": 0.5
     },
     {
       "name": "swarm_fighter",

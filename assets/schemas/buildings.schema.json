@@ -187,6 +187,11 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 10000
+              },
+              "root_interval_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10000
               }
             },
             "required": ["seconds", "count", "spacing", "production", "seed", "normal"],
@@ -262,6 +267,28 @@
               }
             },
             "required": ["health_per_second", "nutrients_per_health", "delay_seconds"],
+            "additionalProperties": false
+          },
+          "haze": {
+            "type": "object",
+            "properties": {
+              "reach": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 20
+              },
+              "damage_per_second": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1000
+              },
+              "heal_per_second": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1000
+              }
+            },
+            "required": ["reach", "damage_per_second", "heal_per_second"],
             "additionalProperties": false
           }
         },

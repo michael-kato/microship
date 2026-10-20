@@ -14,7 +14,8 @@ count=0
 with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
     out=Path(directory);data=stage_world(root/'assets/levels/virus-player-level.json',out)
     for building in data['content']['buildings']:
-        building.pop('repair',None)
+        building.pop('repair',None);building.pop('haze',None)
+        building['branches'].pop('root_interval_seconds',None)
         building.update(growth_seconds=.01,establishment_seconds=.01);building['branches']['seconds']=.01
     data['rules']['ai']['expansion_delay']=300;data['rules']['economy'].update(enemy_attack_seconds=300,manufacture_seconds=1000)
     def check_leaf_caps(game,scene):
@@ -105,7 +106,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
         regrow['bodies'][0]['owner']=side;regrow['bodies'][1]['owner']=enemy
         regrow['spawns']=[];regrow['rules'].pop('exploration',None)
         for b in regrow['content']['buildings']:
-            b.pop('repair',None);b['hits']=1;b['branches']['regrow_seconds']=.5
+            b.pop('repair',None);b.pop('haze',None);b['hits']=1;b['branches']['regrow_seconds']=.5
         definition=next(b for b in regrow['content']['buildings'] if b['faction']==side)
         growing=deepcopy(regrow)
         for building in growing['content']['buildings']:building['growth_seconds']=3

@@ -11,8 +11,13 @@ def established_world(source,directory):
     data=stage_world(source,directory)
     data['rules']['economy'].pop('fighter_percent',None)
     for start in data['match'].pop('starts',[]):data['bodies'][start['cell']]['owner']=start['faction']
+    for unit in data['content']['units']:
+        if unit['name']=='fungal_spore':
+            unit.pop('manufacture_seconds',None);unit.update(speed=4.2,cost=1.5,brood=16)
+            unit['attack']['damage']=6;unit['attack']['cloud']['damage']=2
     for building in data['content']['buildings']:
-        building.pop('repair',None)
+        building.pop('repair',None);building.pop('haze',None)
+        building['branches'].pop('root_interval_seconds',None)
         building['branches'].pop('root_limit',None);building['branches'].pop('root_minimum_radius',None)
         building['branches']['count']=max(16,building['branches']['count'])
         if building['branches']['grammar']=='tree':

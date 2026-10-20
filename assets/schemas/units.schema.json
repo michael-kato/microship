@@ -416,6 +416,11 @@
             },
             "required": ["color", "strength"],
             "additionalProperties": false
+          },
+          "manufacture_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
           }
         },
         "required": [

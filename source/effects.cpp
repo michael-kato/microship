@@ -184,6 +184,16 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
         }
     }
     uint32_t cloud_references=0;
+    for (uint32_t i=0;i<s->world.body_count && v->haze_alpha>0;++i)
+    {
+        const Colony& c=s->colonies[i];if (!c.active || !s->visible_bodies[i]) continue;
+        const ProducerDefinition& d=*simulation_producer_definition(s,i);if (d.haze_reach<=0) continue;
+        const Body& b=s->world.bodies[i];
+        uint32_t before=*count;segment(output,count,p,b.position,b.position,b.radius+d.haze_reach,v->haze_color,v->haze_alpha,CLOUD_EFFECT_KIND);
+        int r[4];if (*count==before || !tile_rectangle(output[before],width,height,r)) continue;
+        cloud_references+=(uint32_t)((r[2]-r[0]+1)*(r[3]-r[1]+1));
+        if (cloud_references>CLOUD_REFERENCE_BUDGET) { *count=before;break; }
+    }
     for (uint32_t i=0;i<MAX_UNITS && v->aura_alpha>0;++i)
     {
         const Unit& u=s->units[i];if (u.health<=0 || u.aura<=0 || !s->visible_units[i]) continue;

@@ -63,6 +63,7 @@ struct CombatVisuals
     Color flash, injured;
     float break_seconds,break_speed,break_drag,break_spin,break_shrink;
     Color cloud_color;float cloud_alpha; // Spore cloud glow; zero alpha draws none.
+    Color haze_color;float haze_alpha;
     Color aura_color;float aura_alpha; // Healing aura glow around a unit after devouring.
 };
 struct SpikeRules

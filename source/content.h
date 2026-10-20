@@ -46,6 +46,7 @@ struct UnitDefinition
     float lifetime; // Spores expire after this many seconds; zero keeps them.
     float burst_damage; // A bursting spore's damage to the target it touched.
     float cloud_radius,cloud_seconds,cloud_damage; // A bursting spore leaves this toxic cloud; damage per second.
+    float manufacture_seconds; // Zero uses the global manufacture time.
     uint32_t brood; // Units hatched by one manufacture job.
     float charge_radius,charge_speed,charge_acceleration,release_seconds;
     char blob_model[ASSET_PATH_CAPACITY]; // Digesters may first incapacitate a unit at range with a blob.
@@ -66,7 +67,7 @@ struct BranchRules
     Vec3 normal;
     uint32_t children,levels,root_limit;
     float root_minimum_radius,branch_probability,angle_jitter,length_jitter,width_jitter;
-    float length_scale,width_scale,angle,bend,root_offset_seconds;
+    float length_scale,width_scale,angle,bend,root_offset_seconds,root_interval_seconds;
 };
 struct ProducerDefinition
 {
@@ -76,6 +77,7 @@ struct ProducerDefinition
     float growth_seconds,sprout_seconds,establishment_seconds,health,collection,height,width;
     float stem_radius,head_radius;
     float repair_health_per_second,repair_nutrients_per_health,repair_delay_seconds;
+    float haze_reach,haze_damage,haze_heal;
     Vec3 growth_plane_normal;
     float growth_depth_ratio;
     bool growth_plane_enabled;

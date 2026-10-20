@@ -8,9 +8,20 @@ Virus fighters carry eleven detachable spikes. Virus bombers launch their six vi
 
 Immune fighters are white blood cells. A free cell shoots a blob (the 80-triangle `immune_blob` mesh) at an enemy unit up to 3 units away, beyond contact, every 6 seconds. The blob does no damage but incapacitates the unit for 1.5 seconds: it cannot move or fire. The cell then charges in and latches on to devour it with its digest attack. A cell whose held victim dies glows green for 8 seconds; friendly units within 3 units of it heal one wound every 1.5 seconds, even in combat. `attack.blob` and `attack.aura` in `unit-types.json` set these values; the glow uses `heal_aura` in `combat-effects.json`. Immune fighters have 432 health and take twenty-four hits. Immune bombers have 720 health and take twenty-four hits. Virus fighters and bombers retain three hits. Immune roots have 480 health and take twenty-four hits; immune child limbs have 300 health and take sixteen hits. Virus and fungal roots have 240 health and take twelve hits; their child limbs have 150 health and take eight hits.
 
-Fungal craft are a swarm of individual spores. Each manufacture job hatches a brood of sixteen spores (`brood`), using the 20-triangle `fungal_swarm_spore` mesh. A spore has one hit, takes orders like other craft, and can colonize a cell. Spores are melee: on contact a spore bursts and dies, doing 6 damage to what it touched. It leaves a toxic cloud with a 1.4-unit radius that does 2 damage per second to enemies inside for 5 seconds (`attack.damage` and `attack.cloud` in `unit-types.json`). Damage below one hit builds up on the target (`exposure`) until it adds up to a whole hit; a virus fighter needs about two bursts per hit, an immune fighter about three. Clouds stay where the spore burst and glow with the `spore_cloud` color in `combat-effects.json`. Spores may enter a cell they attack to reach its factory heads.
+Fungal factories start in sequence and release individual spores with a 20-triangle mesh. A complete leaf
+releases one spore every 0.5 seconds at the base rate, with no brood burst.
+This gives 50 percent more spores per second than the former 16-spore job
+that took 12 seconds. Each spore costs 0.1 nutrients and moves at 5.04 world
+units per second, 20 percent faster than before. A spore takes one hit, can
+take orders, and can colonize. Contact destroys the spore and causes 3 damage.
+Its stationary cloud has a 1.4-unit radius and causes 1 damage per second for
+5 seconds. Both damage values are half their former values. Partial damage
+builds up as exposure until it forms a whole hit. Set these values in
+`unit-types.json`: `speed`, `cost`, `brood`, `manufacture_seconds`,
+`attack.damage`, and `attack.cloud`. Omit the per-unit manufacture time to
+use the global value.
 
-Factory deployment takes 180 seconds. Every factory root starts growing when the cell is colonized; roots after the first start up to two seconds later (`branches.root_offset_seconds`). During deployment each structure grows in three seconds (`sprout_seconds`). Each root's limbs then emerge one at a time, depth first, at even intervals so the last one matures as deployment ends. The first child of the first root is always a leaf, so a virus cell makes its first fighter about 20 seconds after colonization. Immune cells take about 24 seconds because a fighter costs 28 nutrients. Each completed leaf can grow one unit at a time. Base manufacture takes twelve seconds per leaf. Leaves share the cell nutrient store. AI manufacture uses the full 1.0 rate. Base collection is 2.5 nutrients per second. Damage regrowth uses fourteen seconds of growth (`growth_seconds`) and thirty-two-second child emergence intervals. Destroyed limbs wait at least forty-eight seconds and require paid repair before regrowth. Mature roots share the base rate. Child limbs add to that rate. Leaves can start production while other factories are still growing. Virus production uses terminal leaves.
+Factory deployment takes 180 seconds. Virus and immune roots start near colonization, with up to two seconds of offset (`branches.root_offset_seconds`). Fungal roots start one at a time, twelve seconds apart, with the same small offset (`branches.root_interval_seconds`). During deployment each structure grows in three seconds (`sprout_seconds`). Each root's limbs then emerge one at a time, depth first, at even intervals so the last one matures as deployment ends. The first child of the first root is always a leaf, so a virus cell makes its first fighter about 20 seconds after colonization. Immune cells take about 24 seconds because a fighter costs 28 nutrients. Each completed leaf can grow one unit at a time. Base manufacture takes twelve seconds per leaf, except where a unit defines its own time. Leaves share the cell nutrient store. AI manufacture uses the full 1.0 rate. Base collection is 2.5 nutrients per second. Damage regrowth uses fourteen seconds of growth (`growth_seconds`) and thirty-two-second child emergence intervals. Destroyed limbs wait at least forty-eight seconds and require paid repair before regrowth. Mature roots share the base rate. Child limbs add to that rate. Leaves can start production while other factories are still growing. Virus production uses terminal leaves.
 
 Each virus organelle root grows a curved trunk, two forked sub-trunks, and four smaller branches with terminal leaves. Factories root on the three largest organelles, so a virus cell has at most twenty-one structures; each fork has a 72 percent chance of a second branch. Child lengths and widths use a 0.62 scale at each level. Child production contribution is 0.05 per mature limb, so a full virus tree roughly matches an immune fan's nutrient income. Immune and fungal factories have nine structures and a 0.12 child contribution. Storage supports 128 structures per cell.
 
@@ -90,7 +101,7 @@ Both sides start with craft at neutral cells. Select craft and right-click your 
 
 A normal launch opens the faction menu. `--world PATH` selects a level directly. `--no-menu` starts the default level. `--menu` opens the menu for a diagnostic run. `--menu-select 1..3` uses the same faction choice without opening a menu window.
 
-The slider moves in one-percent steps. The left end makes fighters only; the right end makes bombers only. Each cell keeps its own setting. Units already in production finish before the new mix applies. The ratio controls future production, not surviving unit counts. Restart restores startup state. Automatic spore emitters have no ratio control.
+The slider moves in one-percent steps. The left end makes fighters only; the right end makes bombers only. Each cell keeps its own setting. Units already in production finish before the new mix applies. The ratio controls future production, not surviving unit counts. Restart restores startup state. Fungal emitters produce spores only and have no ratio control.
 
 A replay line has a tick, command, and argument. `0 ratio 75` requests 75 percent fighters and 25 percent bombers at the selected friendly cell. Use `0 cell 0` first to select cell zero. Replay orders use the production controls in the application. `--pointer-drag X1 Y1 X2 Y2` supplies one complete drag for application checks.
 
@@ -218,3 +229,14 @@ Initial construction does not require a repair payment. A fully lost colony
 does not repair itself. Set `repair.health_per_second`, `nutrients_per_health`,
 and `delay_seconds` in `factory-types.json`. Omit `repair` for the legacy
 regrowth rules.
+
+Every active fungal cell has a protective haze. It reaches four world units
+beyond the cell radius, causes 3 damage per second to enemy units, and heals
+3 health per second on allied units. It heals partial damage and whole wounds;
+it cannot restore dead units. Other cells block it. Overlapping fungal haze
+does not multiply damage or healing. Losing the colony removes its haze.
+Factory repair still requires nutrients. Set the `fungal_emitter.haze` values
+in `factory-types.json`: `reach`, `damage_per_second`, and `heal_per_second`.
+Set its visible color and strength under `cell_haze` in `combat-effects.json`.
+The soft haze uses the existing cloud drawing pass and adds no volume rays.
+Enemy haze is visible only when its cell is in current sight.

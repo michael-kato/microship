@@ -131,7 +131,8 @@
         "grammar": "hypha",
         "root_limit": 3,
         "root_minimum_radius": 0.1,
-        "root_offset_seconds": 2
+        "root_offset_seconds": 2,
+        "root_interval_seconds": 12
       },
       "growth_meshes": {
         "segment": "../models/fungal_stem.fmesh",
@@ -149,6 +150,11 @@
         "health_per_second": 12,
         "nutrients_per_health": 0.08,
         "delay_seconds": 4
+      },
+      "haze": {
+        "reach": 4,
+        "damage_per_second": 3,
+        "heal_per_second": 3
       }
     }
   ]

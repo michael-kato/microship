@@ -477,7 +477,7 @@ static void prepare_factory(Simulation* s,uint32_t p)
             }
         }
     }
-    // Every root starts at colonization; later roots may start up to the authored offset after it.
+    // Roots start at the authored interval, with a bounded offset after each start.
     // Each structure grows for sprout_seconds. A root's limbs emerge depth first at even intervals,
     // so its first child follows the mature trunk and its last limb matures when establishment ends.
     float seconds=simulation_producer_definition(s,p)->establishment_seconds;
@@ -486,7 +486,7 @@ static void prepare_factory(Simulation* s,uint32_t p)
     for (uint32_t r=0;r<c->root_count;++r)
     {
         uint32_t order[MAX_FACTORY_STRUCTURES],count=0;depth_first(c,r,order,&count);
-        float start=r ? (signed_random(&timing_seed)+1)*.5f*f->root_offset_seconds : 0;
+        float start=r*f->root_interval_seconds+(r ? (signed_random(&timing_seed)+1)*.5f*f->root_offset_seconds : 0);
         float first=start+grow,interval=count>2 ? std::fmax(0.0f,seconds-grow-first)/(count-2) : 0;
         for (uint32_t i=0;i<count;++i)
         { c->deployment_start[order[i]]=i ? first+(i-1)*interval : start;c->deployment_seconds[order[i]]=grow; }
@@ -1069,7 +1069,20 @@ static void recover_units(Simulation* s,float dt)
     const SpikeRules* r=&s->world.spikes;if (!r->enabled) return;
     // A unit glowing after devouring heals friendly units near it, even in combat. The
     // shortest interval among overlapping auras applies.
-    float aura_interval[MAX_UNITS]={};uint16_t near[MAX_UNITS];
+    float aura_interval[MAX_UNITS]={},haze_rate[MAX_UNITS]={};uint16_t near[MAX_UNITS];
+    for (uint32_t p=0;p<s->world.body_count;++p)
+    {
+        const Colony& c=s->colonies[p];if (!c.active) continue;
+        const ProducerDefinition& d=*simulation_producer_definition(s,p);if (d.haze_heal<=0) continue;
+        const Body& body=s->world.bodies[p];float radius=body.radius+d.haze_reach;
+        uint32_t count=grid_query(s->grid,body.position,radius,1u<<c.faction,near);
+        for (uint32_t n=0;n<count;++n)
+        {
+            uint32_t i=near[n];const Unit& u=s->units[i];
+            if (u.health>0 && length(subtract(u.position,body.position))<radius && clear_shot(s,body.position,u.position,p))
+                haze_rate[i]=std::fmax(haze_rate[i],d.haze_heal);
+        }
+    }
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         const Unit& e=s->units[i];if (e.health<=0 || e.aura<=0) continue;
@@ -1091,7 +1104,26 @@ static void recover_units(Simulation* s,float dt)
         const UnitDefinition* definition=simulation_unit_definition(s,u);
         for (uint32_t j=0;j<definition->payload_count;++j)
             u->payloads[j]=std::fmin(1.0f,u->payloads[j]+dt/definition->payload_reload);
-        bool friendly=false;
+        if (haze_rate[i]>0)
+        {
+            float budget=haze_rate[i]*dt,removed=std::fmin(u->exposure,budget);
+            u->exposure-=removed;budget-=removed;s->haze_healing+=removed;
+            if (u->wounds)
+            {
+                float per_hit=definition->health/definition->hits;
+                u->haze_recovery+=budget;
+                while (u->wounds && u->haze_recovery>=per_hit)
+                {
+                    --u->wounds;u->haze_recovery-=per_hit;s->haze_healing+=per_hit;++s->healed;
+                    if (u->wounds<MAX_EMBEDDED) u->embedded[u->wounds]=EmbeddedSpike();
+                    u->health=definition->health*(definition->hits-u->wounds)/definition->hits;
+                    sound(s,SOUND_HEAL,u->position);
+                }
+            }
+            if (!u->wounds) u->haze_recovery=0;
+            u->heal_timer=0;continue;
+        }
+        u->haze_recovery=0;bool friendly=false;
         if (u->target>=0)
         {
             const Body* c=&s->world.bodies[u->target];
@@ -1164,6 +1196,34 @@ static uint32_t expose(float* exposure,float damage,float per_hit)
     while (*exposure>=per_hit) { *exposure-=per_hit;++hits; }
     return hits;
 }
+static void cell_haze(Simulation* s,float dt,uint32_t* hit_count)
+{
+    uint16_t near[MAX_UNITS];
+    for (uint32_t p=0;p<s->world.body_count;++p)
+    {
+        const Colony& c=s->colonies[p];if (!c.active) continue;
+        const ProducerDefinition& d=*simulation_producer_definition(s,p);if (d.haze_damage<=0) continue;
+        const Body& body=s->world.bodies[p];float radius=body.radius+d.haze_reach;
+        uint32_t count=grid_query(s->grid,body.position,radius,enemies_of(c.faction),near);
+        for (uint32_t n=0;n<count;++n)
+        {
+            uint32_t i=near[n];Unit& u=s->units[i];
+            if (u.health<=0 || length(subtract(u.position,body.position))>=radius || !clear_shot(s,body.position,u.position,p)) continue;
+            // Overlapping allied cells protect a shared area at one damage rate.
+            bool covered=false;
+            for (uint32_t other=0;other<p;++other)
+            {
+                const Colony& a=s->colonies[other];if (!a.active || a.faction!=c.faction) continue;
+                const ProducerDefinition& ad=*simulation_producer_definition(s,other);const Body& b=s->world.bodies[other];
+                if (ad.haze_damage>0 && length(subtract(u.position,b.position))<b.radius+ad.haze_reach && clear_shot(s,b.position,u.position,other)) { covered=true;break; }
+            }
+            if (covered) continue;
+            const UnitDefinition& target=*simulation_unit_definition(s,&u);float damage=d.haze_damage*dt;
+            uint32_t hits=expose(&u.exposure,damage,target.health/target.hits);hit_count[i]+=hits;s->hits+=hits;s->haze_damage+=damage;
+        }
+    }
+}
+
 static void spore_clouds(Simulation* s,float dt,uint32_t* hit_count)
 {
     uint16_t near[MAX_UNITS];
@@ -1393,6 +1453,7 @@ static void projectile_combat(Simulation* s,float dt)
         }
     }
     spore_clouds(s,dt,hit_count);
+    cell_haze(s,dt,hit_count);
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (s->units[i].health>0 && (hit_count[i]>0 || digest_heal[i] || burst[i] || expired[i]))
         {
@@ -1636,12 +1697,14 @@ static void grow_colonies(Simulation* s, float dt)
             break;
         }
         float rate=s->world.ai_production_set && (c->faction!=s->world.player_faction || s->world.player_ai) ? s->world.ai_production : 1;
-        float step=dt*rate/rules->manufacture_seconds;
+
         c->building=false;c->manufacturing=0;c->capacity_blocked=false;
         for (uint32_t k=0;k<c->structure_count;++k)
         {
             LeafProduction* job=&c->leaves[k];if (!job->active || !ready[k]) continue;
-            job->progress=std::fmin(1.0f,job->progress+step);
+            const UnitDefinition& product=s->world.content.units[job->type];
+            float seconds=product.manufacture_seconds>0 ? product.manufacture_seconds : rules->manufacture_seconds;
+            job->progress=std::fmin(1.0f,job->progress+dt*rate/seconds);
             if (job->progress>=1)
             {
                 const UnitDefinition* definition=&s->world.content.units[job->type];
@@ -1811,6 +1874,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
     fprintf(file,"{\"tick\":%u,\"time\":%.9f,\"unit_capacity\":%u,\"outcome\":%d,\"outcome_tick\":%u,\"births\":%u,\"losses\":%u,\"landings\":%u,\"blocked_landings\":%u,",
         s->tick_count,s->time_seconds,(uint32_t)MAX_UNITS,s->outcome,s->outcome_tick,s->births,s->losses,s->landings,s->blocked_landings);
     write_faction_stats(s,file);
+    fprintf(file,",\"haze\":{\"damage\":%.6f,\"healing\":%.6f}",s->haze_damage,s->haze_healing);
     uint32_t clouds=0;for (uint32_t i=0;i<MAX_SPORE_CLOUDS;++i) clouds+=s->clouds[i].age<s->clouds[i].seconds;
     fprintf(file,",\"faction_events\":{\"digestions\":%u,\"digest_heals\":%u,\"spore_bursts\":%u,\"spore_clouds\":%u,\"captures\":%u,\"releases\":%u,\"blobs\":%u,\"devoured\":%u,\"aura_heals\":%u},\"sound_events\":{",s->digestions,s->digest_heals,s->spore_bursts,clouds,s->captures,s->releases,s->blobs,s->devoured,s->aura_heals);
     for (uint32_t i=0;i<SOUND_COUNT;++i) fprintf(file,"%s\"%s\":%u",i ? "," : "",sound_name(i),s->sounds.totals[i]);

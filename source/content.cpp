@@ -202,8 +202,10 @@ static bool load_units(Content* c,Json root,const char* path)
     json_object(root,"$schema|units");JsonArray a=json_array(json_get(root,"units"),MAX_UNIT_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|trail_origin|pick_radius|cue_radius|hits|brood|attack|secondary_attack|autonomy|payload|rear_tint");
+        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|trail_origin|pick_radius|cue_radius|hits|brood|manufacture_seconds|attack|secondary_attack|autonomy|payload|rear_tint");
         UnitDefinition u={};definition_name(j,u.name);u.charge_speed=u.charge_acceleration=1;
+        Json manufacture=json_find(j,"manufacture_seconds");
+        if (json_present(manufacture)) u.manufacture_seconds=json_positive(manufacture,MAX_BUILDING_GROWTH_SECONDS);
         Json brood=json_find(j,"brood");u.brood=json_present(brood) ? json_uint(brood,1,MAX_UNIT_BROOD) : 1;
         Json rear=json_find(j,"rear_tint");
         if (json_present(rear))
@@ -322,7 +324,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
     json_object(root,"$schema|buildings");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|model|growth_seconds|sprout_seconds|establishment_seconds|health|collection|height|width|hits|branches|growth_meshes|navigation|growth_plane|repair");ProducerDefinition p={};
+        json_object(j,"name|faction|model|growth_seconds|sprout_seconds|establishment_seconds|health|collection|height|width|hits|branches|growth_meshes|navigation|growth_plane|repair|haze");ProducerDefinition p={};
         Json repair=json_find(j,"repair");
         if (json_present(repair))
         {
@@ -330,6 +332,14 @@ static bool load_buildings(Content* c,Json root,const char* path)
             p.repair_health_per_second=json_positive(json_get(repair,"health_per_second"),MAX_BUILDING_HEALTH);
             p.repair_nutrients_per_health=json_positive(json_get(repair,"nutrients_per_health"),MAX_BUILDING_HEALTH);
             p.repair_delay_seconds=json_float(json_get(repair,"delay_seconds"),0,MAX_BUILDING_GROWTH_SECONDS);
+        }
+        Json haze=json_find(j,"haze");
+        if (json_present(haze))
+        {
+            json_object(haze,"reach|damage_per_second|heal_per_second");
+            p.haze_reach=json_positive(json_get(haze,"reach"),MAX_UNIT_CLOUD_RADIUS);
+            p.haze_damage=json_positive(json_get(haze,"damage_per_second"),MAX_UNIT_CLOUD_DAMAGE);
+            p.haze_heal=json_positive(json_get(haze,"heal_per_second"),MAX_UNIT_CLOUD_DAMAGE);
         }
         Json plane=json_find(j,"growth_plane");
         if (json_present(plane))
@@ -361,7 +371,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
         p.height=json_positive(json_get(j,"height"),MAX_BUILDING_HEIGHT);
         p.width=json_positive(json_get(j,"width"),MAX_BUILDING_WIDTH);
         p.hits=json_uint(json_get(j,"hits"),1,MAX_HIT_COUNT);Json b=json_get(j,"branches");
-        json_object(b,"seconds|count|spacing|production|seed|normal|health|hits|regrow_seconds|roots|root_limit|root_minimum_radius|root_offset_seconds|grammar|tree");
+        json_object(b,"seconds|count|spacing|production|seed|normal|health|hits|regrow_seconds|roots|root_limit|root_minimum_radius|root_offset_seconds|root_interval_seconds|grammar|tree");
         char roots[ASSET_NAME_CAPACITY]={},grammar[ASSET_NAME_CAPACITY]={};
         Json roots_json=json_find(b,"roots"),grammar_json=json_find(b,"grammar");
         if (json_present(roots_json))
@@ -376,6 +386,8 @@ static bool load_buildings(Content* c,Json root,const char* path)
         if (!p.branches.organelle_roots && (json_present(root_limit) || json_present(root_radius))) json_error(b,"root filters require organelle roots");
         Json root_offset=json_find(b,"root_offset_seconds");
         if (json_present(root_offset)) p.branches.root_offset_seconds=json_float(root_offset,0,MAX_ESTABLISHMENT_SECONDS);
+        Json root_interval=json_find(b,"root_interval_seconds");
+        if (json_present(root_interval)) p.branches.root_interval_seconds=json_float(root_interval,0,MAX_ESTABLISHMENT_SECONDS);
         p.branches.branch_probability=1;
         if (json_present(grammar_json))
         {
