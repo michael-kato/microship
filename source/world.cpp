@@ -159,7 +159,13 @@ static bool load_rules(World* w,const char* path)
 static bool load_effects(World* w,const char* path)
 {
     JsonDocument d;if (!json_load(&d,path)) return false;Json root=json_root(&d);
-    json_object(root,"$schema|projectile|damage|injury|spikes|limb_break|target_line");
+    json_object(root,"$schema|projectile|damage|injury|spikes|limb_break|target_line|spore_cloud");
+    Json cloud=json_find(root,"spore_cloud");
+    if (json_present(cloud))
+    {
+        json_object(cloud,"color|alpha");w->combat.cloud_color=json_color(json_get(cloud,"color"));
+        w->combat.cloud_alpha=json_float(json_get(cloud,"alpha"),0,1);
+    }
     Json line=json_find(root,"target_line");
     if (json_present(line))
     {

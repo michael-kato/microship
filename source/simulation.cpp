@@ -10,6 +10,8 @@
 #include <new>
 
 static const float GOLDEN_ANGLE_RADIANS = 2.39996323f;
+static const float BROOD_SPREAD_SCALE = 2.5f;
+static const float BROOD_SPREAD_PHASE = 1.7f;
 static const float UNIT_GRID_CELL_SIZE = 4;
 static const float UNIT_GRID_MARGIN = 16;
 static const float UNIT_GRID_CELL_GROWTH = 1.25f;
@@ -63,7 +65,6 @@ static const float ORBIT_HEIGHT_PHASE_PER_GENERATION = .7f;
 static const float STRAFE_ENTRY_RANGE_SCALE = 1.1f;
 static const float ATTACK_STOP_RANGE_SCALE = .85f;
 static const float STEERING_DIRECTION_EPSILON = .001f;
-static const float SPORE_TARGET_SCORE_VARIATION = .3f;
 static const float STRAFE_PREFERRED_RANGE_SCALE = .72f;
 static const float LANDING_APPROACH_RADIUS = 1.5f;
 static const float CELL_AVOIDANCE_LOOKAHEAD_SECONDS = .35f;
@@ -724,6 +725,8 @@ static bool defended(const Simulation* s, uint32_t p, Faction faction)
     return false;
 }
 
+// Digesters and spores must touch their target, so they may enter the cell they attack.
+static bool contact_attack(const UnitDefinition& d) { return d.attack==ATTACK_DIGEST || d.attack==ATTACK_SPORE; }
 static bool clear_shot(const Simulation* s, Vec3 from, Vec3 to,int32_t structure_cell=NO_BODY)
 {
     Vec3 delta=subtract(to,from);float distance=length(delta);
@@ -940,21 +943,6 @@ static void move_units(Simulation* s, float dt)
             if (dot(radial,radial)>STEERING_DIRECTION_EPSILON) goal=add(u->position,scale(normalize(radial),LAUNCH_GOAL_DISTANCE));
             u->task=TASK_LAUNCH;u->attention=-1;
         }
-        if (definition->attack==ATTACK_SPORE)
-        {
-            float nearest=definition->seek_radius;bool found=false;
-            uint32_t count=grid_query(s->grid,u->position,definition->seek_radius,enemies_of(u->faction),near);
-            for (uint32_t n=0;n<count;++n) if (s->units[near[n]].health>0 && s->units[near[n]].faction!=u->faction)
-            {
-                uint32_t j=near[n];
-                float d=length(subtract(positions[j],u->position));uint32_t seed=u->generation*SEED_INDEX_MULTIPLIER+s->units[j].generation*TARGET_SEED_MULTIPLIER;
-                float score=d*(1+SPORE_TARGET_SCORE_VARIATION*signed_random(&seed));
-                if (d<definition->seek_radius && score<nearest) { nearest=score;goal=positions[j];found=true; }
-            }
-            if (!found) for (uint32_t j=0;j<s->world.body_count;++j) if (s->colonies[j].active && s->colonies[j].faction!=u->faction)
-            { Vec3 point=colony_tip(s,j);float d=length(subtract(point,u->position));if (d<nearest) { nearest=d;goal=point; } }
-            strafe=false;
-        }
         u->flight_goal=goal;
         Vec3 delta=subtract(goal,u->position);float distance=length(delta);
         float speed=definition->speed*((u->task==TASK_PATROL || u->task==TASK_LAUNCH) ? definition->cruise_fraction : 1);
@@ -991,7 +979,7 @@ static void move_units(Simulation* s, float dt)
             for (uint32_t j=0;j<s->world.body_count;++j)
             {
                 if (colonizing && j==p && distance<LANDING_APPROACH_RADIUS) continue;
-                if (definition->attack==ATTACK_DIGEST && u->task==TASK_ATTACK_STRUCTURE && u->attention==(int32_t)j) continue;
+                if (contact_attack(*definition) && u->task==TASK_ATTACK_STRUCTURE && u->attention==(int32_t)j) continue;
                 Vec3 probe=add(u->position,scale(velocities[i],CELL_AVOIDANCE_LOOKAHEAD_SECONDS));
                 Vec3 away=subtract(probe,s->world.bodies[j].position);float d=length(away);
                 float safe=s->world.bodies[j].radius*CELL_COLLISION_RADIUS_SCALE+CELL_AVOIDANCE_CLEARANCE;
@@ -1019,7 +1007,7 @@ static void move_units(Simulation* s, float dt)
             Vec3 offset=subtract(u->position,s->world.bodies[p2].position);float radial=length(offset);
             float clearance=s->world.bodies[p2].radius*CELL_COLLISION_RADIUS_SCALE+CELL_COLLISION_CLEARANCE;
             if (colonizing && p2==p && distance<LANDING_APPROACH_RADIUS) continue;
-            if (definition->attack==ATTACK_DIGEST && u->task==TASK_ATTACK_STRUCTURE && u->attention==(int32_t)p2) continue;
+            if (contact_attack(*definition) && u->task==TASK_ATTACK_STRUCTURE && u->attention==(int32_t)p2) continue;
             if (radial<clearance && radial>POSITION_EPSILON)
                 u->position=add(s->world.bodies[p2].position,scale(offset,clearance/radial));
         }
@@ -1151,6 +1139,44 @@ static void fracture_limb(Simulation* s,uint32_t p,uint32_t k,float old_growth,f
     }
 }
 
+// Cloud damage below one hit waits in the target's exposure; each whole hit's
+// worth becomes a hit this tick.
+static uint32_t expose(float* exposure,float damage,float per_hit)
+{
+    *exposure+=damage;uint32_t hits=0;
+    while (*exposure>=per_hit) { *exposure-=per_hit;++hits; }
+    return hits;
+}
+static void spore_clouds(Simulation* s,float dt,uint32_t* hit_count)
+{
+    uint16_t near[MAX_UNITS];
+    for (uint32_t c=0;c<MAX_SPORE_CLOUDS;++c)
+    {
+        SporeCloud& cloud=s->clouds[c];if (cloud.age>=cloud.seconds) continue;
+        cloud.age+=dt;float damage=cloud.damage*dt;
+        uint32_t count=grid_query(s->grid,cloud.position,cloud.radius,cloud.friendly_fire ? ~0u : enemies_of(cloud.faction),near);
+        for (uint32_t n=0;n<count;++n)
+        {
+            Unit& u=s->units[near[n]];const UnitDefinition& d=*simulation_unit_definition(s,&u);
+            if (u.health<=0 || length(subtract(u.position,cloud.position))>=cloud.radius || !clear_shot(s,cloud.position,u.position)) continue;
+            uint32_t hits=expose(&u.exposure,damage,d.health/d.hits);hit_count[near[n]]+=hits;s->hits+=hits;
+        }
+        for (uint32_t p=0;p<s->world.body_count;++p)
+        {
+            Colony& colony=s->colonies[p];if (!colony.active || (!cloud.friendly_fire && colony.faction==cloud.faction)) continue;
+            const ProducerDefinition& d=*simulation_producer_definition(s,p);
+            for (uint32_t k=0;k<colony.structure_count;++k)
+            {
+                Vec3 point=simulation_structure_position(s,p,k);
+                if (structure_health(&colony,k)<=0 || length(subtract(point,cloud.position))>=cloud.radius || !clear_shot(s,cloud.position,point,(int32_t)p)) continue;
+                bool root=colony.parents[k]<0;float* exposure=k ? &colony.branches[k-1].exposure : &colony.exposure;
+                uint32_t hits=expose(exposure,damage,root ? d.health/d.hits : d.branches.health/d.branches.hits);
+                hit_count[structure_slot(p,k)]+=hits;s->hits+=hits;
+            }
+        }
+    }
+}
+
 static void projectile_combat(Simulation* s,float dt)
 {
     const CombatVisuals* v=&s->world.combat;
@@ -1171,7 +1197,7 @@ static void projectile_combat(Simulation* s,float dt)
     {
         Unit* u=&s->units[i];if (u->health<=0) continue;
         const UnitDefinition* definition=simulation_unit_definition(s,u);
-        if (definition->attack==ATTACK_SPORE && u->age>=definition->lifetime)
+        if (definition->attack==ATTACK_SPORE && definition->lifetime>0 && u->age>=definition->lifetime)
         { expired[i]=true;continue; }
         // A held victim cannot fire. Supporting units must break the hold.
         // Read the phase input: a newly captured victim stops on the next tick.
@@ -1217,23 +1243,23 @@ static void projectile_combat(Simulation* s,float dt)
         }
         if (definition->attack==ATTACK_SPORE)
         {
+            // Contact bursts the spore: a small hit on what it touched, then a toxic cloud from this tick.
             burst[i]=true;++s->spore_bursts;sound(s,SOUND_HIT,u->position);
-            uint32_t count=grid_query(s->grid,u->position,definition->blast_radius,definition->friendly_fire ? ~0u : enemies_of(u->faction),near);
-            for (uint32_t n=0;n<count;++n)
+            if (colony)
             {
-                uint32_t j=near[n];
-                if (i!=j && s->units[j].health>0 && (definition->friendly_fire || s->units[j].faction!=u->faction)
-                    && length(subtract(s->units[j].position,u->position))<definition->blast_radius && clear_shot(s,u->position,s->units[j].position))
-                { ++hit_count[j];++s->hits; }
+                Colony& c=s->colonies[target];const ProducerDefinition& d=*simulation_producer_definition(s,(uint32_t)target);bool root=c.parents[structure]<0;
+                float* exposure=structure ? &c.branches[structure-1].exposure : &c.exposure;
+                uint32_t hits=expose(exposure,definition->burst_damage,root ? d.health/d.hits : d.branches.health/d.branches.hits);
+                hit_count[structure_slot((uint32_t)target,structure)]+=hits;s->hits+=hits;
             }
-            for (uint32_t p=0;p<s->world.body_count;++p)
-                if (s->colonies[p].active && (definition->friendly_fire || s->colonies[p].faction!=u->faction))
-                    for (uint32_t k=0;k<s->colonies[p].structure_count;++k)
-                    {
-                        Vec3 point=simulation_structure_position(s,p,k);
-                        if (structure_health(&s->colonies[p],k)>0 && length(subtract(point,u->position))<definition->blast_radius && clear_shot(s,u->position,point,(int32_t)p))
-                        { ++hit_count[structure_slot(p,k)];++s->hits; }
-                    }
+            else
+            {
+                const UnitDefinition& d=*simulation_unit_definition(s,&s->units[target]);
+                uint32_t hits=expose(&s->units[target].exposure,definition->burst_damage,d.health/d.hits);hit_count[target]+=hits;s->hits+=hits;
+            }
+            uint32_t slot=0;while (slot<MAX_SPORE_CLOUDS && s->clouds[slot].age<s->clouds[slot].seconds) ++slot;
+            if (slot==MAX_SPORE_CLOUDS) { slot=s->cloud_cursor;s->cloud_cursor=(s->cloud_cursor+1)%MAX_SPORE_CLOUDS; }
+            s->clouds[slot]=SporeCloud{u->position,definition->cloud_radius,0,definition->cloud_seconds,definition->cloud_damage,u->faction,definition->friendly_fire};
             continue;
         }
         uint32_t slot=0;while (slot<MAX_PROJECTILES && s->projectiles[slot].active) ++slot;
@@ -1320,6 +1346,7 @@ static void projectile_combat(Simulation* s,float dt)
             p->active=false;++s->hits;sound(s,SOUND_HIT,target);
         }
     }
+    spore_clouds(s,dt,hit_count);
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (s->units[i].health>0 && (hit_count[i]>0 || digest_heal[i] || burst[i] || expired[i]))
         {
@@ -1355,7 +1382,7 @@ static void projectile_combat(Simulation* s,float dt)
             }
             if (u->health==0)
             {
-                pop_body(s,u->position,u->faction,true,burst[i] ? simulation_unit_definition(s,u)->blast_radius : 0);
+                pop_body(s,u->position,u->faction,true,burst[i] ? simulation_unit_definition(s,u)->cloud_radius : 0);
                 ++s->losses;++s->faction_stats[u->faction].lost;u->selected=false;s->trails[i].count=0;
             }
         }
@@ -1451,6 +1478,7 @@ static void grow_colonies(Simulation* s, float dt)
             float* timer=k ? &b->regrow_timer : &c->root_regrow_timer;
             uint32_t* wounds=k ? &b->wounds : &c->wounds;
             uint32_t* generation=k ? &b->generation : &c->root_generation;
+            float* exposure=k ? &b->exposure : &c->exposure;
             EmbeddedSpike* embedded=k ? b->embedded : c->embedded;
             int32_t parent=c->parents[k];
             *timer=std::fmax(0.0f,*timer-dt);
@@ -1461,7 +1489,7 @@ static void grow_colonies(Simulation* s, float dt)
             {
                 if (f.grammar!=GROWTH_TREE) c->branch_timer=0;
                 if (*generation>0 && d.segment_path[0]) regrow_factory_stems(s,p,k,*generation+1);
-                emerged=true;*health=parent<0 ? d.health : f.health;*growth=first ? 0 : INITIAL_FACTORY_GROWTH;*wounds=0;++*generation;
+                emerged=true;*health=parent<0 ? d.health : f.health;*growth=first ? 0 : INITIAL_FACTORY_GROWTH;*wounds=0;*exposure=0;++*generation;
                 memset(embedded,0,sizeof(EmbeddedSpike)*MAX_EMBEDDED);sound(s,SOUND_GROW,simulation_structure_position(s,p,k));
             }
             if (*health<=0) continue;
@@ -1538,8 +1566,15 @@ static void grow_colonies(Simulation* s, float dt)
                     normal=normalize(subtract(tip,s->world.bodies[p].position));
                     position=add(tip,scale(normal,definition->scale*NEW_UNIT_TIP_CLEARANCE_SCALE));
                 }
-                if (spawn(s,job->type,position,(int)p,&normal))
-                { if (definition->group<2) ++c->produced[definition->group];++c->leaf_births[k];*job=LeafProduction();c->production_tip=k; }
+                // A brood hatches together around the leaf. A partial brood completes the job.
+                uint32_t hatched=0;
+                for (uint32_t b=0;b<definition->brood;++b)
+                {
+                    Vec3 offset=b ? scale(Vec3{std::cos(b*GOLDEN_ANGLE_RADIANS),std::sin(b*GOLDEN_ANGLE_RADIANS),std::cos(b*BROOD_SPREAD_PHASE)},definition->scale*BROOD_SPREAD_SCALE*std::sqrt((float)b)) : Vec3{};
+                    hatched+=spawn(s,job->type,add(position,offset),(int)p,&normal);
+                }
+                if (hatched)
+                { if (definition->group<2) c->produced[definition->group]+=hatched;c->leaf_births[k]+=hatched;*job=LeafProduction();c->production_tip=k; }
                 else c->capacity_blocked=true;
             }
             if (job->active && (!c->building || job->progress>c->manufacturing))
@@ -1685,7 +1720,8 @@ bool simulation_write_state(const Simulation* s, const char* path)
     fprintf(file,"{\"tick\":%u,\"time\":%.9f,\"unit_capacity\":%u,\"outcome\":%d,\"outcome_tick\":%u,\"births\":%u,\"losses\":%u,\"landings\":%u,\"blocked_landings\":%u,",
         s->tick_count,s->time_seconds,(uint32_t)MAX_UNITS,s->outcome,s->outcome_tick,s->births,s->losses,s->landings,s->blocked_landings);
     write_faction_stats(s,file);
-    fprintf(file,",\"faction_events\":{\"digestions\":%u,\"digest_heals\":%u,\"spore_bursts\":%u,\"captures\":%u,\"releases\":%u},\"sound_events\":{",s->digestions,s->digest_heals,s->spore_bursts,s->captures,s->releases);
+    uint32_t clouds=0;for (uint32_t i=0;i<MAX_SPORE_CLOUDS;++i) clouds+=s->clouds[i].age<s->clouds[i].seconds;
+    fprintf(file,",\"faction_events\":{\"digestions\":%u,\"digest_heals\":%u,\"spore_bursts\":%u,\"spore_clouds\":%u,\"captures\":%u,\"releases\":%u},\"sound_events\":{",s->digestions,s->digest_heals,s->spore_bursts,clouds,s->captures,s->releases);
     for (uint32_t i=0;i<SOUND_COUNT;++i) fprintf(file,"%s\"%s\":%u",i ? "," : "",sound_name(i),s->sounds.totals[i]);
     uint32_t fragments=0;for (uint32_t i=0;i<MAX_LIMB_DEBRIS;++i) fragments+=s->debris[i].seconds>0;
     fprintf(file,"},\"sound_dropped\":%u,\"fractures\":{\"limbs\":%u,\"fragments\":%u,\"replaced\":%u},\"colonies\":[",s->sounds.dropped,s->limbs_broken,fragments,s->debris_replaced);
@@ -1720,7 +1756,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
             const FactoryStructure* b=k ? &c->branches[k-1] : 0;Vec3 position=simulation_structure_position(s,p,k);
             fprintf(file,"%s{\"health\":%.6f,\"growth\":%.6f,\"wounds\":%u,\"generation\":%u,\"position\":[%.6f,%.6f,%.6f]",k ? "," : "",
                 k ? b->health : c->health,k ? b->growth : c->growth,k ? b->wounds : c->wounds,k ? b->generation : c->root_generation,position.x,position.y,position.z);
-            fprintf(file,",\"parent\":%d,\"visible_growth\":%.6f,\"scale\":%.6f,\"terminal\":%s",c->parents[k],simulation_structure_growth(s,p,k),simulation_structure_scale(s,p,k),simulation_structure_terminal(s,p,k) ? "true" : "false");
+            fprintf(file,",\"exposure\":%.6f,\"parent\":%d,\"visible_growth\":%.6f,\"scale\":%.6f,\"terminal\":%s",k ? b->exposure : c->exposure,c->parents[k],simulation_structure_growth(s,p,k),simulation_structure_scale(s,p,k),simulation_structure_terminal(s,p,k) ? "true" : "false");
             fprintf(file,",\"stem\":[");
             for (uint32_t j=0;j<=GROWTH_SEGMENTS;++j) { Vec3 v=c->stems[k][j];fprintf(file,"%s[%.6f,%.6f,%.6f]",j ? "," : "",v.x,v.y,v.z); }
             fprintf(file,"]}");
@@ -1743,6 +1779,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
             uint32_t ready=0;for (uint32_t j=0;j<s->world.spikes.count;++j) ready+=u->spikes[j]>=1;
             fprintf(file,"%s{\"slot\":%u,\"generation\":%u,\"faction\":%d,\"kind\":%d,\"health\":%.6f,\"target\":%d,\"position\":[%.6f,%.6f,%.6f],\"velocity\":[%.6f,%.6f,%.6f],\"bank\":%.6f,\"selected\":%s,\"wounds\":%u,\"ready_spikes\":%u,\"flash\":%.6f,\"visible\":%s,\"moving\":%s",
                 first ? "" : ",",i,u->generation,(int)u->faction,(int)simulation_unit_definition(s,u)->group,u->health,u->target,u->position.x,u->position.y,u->position.z,u->velocity.x,u->velocity.y,u->velocity.z,u->bank,u->selected ? "true" : "false",u->wounds,ready,u->flash,s->visible_units[i] ? "true" : "false",u->moving ? "true" : "false");
+            fprintf(file,",\"exposure\":%.6f",u->exposure);
             uint32_t pods=0;const UnitDefinition* definition=simulation_unit_definition(s,u);
             for (uint32_t j=0;j<definition->payload_count;++j) pods+=u->payloads[j]>=1;
             fprintf(file,",\"ready_payloads\":%u,\"payload_growth\":[",pods);

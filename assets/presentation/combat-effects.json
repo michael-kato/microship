@@ -36,5 +36,9 @@
     "alpha": 0.1,
     "hold_seconds": 0.5,
     "fade_seconds": 0.5
+  },
+  "spore_cloud": {
+    "color": [0.72, 0.64, 0.22],
+    "alpha": 0.08
   }
 }

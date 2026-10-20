@@ -30,6 +30,11 @@ static const float DEATH_RAY_INNER_START_RADIUS_SCALE = .1f;
 static const float HIT_RAY_WIDTH_SCALE = .55f;
 static const int EFFECT_TILE_RADIUS_MARGIN_PIXELS = 2;
 static const float DEATH_RAY_OUTER_START_RADIUS_SCALE = .2f;
+static const float CLOUD_RISE_FRACTION = .1f;
+static const float CLOUD_FADE_FRACTION = .4f;
+static const int CLOUD_EFFECT_KIND = 5;
+// Clouds are visual only: past this many tile references, further clouds are not drawn.
+static const uint32_t CLOUD_REFERENCE_BUDGET = MAX_EFFECT_REFERENCES/2;
 
 struct Projection { Vec3 eye,forward,right,up; float pixels,cx,cy; };
 static bool project(const Projection& p,Vec3 world,float* screen)
@@ -176,6 +181,16 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
             Vec3 b=add(pop->position,scale(direction,v->pop_radius*(DEATH_RAY_OUTER_START_RADIUS_SCALE+ease*DEATH_RAY_OUTER_GROWTH_SCALE)));
             segment(output,count,p,a,b,v->trail_width*DEATH_RAY_WIDTH_SCALE,content_color(&s->world.content,pop->faction),1-t,1);
         }
+    }
+    uint32_t cloud_references=0;
+    for (uint32_t i=0;i<MAX_SPORE_CLOUDS && v->cloud_alpha>0;++i)
+    {
+        const SporeCloud& c=s->clouds[i];if (c.age>=c.seconds || !simulation_in_sight(s,c.position,c.radius)) continue;
+        float t=c.age/c.seconds,fade=std::fmin(1.0f,t/CLOUD_RISE_FRACTION)*std::fmin(1.0f,(1-t)/CLOUD_FADE_FRACTION);
+        uint32_t before=*count;segment(output,count,p,c.position,c.position,c.radius,v->cloud_color,v->cloud_alpha*fade,CLOUD_EFFECT_KIND);
+        int r[4];if (*count==before || !tile_rectangle(output[before],width,height,r)) continue;
+        cloud_references+=(uint32_t)((r[2]-r[0]+1)*(r[3]-r[1]+1));
+        if (cloud_references>CLOUD_REFERENCE_BUDGET) { *count=before;break; }
     }
     for (uint32_t i=0;i<MAX_POPS;++i)
     {

@@ -97,7 +97,12 @@ with tempfile.TemporaryDirectory(prefix='nanova-growth-') as directory:
     assert not any(u['faction']==3 for u in shot['units']) and shot['faction_events']['spore_bursts']==0
     body['spawns'][1]['position']=[.3,0,6]
     burst,_=run('spore-contact',body,10)
-    assert burst['faction_events']['spore_bursts']==1 and burst['effects']['hits']>0
+    victim=next(u for u in burst['units'] if u['faction']!=3)
+    assert burst['faction_events']['spore_bursts']==1 and burst['faction_events']['spore_clouds']==1 and victim['exposure']>0,burst['faction_events']
+    # The cloud keeps adding sub-hit damage to a target inside it until a whole hit lands.
+    later,_=run('spore-cloud',body,240)
+    victim=next(u for u in later['units'] if u['faction']!=3)
+    assert victim['wounds']>=1 and later['faction_events']['spore_clouds']==1,(victim['wounds'],victim['exposure'])
     expired=deepcopy(body);expired['spawns'][1]['position']=[1000,0,6]
     for u in expired['content']['units']:
         if u['name']=='fungal_spore':u['attack']['lifetime']=.1
@@ -146,6 +151,8 @@ with tempfile.TemporaryDirectory(prefix='nanova-growth-') as directory:
     regrow['spawns']=[dict(type='fungal_spore',position=position)]
     for producer in regrow['content']['buildings']:
         producer['hits']=1;producer['branches']['regrow_seconds']=.5
+    for unit in regrow['content']['units']:
+        if unit['name']=='fungal_spore':unit['attack'].update(damage=1000,cloud=dict(radius=.25,seconds=.1,damage=.001))
     lost,_=run('root-awaits-regrowth',regrow,10)
     assert lost['colonies'][0]['health']==0 and lost['colonies'][0]['active']
     rebuilt,_=run('independent-root-regrowth',regrow,120)

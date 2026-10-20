@@ -61,6 +61,7 @@ struct CombatVisuals
     float lookahead,obstacle_clearance,weave_radius,weave_height;
     Color flash, injured;
     float break_seconds,break_speed,break_drag,break_spin,break_shrink;
+    Color cloud_color;float cloud_alpha; // Spore cloud glow; zero alpha draws none.
 };
 struct SpikeRules
 {

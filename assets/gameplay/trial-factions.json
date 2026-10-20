@@ -50,8 +50,7 @@
       "production": {
         "building": "fungal_emitter",
         "default_unit": "fungal_spore",
-        "assault_unit": "fungal_spore",
-        "mode": "spores"
+        "assault_unit": "fungal_spore"
       },
       "cell_appearance": {
         "tint": [0.43, 0.23, 0.1],

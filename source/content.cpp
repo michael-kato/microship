@@ -35,8 +35,10 @@ static const int MAX_UNIT_SPEED = 10000;
 static const int MAX_UNIT_YAW_DEGREES = 360000;
 static const int MAX_UNIT_SCALE = 1000;
 static const int MAX_UNIT_LIFETIME = 300;
-static const int MAX_UNIT_BLAST_RADIUS = 100;
-static const int MAX_UNIT_SEEK_RADIUS = 10000;
+static const int MAX_UNIT_CLOUD_RADIUS = 20;
+static const int MAX_UNIT_CLOUD_SECONDS = 120;
+static const int MAX_UNIT_CLOUD_DAMAGE = 1000;
+static const int MAX_UNIT_BROOD = 64;
 static const int MAX_CELL_TINT_SECONDS = 3600;
 static const float MIN_CELL_DISPLACEMENT_WIDTH_DEGREES = 6;
 static const double MAX_CELL_INTERIOR_VARIATION = .15;
@@ -197,8 +199,9 @@ static bool load_units(Content* c,Json root,const char* path)
     json_object(root,"$schema|units");JsonArray a=json_array(json_get(root,"units"),MAX_UNIT_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|trail_origin|pick_radius|cue_radius|hits|attack|secondary_attack|autonomy|payload|rear_tint");
+        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|trail_origin|pick_radius|cue_radius|hits|brood|attack|secondary_attack|autonomy|payload|rear_tint");
         UnitDefinition u={};definition_name(j,u.name);u.charge_speed=u.charge_acceleration=1;
+        Json brood=json_find(j,"brood");u.brood=json_present(brood) ? json_uint(brood,1,MAX_UNIT_BROOD) : 1;
         Json rear=json_find(j,"rear_tint");
         if (json_present(rear))
         {
@@ -207,13 +210,18 @@ static bool load_units(Content* c,Json root,const char* path)
         Json attack=json_find(j,"attack");
         if (json_present(attack))
         {
-            json_object(attack,"mode|seek_radius|blast_radius|lifetime|friendly_fire|charge_radius|charge_speed|charge_acceleration|release_hits|release_seconds");char mode[ASSET_NAME_CAPACITY]={};json_string(json_get(attack,"mode"),mode,ASSET_NAME_CAPACITY);
+            json_object(attack,"mode|lifetime|friendly_fire|damage|cloud|charge_radius|charge_speed|charge_acceleration|release_hits|release_seconds");char mode[ASSET_NAME_CAPACITY]={};json_string(json_get(attack,"mode"),mode,ASSET_NAME_CAPACITY);
             if (!strcmp(mode,"digest")) u.attack=ATTACK_DIGEST;
             else if (!strcmp(mode,"spore"))
             {
-                u.attack=ATTACK_SPORE;u.seek_radius=json_positive(json_get(attack,"seek_radius"),MAX_UNIT_SEEK_RADIUS);
-                u.blast_radius=json_positive(json_get(attack,"blast_radius"),MAX_UNIT_BLAST_RADIUS);u.lifetime=json_positive(json_get(attack,"lifetime"),MAX_UNIT_LIFETIME);
+                u.attack=ATTACK_SPORE;
+                Json lifetime=json_find(attack,"lifetime");if (json_present(lifetime)) u.lifetime=json_positive(lifetime,MAX_UNIT_LIFETIME);
                 u.friendly_fire=json_bool(json_get(attack,"friendly_fire"));
+                u.burst_damage=json_float(json_get(attack,"damage"),0,MAX_UNIT_CLOUD_DAMAGE);
+                Json cloud=json_get(attack,"cloud");json_object(cloud,"radius|seconds|damage");
+                u.cloud_radius=json_positive(json_get(cloud,"radius"),MAX_UNIT_CLOUD_RADIUS);
+                u.cloud_seconds=json_positive(json_get(cloud,"seconds"),MAX_UNIT_CLOUD_SECONDS);
+                u.cloud_damage=json_positive(json_get(cloud,"damage"),MAX_UNIT_CLOUD_DAMAGE);
             }
             else if (strcmp(mode,"projectile")) json_error(attack,"unknown attack mode");
             Json radius=json_find(attack,"charge_radius"),speed=json_find(attack,"charge_speed"),acceleration=json_find(attack,"charge_acceleration");
@@ -226,7 +234,7 @@ static bool load_units(Content* c,Json root,const char* path)
             if (json_present(hits)) u.release_hits=json_uint(hits,1,MAX_HIT_COUNT);
             if (json_present(seconds)) u.release_seconds=json_positive(seconds,10);
             if (json_present(hits)!=json_present(seconds)) json_error(attack,"release requires both hits and seconds");
-            if (u.attack!=ATTACK_SPORE && (json_present(json_find(attack,"seek_radius")) || json_present(json_find(attack,"blast_radius")) || json_present(json_find(attack,"lifetime")) || json_present(json_find(attack,"friendly_fire"))))
+            if (u.attack!=ATTACK_SPORE && (json_present(json_find(attack,"cloud")) || json_present(json_find(attack,"damage")) || json_present(json_find(attack,"lifetime")) || json_present(json_find(attack,"friendly_fire"))))
                 json_error(attack,"spore parameters require spore mode");
         }
         json_string(json_get(j,"faction"),u.faction_name,ASSET_NAME_CAPACITY);json_string(json_get(j,"group"),u.group_name,ASSET_NAME_CAPACITY);

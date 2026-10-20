@@ -67,6 +67,7 @@ struct Unit
     float bank,age;
     float spikes[MAX_SPIKES],payloads[MAX_UNIT_PAYLOADS],damage_age,heal_timer;
     uint32_t wounds;
+    float exposure; // Toxic cloud damage that has not yet added up to a hit.
     EmbeddedSpike embedded[MAX_EMBEDDED];
     int32_t latch;
     uint32_t latch_generation,latch_structure,latch_root_generation,latch_hits;
@@ -93,11 +94,15 @@ struct Projectile
 };
 struct Pop { Vec3 position; float age, duration,blast_radius; Faction faction; };
 struct Impact { Vec3 position; float age,duration; Faction faction; };
+// A burst spore's toxic cloud: damage per second to enemies inside, until its seconds pass.
+struct SporeCloud { Vec3 position; float radius,age,seconds,damage; Faction faction; bool friendly_fire; };
+enum { MAX_SPORE_CLOUDS=1024 };
 struct FactoryStructure
 {
     Vec3 offset;
     float health, growth,regrow_timer;
     uint32_t generation,wounds;
+    float exposure;
     EmbeddedSpike embedded[MAX_EMBEDDED];
 };
 struct LeafProduction
@@ -123,6 +128,7 @@ struct Colony
     int32_t parents[MAX_FACTORY_STRUCTURES];
     uint32_t root_attachments[MAX_FACTORY_STRUCTURES];
     uint32_t wounds;
+    float exposure;
     EmbeddedSpike embedded[MAX_EMBEDDED];
     float branch_timer;
     float establishment_age;
@@ -157,6 +163,8 @@ struct Simulation
     Projectile projectiles[MAX_PROJECTILES];
     Pop pops[MAX_POPS];
     Impact impacts[MAX_POPS];
+    SporeCloud clouds[MAX_SPORE_CLOUDS]; // When full, a new cloud replaces the oldest slot in turn.
+    uint32_t cloud_cursor;
     Colony colonies[MAX_BODIES];
     CellAppearance cell_appearance[MAX_BODIES];
     LimbDebris debris[MAX_LIMB_DEBRIS];

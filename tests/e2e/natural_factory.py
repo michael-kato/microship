@@ -74,7 +74,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
     initial,_=run('regrow_probe',regrow,ticks=120);original=initial['colonies'][0]['structures'];tip=original[0]['position']
     regrow['spawns']=[dict(type='fungal_spore',position=[tip[0],tip[1],tip[2]+.1])]
     for unit in regrow['content']['units']:
-        if unit['name']=='fungal_spore':unit.update(range=.4,speed=.01);unit['attack'].update(blast_radius=.25,seek_radius=.4,lifetime=.4)
+        if unit['name']=='fungal_spore':unit.update(range=.4,speed=.01);unit['attack'].update(damage=1000,lifetime=.4,cloud=dict(radius=.25,seconds=.1,damage=.001))
     lost,_=run('lost_root',regrow,ticks=10);assert lost['colonies'][0]['health']==0 and lost['colonies'][0]['active']
     rebuilt,_=run('regrown',regrow,ticks=120);c=rebuilt['colonies'][0];check_roots(c,branch);check_stems(c)
     assert c['structures'][0]['generation']==2 and c['structures'][0]['health']==profile['health']

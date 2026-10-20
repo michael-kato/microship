@@ -43,7 +43,10 @@ struct UnitDefinition
     float speed,health,range,cost,shot_interval,separation,pick_radius,cue_radius;
     float unit_radius,structure_radius,colonize_radius,leash_radius,response_seconds,cruise_fraction;
     AttackMode attack;
-    float seek_radius,blast_radius,lifetime;
+    float lifetime; // Spores expire after this many seconds; zero keeps them.
+    float burst_damage; // A bursting spore's damage to the target it touched.
+    float cloud_radius,cloud_seconds,cloud_damage; // A bursting spore leaves this toxic cloud; damage per second.
+    uint32_t brood; // Units hatched by one manufacture job.
     float charge_radius,charge_speed,charge_acceleration,release_seconds;
     uint32_t release_hits;
     Color rear_tint;float rear_tint_strength;

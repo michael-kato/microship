@@ -116,6 +116,7 @@ NODE_BUD_COUNT = 5
 NODE_BUD_Y = .82
 NODE_CROWN_Y = .87
 SPORE_RADIUS = .48
+SWARM_SPORE_RADIUS = .5
 SPORE_RAY_COUNT = 9
 SPORE_RAY_ROOT_RADIUS = .4
 SPORE_RAY_LENGTH = .18
@@ -562,6 +563,8 @@ sphere((0,0,0),(GROWTH_TIP_RADIUS,GROWTH_TIP_RADIUS,GROWTH_TIP_RADIUS),(1,1,1),2
 # One reusable shaft and head, local +Z; attached, flying and embedded use this mesh.
 rod((0,0,0),(0,0,SPIKE_SHAFT_LENGTH),SPIKE_SHAFT_RADIUS,(1,1,1),'spike');sphere((0,0,SPIKE_HEAD_Z),SPIKE_HEAD_SIZE,(1,1,1),1,surface='spike')
 export('virus_spike')
+# One low-poly mote per swarm unit: thousands can be drawn at once.
+sphere((0,0,0),(SWARM_SPORE_RADIUS,)*3,profiles['fungal_spore']['core'],1,surface='fungal_spore');export('fungal_swarm_spore')
 rng=random.Random(profiles['seed'])
 background('tissue_background','tissue');background('bloodstream_background','bloodstream')
 bpy.context.preferences.filepaths.save_version=0

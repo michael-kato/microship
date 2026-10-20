@@ -10,6 +10,7 @@ const float MIN_SEGMENT_SQUARED_LENGTH = .0001;
 const float RING_KIND_LOWER_BOUND = 1.5;
 const float RING_KIND_UPPER_BOUND = 3.5;
 const float SELECTION_KIND_LOWER_BOUND = 2.5;
+const float CLOUD_KIND_LOWER_BOUND = 4.5;
 const float BLAST_RING_RADIUS_SCALE = .75;
 const float EDGE_FEATHER_PIXELS = .7;
 const float EDGE_FEATHER_WIDTH_PIXELS = 1.4;
@@ -44,7 +45,12 @@ void main()
         float t=clamp(dot(vec2(p)+.5-s.a.xy,delta)/max(MIN_SEGMENT_SQUARED_LENGTH,dot(delta,delta)),0.0,1.0);
         float distance=length(vec2(p)+.5-mix(s.a.xy,s.b.xy,t));
         float alpha;
-        if (s.b.w>RING_KIND_LOWER_BOUND && s.b.w<RING_KIND_UPPER_BOUND)
+        if (s.b.w>CLOUD_KIND_LOWER_BOUND)
+        {
+            // Soft disc: full at the center, zero at the radius.
+            float t=clamp(distance/max(s.a.w,1.0),0.0,1.0);alpha=(1.0-t*t)*(1.0-t*t);
+        }
+        else if (s.b.w>RING_KIND_LOWER_BOUND && s.b.w<RING_KIND_UPPER_BOUND)
         {
             float ring=abs(distance-s.a.w*(s.b.w>SELECTION_KIND_LOWER_BOUND ? 1.0 : BLAST_RING_RADIUS_SCALE));
             alpha=exp(-ring*ring/2.0)*clamp(1.0-distance/max(s.a.w,1.0),0.0,1.0)*RING_LIGHT_GAIN;

@@ -98,21 +98,16 @@
             "minimum": 1,
             "maximum": 32
           },
+          "brood": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          },
           "attack": {
             "type": "object",
             "properties": {
               "mode": {
                 "enum": ["projectile", "digest", "spore"]
-              },
-              "seek_radius": {
-                "type": "number",
-                "exclusiveMinimum": 0,
-                "maximum": 10000
-              },
-              "blast_radius": {
-                "type": "number",
-                "exclusiveMinimum": 0,
-                "maximum": 100
               },
               "lifetime": {
                 "type": "number",
@@ -121,6 +116,11 @@
               },
               "friendly_fire": {
                 "type": "boolean"
+              },
+              "damage": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000
               },
               "charge_radius": {
                 "type": "number",
@@ -146,6 +146,28 @@
                 "type": "number",
                 "exclusiveMinimum": 0,
                 "maximum": 10
+              },
+              "cloud": {
+                "type": "object",
+                "properties": {
+                  "radius": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 20
+                  },
+                  "seconds": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 120
+                  },
+                  "damage": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000
+                  }
+                },
+                "required": ["radius", "seconds", "damage"],
+                "additionalProperties": false
               }
             },
             "required": ["mode"],
@@ -160,16 +182,16 @@
                   }
                 },
                 "then": {
-                  "required": ["seek_radius", "blast_radius", "lifetime", "friendly_fire"]
+                  "required": ["friendly_fire", "damage", "cloud"]
                 },
                 "else": {
                   "not": {
                     "anyOf": [
                       {
-                        "required": ["seek_radius"]
+                        "required": ["cloud"]
                       },
                       {
-                        "required": ["blast_radius"]
+                        "required": ["damage"]
                       },
                       {
                         "required": ["lifetime"]
