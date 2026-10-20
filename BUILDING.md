@@ -856,14 +856,27 @@ game minutes; `--jobs`, default half the CPU threads). Each pairing, role and
 cell is one process: `nanova --smoke --ticks N --world-seed S --matches M`
 plays M seeded matches back to back without audio or rendering, stops each at
 its outcome or N ticks, and prints one JSON summary line per match. The three
-factions (120 matches) take about 35 s on a 24-thread CPU. It writes `results.json` and `report.txt` under `build/faction-balance/`
+factions (120 matches) take about 2.3 minutes on a 24-thread CPU, mostly in
+matches with fungal swarms of several hundred spores. It writes `results.json` and `report.txt` under `build/faction-balance/`
 and prints wins, decision times, units built and lost, peak army and
 flagged results: one-sided pairings, stalemates, role or start-cell bias,
 idle factions and unit-storage saturation while a match is still open.
 State exports and match summaries carry `outcome_tick` and per-faction
 `faction_stats` (current colonies and units, then match totals).
 Matches with heavy parallel CPU load can exceed the per-process timeout of
-the ordinary checks; run those with lower `ctest -j`.
+the ordinary checks; run those with lower `ctest -j`. Under Proton, a check
+can also fail with "ShellExecuteEx failed" or a 10 s timeout from a stuck
+Wine launch; the same check passes when rerun, and stale `nanova.exe` Wine
+processes from the failed run should be stopped first.
+
+Results on Oct 20 (commit b0062ab, 40 matches per pairing): immune beats
+virus 40-0, virus beats fungus 27-13 (1 undecided), immune beats fungus
+40-0. Before the white blood cell blob, virus and immune were 22-18. The
+built-in AI sends each unit to its target as it is produced, so armies
+arrive piecemeal and virus peaks at 9-24 craft alive; these runs measure
+trickled engagements more than massed swarms. In massed equal-cost battles
+(virus ordered onto immune defenders, no production) immune won 40 against 17
+at about 480 nutrients each, and virus won two of three 28 against 12 at 336.
 
 ## Unit storage and swarm budget
 
