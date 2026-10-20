@@ -407,6 +407,7 @@ bool content_finish(Content* c,const char* path)
         UnitDefinition* u=&c->units[i];int faction=content_faction(c,u->faction_name),group=content_group(c,u->group_name);
         if (faction<=0 || group<0) { valid=false;break; }
         u->faction=(Faction)faction;u->group=(uint32_t)group;
+        c->max_unit_range=std::fmax(c->max_unit_range,u->range);c->max_unit_separation=std::fmax(c->max_unit_separation,u->separation);
     }
     for (uint32_t i=0;valid && i<c->producer_count;++i)
     {

@@ -8,6 +8,10 @@
 #include <algorithm>
 
 static const float GOLDEN_ANGLE_RADIANS = 2.39996323f;
+static const float UNIT_GRID_CELL_SIZE = 4;
+static const float UNIT_GRID_MARGIN = 32;
+static const float UNIT_GRID_CELL_GROWTH = 1.25f;
+static const float UNIT_GRID_MOTION_MARGIN = 1;
 static const float UNIT_UP_AXIS_PARALLEL_LIMIT = .95f;
 static const unsigned int BRANCH_RANDOM_MULTIPLIER = 1664525u;
 static const unsigned int BRANCH_RANDOM_INCREMENT = 1013904223u;
@@ -145,6 +149,55 @@ static int home_body(const Simulation* s, Faction faction)
     return NO_BODY;
 }
 
+static int32_t grid_axis(const UnitGrid& g,float value,uint32_t axis)
+{
+    float low=axis==0 ? g.low.x : axis==1 ? g.low.y : g.low.z;
+    float cell=std::floor((value-low)*g.inverse_cell);
+    return cell<0 ? 0 : cell>=g.size[axis] ? g.size[axis]-1 : (int32_t)cell;
+}
+static uint32_t grid_cell(const UnitGrid& g,Vec3 p)
+{ return ((uint32_t)grid_axis(g,p.z,2)*g.size[1]+grid_axis(g,p.y,1))*g.size[0]+grid_axis(g,p.x,0); }
+// Covers the cells and a margin; units outside clamp to the border cells.
+static void grid_bounds(Simulation* s)
+{
+    const World& w=s->world;Vec3 low=w.bodies[0].position,high=low;
+    for (uint32_t p=0;p<w.body_count;++p)
+    {
+        Vec3 c=w.bodies[p].position;float r=w.bodies[p].radius;
+        low=Vec3{std::fmin(low.x,c.x-r),std::fmin(low.y,c.y-r),std::fmin(low.z,c.z-r)};
+        high=Vec3{std::fmax(high.x,c.x+r),std::fmax(high.y,c.y+r),std::fmax(high.z,c.z+r)};
+    }
+    UnitGrid& g=s->grid;g.low=subtract(low,Vec3{UNIT_GRID_MARGIN,UNIT_GRID_MARGIN,UNIT_GRID_MARGIN});
+    Vec3 span=add(subtract(high,low),scale(Vec3{1,1,1},2*UNIT_GRID_MARGIN));
+    for (float cell=UNIT_GRID_CELL_SIZE;;cell*=UNIT_GRID_CELL_GROWTH)
+    {
+        g.size[0]=(int32_t)std::ceil(span.x/cell);g.size[1]=(int32_t)std::ceil(span.y/cell);g.size[2]=(int32_t)std::ceil(span.z/cell);
+        if ((uint32_t)g.size[0]*g.size[1]*g.size[2]<=MAX_UNIT_GRID_CELLS) { g.inverse_cell=1/cell;break; }
+    }
+}
+static void grid_build(Simulation* s)
+{
+    UnitGrid& g=s->grid;uint32_t cells=(uint32_t)g.size[0]*g.size[1]*g.size[2];
+    memset(g.start,0,(cells+1)*sizeof(g.start[0]));
+    for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) ++g.start[grid_cell(g,s->units[i].position)+1];
+    for (uint32_t c=0;c<cells;++c) { g.start[c+1]+=g.start[c];g.cursor[c]=g.start[c]; }
+    for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) g.units[g.cursor[grid_cell(g,s->units[i].position)]++]=(uint16_t)i;
+}
+// Live units in the cells overlapping the sphere: a superset that callers test by distance.
+static uint32_t grid_query(const UnitGrid& g,Vec3 center,float radius,uint16_t* out)
+{
+    radius+=UNIT_GRID_MOTION_MARGIN;uint32_t count=0;
+    int32_t x0=grid_axis(g,center.x-radius,0),x1=grid_axis(g,center.x+radius,0);
+    int32_t y0=grid_axis(g,center.y-radius,1),y1=grid_axis(g,center.y+radius,1);
+    int32_t z0=grid_axis(g,center.z-radius,2),z1=grid_axis(g,center.z+radius,2);
+    for (int32_t z=z0;z<=z1;++z) for (int32_t y=y0;y<=y1;++y)
+    {
+        uint32_t row=((uint32_t)z*g.size[1]+y)*g.size[0];
+        for (uint32_t k=g.start[row+x0];k<g.start[row+x1+1];++k) out[count++]=g.units[k];
+    }
+    return count;
+}
+
 bool simulation_in_sight(const Simulation* s,Vec3 position,float radius)
 {
     if (s->world.sight_radius<=0) return true;
@@ -152,9 +205,12 @@ bool simulation_in_sight(const Simulation* s,Vec3 position,float radius)
     for (uint32_t p=0;p<s->world.body_count;++p)
         if (s->colonies[p].active && s->colonies[p].faction==s->world.player_faction
             && length(subtract(position,s->world.bodies[p].position))<reach+s->world.bodies[p].radius) return true;
-    for (uint32_t i=0;i<MAX_UNITS;++i)
-        if (s->units[i].health>0 && s->units[i].faction==s->world.player_faction
-            && length(subtract(position,s->units[i].position))<reach) return true;
+    uint16_t near[MAX_UNITS];uint32_t count=grid_query(s->grid,position,reach,near);
+    for (uint32_t n=0;n<count;++n)
+    {
+        const Unit& u=s->units[near[n]];
+        if (u.health>0 && u.faction==s->world.player_faction && length(subtract(position,u.position))<reach) return true;
+    }
     return false;
 }
 static bool opening_orbit(const Simulation* s,const Unit& unit)
@@ -166,6 +222,7 @@ bool simulation_body_known(const Simulation* s,uint32_t p)
 
 void simulation_update_sight(Simulation* s)
 {
+    grid_build(s);
     for (uint32_t p=0;p<s->world.body_count;++p)
     {
         s->visible_bodies[p]=simulation_in_sight(s,s->world.bodies[p].position,s->world.bodies[p].radius);
@@ -446,6 +503,7 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
 {
     *s=Simulation();s->selected_body=s->order_body=NO_BODY;
     if (!world_load(&s->world,world_path,seed)) return false;
+    grid_bounds(s);
     if (seed) for (uint32_t i=0;i<s->world.body_count;++i) s->world.bodies[i].seed^=seed;
     for (uint32_t i=0;i<s->world.body_count;++i) s->home_owner[i]=s->world.start_owner[i];
     if (!s->world.gameplay.enabled) return true;
@@ -606,9 +664,12 @@ static bool defended(const Simulation* s, uint32_t p, Faction faction)
 {
     const Body* cell=&s->world.bodies[p];
     if (s->colonies[p].active && s->colonies[p].faction!=faction) return true;
-    for (uint32_t i=0;i<MAX_UNITS;++i)
-        if (s->units[i].health>0 && s->units[i].faction!=faction
-            && length(subtract(s->units[i].position,cell->position))<cell->radius+simulation_unit_definition(s,&s->units[i])->range) return true;
+    uint16_t near[MAX_UNITS];uint32_t count=grid_query(s->grid,cell->position,cell->radius+s->world.content.max_unit_range,near);
+    for (uint32_t n=0;n<count;++n)
+    {
+        const Unit& u=s->units[near[n]];
+        if (u.health>0 && u.faction!=faction && length(subtract(u.position,cell->position))<cell->radius+simulation_unit_definition(s,&u)->range) return true;
+    }
     return false;
 }
 
@@ -668,9 +729,10 @@ static void local_task(Simulation* s,Unit* u,const Vec3* positions,const int32_t
     for (uint32_t pass=0;pass<2;++pass)
     {
         uint32_t mask=pass ? d.secondary_targets : d.targets;float nearest=d.unit_radius;
-        if (mask&TARGET_UNITS) for (uint32_t j=0;j<MAX_UNITS;++j)
+        uint16_t near[MAX_UNITS];uint32_t count=mask&TARGET_UNITS ? grid_query(s->grid,u->position,nearest,near) : 0;
+        for (uint32_t n=0;n<count;++n)
         {
-            const Unit& other=s->units[j];if (other.health<=0 || other.faction==u->faction) continue;
+            uint32_t j=near[n];const Unit& other=s->units[j];if (other.health<=0 || other.faction==u->faction) continue;
             float distance=length(subtract(positions[j],u->position));
             if (distance>=nearest || !within_leash(s,*u,positions[j]) || !clear_shot(s,u->position,positions[j])) continue;
             nearest=distance;u->task=TASK_ATTACK_UNIT;u->attention=j;u->attention_generation=other.generation;
@@ -733,6 +795,8 @@ static void move_units(Simulation* s, float dt)
     Vec3 positions[MAX_UNITS],velocities[MAX_UNITS];int32_t held_by[MAX_UNITS];
     for (uint32_t i=0;i<MAX_UNITS;++i)
     { positions[i]=s->units[i].position;velocities[i]=s->units[i].velocity;held_by[i]=-1;s->units[i].charging=false; }
+    grid_build(s);
+    uint16_t near[MAX_UNITS];
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         const Unit& u=s->units[i];
@@ -828,8 +892,10 @@ static void move_units(Simulation* s, float dt)
         if (definition->attack==ATTACK_SPORE)
         {
             float nearest=definition->seek_radius;bool found=false;
-            for (uint32_t j=0;j<MAX_UNITS;++j) if (s->units[j].health>0 && s->units[j].faction!=u->faction)
+            uint32_t count=grid_query(s->grid,u->position,definition->seek_radius,near);
+            for (uint32_t n=0;n<count;++n) if (s->units[near[n]].health>0 && s->units[near[n]].faction!=u->faction)
             {
+                uint32_t j=near[n];
                 float d=length(subtract(positions[j],u->position));uint32_t seed=u->generation*SEED_INDEX_MULTIPLIER+s->units[j].generation*TARGET_SEED_MULTIPLIER;
                 float score=d*(1+SPORE_TARGET_SCORE_VARIATION*signed_random(&seed));
                 if (d<definition->seek_radius && score<nearest) { nearest=score;goal=positions[j];found=true; }
@@ -860,9 +926,11 @@ static void move_units(Simulation* s, float dt)
                 }
             }
             // Read a stable pass input: separation must not depend on unit update order.
-            for (uint32_t j=0;j<MAX_UNITS;++j)
-                if (j!=i && s->units[j].health>0 && !(colonizing && s->units[j].faction==u->faction && s->units[j].target==u->target))
+            uint32_t count=grid_query(s->grid,positions[i],flight->separation*s->world.content.max_unit_separation,near);
+            for (uint32_t n=0;n<count;++n)
+                if (near[n]!=i && s->units[near[n]].health>0 && !(colonizing && s->units[near[n]].faction==u->faction && s->units[near[n]].target==u->target))
                 {
+                    uint32_t j=near[n];
                     Vec3 apart=subtract(positions[i],positions[j]);float d=length(apart);
                     float spacing=flight->separation*std::fmax(simulation_unit_definition(s,u)->separation,simulation_unit_definition(s,&s->units[j])->separation);
                     if (d<spacing && d>POSITION_EPSILON) desired=add(desired,scale(apart,speed*(1-d/spacing)/d));
@@ -1040,6 +1108,7 @@ static void projectile_combat(Simulation* s,float dt)
     bool held[MAX_UNITS]={};
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (!s->units[i].latch_colony && simulation_attachment_valid(s,&s->units[i])) held[s->units[i].latch]=true;
+    grid_build(s);uint16_t near[MAX_UNITS];
     uint32_t incoming[MAX_UNITS+MAX_BODIES*MAX_FACTORY_STRUCTURES]={};
     if (s->world.spikes.enabled) for (uint32_t i=0;i<MAX_PROJECTILES;++i)
     {
@@ -1065,9 +1134,11 @@ static void projectile_combat(Simulation* s,float dt)
         {
         uint32_t targets=pass ? definition->secondary_targets : definition->targets;
         secondary=pass!=0;
-        for (uint32_t j=0;(targets&TARGET_UNITS) && j<MAX_UNITS;++j)
-            if (s->units[j].health>0 && s->units[j].faction!=u->faction)
+        uint32_t count=targets&TARGET_UNITS ? grid_query(s->grid,u->position,nearest,near) : 0;
+        for (uint32_t n=0;n<count;++n)
+            if (s->units[near[n]].health>0 && s->units[near[n]].faction!=u->faction)
             {
+                uint32_t j=near[n];
                 float d=length(subtract(u->position,s->units[j].position));
                 if (d<nearest && clear_shot(s,u->position,s->units[j].position)) { nearest=d;target=(int)j; }
             }
@@ -1097,10 +1168,14 @@ static void projectile_combat(Simulation* s,float dt)
         if (definition->attack==ATTACK_SPORE)
         {
             burst[i]=true;++s->spore_bursts;sound(s,SOUND_HIT,u->position);
-            for (uint32_t j=0;j<MAX_UNITS;++j)
+            uint32_t count=grid_query(s->grid,u->position,definition->blast_radius,near);
+            for (uint32_t n=0;n<count;++n)
+            {
+                uint32_t j=near[n];
                 if (i!=j && s->units[j].health>0 && (definition->friendly_fire || s->units[j].faction!=u->faction)
                     && length(subtract(s->units[j].position,u->position))<definition->blast_radius && clear_shot(s,u->position,s->units[j].position))
                 { ++hit_count[j];++s->hits; }
+            }
             for (uint32_t p=0;p<s->world.body_count;++p)
                 if (s->colonies[p].active && (definition->friendly_fire || s->colonies[p].faction!=u->faction))
                     for (uint32_t k=0;k<s->colonies[p].structure_count;++k)

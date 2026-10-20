@@ -13,6 +13,17 @@ enum { MAX_SPIKES=32, MAX_EMBEDDED=2, GROWTH_SEGMENTS=4,MAX_LIMB_DEBRIS=256 };
 static const float SIMULATION_TICKS_PER_SECOND_FLOAT=(float)SIMULATION_TICKS_PER_SECOND;
 static const double SIMULATION_TICKS_PER_SECOND_DOUBLE=(double)SIMULATION_TICKS_PER_SECOND;
 struct EmbeddedSpike { Vec3 direction,anchor; Faction faction; };
+// Live units bucketed by a clamped uniform grid over the world, rebuilt at phase
+// boundaries. Units keep index order within a cell; queries visit cells in order.
+enum { MAX_UNIT_GRID_CELLS=16384 };
+struct UnitGrid
+{
+    Vec3 low;
+    float inverse_cell;
+    int32_t size[3];
+    uint32_t start[MAX_UNIT_GRID_CELLS+1],cursor[MAX_UNIT_GRID_CELLS];
+    uint16_t units[MAX_UNITS];
+};
 enum UnitTask { TASK_PATROL,TASK_MOVE,TASK_ATTACK_UNIT,TASK_ATTACK_STRUCTURE,TASK_COLONIZE,TASK_LAUNCH };
 struct Unit
 {
@@ -120,6 +131,7 @@ struct Simulation
     double time_seconds;
     Unit units[MAX_UNITS];
     Trail trails[MAX_UNITS];
+    UnitGrid grid; // Scratch spatial index; positions may move up to UNIT_GRID_MOTION_MARGIN after a build.
     SightField fog_memory;
     Projectile projectiles[MAX_PROJECTILES];
     Pop pops[MAX_POPS];

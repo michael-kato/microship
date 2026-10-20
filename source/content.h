@@ -94,6 +94,7 @@ struct Content
     UnitDefinition units[MAX_UNIT_TYPES];
     ProducerDefinition producers[MAX_PRODUCER_TYPES];
     uint32_t unit_count,producer_count;
+    float max_unit_range,max_unit_separation; // Largest values over all unit types, for neighbor queries.
 };
 int content_faction(const Content*,const char*);
 int content_group(const Content*,const char*);
