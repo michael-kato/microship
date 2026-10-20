@@ -25,7 +25,7 @@ struct MeshSource
     Color color;
     const char* parts_path;
     uint32_t seed;
-    float shape_variation,part_variation;
+    float shape_variation,part_variation,layout_rotation;
 };
 struct Geometry
 {

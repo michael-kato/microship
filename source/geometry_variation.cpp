@@ -22,6 +22,7 @@ static const float MIN_AUTHORED_NORMAL_SQUARED_LENGTH = .98f;
 static const float MAX_AUTHORED_NORMAL_SQUARED_LENGTH = 1.02f;
 static const float MIN_GENERATED_NORMAL_SQUARED_LENGTH = 1e-20f;
 static const int PART_ROTATION_RADIANS_PER_VARIATION = 4;
+static const float LAYOUT_TILT_FRACTION = .25f;
 static const int DISPLACEMENT_LOW_FREQUENCY = 3;
 static const int DISPLACEMENT_HIGH_FREQUENCY = 4;
 
@@ -61,6 +62,13 @@ Vec3 transform(Vec3 v,const Part& p,const MeshSource& source,uint32_t index)
         float size=1+random(&seed)*source.part_variation;
         Vec3 local=scale(subtract(v,p.pivot),size);
         v=add(add(p.pivot,scale(delta,source.part_variation)),Vec3{local.x*c-local.y*s,local.x*s+local.y*c,local.z});
+        // Rotate the organ arrangement as one body. This preserves the authored spacing
+        // and the distance from the cell center. Meshes and roots use this same transform.
+        uint32_t layout_seed=source.seed^PART_SEED_OFFSET;
+        float yaw=random(&layout_seed)*source.layout_rotation;
+        float tilt=random(&layout_seed)*source.layout_rotation*LAYOUT_TILT_FRACTION;
+        Vec3 rotated={v.x*std::cos(yaw)-v.y*std::sin(yaw),v.x*std::sin(yaw)+v.y*std::cos(yaw),v.z};
+        v=Vec3{rotated.x,rotated.y*std::cos(tilt)-rotated.z*std::sin(tilt),rotated.y*std::sin(tilt)+rotated.z*std::cos(tilt)};
     }
     // A smooth bounded displacement preserves connected surfaces and shared seams.
     float a=source.shape_variation;

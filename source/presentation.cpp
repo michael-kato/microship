@@ -69,7 +69,7 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
         {
             const Body* c=&w->bodies[i];p->body_meshes[i]=(uint32_t)sources.size();
             const BodyDefinition& d=w->content.bodies[c->type];
-            sources.push_back(MeshSource{c->model_path,c->position,c->radius,0,c->color,d.parts_path,c->seed,d.shape_variation,d.part_variation});
+            sources.push_back(MeshSource{c->model_path,c->position,c->radius,0,c->color,d.parts_path,c->seed,d.shape_variation,d.part_variation,d.layout_rotation});
         }
         for (uint32_t i=0;i<w->content.unit_count;++i)
         {
@@ -80,38 +80,38 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
                 { p->unit_meshes[i]=p->unit_meshes[j];shared=true;break; }
             if (shared) continue;
             p->unit_meshes[i]=(uint32_t)sources.size();
-            sources.push_back(MeshSource{definition->model_path,Vec3{},1,0,definition->color,0,0,0,0});
+            sources.push_back(MeshSource{definition->model_path,Vec3{},1,0,definition->color,0,0,0,0,0});
         }
         for (uint32_t i=0;i<w->content.unit_count;++i) if (w->content.units[i].payload_count)
         {
             p->payload_meshes[i]=(uint32_t)sources.size();
-            sources.push_back(MeshSource{w->content.units[i].payload_model,Vec3{},1,0,Color{1,1,1},0,0,0,0});
+            sources.push_back(MeshSource{w->content.units[i].payload_model,Vec3{},1,0,Color{1,1,1},0,0,0,0,0});
         }
         for (uint32_t i=0;i<w->content.unit_count;++i) if (w->content.units[i].blob_model[0])
         {
             p->blob_meshes[i]=(uint32_t)sources.size();
-            sources.push_back(MeshSource{w->content.units[i].blob_model,Vec3{},1,0,Color{1,1,1},0,0,0,0});
+            sources.push_back(MeshSource{w->content.units[i].blob_model,Vec3{},1,0,Color{1,1,1},0,0,0,0,0});
         }
         for (uint32_t i=0;i<w->content.producer_count;++i)
         {
             p->factory_meshes[i]=(uint32_t)sources.size();
-            sources.push_back(MeshSource{w->content.producers[i].model_path,Vec3{},1,0,Color{1,1,1},0,0,0,0});
+            sources.push_back(MeshSource{w->content.producers[i].model_path,Vec3{},1,0,Color{1,1,1},0,0,0,0,0});
             const ProducerDefinition& d=w->content.producers[i];
             if (d.segment_path[0])
             {
-                p->segment_meshes[i]=(uint32_t)sources.size();sources.push_back(MeshSource{d.segment_path,Vec3{},1,0,Color{1,1,1},0,0,0,0});
-                p->tip_meshes[i]=(uint32_t)sources.size();sources.push_back(MeshSource{d.tip_path,Vec3{},1,0,Color{1,1,1},0,0,0,0});
+                p->segment_meshes[i]=(uint32_t)sources.size();sources.push_back(MeshSource{d.segment_path,Vec3{},1,0,Color{1,1,1},0,0,0,0,0});
+                p->tip_meshes[i]=(uint32_t)sources.size();sources.push_back(MeshSource{d.tip_path,Vec3{},1,0,Color{1,1,1},0,0,0,0,0});
             }
         }
         if (w->spikes.enabled)
         {
             p->spike_mesh=(uint32_t)sources.size();
-            sources.push_back(MeshSource{w->spikes.model,Vec3{},1,0,Color{1,1,1},0,0,0,0});
+            sources.push_back(MeshSource{w->spikes.model,Vec3{},1,0,Color{1,1,1},0,0,0,0,0});
         }
         if (w->backdrop.model_path[0])
         {
             p->background_mesh=(uint32_t)sources.size();const Background* b=&w->backdrop;
-            sources.push_back(MeshSource{b->model_path,b->position,b->scale,0,b->color,0,0,0,0});
+            sources.push_back(MeshSource{b->model_path,b->position,b->scale,0,b->color,0,0,0,0,0});
         }
         if (!geometry_build(&scene->geometry,sources.data(),(uint32_t)sources.size(),config)) return false;
         for (uint32_t u=0;u<w->content.unit_count;++u)

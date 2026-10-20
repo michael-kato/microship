@@ -64,6 +64,11 @@
                 },
                 "required": ["strength", "frequency", "warm", "cool"],
                 "additionalProperties": false
+              },
+              "layout_rotation_degrees": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 180
               }
             },
             "required": ["parts", "shape", "interior"],

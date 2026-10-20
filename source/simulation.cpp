@@ -570,7 +570,7 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
     for (uint32_t i=0;i<s->world.body_count;++i)
     {
         Body& b=s->world.bodies[i];const BodyDefinition& d=s->world.content.bodies[b.type];
-        MeshSource source={b.model_path,b.position,b.radius,0,b.color,d.parts_path,b.seed,d.shape_variation,d.part_variation};
+        MeshSource source={b.model_path,b.position,b.radius,0,b.color,d.parts_path,b.seed,d.shape_variation,d.part_variation,d.layout_rotation};
         if (d.hosts_site && !geometry_attachments(source,b.colony_normal,b.factory_roots,b.factory_root_radii,MAX_FACTORY_STRUCTURES,&b.factory_root_count)) return false;
         b.factory_root=b.factory_roots[0];
         for (uint32_t t=0;d.hosts_site && t<s->world.content.producer_count;++t)

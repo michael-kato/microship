@@ -111,7 +111,7 @@ static bool load_bodies(Content* c,Json root,const char* path)
         Json variation=json_find(j,"variation");
         if (json_present(variation))
         {
-            json_object(variation,"parts|shape|interior|wall_noise");
+            json_object(variation,"parts|shape|interior|wall_noise|layout_rotation_degrees");
             Json noise=json_find(variation,"wall_noise");
             if (json_present(noise))
             {
@@ -123,6 +123,8 @@ static bool load_bodies(Content* c,Json root,const char* path)
             json_path(json_get(variation,"parts"),path,b.parts_path);
             b.shape_variation=json_float(json_get(variation,"shape"),0,MAX_CELL_SHAPE_VARIATION);
             b.part_variation=json_float(json_get(variation,"interior"),0,MAX_CELL_INTERIOR_VARIATION);
+            Json rotation=json_find(variation,"layout_rotation_degrees");
+            if (json_present(rotation)) b.layout_rotation=json_float(rotation,0,180)*.01745329252f;
             if (!b.model_path[0]) json_error(variation,"variation requires a mesh");
         }
         if (content_body(c,b.name)>=0) return json_error(j,"duplicate body definition");

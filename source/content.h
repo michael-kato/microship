@@ -85,7 +85,7 @@ struct BodyDefinition
 {
     char name[ASSET_NAME_CAPACITY],label[ASSET_NAME_CAPACITY],model_path[ASSET_PATH_CAPACITY];
     char parts_path[ASSET_PATH_CAPACITY];
-    float shape_variation,part_variation;
+    float shape_variation,part_variation,layout_rotation;
     float wall_noise_strength,wall_noise_frequency;
     Color wall_noise_warm,wall_noise_cool;
     bool hosts_site;

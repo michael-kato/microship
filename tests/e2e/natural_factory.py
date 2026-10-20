@@ -49,6 +49,16 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
         for k in range(colony['root_count']):assert colony['structures'][k]['stem'][0]==colony['attachments'][indices[k]],'A factory missed its large organelle'
     game,scene=run('default');colony=game['colonies'][0];profile=data['content']['buildings'][0];branch=profile['branches'];tree=branch['tree']
     check_roots(colony,branch);assert 9<=len(colony['structures'])<=21<70
+    # Disable the layout rotation with the same seed. Anchors must move without
+    # changing organ sizes or the branch-to-organ connection.
+    aligned=deepcopy(data)
+    for body in aligned['content']['bodies']:body['variation']['layout_rotation_degrees']=0
+    old,_=run('aligned_organs',aligned);aligned_home=old['colonies'][0]
+    assert aligned_home['attachment_radii']==colony['attachment_radii']
+    assert max(math.dist(a,b) for a,b in zip(aligned_home['attachments'],colony['attachments']))>.1
+    check_roots(aligned_home,branch)
+    invalid=deepcopy(data);invalid['content']['bodies'][0]['variation']['layout_rotation_degrees']=181
+    run('invalid_rotation',invalid,expected=1)
     def check_stems(colony):
         for k,limb in enumerate(colony['structures']):
             depth=0;parent=limb['parent']

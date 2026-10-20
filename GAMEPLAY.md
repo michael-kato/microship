@@ -198,3 +198,9 @@ Factory trees sway about their roots, with connected joints, heads, and growing
 units. The membrane ripple changes its shading normal. It does not move the
 silhouette or add another wall. Faction mutation still moves the wall vertices.
 All motion uses the current simulation time. Pause stops it.
+
+Cell organs use a fixed arrangement for each world seed.
+`variation.layout_rotation_degrees` in `cell-types.json` sets the range
+of random arrangement rotation. The default is 180 degrees. Existing
+per-organ position, size, and orientation variation still applies.
+Factory roots use the same transform as the organs. Restart keeps the seed.
