@@ -1442,6 +1442,7 @@ static void projectile_combat(Simulation* s,float dt)
         if (s->colonies[i].active && structure_health(&s->colonies[i],k)>0 && hit_count[structure_slot(i,k)]>0)
         {
             Colony* c=&s->colonies[i];FactoryStructure* branch=k ? &c->branches[k-1] : 0;
+            c->repair_delay[k]=simulation_producer_definition(s,i)->repair_delay_seconds;c->repair_credit[k]=0;
             float before=simulation_structure_growth(s,i,k);
             float* health=k ? &branch->health : &c->health;uint32_t* wounds=k ? &branch->wounds : &c->wounds;
             EmbeddedSpike* embedded=k ? branch->embedded : c->embedded;
@@ -1472,6 +1473,7 @@ static void projectile_combat(Simulation* s,float dt)
                     FactoryStructure& child=c->branches[j-1];
                     if (child.health>0) fracture_limb(s,i,j,simulation_structure_growth(s,i,j),0);
                     child.health=0;child.growth=0;child.regrow_timer=definition.branches.regrow_seconds;
+                    c->repair_credit[j]=0;c->repair_delay[j]=definition.repair_delay_seconds;
                 }
             bool was_active=c->active;c->active=c->health>0;
             for (uint32_t j=1;j<c->structure_count;++j) c->active=c->active || c->branches[j-1].health>0;
@@ -1508,6 +1510,40 @@ static void colonize_cells(Simulation* s, float dt)
     }
 }
 
+static bool repair_colony(Simulation* s,uint32_t p,float dt)
+{
+    Colony& c=s->colonies[p];const ProducerDefinition& d=*simulation_producer_definition(s,p);
+    if (d.repair_health_per_second<=0) return false;
+    float budget=d.repair_health_per_second*dt;bool damaged=false;
+    for (uint32_t k=0;k<c.structure_count;++k)
+    {
+        c.repair_delay[k]=std::fmax(0.0f,c.repair_delay[k]-dt);
+        uint32_t generation=k ? c.branches[k-1].generation : c.root_generation;
+        uint32_t* wounds=k ? &c.branches[k-1].wounds : &c.wounds;
+        float* health=k ? &c.branches[k-1].health : &c.health;
+        // Unbuilt limbs belong to initial construction. They require no repair.
+        if (!generation || (*health>0 && !*wounds)) continue;
+        damaged=true;int32_t parent=c.parents[k];
+        if (c.repair_delay[k]>0 || (parent>=0 && (structure_health(&c,parent)<=0 || simulation_structure_growth(s,p,parent)<1))) continue;
+        bool root=parent<0;float maximum=root ? d.health : d.branches.health;
+        uint32_t hits=root ? d.hits : d.branches.hits;
+        float missing=*health<=0 ? maximum : maximum*(*wounds)/(float)hits;
+        float work=std::fmin(budget,std::fmin(std::fmax(0.0f,missing-c.repair_credit[k]),c.energy/d.repair_nutrients_per_health));
+        c.repair_credit[k]+=work;budget-=work;
+        float cost=work*d.repair_nutrients_per_health;c.energy=std::fmax(0.0f,c.energy-cost);c.repair_nutrients+=cost;
+        float per_hit=maximum/hits;
+        while (*health>0 && *wounds && c.repair_credit[k]>=per_hit)
+        {
+            float old=simulation_structure_growth(s,p,k);--*wounds;c.repair_credit[k]-=per_hit;
+            *health=maximum*(hits-*wounds)/hits;
+            float* growth=k ? &c.branches[k-1].growth : &c.growth;*growth=std::fmin(*growth,old);
+            EmbeddedSpike* embedded=k ? c.branches[k-1].embedded : c.embedded;
+            if (*wounds<MAX_EMBEDDED) embedded[*wounds]=EmbeddedSpike();
+        }
+    }
+    return damaged;
+}
+
 static void grow_colonies(Simulation* s, float dt)
 {
     const GameplayRules* rules=&s->world.gameplay;
@@ -1536,11 +1572,13 @@ static void grow_colonies(Simulation* s, float dt)
             bool ready=parent<0 || ((parent ? c->branches[parent-1].health : c->health)>0 && simulation_structure_growth(s,p,parent)>=1);
             bool first=establishing && *generation==0;
             bool due=first ? c->establishment_age>c->deployment_start[k] : c->branch_timer>=f.seconds;
-            if (*health<=0 && *timer<=0 && ready && due)
+            float maximum=parent<0 ? d.health : f.health;
+            bool funded=d.repair_health_per_second<=0 || !*generation || c->repair_credit[k]>=maximum;
+            if (*health<=0 && *timer<=0 && ready && due && funded)
             {
                 if (f.grammar!=GROWTH_TREE) c->branch_timer=0;
                 if (*generation>0 && d.segment_path[0]) regrow_factory_stems(s,p,k,*generation+1);
-                emerged=true;*health=parent<0 ? d.health : f.health;*growth=first ? 0 : INITIAL_FACTORY_GROWTH;*wounds=0;*exposure=0;++*generation;
+                c->repair_credit[k]=0;emerged=true;*health=parent<0 ? d.health : f.health;*growth=first ? 0 : INITIAL_FACTORY_GROWTH;*wounds=0;*exposure=0;++*generation;
                 memset(embedded,0,sizeof(EmbeddedSpike)*MAX_EMBEDDED);sound(s,SOUND_GROW,simulation_structure_position(s,p,k));
             }
             if (*health<=0) continue;
@@ -1555,6 +1593,8 @@ static void grow_colonies(Simulation* s, float dt)
         float production=simulation_production(s,p);
         c->uptake=s->world.bodies[p].availability;
         c->energy=std::fmin(rules->storage,c->energy+dt*d.collection*c->uptake*production);
+        c->repairing=repair_colony(s,p,dt);
+        if (c->repairing) { c->building=false;c->manufacturing=0;c->capacity_blocked=false;continue; }
         if (!mature)
         { memset(c->leaves,0,sizeof(c->leaves));c->building=false;c->manufacturing=0;c->capacity_blocked=false;continue; }
         uint32_t tips[MAX_FACTORY_STRUCTURES],count=0;
@@ -1782,6 +1822,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
         fprintf(file,"%s{\"%s\":%u,\"faction\":%d,\"health\":%.6f,\"growth\":%.6f,\"%s\":%.6f,\"energy\":%.6f,\"building\":%s,\"priority\":%d,\"manufacturing\":%.6f,\"capacity_blocked\":%s,\"wounds\":%u",
             p ? "," : "","cell",p,(int)c->faction,c->health,c->growth,"nutrients",c->uptake,c->energy,c->building ? "true" : "false",(int)(c->faction ? s->world.content.units[c->priority].group : 0),c->manufacturing,c->capacity_blocked ? "true" : "false",c->wounds);
         fprintf(file,",\"fighter_percent\":%u,\"ratio_enabled\":%s,\"produced\":[%u,%u],\"building_type\":\"%s\"",c->fighter_percent,c->ratio_enabled ? "true" : "false",c->produced[0],c->produced[1],c->building ? s->world.content.units[c->building_kind].name : "");
+        fprintf(file,",\"repairing\":%s,\"repair_nutrients\":%.6f",c->repairing ? "true" : "false",c->repair_nutrients);
         const Body& body=s->world.bodies[p];
         fprintf(file,",\"active\":%s,\"establishment_age\":%.6f,\"root_count\":%u,\"production\":%.6f,\"attachments\":[",c->active ? "true" : "false",c->establishment_age,c->root_count,c->active ? simulation_production(s,p) : 0);
         for (uint32_t k=0;k<body.factory_root_count;++k) { Vec3 v=body.factory_roots[k];fprintf(file,"%s[%.6f,%.6f,%.6f]",k ? "," : "",v.x,v.y,v.z); }

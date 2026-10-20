@@ -322,7 +322,15 @@ static bool load_buildings(Content* c,Json root,const char* path)
     json_object(root,"$schema|buildings");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|model|growth_seconds|sprout_seconds|establishment_seconds|health|collection|height|width|hits|branches|growth_meshes|navigation|growth_plane");ProducerDefinition p={};
+        json_object(j,"name|faction|model|growth_seconds|sprout_seconds|establishment_seconds|health|collection|height|width|hits|branches|growth_meshes|navigation|growth_plane|repair");ProducerDefinition p={};
+        Json repair=json_find(j,"repair");
+        if (json_present(repair))
+        {
+            json_object(repair,"health_per_second|nutrients_per_health|delay_seconds");
+            p.repair_health_per_second=json_positive(json_get(repair,"health_per_second"),MAX_BUILDING_HEALTH);
+            p.repair_nutrients_per_health=json_positive(json_get(repair,"nutrients_per_health"),MAX_BUILDING_HEALTH);
+            p.repair_delay_seconds=json_float(json_get(repair,"delay_seconds"),0,MAX_BUILDING_GROWTH_SECONDS);
+        }
         Json plane=json_find(j,"growth_plane");
         if (json_present(plane))
         {

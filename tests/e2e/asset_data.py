@@ -12,6 +12,7 @@ def established_world(source,directory):
     data['rules']['economy'].pop('fighter_percent',None)
     for start in data['match'].pop('starts',[]):data['bodies'][start['cell']]['owner']=start['faction']
     for building in data['content']['buildings']:
+        building.pop('repair',None)
         building['branches'].pop('root_limit',None);building['branches'].pop('root_minimum_radius',None)
         building['branches']['count']=max(16,building['branches']['count'])
         if building['branches']['grammar']=='tree':

@@ -52,6 +52,11 @@
       "growth_plane": {
         "normal": [0, 0.28734789, 0.95782629],
         "depth_ratio": 0.15
+      },
+      "repair": {
+        "health_per_second": 12,
+        "nutrients_per_health": 0.08,
+        "delay_seconds": 4
       }
     },
     {
@@ -93,6 +98,11 @@
       "growth_plane": {
         "normal": [0, 0.28734789, 0.95782629],
         "depth_ratio": 0.15
+      },
+      "repair": {
+        "health_per_second": 12,
+        "nutrients_per_health": 0.08,
+        "delay_seconds": 4
       }
     },
     {
@@ -134,6 +144,11 @@
       "growth_plane": {
         "normal": [0, 0.28734789, 0.95782629],
         "depth_ratio": 0.15
+      },
+      "repair": {
+        "health_per_second": 12,
+        "nutrients_per_health": 0.08,
+        "delay_seconds": 4
       }
     }
   ]

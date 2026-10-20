@@ -13,7 +13,9 @@ command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'sc
 count=0
 with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
     out=Path(directory);data=stage_world(root/'assets/levels/virus-player-level.json',out)
-    for building in data['content']['buildings']:building.update(growth_seconds=.01,establishment_seconds=.01);building['branches']['seconds']=.01
+    for building in data['content']['buildings']:
+        building.pop('repair',None)
+        building.update(growth_seconds=.01,establishment_seconds=.01);building['branches']['seconds']=.01
     data['rules']['ai']['expansion_delay']=300;data['rules']['economy'].update(enemy_attack_seconds=300,manufacture_seconds=1000)
     def check_leaf_caps(game,scene):
         instances={item['slot']:item for item in scene['instances']}
@@ -102,7 +104,8 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
         regrow['match'].pop('starts');regrow['match'].update(player=side,opponent=enemy)
         regrow['bodies'][0]['owner']=side;regrow['bodies'][1]['owner']=enemy
         regrow['spawns']=[];regrow['rules'].pop('exploration',None)
-        for b in regrow['content']['buildings']:b['hits']=1;b['branches']['regrow_seconds']=.5
+        for b in regrow['content']['buildings']:
+            b.pop('repair',None);b['hits']=1;b['branches']['regrow_seconds']=.5
         definition=next(b for b in regrow['content']['buildings'] if b['faction']==side)
         growing=deepcopy(regrow)
         for building in growing['content']['buildings']:building['growth_seconds']=3

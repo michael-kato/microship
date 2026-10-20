@@ -241,6 +241,28 @@
             },
             "required": ["normal", "depth_ratio"],
             "additionalProperties": false
+          },
+          "repair": {
+            "type": "object",
+            "properties": {
+              "health_per_second": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 10000
+              },
+              "nutrients_per_health": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 10000
+              },
+              "delay_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            },
+            "required": ["health_per_second", "nutrients_per_health", "delay_seconds"],
+            "additionalProperties": false
           }
         },
         "required": [

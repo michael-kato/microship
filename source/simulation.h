@@ -140,6 +140,8 @@ struct Colony
     uint32_t production_tip,production_cursor;
     LeafProduction leaves[MAX_FACTORY_STRUCTURES];
     uint32_t leaf_births[MAX_FACTORY_STRUCTURES];
+    float repair_credit[MAX_FACTORY_STRUCTURES],repair_delay[MAX_FACTORY_STRUCTURES];
+    float repair_nutrients;bool repairing;
 };
 struct CellAppearance { Color tint;float strength,seconds;float factions[MAX_FACTIONS]; };
 struct LimbDebris

@@ -75,6 +75,7 @@ struct ProducerDefinition
     Faction faction;
     float growth_seconds,sprout_seconds,establishment_seconds,health,collection,height,width;
     float stem_radius,head_radius;
+    float repair_health_per_second,repair_nutrients_per_health,repair_delay_seconds;
     Vec3 growth_plane_normal;
     float growth_depth_ratio;
     bool growth_plane_enabled;
