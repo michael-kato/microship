@@ -3,6 +3,7 @@
 
 #include "world.h"
 #include "sight_field.h"
+#include <stdio.h>
 #include "sound_events.h"
 
 enum { MAX_UNITS = 256, NO_BODY = -1, MAX_PROJECTILES=512, MAX_POPS=256, TRAIL_POINTS=8 };
@@ -158,6 +159,8 @@ bool simulation_ratio_available(const Simulation*,uint32_t cell);
 void simulation_production_ratio(Simulation*,uint32_t fighter_percent);
 void simulation_priority_type(Simulation*,uint32_t type);
 bool simulation_write_state(const Simulation* simulation, const char* path);
+// One JSON line: seed, outcome, blocked sites and per-faction totals, for balance runs.
+void simulation_write_summary(const Simulation* simulation,uint32_t seed,FILE* file);
 Vec3 simulation_spike_direction(uint32_t index,uint32_t count);
 float simulation_unit_scale(const Simulation*,const Unit*);
 Vec3 simulation_trail_origin(const Simulation*,const Unit*);

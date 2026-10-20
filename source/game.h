@@ -32,6 +32,7 @@ struct GameOptions
     const char* state_path;
     const char* scene_state_path;
     uint32_t ticks;
+    uint32_t matches; // Balance runs: seeded matches played back to back, each until its outcome or --ticks.
     PointerInput camera_input;
 };
 

@@ -1528,22 +1528,38 @@ void simulation_step(Simulation* s)
     ++s->tick_count;simulation_set_time(s,s->time_seconds+1.0/SIMULATION_TICKS_PER_SECOND_DOUBLE);
 }
 
-bool simulation_write_state(const Simulation* s, const char* path)
+// One entry per named faction: its current colonies and units, then match totals.
+static void write_faction_stats(const Simulation* s,FILE* file)
 {
-    FILE* file=fopen(path,"wb");if (!file) { fprintf(stderr,"Cannot write state '%s'.\n",path);return false; }
-    fprintf(file,"{\"tick\":%u,\"time\":%.9f,\"outcome\":%d,\"outcome_tick\":%u,\"births\":%u,\"losses\":%u,\"landings\":%u,\"blocked_landings\":%u,",
-        s->tick_count,s->time_seconds,s->outcome,s->outcome_tick,s->births,s->losses,s->landings,s->blocked_landings);
+    uint32_t colonies[MAX_FACTIONS]={},units[MAX_FACTIONS]={};
+    for (uint32_t p=0;p<s->world.body_count;++p) if (s->colonies[p].active) ++colonies[s->colonies[p].faction];
+    for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) ++units[s->units[i].faction];
     fprintf(file,"\"faction_stats\":[");
     bool listed=false;
     for (uint32_t f=1;f<MAX_FACTIONS;++f)
     {
         if (!s->world.content.factions[f].name[0]) continue;
         const Simulation::FactionStats& t=s->faction_stats[f];
-        fprintf(file,"%s{\"faction\":\"%s\",\"built\":%u,\"lost\":%u,\"limbs_lost\":%u,\"colonies_gained\":%u,\"colonies_lost\":%u,\"peak_units\":%u}",
-            listed ? "," : "",s->world.content.factions[f].name,t.built,t.lost,t.limbs_lost,t.colonies_gained,t.colonies_lost,t.peak_units);
+        fprintf(file,"%s{\"faction\":\"%s\",\"colonies\":%u,\"units\":%u,\"built\":%u,\"lost\":%u,\"limbs_lost\":%u,\"colonies_gained\":%u,\"colonies_lost\":%u,\"peak_units\":%u}",
+            listed ? "," : "",s->world.content.factions[f].name,colonies[f],units[f],t.built,t.lost,t.limbs_lost,t.colonies_gained,t.colonies_lost,t.peak_units);
         listed=true;
     }
-    fprintf(file,"],\"faction_events\":{\"digestions\":%u,\"digest_heals\":%u,\"spore_bursts\":%u,\"captures\":%u,\"releases\":%u},\"sound_events\":{",s->digestions,s->digest_heals,s->spore_bursts,s->captures,s->releases);
+    fprintf(file,"]");
+}
+void simulation_write_summary(const Simulation* s,uint32_t seed,FILE* file)
+{
+    uint32_t blocked=0;for (uint32_t p=0;p<s->world.body_count;++p) blocked+=s->colonies[p].capacity_blocked;
+    fprintf(file,"{\"seed\":%u,\"tick\":%u,\"outcome\":%d,\"outcome_tick\":%u,\"capacity_blocked\":%u,",seed,s->tick_count,s->outcome,s->outcome_tick,blocked);
+    write_faction_stats(s,file);fprintf(file,"}\n");
+}
+
+bool simulation_write_state(const Simulation* s, const char* path)
+{
+    FILE* file=fopen(path,"wb");if (!file) { fprintf(stderr,"Cannot write state '%s'.\n",path);return false; }
+    fprintf(file,"{\"tick\":%u,\"time\":%.9f,\"outcome\":%d,\"outcome_tick\":%u,\"births\":%u,\"losses\":%u,\"landings\":%u,\"blocked_landings\":%u,",
+        s->tick_count,s->time_seconds,s->outcome,s->outcome_tick,s->births,s->losses,s->landings,s->blocked_landings);
+    write_faction_stats(s,file);
+    fprintf(file,",\"faction_events\":{\"digestions\":%u,\"digest_heals\":%u,\"spore_bursts\":%u,\"captures\":%u,\"releases\":%u},\"sound_events\":{",s->digestions,s->digest_heals,s->spore_bursts,s->captures,s->releases);
     for (uint32_t i=0;i<SOUND_COUNT;++i) fprintf(file,"%s\"%s\":%u",i ? "," : "",sound_name(i),s->sounds.totals[i]);
     uint32_t fragments=0;for (uint32_t i=0;i<MAX_LIMB_DEBRIS;++i) fragments+=s->debris[i].seconds>0;
     fprintf(file,"},\"sound_dropped\":%u,\"fractures\":{\"limbs\":%u,\"fragments\":%u,\"replaced\":%u},\"colonies\":[",s->sounds.dropped,s->limbs_broken,fragments,s->debris_replaced);

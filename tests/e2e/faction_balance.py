@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Play every faction pairing with the built-in AI on both sides and report balance.
 
-Each match runs the real application in --smoke mode (simulation only, no GPU)
-at full speed. Both sides use the same AI, fog is off and both sides swap start
-cells, so the remaining differences come from faction content. The report lists
-win rates, decision times, production and losses, and flags suspect results.
+Each pairing, role and start cell runs one real application process in
+--smoke --matches mode (simulation only, no GPU) that plays every seed back to
+back and stops each match at its outcome. Both sides use the same AI, fog is
+off and both sides swap start cells, so the remaining differences come from
+faction content. The report lists win rates, decision times, production and
+losses, and flags suspect results.
 """
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from itertools import combinations
 import json
+import os
 from pathlib import Path
 import statistics
 import subprocess
@@ -24,9 +27,9 @@ root = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('binary', type=Path)
 parser.add_argument('--level', type=Path, default=root/'assets/levels/virus-player-level.json')
-parser.add_argument('--seeds', type=int, default=4, help='World seeds per pairing and start order')
+parser.add_argument('--seeds', type=int, default=10, help='World seeds per pairing, role and start cell')
 parser.add_argument('--minutes', type=float, default=15, help='Match time limit in game minutes')
-parser.add_argument('--jobs', type=int, default=4)
+parser.add_argument('--jobs', type=int, default=max(1, (os.cpu_count() or 2)//2))
 parser.add_argument('--factions', help='Comma-separated subset, for example virus,immune')
 parser.add_argument('--output', type=Path, default=root/'build/faction-balance')
 a = parser.parse_args()
@@ -70,42 +73,38 @@ for x, y in combinations(names, 2):
         for cell in (0, 1):
             name = f'{player}-vs-{opponent}-cell{cell}'
             path = out/(name+'-world.json'); write_world(path, world_for(player, opponent, cell))
-            for seed in range(1, a.seeds+1): jobs.append((name, player, opponent, cell, seed, path))
+            jobs.append((name, player, opponent, cell, path))
 
 def play(job):
-    name, player, opponent, cell, seed, path = job
-    state = out/f'{name}-seed{seed}-state.json'
-    started = time.monotonic()
-    result = subprocess.run([*prefix, '--smoke', '--world', str(path), '--ticks', str(ticks), '--world-seed', str(seed),
-                             '--state', str(state)], capture_output=True, text=True, timeout=600)
-    assert result.returncode == 0, (name, seed, result.stdout[-2000:], result.stderr[-2000:])
-    data = json.loads(state.read_text())
-    stats = {s['faction']: s for s in data['faction_stats']}
-    by_index = {i+1: n for i, n in enumerate(names_all)}
-    colonies = {n: 0 for n in (player, opponent)}
-    for c in data['colonies']:
-        if c['active'] and by_index.get(c['faction']) in colonies: colonies[by_index[c['faction']]] += 1
-    alive = {n: 0 for n in (player, opponent)}
-    for u in data['units']:
-        if u['health'] > 0 and by_index.get(u['faction']) in alive: alive[by_index[u['faction']]] += 1
-    if data['outcome']:
-        winner = player if data['outcome'] > 0 else opponent
-        decided = data['outcome_tick']/TICKS_PER_SECOND
-    else:
-        # Undecided at the limit: lead by colonies, then surviving units.
-        lead = sorted((colonies[n], alive[n], n) for n in (player, opponent))
-        winner = None if lead[0][:2] == lead[1][:2] else lead[1][2]
-        decided = None
-    blocked = sum(1 for c in data['colonies'] if c['capacity_blocked'])
-    return dict(name=name, player=player, opponent=opponent, cell=cell, seed=seed, outcome=data['outcome'], winner=winner,
-                decided_seconds=decided, colonies=colonies, alive=alive, stats={n: stats[n] for n in (player, opponent)},
-                capacity_blocked=blocked, wall_seconds=time.monotonic()-started)
+    name, player, opponent, cell, path = job
+    result = subprocess.run([*prefix, '--smoke', '--world', str(path), '--ticks', str(ticks), '--world-seed', '1',
+                             '--matches', str(a.seeds)], capture_output=True, text=True, timeout=600)
+    assert result.returncode == 0, (name, result.stdout[-2000:], result.stderr[-2000:])
+    matches = []
+    for line in result.stdout.splitlines():
+        if not line.startswith('{'): continue
+        data = json.loads(line)
+        stats = {s['faction']: s for s in data['faction_stats']}
+        colonies = {n: stats[n]['colonies'] for n in (player, opponent)}
+        alive = {n: stats[n]['units'] for n in (player, opponent)}
+        if data['outcome']:
+            winner = player if data['outcome'] > 0 else opponent
+            decided = data['outcome_tick']/TICKS_PER_SECOND
+        else:
+            # Undecided at the limit: lead by colonies, then surviving units.
+            lead = sorted((colonies[n], alive[n], n) for n in (player, opponent))
+            winner = None if lead[0][:2] == lead[1][:2] else lead[1][2]
+            decided = None
+        matches.append(dict(name=name, player=player, opponent=opponent, cell=cell, seed=data['seed'], outcome=data['outcome'],
+                            winner=winner, decided_seconds=decided, colonies=colonies, alive=alive,
+                            stats={n: stats[n] for n in (player, opponent)}, capacity_blocked=data['capacity_blocked']))
+    assert len(matches) == a.seeds, (name, result.stdout[-2000:])
+    return matches
 
-names_all = [f['name'] for f in base['content']['factions']]
 if not jobs: raise SystemExit('Need at least two factions.')
-print(f'Playing {len(jobs)} AI-vs-AI matches of up to {a.minutes:g} game minutes ({ticks} ticks) with {a.jobs} jobs...', flush=True)
+print(f'Playing {len(jobs)*a.seeds} AI-vs-AI matches of up to {a.minutes:g} game minutes ({ticks} ticks) in {len(jobs)} processes with {a.jobs} jobs...', flush=True)
 started = time.monotonic()
-with ThreadPoolExecutor(a.jobs) as pool: results = list(pool.map(play, jobs))
+with ThreadPoolExecutor(a.jobs) as pool: results = [m for batch in pool.map(play, jobs) for m in batch]
 (out/'results.json').write_text(json.dumps(results, indent=1)+'\n')
 
 def mean(values): return statistics.mean(values) if values else float('nan')

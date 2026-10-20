@@ -848,15 +848,19 @@ the repeated taps were cache hits. Both were reverted.
 ## Faction balance runs
 
 `python3 tests/e2e/faction_balance.py build/windows-cross/nanova.exe` plays
-every faction pairing headless (`--smoke`, simulation only, about 45 times
-real time) with the built-in AI on both sides (`match.player_ai`). Fog is
-off, each side starts with its faction's player-level roster, and every
-pairing runs with both roles and both start cells for each world seed
-(`--seeds`, default 4; `--minutes`, default 20 game minutes; `--jobs`).
-It writes `results.json` and `report.txt` under `build/faction-balance/`
+every faction pairing headless with the built-in AI on both sides
+(`match.player_ai`). Fog is off, each side starts with its faction's
+player-level roster, and every pairing runs with both roles and both start
+cells for each world seed (`--seeds`, default 10; `--minutes`, default 15
+game minutes; `--jobs`, default half the CPU threads). Each pairing, role and
+cell is one process: `nanova --smoke --ticks N --world-seed S --matches M`
+plays M seeded matches back to back without audio or rendering, stops each at
+its outcome or N ticks, and prints one JSON summary line per match. The three
+factions (120 matches) take about 35 s on a 24-thread CPU. It writes `results.json` and `report.txt` under `build/faction-balance/`
 and prints wins, decision times, units built and lost, peak army and
 flagged results: one-sided pairings, stalemates, role or start-cell bias,
 idle factions and unit-storage saturation while a match is still open.
-State exports carry `outcome_tick` and per-faction `faction_stats` for it.
+State exports and match summaries carry `outcome_tick` and per-faction
+`faction_stats` (current colonies and units, then match totals).
 Matches with heavy parallel CPU load can exceed the per-process timeout of
 the ordinary checks; run those with lower `ctest -j`.

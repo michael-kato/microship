@@ -407,8 +407,23 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     selection_marker(game,config,hover==p ? -1 : hover,r->hover_marker);
 }
 
+// Plays seeded matches back to back without audio or rendering and prints one summary line each.
+static int run_matches(const GameOptions* options)
+{
+    std::unique_ptr<Simulation> simulation(new (std::nothrow) Simulation());if (!simulation) return 1;
+    for (uint32_t i=0;i<options->matches;++i)
+    {
+        uint32_t seed=options->world_seed+i;
+        if (!simulation_initialize(simulation.get(),options->world_path,seed)) return 1;
+        while (!simulation->outcome && simulation->tick_count<options->ticks) simulation_step(simulation.get());
+        simulation_write_summary(simulation.get(),seed,stdout);fflush(stdout);
+    }
+    return 0;
+}
+
 int game_run(const GameOptions* options)
 {
+    if (options->matches) return run_matches(options);
     std::unique_ptr<Game> storage(new (std::nothrow) Game());if (!storage) return 1;
     Game& game=*storage;
     Audio audio;if (!audio_load(&audio,options->audio_path,options->audio_capture_path)) return 1;

@@ -23,6 +23,7 @@ static const int MAX_CAMERA_PAN_SECONDS = 60;
 static const int MAX_FRAME_DELAY_MS = 250;
 static const int MAX_COMMAND_SAMPLES = 4096;
 static const int MAX_COMMAND_TICKS = 1000000;
+static const int MAX_COMMAND_MATCHES = 1000;
 static const int EXECUTABLE_PATH_CAPACITY = 4096;
 static const int MAX_COMMAND_REAL_MAGNITUDE = 1000000;
 static const int DECIMAL_RADIX = 10;
@@ -71,6 +72,7 @@ static void print_usage(FILE* output)
         "              [--pointer-drag X1 Y1 X2 Y2] (client pixels)\n"
         "              [--smoke] [--stats|--no-stats] [--debug-views] [--no-activate]\n"
         "              [--replay PATH.orders] [--ticks N] [--state PATH.json] [--scene-state PATH.json]\n"
+        "              [--matches N] (with --smoke and --ticks: N seeded matches from --world-seed, each until its outcome)\n"
         "              [--audio-capture PATH.wav] (with --smoke and --ticks, at most 3600 ticks)\n"
         "              [--camera-pan X Y SECONDS] [--world-seed N] [--audio PATH.json] [--menu|--no-menu] [--menu-select 1..3]\n"
         "Default: faction menu, then direct ray-traced Win32 window; Escape or close to exit.\n"
@@ -255,12 +257,14 @@ int main(int argc, char** argv)
                 options.capture_path = argv[i];
         }
         else if (strcmp(argv[i], "--frames") == 0 || strcmp(argv[i], "--samples") == 0
-                 || strcmp(argv[i], "--seed") == 0 || strcmp(argv[i], "--world-seed") == 0 || strcmp(argv[i], "--ticks") == 0)
+                 || strcmp(argv[i], "--seed") == 0 || strcmp(argv[i], "--world-seed") == 0 || strcmp(argv[i], "--ticks") == 0
+                 || strcmp(argv[i], "--matches") == 0)
         {
             const char* flag = argv[i];
             uint32_t value = 0;
             bool seed = strcmp(flag, "--seed") == 0 || strcmp(flag,"--world-seed")==0;
-            uint32_t maximum = strcmp(flag, "--samples") == 0 ? MAX_COMMAND_SAMPLES : strcmp(flag,"--ticks")==0 ? MAX_COMMAND_TICKS : UINT32_MAX;
+            uint32_t maximum = strcmp(flag, "--samples") == 0 ? MAX_COMMAND_SAMPLES : strcmp(flag,"--ticks")==0 ? MAX_COMMAND_TICKS
+                : strcmp(flag,"--matches")==0 ? MAX_COMMAND_MATCHES : UINT32_MAX;
             if (++i == argc || !parse_integer(argv[i], seed ? 0 : 1, maximum, &value))
             {
                 fprintf(stderr, "%s requires an integer in [%u, %u].\n", flag, seed ? 0 : 1, maximum);
@@ -276,6 +280,8 @@ int main(int argc, char** argv)
                 options.samples = value;
             else if (strcmp(flag,"--ticks")==0)
                 options.ticks=value;
+            else if (strcmp(flag,"--matches")==0)
+                options.matches=value;
             else
                 options.frames = value;
         }
@@ -287,6 +293,8 @@ int main(int argc, char** argv)
     }
     if (options.audio_capture_path && (!options.smoke || !options.ticks || options.ticks>MAX_AUDIO_CAPTURE_TICKS))
     { fprintf(stderr,"--audio-capture requires --smoke and --ticks in [1,3600].\n");return 2; }
+    if (options.matches && (!options.smoke || !options.ticks || options.replay_path || options.state_path || options.scene_state_path || options.audio_capture_path))
+    { fprintf(stderr,"--matches requires --smoke and --ticks, without replay, state or audio capture.\n");return 2; }
     if (options.smoke && (options.headless || options.capture_path || options.frames))
     {
         fprintf(stderr, "--smoke cannot be combined with GPU frame controls.\n");
