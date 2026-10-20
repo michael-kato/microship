@@ -405,7 +405,7 @@ static void establish_colony(Simulation* s,uint32_t p,Faction faction)
     c->health=simulation_producer_definition(s,p)->health;c->growth=INITIAL_FACTORY_GROWTH;c->priority=s->world.content.factions[faction].default_unit;
     c->fighter_percent=s->world.content.units[c->priority].group==0 ? 100 : 0;c->production_error=50;
     c->active=true;c->root_generation=1;
-    s->world.bodies[p].owner=faction;s->faction_established[faction]=true;
+    s->world.bodies[p].owner=faction;s->faction_established[faction]=true;++s->faction_stats[faction].colonies_gained;
     if (s->world.gameplay.enabled) prepare_factory(s,p);
     if (simulation_producer_definition(s,p)->establishment_seconds>0) c->growth=0;
     else for (uint32_t k=1;k<c->root_count;++k) { c->branches[k-1].health=simulation_producer_definition(s,p)->health;c->branches[k-1].growth=INITIAL_FACTORY_GROWTH;c->branches[k-1].generation=1; }
@@ -429,7 +429,7 @@ static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,const 
             for (uint32_t j=0;j<definition->payload_count;++j) unit.payloads[j]=1;
             unit.orbit_phase=unit.generation*GOLDEN_ANGLE_RADIANS;unit.cooldown=(unit.generation%FIRE_COOLDOWN_PHASE_COUNT)*FIRE_COOLDOWN_PHASE_SECONDS;
             s->trails[i]=Trail();s->trails[i].points[0]=simulation_trail_origin(s,&unit);s->trails[i].count=1;
-            s->units[i]=unit;++s->births;
+            s->units[i]=unit;++s->births;++s->faction_stats[unit.faction].built;
             sound(s,SOUND_BIRTH,position);
             return true;
         }
@@ -990,7 +990,7 @@ static void fracture_limb(Simulation* s,uint32_t p,uint32_t k,float old_growth,f
 {
     const Colony& c=s->colonies[p];const ProducerDefinition& definition=*simulation_producer_definition(s,p);
     if (!definition.segment_path[0]) return;
-    ++s->limbs_broken;sound(s,SOUND_BREAK,simulation_structure_position(s,p,k));
+    ++s->limbs_broken;++s->faction_stats[s->colonies[p].faction].limbs_lost;sound(s,SOUND_BREAK,simulation_structure_position(s,p,k));
     const CombatVisuals& fx=s->world.combat;if (fx.break_seconds<=0) return;
     float growth=old_growth;
     uint32_t seed=s->world.bodies[p].seed^s->tick_count^(k*SEED_INDEX_MULTIPLIER);
@@ -1224,7 +1224,7 @@ static void projectile_combat(Simulation* s,float dt)
             if (u->health==0)
             {
                 pop_body(s,u->position,u->faction,true,burst[i] ? simulation_unit_definition(s,u)->blast_radius : 0);
-                ++s->losses;u->selected=false;s->trails[i].count=0;
+                ++s->losses;++s->faction_stats[u->faction].lost;u->selected=false;s->trails[i].count=0;
             }
         }
     for (uint32_t i=0;i<s->world.body_count;++i)
@@ -1263,8 +1263,9 @@ static void projectile_combat(Simulation* s,float dt)
                     if (child.health>0) fracture_limb(s,i,j,simulation_structure_growth(s,i,j),0);
                     child.health=0;child.growth=0;child.regrow_timer=definition.branches.regrow_seconds;
                 }
-            c->active=c->health>0;
+            bool was_active=c->active;c->active=c->health>0;
             for (uint32_t j=1;j<c->structure_count;++j) c->active=c->active || c->branches[j-1].health>0;
+            if (was_active && !c->active) ++s->faction_stats[c->faction].colonies_lost;
             if (!c->active)
             { c->energy=0;c->building=false;c->capacity_blocked=false;memset(c->leaves,0,sizeof(c->leaves));s->world.bodies[i].owner=FACTION_NEUTRAL; }
 
@@ -1383,7 +1384,7 @@ static void grow_colonies(Simulation* s, float dt)
             // Continue from the same cursor on the next tick. Do not skip other leaves.
             break;
         }
-        float rate=s->world.ai_production_set && c->faction!=s->world.player_faction ? s->world.ai_production : 1;
+        float rate=s->world.ai_production_set && (c->faction!=s->world.player_faction || s->world.player_ai) ? s->world.ai_production : 1;
         float step=dt*rate/rules->manufacture_seconds;
         c->building=false;c->manufacturing=0;c->capacity_blocked=false;
         for (uint32_t k=0;k<c->structure_count;++k)
@@ -1415,9 +1416,9 @@ static void grow_colonies(Simulation* s, float dt)
     }
 }
 
-static void enemy_orders(Simulation* s)
+// Built-in strategy for one side: expand to the nearest site, then assault.
+static void ai_orders(Simulation* s,Faction enemy)
 {
-    Faction enemy=s->world.opponent_faction;
     int home=home_body(s,enemy),target=-1;float nearest=INITIAL_ENEMY_DISTANCE;bool assault_ready=false;
     bool attack=s->time_seconds>=s->world.gameplay.enemy_attack_seconds;
     for (uint32_t p=0;p<s->world.body_count;++p) if (s->world.content.bodies[s->world.bodies[p].type].hosts_site && s->world.bodies[p].owner!=enemy
@@ -1438,12 +1439,17 @@ static void enemy_orders(Simulation* s)
         if (u->target!=next) { u->attention=-1;u->response_timer=0; }
         u->target=next;u->commanded=expand && (establishing || target>=0);
     }
+}
+
+// An automatic player faction sends its colonizers home once expansion opens.
+static void automatic_player_orders(Simulation* s)
+{
     Faction player=s->world.player_faction;
+    bool expand=s->time_seconds>=(s->world.ai_production_set ? s->world.ai_expansion : s->world.gameplay.enemy_attack_seconds);
     if (s->world.neutral_start && !s->faction_established[player] && s->world.content.factions[player].automatic && expand)
         for (uint32_t i=0;i<MAX_UNITS;++i)
             if (s->units[i].health>0 && s->units[i].faction==player && simulation_unit_definition(s,&s->units[i])->colonizes)
             { s->units[i].target=home_body(s,player);s->units[i].commanded=true; }
-
 }
 
 static void outcome(Simulation* s)
@@ -1460,8 +1466,8 @@ static void outcome(Simulation* s)
         units=units || (s->units[i].health>0 && s->units[i].faction==s->world.player_faction);
         enemy_units=enemy_units || (s->units[i].health>0 && s->units[i].faction==s->world.opponent_faction);
     }
-    if (friendly && !hostile && (s->faction_established[s->world.opponent_faction] || !enemy_units)) { s->outcome=1;sound(s,SOUND_WIN,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"YOU WON. CONTINUE PLAYING OR PRESS R TO RESTART."); }
-    else if (!friendly && !units) { s->outcome=-1;sound(s,SOUND_LOSE,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"COLONY LOST. R TO RESTART."); }
+    if (friendly && !hostile && (s->faction_established[s->world.opponent_faction] || !enemy_units)) { s->outcome=1;s->outcome_tick=s->tick_count;sound(s,SOUND_WIN,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"YOU WON. CONTINUE PLAYING OR PRESS R TO RESTART."); }
+    else if (!friendly && !units) { s->outcome=-1;s->outcome_tick=s->tick_count;sound(s,SOUND_LOSE,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"COLONY LOST. R TO RESTART."); }
 }
 
 void simulation_step(Simulation* s)
@@ -1475,11 +1481,16 @@ void simulation_step(Simulation* s)
     }
     if (s->world.gameplay.enabled)
     {
-        enemy_orders(s);
+        ai_orders(s,s->world.opponent_faction);
+        if (s->world.player_ai) ai_orders(s,s->world.player_faction);
+        else automatic_player_orders(s);
         if (s->world.combat.enabled) advance_visuals(s,dt);
         recover_units(s,dt);move_units(s,dt);
         projectile_combat(s,dt);
         colonize_cells(s,dt);grow_colonies(s,dt);outcome(s);simulation_update_sight(s);
+        uint32_t alive[MAX_FACTIONS]={};
+        for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) ++alive[s->units[i].faction];
+        for (uint32_t f=0;f<MAX_FACTIONS;++f) s->faction_stats[f].peak_units=std::max(s->faction_stats[f].peak_units,alive[f]);
         for (uint32_t p=0;p<s->world.body_count;++p)
         {
             CellAppearance& appearance=s->cell_appearance[p];
@@ -1514,9 +1525,19 @@ void simulation_step(Simulation* s)
 bool simulation_write_state(const Simulation* s, const char* path)
 {
     FILE* file=fopen(path,"wb");if (!file) { fprintf(stderr,"Cannot write state '%s'.\n",path);return false; }
-    fprintf(file,"{\"tick\":%u,\"time\":%.9f,\"outcome\":%d,\"births\":%u,\"losses\":%u,\"landings\":%u,\"blocked_landings\":%u,",
-        s->tick_count,s->time_seconds,s->outcome,s->births,s->losses,s->landings,s->blocked_landings);
-    fprintf(file,"\"faction_events\":{\"digestions\":%u,\"digest_heals\":%u,\"spore_bursts\":%u,\"captures\":%u,\"releases\":%u},\"sound_events\":{",s->digestions,s->digest_heals,s->spore_bursts,s->captures,s->releases);
+    fprintf(file,"{\"tick\":%u,\"time\":%.9f,\"outcome\":%d,\"outcome_tick\":%u,\"births\":%u,\"losses\":%u,\"landings\":%u,\"blocked_landings\":%u,",
+        s->tick_count,s->time_seconds,s->outcome,s->outcome_tick,s->births,s->losses,s->landings,s->blocked_landings);
+    fprintf(file,"\"faction_stats\":[");
+    bool listed=false;
+    for (uint32_t f=1;f<MAX_FACTIONS;++f)
+    {
+        if (!s->world.content.factions[f].name[0]) continue;
+        const Simulation::FactionStats& t=s->faction_stats[f];
+        fprintf(file,"%s{\"faction\":\"%s\",\"built\":%u,\"lost\":%u,\"limbs_lost\":%u,\"colonies_gained\":%u,\"colonies_lost\":%u,\"peak_units\":%u}",
+            listed ? "," : "",s->world.content.factions[f].name,t.built,t.lost,t.limbs_lost,t.colonies_gained,t.colonies_lost,t.peak_units);
+        listed=true;
+    }
+    fprintf(file,"],\"faction_events\":{\"digestions\":%u,\"digest_heals\":%u,\"spore_bursts\":%u,\"captures\":%u,\"releases\":%u},\"sound_events\":{",s->digestions,s->digest_heals,s->spore_bursts,s->captures,s->releases);
     for (uint32_t i=0;i<SOUND_COUNT;++i) fprintf(file,"%s\"%s\":%u",i ? "," : "",sound_name(i),s->sounds.totals[i]);
     uint32_t fragments=0;for (uint32_t i=0;i<MAX_LIMB_DEBRIS;++i) fragments+=s->debris[i].seconds>0;
     fprintf(file,"},\"sound_dropped\":%u,\"fractures\":{\"limbs\":%u,\"fragments\":%u,\"replaced\":%u},\"colonies\":[",s->sounds.dropped,s->limbs_broken,fragments,s->debris_replaced);

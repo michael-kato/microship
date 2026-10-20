@@ -134,7 +134,9 @@ struct Simulation
     int32_t selected_body;
     int32_t order_body;
     uint32_t order_tick,order_count;
+    struct FactionStats { uint32_t built,lost,limbs_lost,colonies_gained,colonies_lost,peak_units; } faction_stats[MAX_FACTIONS]; // Match diagnostics only.
     int32_t outcome; // 0 playing, 1 won, -1 lost.
+    uint32_t outcome_tick; // Tick at which the outcome was decided.
     bool paused;
     char message[SIMULATION_MESSAGE_CAPACITY];
     uint32_t shots, hits, deaths;

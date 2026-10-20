@@ -77,6 +77,7 @@ struct World
     uint32_t body_count;
     Faction start_owner[MAX_BODIES];
     bool neutral_start,auto_colonize;
+    bool player_ai; // The opponent's AI also commands the player side, for balance runs.
     Spawn spawns[MAX_SPAWNS];
     uint32_t spawn_count;
     Content content;

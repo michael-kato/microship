@@ -844,3 +844,19 @@ default settings and slowed the fused quality path's surface stage from 8.90
 to 10.65 ms. Replacing duplicate rounded taps in the cell-blur and tilt-shift
 filters with whole-pixel taps slowed the cell blur from 0.261 to 0.312 ms;
 the repeated taps were cache hits. Both were reverted.
+
+## Faction balance runs
+
+`python3 tests/e2e/faction_balance.py build/windows-cross/nanova.exe` plays
+every faction pairing headless (`--smoke`, simulation only, about 45 times
+real time) with the built-in AI on both sides (`match.player_ai`). Fog is
+off, each side starts with its faction's player-level roster, and every
+pairing runs with both roles and both start cells for each world seed
+(`--seeds`, default 4; `--minutes`, default 20 game minutes; `--jobs`).
+It writes `results.json` and `report.txt` under `build/faction-balance/`
+and prints wins, decision times, units built and lost, peak army and
+flagged results: one-sided pairings, stalemates, role or start-cell bias,
+idle factions and unit-storage saturation while a match is still open.
+State exports carry `outcome_tick` and per-faction `faction_stats` for it.
+Matches with heavy parallel CPU load can exceed the per-process timeout of
+the ordinary checks; run those with lower `ctest -j`.

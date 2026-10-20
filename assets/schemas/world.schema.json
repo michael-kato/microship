@@ -49,6 +49,9 @@
         },
         "auto_colonize": {
           "type": "boolean"
+        },
+        "player_ai": {
+          "type": "boolean"
         }
       },
       "required": ["player", "opponent"],
