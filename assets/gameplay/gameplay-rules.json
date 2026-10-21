@@ -28,7 +28,7 @@
   },
   "spikes": {
     "count": 11,
-    "regrow_seconds": 5.0
+    "regrow_seconds": 3
   },
   "recovery": {
     "heal_interval": 2.5,

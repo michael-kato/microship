@@ -7,15 +7,34 @@ from authored_assets import stage_world, write_world
 
 
 def established_world(source,directory):
-    """Stage the prior axial factory fixture. Current startup and tree checks use stage_world."""
+    """Stage the prior axial balance fixture. Current-content checks use stage_world."""
     data=stage_world(source,directory)
     data['rules']['economy'].pop('fighter_percent',None)
     for start in data['match'].pop('starts',[]):data['bodies'][start['cell']]['owner']=start['faction']
+    # Keep exact timing and damage fixtures independent of current faction tuning.
+    data['rules']['spikes']['regrow_seconds']=5
+    prior={
+        'virus_fighter':dict(speed=2.8,health=36,hits=3,range=3.2,cost=12,shot_interval=1),
+        'virus_bomber':dict(speed=2,health=60,hits=3,range=3.2,cost=30,shot_interval=3),
+        'immune_fighter':dict(speed=2,health=432,hits=24,cost=28,shot_interval=.8),
+        'immune_bomber':dict(speed=1.52,health=720,hits=24,cost=52,shot_interval=1.3),
+        'swarm_fighter':dict(speed=3.84,health=24,hits=2,range=3.2,cost=7,shot_interval=.8),
+        'swarm_bomber':dict(speed=2.8,health=40,hits=2,range=3.2,cost=18,shot_interval=2.4),
+    }
     for unit in data['content']['units']:
+        if unit['name'] in prior:
+            unit.update(prior[unit['name']]);unit.pop('manufacture_seconds',None)
+            if 'payload' in unit:unit['payload']['reload_seconds']=12
+            if unit['name']=='immune_fighter':
+                unit['attack']['blob'].update(range=3,interval=6)
+                unit['attack']['aura'].update(radius=3,heal_interval=1.5)
         if unit['name']=='fungal_spore':
             unit.pop('manufacture_seconds',None);unit.update(speed=4.2,cost=1.5,brood=16)
             unit['attack']['damage']=6;unit['attack']['cloud']['damage']=2
     for building in data['content']['buildings']:
+        immune=building['faction']=='immune'
+        building.update(health=480 if immune else 240,hits=24 if immune else 12)
+        building['branches'].update(health=300 if immune else 150,hits=16 if immune else 8)
         building.pop('repair',None);building.pop('haze',None)
         building['branches'].pop('root_interval_seconds',None)
         building['growth_plane'].pop('spread_roots',None)

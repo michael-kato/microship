@@ -64,8 +64,8 @@ with tempfile.TemporaryDirectory(prefix='nanova-startup-') as directory:
     immune=stage_world(root/'assets/levels/immune-player-level.json',out)
     initial,_=run('immune-durability',immune)
     types={u['name']:u for u in immune['content']['units']}
-    assert types['immune_fighter']['health']==432 and types['immune_fighter']['hits']==24
-    assert types['immune_bomber']['health']==720 and types['immune_bomber']['hits']==24
+    assert types['immune_fighter']['health']==864 and types['immune_fighter']['hits']==24
+    assert types['immune_bomber']['health']==1440 and types['immune_bomber']['hits']==24
     assert all(u['health']==types[u['type']]['health'] for u in initial['units'])
     for bad in [change(base,'match.starts.0.cell',16),change(base,'match.starts.1.cell',0),
                 change(base,'match.starts.0.faction','neutral'),change(base,'match.starts',base['match']['starts'][:1]),

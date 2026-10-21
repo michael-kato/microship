@@ -14,7 +14,10 @@ with tempfile.TemporaryDirectory(prefix='nanova-factory-repair-') as directory:
     for start in base['match'].pop('starts'):base['bodies'][start['cell']]['owner']=start['faction']
     base['spawns']=[];base['rules'].pop('exploration',None)
     base['rules']['ai']['expansion_delay']=300;base['rules']['economy'].update(enemy_attack_seconds=300,manufacture_seconds=.1)
+    # Fix wound size and job duration for the repair accounting scenario.
+    for u in base['content']['units']:u['manufacture_seconds']=.1
     for b in base['content']['buildings']:
+        b.update(health=240,hits=12)
         b.update(growth_seconds=.1,sprout_seconds=.01,establishment_seconds=.01)
         b['branches'].update(seconds=.01,regrow_seconds=.5)
         b['repair'].update(health_per_second=100,nutrients_per_health=.1,delay_seconds=.5)

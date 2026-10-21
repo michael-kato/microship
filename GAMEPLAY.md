@@ -4,9 +4,32 @@ The launch menu offers Virus, Immune, and Fungal. Click a card or press its numb
 
 Fighters prefer units. Bombers prefer structures. Their fallback attack uses one eighth of the primary rate. Either mobile role can establish a site after defenders are gone. One craft approaches the landing point for each side and cell; the others keep clear. Destroy all established enemy factories to win. The HUD shows YOU WON. You can keep playing with orders, colonization, combat, and production. The win stays recorded until restart. Losing all factories and craft causes defeat.
 
-Virus fighters carry eleven detachable spikes. Virus bombers launch their six visible payload sacs in sequence. Each sac regrows over twelve seconds. An empty bomber waits for a sac to finish. Bombs keep their shape and size in flight and do not leave embedded spike shafts. These weapons use the existing projectile hit rules.
+Virus fighters carry eleven detachable spikes. Each spike regrows in three seconds. Virus bombers launch their six visible payload sacs in sequence. Each sac regrows over eight seconds. An empty bomber waits for a sac to finish. Bombs keep their shape and size in flight and do not leave embedded spike shafts. These weapons use the existing projectile hit rules.
 
-Immune fighters are white blood cells. A free cell shoots a blob (the 80-triangle `immune_blob` mesh) at an enemy unit up to 3 units away, beyond contact, every 6 seconds. The blob does no damage but incapacitates the unit for 1.5 seconds: it cannot move or fire. The cell then charges in and latches on to devour it with its digest attack. A cell whose held victim dies glows green for 8 seconds; friendly units within 3 units of it heal one wound every 1.5 seconds, even in combat. `attack.blob` and `attack.aura` in `unit-types.json` set these values; the glow uses `heal_aura` in `combat-effects.json`. Immune fighters have 432 health and take twenty-four hits. Immune bombers have 720 health and take twenty-four hits. Virus fighters and bombers retain three hits. Immune roots have 480 health and take twenty-four hits; immune child limbs have 300 health and take sixteen hits. Virus and fungal roots have 240 health and take twelve hits; their child limbs have 150 health and take eight hits.
+Immune fighters are white blood cells. A free cell shoots a blob (the 80-triangle `immune_blob` mesh) at an enemy unit up to 4.5 units away, beyond contact, every 3 seconds. The blob does no damage but incapacitates the unit for 1.5 seconds: it cannot move or fire. The cell then charges in and latches on to devour it with its digest attack. A cell whose held victim dies glows green for 8 seconds; friendly units within 4 units of it heal one wound every second, even in combat. `attack.blob` and `attack.aura` in `unit-types.json` set these values; the glow uses `heal_aura` in `combat-effects.json`. Immune fighters have 864 health and take twenty-four hits. Immune bombers have 1440 health and take twenty-four hits. Virus fighters have 72 health; bombers have 120. Both take four hits. Immune roots have 1440 health and take twenty-four hits; immune child limbs have 900 health and take sixteen hits. Virus roots have 480 health and take twelve hits; their child limbs have 300 health and take eight hits. Fungal roots have 240 health and take twelve hits; their child limbs have 150 health and take eight hits.
+
+Virus and Immune use per-unit manufacture times. These times apply before leaf
+rate modifiers. Fungal production and damage settings retain their prior values.
+
+| Unit | Speed | Cost | Manufacture seconds | Attack interval | Range |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Virus fighter | 3.2 | 6 | 6 | 0.6 | 4 |
+| Virus bomber | 2.4 | 18 | 8 | 2 | 4.5 |
+| Immune fighter | 2.6 | 22 | 8 | 0.6 | 0.65 |
+| Immune bomber | 2 | 40 | 10 | 0.9 | 0.85 |
+| Trial Virus fighter | 4.2 | 5 | 5 | 0.5 | 4 |
+| Trial Virus bomber | 3.1 | 12 | 7 | 1.8 | 4.5 |
+
+Projectile cooldown also uses the shared projectile interval. Digestion uses
+the unit interval directly. Trial Virus fighters have 64 health and take three
+hits; trial bombers have 100 health and take three hits. Both Virus rosters
+use the shorter spike and payload regrowth times. The Fungal player level
+uses the trial Virus roster as its opponent.
+
+Health and hit counts serve different purposes. A projectile causes one
+wound. Fungal contact, clouds, and haze accumulate damage; one wound requires
+health divided by hit count. More health with the same hit count increases
+resistance to fungal damage. It does not add resistance to projectile hits.
 
 Fungal factories release individual spores with a 20-triangle mesh. A complete leaf
 releases one spore every 0.5 seconds at the base rate, with no brood burst.
@@ -282,3 +305,29 @@ directions spread across the common view plane. `shared.growth_plane.normal`
 sets that plane; `depth_ratio` limits growth toward or away from the camera.
 `spread_roots` separates the initial trunk directions. Trees keep their shape
 after growth and regrowth. Moving the camera does not move their roots.
+
+The October 20 faction buff was checked with the Windows application through
+Proton, without rendering. Before the buff, Virus won 1 of 12 seeded matches
+against Fungus. With the selected buff, Virus and Immune each won all 12
+matches against Fungus. On five unused seeds, each won all 20 matches against
+Fungus. Each comparison swapped both start cells and player/opponent roles.
+Immune also won all 20 matches against Virus. These results show stronger
+factions against the fungal AI; they do not establish equal faction strength.
+The AI sends small groups, so these results do not establish balance for
+player-controlled swarms. The balance report retains these dominance flags.
+`tests/e2e/faction_balance.py --seed-start 101 --seeds 5 --minutes 10 --jobs 3`
+selects the unused seed set; pass the built application path as its first argument.
+A match that reaches the time limit remains undecided, even if one side leads.
+
+A separate contact check placed sixty fungal spores next to three stationary
+fighters in the application. Production and factory haze were disabled for
+this comparison. Virus lost all three fighters with both the old and new
+values, but fungal losses increased from 37 to 60. All three Immune fighters
+survived both versions; their combined wounds decreased from 36 to 16 after
+three seconds. This checks concentrated contact damage, not movement tactics
+or equal-cost armies. A concentrated fungal attack can still kill Virus units.
+
+After the fixture updates, 29 CPU application test groups passed. The existing
+`world_files` failure remains: its empty building fixture omits the required
+`shared` field. JSON formatting and the three changed asset schemas passed.
+No GPU rendering, native Windows, or player session was tested for this buff.

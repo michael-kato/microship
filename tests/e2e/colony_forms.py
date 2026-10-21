@@ -134,7 +134,8 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
         return k
     supported=[v for k,v in enumerate(tree) if k and root_of(k)==0]
     assert tree[0]['wounds']>=3 and len(supported)==4 and all(v['health']==0 for v in supported)
-    assert all(tree[k]['health']==240 for k in range(1,10)) and broken['colonies'][0]['active']
+    root_health=next(b['health'] for b in damaged['content']['buildings'] if b['faction']=='virus')
+    assert all(tree[k]['health']==root_health for k in range(1,10)) and broken['colonies'][0]['active']
     # Let the opponent capture an established cell through normal combat and settlement.
     changeover=deepcopy(virus)
     for start in changeover['match'].pop('starts'):changeover['bodies'][start['cell']]['owner']=start['faction']

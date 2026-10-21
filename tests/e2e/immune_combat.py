@@ -12,7 +12,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-engulf-') as directory:
  base['match'].pop('auto_colonize');base['bodies']=base['bodies'][:2];base['bodies'][0]['position']=[-40,0,0];base['bodies'][1]['position']=[40,0,0]
  base['rules'].pop('exploration');base['rules']['economy'].update(manufacture_seconds=1000,enemy_attack_seconds=300);base['rules']['ai']['expansion_delay']=300
  for u in base['content']['units']:
-  u['cost']=100
+  u['cost']=100;u['manufacture_seconds']=1000
   if 'autonomy' in u:u['autonomy']['leash_radius']=100
  def unit(data,name):return next(u for u in data['content']['units'] if u['name']==name)
  def run(name,data,ticks=1,orders='',expected=0):

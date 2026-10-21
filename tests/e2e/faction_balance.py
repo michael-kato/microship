@@ -27,11 +27,14 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('binary', type=Path)
 parser.add_argument('--level', type=Path, default=root/'assets/levels/virus-player-level.json')
 parser.add_argument('--seeds', type=int, default=10, help='World seeds per pairing, role and start cell')
+parser.add_argument('--seed-start', type=int, default=1, help='First world seed')
 parser.add_argument('--minutes', type=float, default=15, help='Match time limit in game minutes')
 parser.add_argument('--jobs', type=int, default=max(1, (os.cpu_count() or 2)//2))
 parser.add_argument('--factions', help='Comma-separated subset, for example virus,immune')
 parser.add_argument('--output', type=Path, default=root/'build/faction-balance')
 a = parser.parse_args()
+if a.seeds < 1 or a.seed_start < 1 or a.seed_start+a.seeds-1 > 4294967295 or not 0 < a.minutes <= 277 or a.jobs < 1:
+    parser.error('Use positive seeds/jobs and 0 < minutes <= 277; seeds must fit uint32.')
 out = a.output.resolve(); out.mkdir(parents=True, exist_ok=True)
 binary = a.binary.resolve()
 prefix = [str(binary)] if sys.platform == 'win32' else [sys.executable, str(root/'scripts/proton_run.py'), str(binary)]
@@ -45,7 +48,11 @@ unit_faction = {u['name']: u['faction'] for u in base['content']['units']}
 
 def roster(faction):
     """Starting craft from the faction's own player level, as offsets from its start cell."""
-    for level in sorted((root/'assets/levels').glob('*.json')):
+    startup = json.loads((root/'assets/startup.json').read_text())
+    menu_path = (root/'assets'/startup['menu']).resolve()
+    menu = json.loads(menu_path.read_text())
+    for choice in menu['choices']:
+        level = (menu_path.parent/choice['world']).resolve()
         data = json.loads(level.read_text())
         if data['match']['player'] != faction: continue
         cell = next(s['cell'] for s in data['match']['starts'] if s['faction'] == faction)
@@ -76,7 +83,7 @@ for x, y in combinations(names, 2):
 
 def play(job):
     name, player, opponent, cell, path = job
-    result = subprocess.run([*prefix, '--smoke', '--world', str(path), '--ticks', str(ticks), '--world-seed', '1',
+    result = subprocess.run([*prefix, '--smoke', '--world', str(path), '--ticks', str(ticks), '--world-seed', str(a.seed_start),
                              '--matches', str(a.seeds)], capture_output=True, text=True, timeout=600)
     assert result.returncode == 0, (name, result.stdout[-2000:], result.stderr[-2000:])
     matches = []
@@ -92,10 +99,11 @@ def play(job):
         else:
             # Undecided at the limit: lead by colonies, then surviving units.
             lead = sorted((colonies[n], alive[n], n) for n in (player, opponent))
-            winner = None if lead[0][:2] == lead[1][:2] else lead[1][2]
+            winner = None
             decided = None
         matches.append(dict(name=name, player=player, opponent=opponent, cell=cell, seed=data['seed'], outcome=data['outcome'],
-                            winner=winner, decided_seconds=decided, colonies=colonies, alive=alive,
+                            winner=winner, leader=None if data['outcome'] else (None if lead[0][:2] == lead[1][:2] else lead[1][2]),
+                            decided_seconds=decided, colonies=colonies, alive=alive,
                             stats={n: stats[n] for n in (player, opponent)}, capacity_blocked=data['capacity_blocked'],
                             unit_capacity=data['unit_capacity']))
     assert len(matches) == a.seeds, (name, result.stdout[-2000:])
@@ -124,7 +132,7 @@ for x, y in combinations(names, 2):
           f'{lost[x]:>8.0f}{lost[y]:>8.0f}{peak[x]:>8.0f}{peak[y]:>8.0f}')
     share = max(wins.values())/max(1, sum(wins.values()))
     if sum(wins.values()) >= 4 and share >= .8:
-        issues.append(f'{x}/{y}: {max(wins, key=wins.get)} wins {max(wins.values())} of {sum(wins.values())} decided or led games.')
+        issues.append(f'{x}/{y}: {max(wins, key=wins.get)} wins {max(wins.values())} of {sum(wins.values())} decided games.')
     if undecided > len(games)/2:
         issues.append(f'{x}/{y}: {undecided} of {len(games)} matches undecided after {a.minutes:g} minutes (stalemate).')
     for side in (x, y):
