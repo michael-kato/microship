@@ -283,6 +283,25 @@ bool geometry_build(Geometry* geometry,const MeshSource* sources,uint32_t count,
     return true;
 }
 
+// Startup query. Use the same part transforms as the visible mesh.
+bool geometry_outer_radius(const MeshSource& source,float* radius)
+{
+    *radius=source.scale;
+    if (!source.path[0]) return true;
+    Geometry geometry={};uint32_t vertices=0,triangles=0;
+    if (!mesh_counts(source.path,&vertices,&triangles)) return false;
+    try { geometry.vertices.reserve(vertices);geometry.triangles.reserve(triangles); }
+    catch (const std::bad_alloc&) { fprintf(stderr,"Cannot allocate cell bound query.\n");return false; }
+    if (!add_model(&geometry,source.path,source.position,source.scale,source.color,source.yaw,&source)) return false;
+    for (uint32_t i=0;i<geometry.vertices.size();++i)
+    {
+        const float* v=geometry.vertices[i].position;
+        Vec3 offset=subtract(Vec3{v[0],v[1],v[2]},source.position);
+        *radius=std::fmax(*radius,std::sqrt(dot(offset,offset)));
+    }
+    return true;
+}
+
 bool geometry_surface_point(const char* path,Vec3 position,float radius,Vec3 normal,Vec3* point)
 {
     if (!path[0])

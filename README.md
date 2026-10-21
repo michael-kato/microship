@@ -1,6 +1,6 @@
 # Nanova
 
-Microscopic strategy inside a body, inspired by Eufloria. Command craft, scout living cells, establish factories, and expand. Both sides start around neutral cells. Fighters prefer units; bombers prefer factories. A slider sets their production ratio. Destroy enemy factories to win.
+Microscopic strategy inside a body, inspired by Eufloria. Command craft, scout living cells, establish factories, and expand. All three factions start on a 15-cell map. Fighters prefer units; bombers prefer factories. A slider sets their production ratio. Destroy enemy factories to win.
 
 Virus forces use large swarms of light craft and spike projectiles. Immune forces use fewer, tougher craft that stun a target with a blob, devour it, then heal nearby allies. The fungal trial fields swarms of melee spores that burst into toxic clouds.
 
@@ -11,6 +11,10 @@ Each visible organelle supports a factory. Large organelles support branching fa
 Textures are permitted on any object when the game generates them. Noise and other procedural methods may generate color, normal, roughness, opacity, emission, and environment maps. Vertex colors remain supported.
 
 Simulation rules remain separate from rendering. The project uses direct functions and contiguous data, with real application checks.
+
+Normal faction choices use `virus_large_level.json`, `immune_large_level.json`, and `fungus_large_level.json`. Older two-side levels remain diagnostic fixtures. Every intact, mature factory head produces units, including heads below forks. Stems extend through the cell wall. Immune factories form a short, evenly spaced ring; fungal chains spread at their root forks.
+
+The primary stress scene is `assets/levels/three_faction_stress.json`: five fully developed cells and 60 seconds of actual production per faction, with all armies and reinforcements ordered to the center. Preparation runs 3,600 normal production steps with full initial nutrient storage and no combat or unit expiry. The produced armies assemble at their front cells. Counts follow faction production; unit storage holds 4,096. Run it with `python3 scripts/proton_run.py build/windows-cross/nanova.exe --world assets/levels/three_faction_stress.json`.
 
 C++ and Vulkan target Windows. Linux builds use MinGW, `glslc`, and an initialized Steam Proton 11 prefix:
 

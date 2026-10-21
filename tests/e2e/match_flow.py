@@ -55,14 +55,14 @@ with tempfile.TemporaryDirectory(prefix='nanova-match-') as directory:
         assert c['establishment_age']<180 and sum(c['produced'])>0,(side,c['produced'],c['establishment_age'])
         assert any(v['growth']<1 for v in c['structures'])
         # Each mature terminal leaf gets a job, with no whole-cell completion gate.
-        fast=deepcopy(data);fast['rules']['economy']['manufacture_seconds']=2
+        fast=deepcopy(data);fast['rules']['economy']['manufacture_seconds']=.05
         for building in fast['content']['buildings']:building.update(establishment_seconds=4,growth_seconds=.1,sprout_seconds=.1,collection=100)
         for building in fast['content']['buildings']:building['branches']['root_offset_seconds']=0
-        for unit in fast['content']['units']:unit.update(cost=.01,manufacture_seconds=2)
+        for unit in fast['content']['units']:unit.update(cost=.01,manufacture_seconds=.05)
         full,_=run(side+'-all-leaves',fast,1050,f'0 select all\n0 order {home}\n')
         colony=full['colonies'][home]
         for k,branch in enumerate(colony['structures']):
-            if branch['terminal']:assert colony['leaf_births'][k]>0,(side,k,colony['leaf_births'])
+            if branch['health']>0 and branch['visible_growth']==1:assert colony['leaf_births'][k]>0,(side,k,colony['leaf_births'])
         assert full==run(side+'-repeat',fast,1050,f'0 select all\n0 order {home}\n')[0]
     # A paid job must wait when a new child temporarily replaces the only ready tip.
     waiting=branches(established_world(root/'assets/levels/virus-player-level.json',out),count=2,seconds=3)

@@ -409,8 +409,9 @@ static uint32_t select_factory_roots(const Body& body,const BranchRules& f,uint3
 static Vec3 spread_root_direction(const Simulation* s,uint32_t p,uint32_t root,Vec3 plane)
 {
     const Colony& c=s->colonies[p];const Body& b=s->world.bodies[p];
-    if (root>=c.large_root_count) return factory_direction(normalize(subtract(b.factory_roots[c.root_attachments[root]],b.position)),*simulation_producer_definition(s,p));
-    uint32_t count=c.large_root_count;
+    bool all=simulation_producer_definition(s,p)->branches.spread_all_roots;
+    if (!all && root>=c.large_root_count) return factory_direction(normalize(subtract(b.factory_roots[c.root_attachments[root]],b.position)),*simulation_producer_definition(s,p));
+    uint32_t count=all ? c.root_count : c.large_root_count;
     Vec3 right=normalize(cross(std::fabs(plane.y)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0},plane));
     Vec3 up=cross(plane,right);float angles[MAX_FACTORY_STRUCTURES];uint32_t ranks[MAX_FACTORY_STRUCTURES]={};
     for (uint32_t k=0;k<count;++k)
@@ -418,10 +419,29 @@ static Vec3 spread_root_direction(const Simulation* s,uint32_t p,uint32_t root,V
         Vec3 offset=subtract(b.factory_roots[c.root_attachments[k]],b.position);
         angles[k]=std::atan2(dot(offset,up),dot(offset,right));
     }
+    if (all)
+    {
+        // Reserve evenly spaced slots for the large factories. Fill the gaps with small factories.
+        bool occupied[MAX_FACTORY_STRUCTURES]={},assigned[MAX_FACTORY_STRUCTURES]={};
+        for (uint32_t k=0;k<c.large_root_count;++k)
+        {
+            uint32_t rank=0;
+            for (uint32_t j=0;j<c.large_root_count;++j) rank+=angles[j]<angles[k] || (angles[j]==angles[k] && j<k);
+            ranks[k]=rank*count/c.large_root_count;occupied[ranks[k]]=true;
+        }
+        for (uint32_t slot=0;slot<count;++slot) if (!occupied[slot])
+        {
+            uint32_t best=count;
+            for (uint32_t j=c.large_root_count;j<count;++j) if (!assigned[j]
+                && (best==count || angles[j]<angles[best])) best=j;
+            ranks[best]=slot;assigned[best]=true;
+        }
+    }
+    else for (uint32_t k=0;k<count;++k)
+        for (uint32_t j=0;j<count;++j) ranks[k]+=angles[j]<angles[k] || (angles[j]==angles[k] && j<k);
     float sine=0,cosine=0,step=FULL_TURN_RADIANS/count;
     for (uint32_t k=0;k<count;++k)
     {
-        for (uint32_t j=0;j<count;++j) ranks[k]+=angles[j]<angles[k] || (angles[j]==angles[k] && j<k);
         float residual=angles[k]-ranks[k]*step;sine+=std::sin(residual);cosine+=std::cos(residual);
     }
     float angle=std::atan2(sine,cosine)+ranks[root]*step;
@@ -446,7 +466,7 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
             : normalize(subtract(c->stems[parent][GROWTH_SEGMENTS],c->stems[parent][GROWTH_SEGMENTS-1]));
         side=normalize(cross(definition.growth_plane_normal,radial));other=cross(radial,side);
     }
-    float extent=parent>=0 ? f->spacing*CHILD_LIMB_LENGTH_SCALE : simulation_producer_definition(s,p)->height;
+    float extent=parent>=0 ? f->spacing*CHILD_LIMB_LENGTH_SCALE : f->root_height>0 ? f->root_height : definition.height;
     float spread=f->grammar==GROWTH_AXIAL ? AXIAL_SPREAD : f->grammar==GROWTH_FAN ? FAN_SPREAD : HYPHA_SPREAD;
     spread*=f->spread_scale;
     float bend=f->grammar==GROWTH_AXIAL ? AXIAL_BEND : f->grammar==GROWTH_FAN ? FAN_BEND : HYPHA_BEND;
@@ -471,6 +491,20 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
         if (dot(tangent,tangent)<.000001f) tangent=cross(std::fabs(radial.y)<.9f ? Vec3{0,1,0} : Vec3{1,0,0},radial);
         side=normalize(tangent);other=cross(radial,side);
     }
+    // Hypha chains spread at the root fork, then continue along that heading.
+    if (f->grammar==GROWTH_HYPHA && definition.spread_roots)
+    {
+        if (parent>=0 && parent<(int32_t)c->large_root_count)
+        {
+            uint32_t siblings=0,rank=0;
+            for (uint32_t j=c->root_count;j<c->structure_count;++j) if (c->parents[j]==parent)
+            { ++siblings;rank+=j<k; }
+            float fan=siblings>1 ? 2.0f*rank/(siblings-1)-1 : 0;
+            radial=normalize(add(scale(radial,LIMB_RADIAL_DIRECTION_WEIGHT),scale(side,fan*spread)));
+            side=normalize(cross(definition.growth_plane_normal,radial));other=cross(radial,side);
+        }
+        spread=0;
+    }
     extent*=c->factory_scale[k];
     for (uint32_t j=1;j<=GROWTH_SEGMENTS;++j)
     {
@@ -478,6 +512,20 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
         direction=factory_direction(direction,*simulation_producer_definition(s,p));
         c->stems[k][j]=add(c->stems[k][j-1],scale(direction,extent/GROWTH_SEGMENTS));
         radial=f->grammar==GROWTH_TREE || definition.spread_roots ? direction : normalize(subtract(c->stems[k][j],body.position));
+    }
+    if (f->surface_clearance>0)
+    {
+        Vec3 tip=c->stems[k][GROWTH_SEGMENTS],offset=subtract(tip,body.position);
+        float radius=body.factory_surface_radius+f->surface_clearance;
+        if (dot(offset,offset)<radius*radius || (parent<0 && f->spread_all_roots))
+        {
+            // Extend the intact stem to open space; keep its organelle anchor fixed.
+            Vec3 outward=parent<0 && f->spread_all_roots ? spread_root_direction(s,p,k,definition.growth_plane_normal)
+                : dot(offset,offset)>POSITION_EPSILON*POSITION_EPSILON ? normalize(offset) : radial;
+            Vec3 extension=subtract(add(body.position,scale(outward,radius)),tip);
+            for (uint32_t j=1;j<=GROWTH_SEGMENTS;++j)
+                c->stems[k][j]=add(c->stems[k][j],scale(extension,j/(float)GROWTH_SEGMENTS));
+        }
     }
     if (k) c->branches[k-1].offset=subtract(start,c->surface);
 }
@@ -612,6 +660,8 @@ static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,const 
     return false;
 }
 
+static void grow_colonies(Simulation*,float dt);
+
 bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
 {
     // Construct in place: a temporary of this size would not fit the 2 MB stack.
@@ -621,14 +671,14 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
     if (seed) for (uint32_t i=0;i<s->world.body_count;++i) s->world.bodies[i].seed^=seed;
     for (uint32_t i=0;i<s->world.body_count;++i) s->home_owner[i]=s->world.start_owner[i];
     if (!s->world.gameplay.enabled) return true;
-    if (home_body(s,s->world.player_faction)<0 || home_body(s,s->world.opponent_faction)<0)
-    { fprintf(stderr,"Both match sides require a home body.\n");return false; }
+    for (uint32_t f=1;f<MAX_FACTIONS;++f) if ((s->world.active_factions&(1u<<f)) && home_body(s,(Faction)f)<0)
+    { fprintf(stderr,"Every active faction requires a home body.\n");return false; }
     for (uint32_t i=0;i<s->world.spawn_count;++i)
     {
         const Spawn* placement=&s->world.spawns[i];Faction faction=s->world.content.units[placement->type].faction;
         int home=home_body(s,faction);
         if (home<0) { fprintf(stderr,"Mobile entities require a home body.\n");return false; }
-        spawn(s,placement->type,placement->position,home);
+        if (!spawn(s,placement->type,placement->position,home)) return false;
     }
     for (uint32_t i=0;i<s->world.body_count;++i)
     {
@@ -636,6 +686,14 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
         MeshSource source={b.model_path,b.position,b.radius,0,b.color,d.parts_path,b.seed,d.shape_variation,d.part_variation,d.layout_rotation};
         if (d.hosts_site && !geometry_attachments(source,b.colony_normal,b.factory_roots,b.factory_root_radii,MAX_FACTORY_STRUCTURES,&b.factory_root_count)) return false;
         b.factory_root=b.factory_roots[0];
+        if (d.hosts_site)
+        {
+            if (!geometry_outer_radius(source,&b.factory_surface_radius)) return false;
+            float displacement=0;
+            for (uint32_t f=1;f<MAX_FACTIONS;++f)
+                displacement=std::fmax(displacement,s->world.content.factions[f].displacement_height);
+            b.factory_surface_radius+=b.radius*displacement;
+        }
         for (uint32_t t=0;d.hosts_site && t<s->world.content.producer_count;++t)
             {
                 const BranchRules& f=s->world.content.producers[t].branches;
@@ -658,6 +716,37 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
                 for (uint32_t k=1;k<c.root_count;++k)
                 { c.branches[k-1].health=structure_max_health(s,p,k);c.branches[k-1].growth=1;c.branches[k-1].generation=1; }
             }
+    if (s->world.fully_established)
+        for (uint32_t p=0;p<s->world.body_count;++p) if (s->colonies[p].active)
+        {
+            Colony& c=s->colonies[p];const FactionDefinition& f=s->world.content.factions[c.faction];
+            for (uint32_t k=0;k<c.structure_count;++k)
+                if (k) { c.branches[k-1].health=structure_max_health(s,p,k);c.branches[k-1].growth=1;c.branches[k-1].generation=1; }
+                else { c.health=structure_max_health(s,p,k);c.growth=1; }
+            s->cell_appearance[p].factions[c.faction]=1;s->cell_appearance[p].tint=f.cell_tint;s->cell_appearance[p].strength=f.cell_strength;
+        }
+    if (s->world.production_ticks)
+    {
+        for (uint32_t p=0;p<s->world.body_count;++p) if (s->colonies[p].active) s->colonies[p].energy=s->world.gameplay.storage;
+        for (uint32_t tick=0;tick<s->world.production_ticks;++tick)
+        {
+            grow_colonies(s,1.0f/SIMULATION_TICKS_PER_SECOND_FLOAT);
+            for (uint32_t p=0;p<s->world.body_count;++p) if (s->colonies[p].capacity_blocked)
+            { fprintf(stderr,"Production preparation exceeds unit storage capacity.\n");return false; }
+        }
+        // Assemble exactly the units produced. No combat or unit expiry runs during preparation.
+        uint32_t counts[MAX_FACTIONS]={},ranks[MAX_FACTIONS]={};
+        for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) ++counts[s->units[i].faction];
+        for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0)
+        {
+            Unit& u=s->units[i];uint32_t rank=ranks[u.faction]++;
+            uint32_t columns=(uint32_t)std::ceil(std::sqrt((float)counts[u.faction]));
+            const Body& home=s->world.bodies[home_body(s,u.faction)];
+            Vec3 offset={(rank%columns-(columns-1)*.5f)*s->world.formation_spacing,(rank/columns-(columns-1)*.5f)*s->world.formation_spacing,home.factory_surface_radius+s->world.formation_spacing};
+            u.position=add(home.position,offset);u.destination=s->world.rally_point;u.flight_goal=u.destination;u.moving=true;u.commanded=true;
+            s->faction_stats[u.faction].peak_units=counts[u.faction];
+        }
+    }
     if (s->world.auto_colonize && s->world.neutral_start)
         for (uint32_t i=0;i<MAX_UNITS;++i)
         {
@@ -1725,14 +1814,14 @@ static void grow_colonies(Simulation* s, float dt)
             bool child=false;
             for (uint32_t j=k+1;j<c->structure_count;++j)
                 child=child || (c->parents[j]==(int32_t)k && c->branches[j-1].health>0);
-            if (!child && (f.grammar!=GROWTH_TREE || simulation_structure_terminal(s,p,k))) tips[count++]=k;
+            if (f.all_leaf_nodes || (!child && (f.grammar!=GROWTH_TREE || simulation_structure_terminal(s,p,k)))) tips[count++]=k;
         }
         // Each ready leaf owns a job. All jobs draw from the same cell nutrients.
         bool ready[MAX_FACTORY_STRUCTURES]={};
         for (uint32_t i=0;i<count;++i) ready[tips[i]]=true;
         for (uint32_t k=0;k<c->structure_count;++k) if (!ready[k] && c->leaves[k].active)
         {
-            // A new child can replace a tip. Move its paid job to another ready leaf.
+            // In terminal-only definitions, a new child can replace a tip. Move its paid job.
             // Damage removes the job with the damaged support.
             if (structure_health(c,k)<=0 || simulation_structure_growth(s,p,k)<1)
             { c->leaves[k]=LeafProduction();continue; }
@@ -1809,6 +1898,15 @@ static void grow_colonies(Simulation* s, float dt)
 static void ai_orders(Simulation* s,Faction enemy)
 {
     int home=home_body(s,enemy),target=-1;float nearest=INITIAL_ENEMY_DISTANCE;bool assault_ready=false;
+    if (home<0) return;
+    if (s->world.rally_enabled)
+    {
+        for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0 && s->units[i].faction==enemy)
+        {
+            Unit& u=s->units[i];u.destination=s->world.rally_point;u.moving=true;u.commanded=true;
+        }
+        return;
+    }
     bool attack=s->time_seconds>=s->world.gameplay.enemy_attack_seconds;
     for (uint32_t p=0;p<s->world.body_count;++p) if (s->world.content.bodies[s->world.bodies[p].type].hosts_site && s->world.bodies[p].owner!=enemy
         && (s->home_owner[p]==FACTION_NEUTRAL || attack))
@@ -1853,9 +1951,9 @@ static void outcome(Simulation* s)
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         units=units || (s->units[i].health>0 && s->units[i].faction==s->world.player_faction);
-        enemy_units=enemy_units || (s->units[i].health>0 && s->units[i].faction==s->world.opponent_faction);
+        enemy_units=enemy_units || (s->units[i].health>0 && s->units[i].faction!=s->world.player_faction && !s->faction_established[s->units[i].faction]);
     }
-    if (friendly && !hostile && (s->faction_established[s->world.opponent_faction] || !enemy_units)) { s->outcome=1;s->outcome_tick=s->tick_count;sound(s,SOUND_WIN,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"YOU WON. CONTINUE PLAYING OR PRESS R TO RESTART."); }
+    if (friendly && !hostile && !enemy_units) { s->outcome=1;s->outcome_tick=s->tick_count;sound(s,SOUND_WIN,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"YOU WON. CONTINUE PLAYING OR PRESS R TO RESTART."); }
     else if (!friendly && !units) { s->outcome=-1;s->outcome_tick=s->tick_count;sound(s,SOUND_LOSE,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"COLONY LOST. R TO RESTART."); }
 }
 
@@ -1870,9 +1968,9 @@ void simulation_step(Simulation* s)
     }
     if (s->world.gameplay.enabled)
     {
-        ai_orders(s,s->world.opponent_faction);
-        if (s->world.player_ai) ai_orders(s,s->world.player_faction);
-        else automatic_player_orders(s);
+        for (uint32_t f=1;f<MAX_FACTIONS;++f)
+            if ((s->world.active_factions&(1u<<f)) && (f!=s->world.player_faction || s->world.player_ai)) ai_orders(s,(Faction)f);
+        if (!s->world.player_ai) automatic_player_orders(s);
         if (s->world.combat.enabled) advance_visuals(s,dt);
         recover_units(s,dt);move_units(s,dt);
         projectile_combat(s,dt);
@@ -1940,6 +2038,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
     FILE* file=fopen(path,"wb");if (!file) { fprintf(stderr,"Cannot write state '%s'.\n",path);return false; }
     fprintf(file,"{\"tick\":%u,\"time\":%.9f,\"unit_capacity\":%u,\"outcome\":%d,\"outcome_tick\":%u,\"births\":%u,\"losses\":%u,\"landings\":%u,\"blocked_landings\":%u,",
         s->tick_count,s->time_seconds,(uint32_t)MAX_UNITS,s->outcome,s->outcome_tick,s->births,s->losses,s->landings,s->blocked_landings);
+    fprintf(file,"\"prepared_production_ticks\":%u,",s->world.production_ticks);
     write_faction_stats(s,file);
     fprintf(file,",\"haze\":{\"damage\":%.6f,\"healing\":%.6f}",s->haze_damage,s->haze_healing);
     uint32_t clouds=0;for (uint32_t i=0;i<MAX_SPORE_CLOUDS;++i) clouds+=s->clouds[i].age<s->clouds[i].seconds;
@@ -1959,7 +2058,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
         for (uint32_t k=0;k<body.factory_root_count;++k) { Vec3 v=body.factory_roots[k];fprintf(file,"%s[%.6f,%.6f,%.6f]",k ? "," : "",v.x,v.y,v.z); }
         fprintf(file,"],\"attachment_radii\":[");
         for (uint32_t k=0;k<body.factory_root_count;++k) fprintf(file,"%s%.9g",k ? "," : "",body.factory_root_radii[k]);
-        fprintf(file,"],\"large_root_count\":%u,\"root_attachments\":[",c->large_root_count);
+        fprintf(file,"],\"surface_radius\":%.6f,\"large_root_count\":%u,\"root_attachments\":[",body.factory_surface_radius,c->large_root_count);
         for (uint32_t k=0;k<c->root_count;++k) fprintf(file,"%s%u",k ? "," : "",c->root_attachments[k]);
         fprintf(file,"]");
         fprintf(file,",\"appearance\":{\"tint\":[%.6f,%.6f,%.6f],\"strength\":%.6f,\"factions\":[",s->cell_appearance[p].tint.r,s->cell_appearance[p].tint.g,s->cell_appearance[p].tint.b,s->cell_appearance[p].strength);

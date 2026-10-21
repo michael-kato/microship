@@ -32,7 +32,7 @@ Select a level with `--world`:
 python3 scripts/proton_run.py build/windows-cross/nanova.exe --world assets/levels/immune-player-level.json
 ```
 
-`fungus-player-level.json` and `swarm-level.json` are faction trials. `--world-seed N` fixes the variation seed. `--smoke` loads assets, runs the simulation, builds render input, and shuts down without a GPU. `--state PATH.json` and `--scene-state PATH.json` export diagnostics.
+`virus_large_level.json`, `immune_large_level.json`, and `fungus_large_level.json` are the normal 15-cell maps. Each includes all three factions. Older two-side levels remain diagnostic fixtures. `three_faction_stress.json` is the primary stress scene: 15 developed cells, 60 seconds of actual production per faction, and a shared battle point. `--world-seed N` fixes the variation seed. `--smoke` loads assets, runs the simulation, builds render input, and shuts down without a GPU. `--state PATH.json` and `--scene-state PATH.json` export diagnostics.
 
 Per-frame diagnostic lines (`Scene time`, GPU stage times, `Application frame`) print only in bounded `--frames` runs. Interactive play writes startup lines only, so console output stays out of the frame.
 
@@ -895,7 +895,7 @@ at about 480 nutrients each, and virus won two of three 28 against 12 at 336.
 
 ## Unit storage and swarm budget
 
-Unit storage holds 2048 units (`MAX_UNITS`; state exports report
+Unit storage holds 4096 units (`MAX_UNITS`; state exports report
 `unit_capacity`). The simulation finds neighbors through two grids rebuilt
 each phase: a clamped world grid keyed by cell and faction, for targets,
 site defense and sight, and a hashed grid as wide as the largest

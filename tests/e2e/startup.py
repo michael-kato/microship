@@ -27,7 +27,9 @@ with tempfile.TemporaryDirectory(prefix='nanova-startup-') as directory:
         if expected:return None,None
         return json.loads(state.read_text()),json.loads(scene.read_text())
     for path in sorted((root/'assets/levels').glob('*.json')):
-        data=stage_world(path,out);player=data['match']['player'];opponent=data['match']['opponent']
+        data=stage_world(path,out)
+        if len(data['match'].get('starts',[]))!=2:continue  # Three-faction startup and stress are checked in three_factions.py.
+        player=data['match']['player'];opponent=data['match']['opponent']
         factions={f['name']:f for f in data['content']['factions']}
         home=next(v['cell'] for v in data['match']['starts'] if v['faction']==player)
         enemy=next(v['cell'] for v in data['match']['starts'] if v['faction']==opponent)

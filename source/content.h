@@ -59,7 +59,7 @@ struct UnitDefinition
 struct BranchRules
 {
     GrowthGrammar grammar;
-    bool organelle_roots;
+    bool organelle_roots,all_leaf_nodes,spread_all_roots;
     uint32_t fields,count,seed;
     uint32_t hits;
     float health;
@@ -68,7 +68,7 @@ struct BranchRules
     uint32_t production_reference_count;
     Vec3 normal;
     uint32_t children,levels,root_limit;
-    float root_minimum_radius,additional_root_scale,branch_probability,angle_jitter,length_jitter,width_jitter;
+    float root_height,root_minimum_radius,additional_root_scale,surface_clearance,branch_probability,angle_jitter,length_jitter,width_jitter;
     float length_scale,width_scale,angle,bend,root_offset_seconds,root_interval_seconds;
 };
 struct ProducerDefinition

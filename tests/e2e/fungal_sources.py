@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-sources-') as directory:
         data=deepcopy(base);data['bodies'][0]['radius']=radius
         early=run('start_'+str(radius),data);later=run('minute_'+str(radius),data,18120)
         a=early['colonies'][0];b=later['colonies'][0];roots=b['large_root_count']
-        leaves=[k for k,s in enumerate(b['structures']) if s['terminal']]
+        leaves=[k for k,s in enumerate(b['structures']) if s['health']>0 and s['visible_growth']==1]
         budget=next(v['leaves'] for v in fungus(data)['branches']['production_leaf_limits'] if v['roots']==roots)
         assert len(leaves)>budget and all(b['leaf_births'][k]>a['leaf_births'][k] for k in leaves),(radius,roots,leaves,b['leaf_births'])
         actual=sum(b['produced'])-sum(a['produced']);expected=budget*600
@@ -50,6 +50,17 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-sources-') as directory:
         assert min(chains)>0 and max(chains)-min(chains)<=1,(radius,chains)
         assert later['faction_stats'][2]['built']==sum(b['produced'])
         print(f'Radius {radius}: {roots} roots, {len(leaves)} producing tips, {actual} spores/5 minutes, expected {expected}.')
+    # Measure sibling fan width against the earlier spread setting in the application.
+    wide=run('fan_wide',base)['colonies'][0];narrow_data=deepcopy(base)
+    fungus(narrow_data)['branches']['spread_scale']=1.6
+    narrow=run('fan_narrow',narrow_data)['colonies'][0]
+    def fan_width(colony):
+        total=0
+        for k in range(colony['large_root_count']):
+            tips=[v['position'] for v in colony['structures'] if v['parent']==k]
+            total+=max((math.dist(a,b) for a in tips for b in tips),default=0)
+        return total
+    assert fan_width(wide)>1.2*fan_width(narrow),(fan_width(wide),fan_width(narrow))
     for field,value in [('spread_scale',0),('spread_scale',3.01),('production_reference_count',0),('production_leaf_limits',[dict(roots=3,leaves=0)]),('production_leaf_limits',[dict(roots=3,leaves=4)]*2),('production_leaf_limits',[dict(roots=3,leaves=4,establishing_leaves=0)])]:
         bad=deepcopy(base);fungus(bad)['branches'][field]=value
         run('invalid_'+str(count),bad,expected=1)

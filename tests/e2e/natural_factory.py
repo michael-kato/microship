@@ -15,6 +15,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
     out=Path(directory);data=stage_world(root/'assets/levels/virus-player-level.json',out)
     for building in data['content']['buildings']:
         building['branches'].pop('additional_root_scale',None)
+        building['branches'].pop('surface_clearance',None);building['branches'].pop('root_height',None);building['branches'].pop('spread_all_roots',None)
         building.pop('repair',None);building.pop('haze',None)
         building['branches'].pop('root_interval_seconds',None)
         building.update(growth_seconds=.01,establishment_seconds=.01);building['branches']['seconds']=.01
@@ -95,7 +96,8 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
     small=change(data,'bodies.0.radius',2.1);c=run('small_cell',small)[0]['colonies'][0];check_roots(c,branch);assert c['root_count']==2
     for side,faction in [('immune',2),('fungus',3)]:
         d=stage_world(root/'assets/levels'/(side+'-player-level.json'),out)
-        for building in d['content']['buildings']:building['branches'].pop('additional_root_scale',None)
+        for building in d['content']['buildings']:
+            building['branches'].pop('additional_root_scale',None);building['branches'].pop('surface_clearance',None);building['branches'].pop('root_height',None);building['branches'].pop('spread_all_roots',None)
         for start in d['match'].pop('starts'):d['bodies'][start['cell']]['owner']=start['faction']
         d['spawns']=[];d['rules']['ai']['expansion_delay']=300;d['rules']['economy'].update(enemy_attack_seconds=300,manufacture_seconds=1000)
         state,_=run(side,d,ticks=120);home=1 if side=='immune' else 0;c=state['colonies'][home]

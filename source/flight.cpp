@@ -58,7 +58,7 @@ void flight_obstacles(const Simulation* s,FlightObstacles* out)
                 Vec3 a=c.stems[k][j],b=add(a,scale(subtract(c.stems[k][j+1],a),extension));
                 out->values[out->count++]=capsule(a,b,width*d.stem_radius,p,k);
             }
-            if (growth>=(k ? c.branches[k-1].growth : c.growth) && (d.branches.grammar!=GROWTH_TREE || simulation_structure_terminal(s,p,k)))
+            if (growth>=(k ? c.branches[k-1].growth : c.growth))
             {
                 Vec3 tip=simulation_structure_position(s,p,k);
                 float size=d.width*simulation_structure_head_scale(s,p,k)*(FACTORY_HEAD_START_WIDTH_SCALE+FACTORY_HEAD_GROWTH_WIDTH_SCALE*growth);

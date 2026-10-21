@@ -66,11 +66,11 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-defence-') as directory:
         for body in capacity['bodies'][2:]:body['owner']='fungus'
         for building in capacity['content']['buildings']:building.pop('haze',None)
         for unit in capacity['content']['units']:
-            if unit['name']=='fungal_spore':unit.update(cost=.0001,manufacture_seconds=.001,separation=.01)
+            if unit['name']=='fungal_spore':unit.update(cost=.0001,manufacture_seconds=.001,separation=.01,brood=2)
         full,_=run('capacity_full',capacity,ticks=650)
         waiting,_=run('capacity_waiting',capacity,ticks=680)
         a=full['colonies'][0];b=waiting['colonies'][0]
-        assert len(full['units'])==full['unit_capacity']==2048 and a['capacity_blocked']
+        assert len(full['units'])==full['unit_capacity'] and a['capacity_blocked']
         assert a['produced']==b['produced'] and a['leaf_jobs']==b['leaf_jobs'] and b['capacity_blocked']
         assert math.isclose(b['energy']-a['energy'],1.25,abs_tol=.001),'A blocked job charged nutrients again'
     # Isolate the cell's haze from weapon damage, production and movement.

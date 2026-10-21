@@ -14,16 +14,17 @@ command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'sc
 count=0
 with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
     out=Path(directory)
-    def run(name,data,ticks=600,expected=0):
+    def run(name,data,ticks=600,expected=0,seed=1234):
         global count
         world=out/(name+'_world.json');state=out/(name+'_state.json');scene=out/(name+'_scene.json');write_world(world,data)
-        result=subprocess.run([*command,'--smoke','--world',str(world),'--world-seed','1234','--ticks',str(ticks),'--state',str(state),'--scene-state',str(scene)],capture_output=True,text=True,timeout=10);count+=1
+        result=subprocess.run([*command,'--smoke','--world',str(world),'--world-seed',str(seed),'--ticks',str(ticks),'--state',str(state),'--scene-state',str(scene)],capture_output=True,text=True,timeout=10);count+=1
         assert result.returncode==expected,(name,result.stdout,result.stderr)
         return (json.loads(state.read_text()),json.loads(scene.read_text())) if not expected else (None,None)
     for side,home in [('virus',0),('immune',1),('fungus',0)]:
         data=stage_world(root/'assets/levels'/(side+'-player-level.json'),out)
         for start in data['match'].pop('starts'):data['bodies'][start['cell']]['owner']=start['faction']
         data['spawns']=[];data['rules'].pop('exploration',None)
+        data['rules']['cell_infection'].update(morph_seconds=.01,tint_seconds=.01)
         data['rules']['ai']['expansion_delay']=300;data['rules']['economy']['enemy_attack_seconds']=300
         for building in data['content']['buildings']:
             building.update(growth_seconds=.01,sprout_seconds=.01,establishment_seconds=.01)
@@ -37,15 +38,28 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
             assert roots==len(colony['attachments'])==expected_roots and 0<large<roots
             assert sorted(indices)==list(range(roots)),'A visible organelle has no factory'
             assert all(colony['leaf_births'][k]>0 for k in range(large,roots)),(side,radius,colony['leaf_births'])
+            assert all(colony['leaf_births'][k]>0 for k,s in enumerate(colony['structures']) if s['health']>0 and s['visible_growth']==1),(side,radius,colony['leaf_births'])
+            if side=='immune':
+                center=case['bodies'][home]['position'];directions=[[x-y for x,y in zip(v['position'],center)] for v in colony['structures'][:roots]]
+                expected_dot=math.cos(2*math.pi/roots)
+                for i,a in enumerate(directions):
+                    nearest=max(sum(x*y for x,y in zip(a,b))/(math.dist(a,[0,0,0])*math.dist(b,[0,0,0])) for j,b in enumerate(directions) if i!=j)
+                    assert math.isclose(nearest,expected_dot,abs_tol=1e-4),(radius,nearest,expected_dot)
+                closest=math.cos(2*math.pi*(roots//large)/roots)
+                assert all(sum(x*y for x,y in zip(a,b))/(math.dist(a,[0,0,0])*math.dist(b,[0,0,0]))<=closest+1e-4 for i,a in enumerate(directions[:large]) for j,b in enumerate(directions[:large]) if i!=j)
+            membrane=scene['meshes'][home]['deformation'];wall={i for t in membrane['indices'] if t[3]==3 for i in t[:3]}
+            actual_radius=max(math.dist(membrane['vertices'][i][:3],case['bodies'][home]['position']) for i in wall)
+            assert all(math.dist(v['position'],case['bodies'][home]['position'])>actual_radius for v in colony['structures'] if v['health']>0)
             instances={v['slot']:v for v in scene['instances']};head_base=game['unit_capacity']+len(game['colonies']);stem_base=head_base+len(game['colonies'])*128
             for k in range(roots):
                 limb=colony['structures'][k];scale=limb['factory_scale']
                 expected_scale=1 if k<large else branch['additional_root_scale']*min(1,radii[indices[k]]/min(radii[j] for j in indices[:large]))
                 assert math.isclose(scale,expected_scale,abs_tol=1e-6),(side,k,scale,expected_scale)
                 assert limb['parent']==-1 and limb['stem'][0]==colony['attachments'][indices[k]]
-                length=sum(math.dist(a,b) for a,b in zip(limb['stem'],limb['stem'][1:]));nominal=profile['height']*scale
+                length=sum(math.dist(a,b) for a,b in zip(limb['stem'],limb['stem'][1:]));nominal=branch.get('root_height',profile['height'])*scale
                 jitter=branch.get('tree',{}).get('length_jitter',0)
-                assert nominal*(1-jitter)-1e-4<=length<=nominal*(1+jitter)+1e-4
+                if not branch.get('spread_all_roots'):assert length>=nominal*(1-jitter)-1e-4
+                assert math.dist(limb['position'],case['bodies'][home]['position'])>=colony['surface_radius']+branch['surface_clearance']-1e-4
                 assert math.isclose(limb['health'],profile['health']*scale*scale,rel_tol=2e-5)
                 head=instances[head_base+home*128+k];stem=instances[stem_base+(home*128+k)*4+3]
                 tip=[stem['transform'][j+1]+stem['transform'][j+3] for j in (0,4,8)]
@@ -53,7 +67,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
                 head_width=math.sqrt(sum(head['transform'][j]**2 for j in (0,4,8)))
                 assert math.isclose(head_width,profile['width']*limb['scale'],rel_tol=2e-5)
                 obstacles=[o for o in game['flight']['obstacles'] if o['cell']==home and o['structure']==k]
-                has_head=branch['grammar']!='tree' or limb['terminal']
+                has_head=True
                 assert len(obstacles)==4+has_head,(side,k,obstacles)
                 if has_head:assert math.isclose(obstacles[-1]['radius'],head_width*profile['navigation']['head_radius'],rel_tol=2e-5)
             if radius==4.2:
@@ -74,6 +88,13 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
                 assert b['structures'][target]['factory_scale']==original['factory_scale']
                 assert b['structures'][target]['stem'][0]==colony['attachments'][indices[target]]
                 assert all(v['generation']==1 and v['health']>0 for k,v in enumerate(b['structures'][:roots]) if k!=target)
+        for seed in (1235,1236):
+            varied,draw=run(side+'_surface_seed_'+str(seed),case,seed=seed);c=varied['colonies'][home]
+            membrane=draw['meshes'][home]['deformation'];wall={i for t in membrane['indices'] if t[3]==3 for i in t[:3]}
+            surface=max(math.dist(membrane['vertices'][i][:3],case['bodies'][home]['position']) for i in wall)
+            assert all(math.dist(v['position'],case['bodies'][home]['position'])>surface for v in c['structures'])
+            assert all(c['leaf_births'][k]>0 for k in range(len(c['structures'])))
+            assert all(c['structures'][k]['stem'][0]==c['attachments'][c['root_attachments'][k]] for k in range(c['root_count']))
         bad=deepcopy(data)
         for b in bad['content']['buildings']:b['branches']['additional_root_scale']=.51
         run(side+'_invalid_scale',bad,expected=1)

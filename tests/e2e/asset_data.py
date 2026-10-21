@@ -36,7 +36,7 @@ def established_world(source,directory):
         building.update(health=480 if immune else 240,hits=24 if immune else 12)
         building['branches'].update(health=300 if immune else 150,hits=16 if immune else 8)
         building.pop('repair',None);building.pop('haze',None)
-        for key in ('additional_root_scale','spread_scale','production_leaf_limits','production_reference_count'):building['branches'].pop(key,None)
+        for key in ('root_height','spread_all_roots','surface_clearance','all_leaf_nodes','additional_root_scale','spread_scale','production_leaf_limits','production_reference_count'):building['branches'].pop(key,None)
         building['branches'].pop('root_interval_seconds',None)
         building['growth_plane'].pop('spread_roots',None)
         building['growth_plane']['depth_ratio']=.15

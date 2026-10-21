@@ -1,0 +1,42 @@
+{
+  "$schema": "../schemas/rules.schema.json",
+  "resource_label": "NUTRIENTS",
+  "economy": {
+    "storage": 180.0,
+    "manufacture_seconds": 12,
+    "landing_seconds": 1.5,
+    "enemy_attack_seconds": 140.0,
+    "fighter_percent": 80
+  },
+  "ai": {
+    "production_rate": 1,
+    "expansion_delay": 22.0
+  },
+  "orbit": {
+    "clearance": 1,
+    "speed": 0.24,
+    "weave_radius": 0.9,
+    "weave_height": 0.8
+  },
+  "flight": {
+    "acceleration": 3.2,
+    "turn_rate": 2.5,
+    "separation": 0.55,
+    "bank": 0.55,
+    "lookahead_seconds": 2,
+    "obstacle_clearance": 1
+  },
+  "spikes": {
+    "count": 11,
+    "regrow_seconds": 3
+  },
+  "recovery": {
+    "heal_interval": 2.5,
+    "damage_delay": 3.0,
+    "orbit_clearance": 1.6
+  },
+  "cell_infection": {
+    "morph_seconds": 18,
+    "tint_seconds": 24
+  }
+}

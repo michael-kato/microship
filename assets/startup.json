@@ -1,6 +1,6 @@
 {
   "$schema": "schemas/startup.schema.json",
-  "world": "levels/virus-player-level.json",
+  "world": "levels/virus_large_level.json",
   "render": "rendering/renderer.json",
   "shader": "shaders/ray_trace.comp.spv",
   "audio": "audio/audio.json",

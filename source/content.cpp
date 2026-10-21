@@ -326,7 +326,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
     json_object(root,"$schema|shared|buildings");
     Json shared=json_get(root,"shared"),shared_branches=json_get(shared,"branches");
     json_object(shared,"growth_seconds|sprout_seconds|establishment_seconds|collection|height|width|repair|growth_plane|branches");
-    json_object(shared_branches,"seconds|seed|regrow_seconds|roots|root_limit|root_minimum_radius|additional_root_scale|root_offset_seconds");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
+    json_object(shared_branches,"seconds|seed|regrow_seconds|roots|root_limit|root_minimum_radius|additional_root_scale|surface_clearance|all_leaf_nodes|root_offset_seconds");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
     while (json_next(&a,&j))
     {
         json_object(j,"name|faction|model|health|hits|branches|growth_meshes|navigation|haze");ProducerDefinition p={};
@@ -378,7 +378,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
         p.height=json_positive(json_get(shared,"height"),MAX_BUILDING_HEIGHT);
         p.width=json_positive(json_get(shared,"width"),MAX_BUILDING_WIDTH);
         p.hits=json_uint(json_get(j,"hits"),1,MAX_HIT_COUNT);Json b=json_get(j,"branches");
-        json_object(b,"count|spacing|spread_scale|production|production_leaf_limits|production_reference_count|health|hits|root_interval_seconds|grammar|tree");
+        json_object(b,"count|spacing|spread_scale|production|production_leaf_limits|production_reference_count|health|hits|root_height|spread_all_roots|root_interval_seconds|grammar|tree");
         char roots[ASSET_NAME_CAPACITY]={},grammar[ASSET_NAME_CAPACITY]={};
         Json roots_json=json_find(shared_branches,"roots"),grammar_json=json_find(b,"grammar");
         if (json_present(roots_json))
@@ -397,8 +397,14 @@ static bool load_buildings(Content* c,Json root,const char* path)
             p.branches.additional_root_scale=json_float(additional,.05f,.5f);
             if (!p.branches.organelle_roots) json_error(additional,"additional roots require organelle roots");
         }
+        Json clearance=json_find(shared_branches,"surface_clearance"),all_leaves=json_find(shared_branches,"all_leaf_nodes");
+        if (json_present(clearance)) p.branches.surface_clearance=json_positive(clearance,MAX_BUILDING_SPACING);
+        if (json_present(all_leaves)) p.branches.all_leaf_nodes=json_bool(all_leaves);
         Json root_offset=json_find(shared_branches,"root_offset_seconds");
         if (json_present(root_offset)) p.branches.root_offset_seconds=json_float(root_offset,0,MAX_ESTABLISHMENT_SECONDS);
+        Json root_height=json_find(b,"root_height"),spread_all=json_find(b,"spread_all_roots");
+        if (json_present(root_height)) p.branches.root_height=json_positive(root_height,MAX_BUILDING_HEIGHT);
+        if (json_present(spread_all)) p.branches.spread_all_roots=json_bool(spread_all);
         Json root_interval=json_find(b,"root_interval_seconds");
         if (json_present(root_interval)) p.branches.root_interval_seconds=json_float(root_interval,0,MAX_ESTABLISHMENT_SECONDS);
         p.branches.branch_probability=1;

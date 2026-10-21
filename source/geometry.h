@@ -36,6 +36,7 @@ struct Geometry
 
 bool geometry_build(Geometry*,const MeshSource*,uint32_t count,const RenderConfig*);
 bool geometry_validate_model(const char* path); // Startup validation of unselected authored alternatives.
+bool geometry_outer_radius(const MeshSource&,float* radius);
 bool geometry_surface_point(const char* path,Vec3 position,float scale,Vec3 direction,Vec3* point);
 // The same startup transform is used for mesh parts and their attachment points.
 bool geometry_attachments(const MeshSource&,Vec3 direction,Vec3* points,float* radii,uint32_t capacity,uint32_t* count);

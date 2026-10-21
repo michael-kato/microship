@@ -20,6 +20,7 @@ struct Body
     Vec3 factory_roots[MAX_FACTORY_STRUCTURES];
     float factory_root_radii[MAX_FACTORY_STRUCTURES]; // Local major radii after startup part scaling.
     uint32_t factory_root_count;
+    float factory_surface_radius; // Startup bound includes every faction wall shape.
     float availability;
     float interior_radius, interior_fade;
     Color interior_scattering;
@@ -82,7 +83,10 @@ struct World
     uint32_t body_count;
     Faction start_owner[MAX_BODIES];
     bool neutral_start,auto_colonize;
-    bool player_ai; // The opponent's AI also commands the player side, for balance runs.
+    uint32_t active_factions;
+    bool fully_established,rally_enabled;Vec3 rally_point;
+    uint32_t production_ticks;float formation_spacing; // Production-only stress preparation.
+    bool player_ai; // Enable AI control of the player's faction.
     Spawn spawns[MAX_SPAWNS];
     uint32_t spawn_count;
     Content content;

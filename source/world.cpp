@@ -480,9 +480,9 @@ static bool validate_world(const World* world,const char* path)
         if (!world->content.resource_label[0] || !world->content.producer_count || !world->spikes.enabled)
         { fprintf(stderr,"%s: gameplay requires producer and spike definitions\n",path);return false; }
         if (world->neutral_start)
-            for (uint32_t side=0;side<2;++side)
+            for (uint32_t f=1;f<MAX_FACTIONS;++f) if (world->active_factions&(1u<<f))
             {
-                Faction faction=side ? world->opponent_faction : world->player_faction;bool founder=false;
+                Faction faction=(Faction)f;bool founder=false;
                 for (uint32_t i=0;i<world->spawn_count;++i)
                 { const UnitDefinition& u=world->content.units[world->spawns[i].type];founder=founder || (u.faction==faction && u.colonizes); }
                 if (!founder) { fprintf(stderr,"%s: each neutral-start side requires a craft that can establish a site\n",path);return false; }
@@ -524,7 +524,7 @@ bool world_load(World* world,const char* path,uint32_t seed)
     Json rules=json_find(root,"rules");if (json_present(rules) && (!json_path(rules,path,file) || !load_rules(&loaded,file))) return false;
     Json effects=json_find(root,"effects");if (json_present(effects) && (!json_path(effects,path,file) || !load_effects(&loaded,file))) return false;
     if (!json_path(json_get(root,"appearance"),path,loaded.appearance_path) || !load_appearance(&loaded,loaded.appearance_path,seed)) return false;
-    Json match=json_get(root,"match");json_object(match,"player|opponent|starts|auto_colonize|player_ai");
+    Json match=json_get(root,"match");json_object(match,"player|opponent|starts|auto_colonize|player_ai|fully_established|rally_point|production_seconds|formation_spacing");
     Json automatic=json_find(match,"auto_colonize");if (json_present(automatic)) loaded.auto_colonize=json_bool(automatic);
     Json player_ai=json_find(match,"player_ai");if (json_present(player_ai)) loaded.player_ai=json_bool(player_ai);
     loaded.player_faction=read_owner(&loaded,json_get(match,"player"));loaded.opponent_faction=read_owner(&loaded,json_get(match,"opponent"));
@@ -532,21 +532,41 @@ bool world_load(World* world,const char* path,uint32_t seed)
         return json_error(match,"match requires two distinct non-neutral factions");
     if (!load_placements(&loaded,root)) return false;
     for (uint32_t p=0;p<loaded.body_count;++p) loaded.start_owner[p]=loaded.bodies[p].owner;
+    loaded.active_factions=(1u<<loaded.player_faction)|(1u<<loaded.opponent_faction);
+    for (uint32_t p=0;p<loaded.body_count;++p) if (loaded.start_owner[p]) loaded.active_factions|=1u<<loaded.start_owner[p];
+    Json established=json_find(match,"fully_established"),rally=json_find(match,"rally_point");
+    if (json_present(established)) loaded.fully_established=json_bool(established);
+    loaded.rally_enabled=json_present(rally);
+    if (loaded.rally_enabled)
+    {
+        loaded.rally_point=json_vector(rally,-MAX_PLACEMENT_COORDINATE,MAX_PLACEMENT_COORDINATE);
+        if (!loaded.player_ai) return json_error(rally,"rally_point requires player_ai");
+    }
+    Json production=json_find(match,"production_seconds"),spacing=json_find(match,"formation_spacing");
+    if (json_present(production))
+    {
+        loaded.production_ticks=json_uint(production,1,300)*SIMULATION_TICKS_PER_SECOND;
+        loaded.formation_spacing=json_positive(spacing,MAX_BODY_RADIUS);
+        if (!loaded.fully_established || loaded.spawn_count || !loaded.rally_enabled)
+            return json_error(production,"production preparation requires developed cells, a rally point and no starting units");
+    }
+    else if (json_present(spacing)) return json_error(spacing,"formation_spacing requires production_seconds");
     Json starts=json_find(match,"starts");
     if (json_present(starts))
     {
         loaded.neutral_start=true;bool seen[MAX_FACTIONS]={};bool cells[MAX_BODIES]={};
-        JsonArray entries=json_array(starts,2);Json entry={};uint32_t count=0;
+        JsonArray entries=json_array(starts,MAX_FACTIONS-1);Json entry={};uint32_t count=0;
         while (json_next(&entries,&entry))
         {
             json_object(entry,"faction|cell");Faction faction=read_owner(&loaded,json_get(entry,"faction"));
             uint32_t cell=json_uint(json_get(entry,"cell"),0,loaded.body_count ? loaded.body_count-1 : 0);
-            if (!loaded.body_count || (faction!=loaded.player_faction && faction!=loaded.opponent_faction)
+            if (!loaded.body_count || !faction
                 || seen[faction] || cells[cell] || loaded.bodies[cell].owner!=FACTION_NEUTRAL
                 || !loaded.content.bodies[loaded.bodies[cell].type].hosts_site) return json_error(entry,"starts require distinct match factions and neutral production cells");
-            seen[faction]=true;cells[cell]=true;loaded.start_owner[cell]=faction;++count;
+            seen[faction]=true;cells[cell]=true;loaded.start_owner[cell]=faction;loaded.active_factions|=1u<<faction;++count;
         }
-        if (count!=2) return json_error(starts,"starts require both match factions");
+        if (count<2 || !seen[loaded.player_faction] || !seen[loaded.opponent_faction]) return json_error(starts,"starts require both selected factions");
+        if (loaded.fully_established) return json_error(starts,"fully_established requires owned cells");
         for (uint32_t p=0;p<loaded.body_count;++p) if (loaded.bodies[p].owner!=FACTION_NEUTRAL) return json_error(starts,"neutral starts cannot contain established factories");
     }
     if (!validate_world(&loaded,path)) return false;

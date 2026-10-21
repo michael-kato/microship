@@ -16,6 +16,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-difficulty-') as directory:
   if not expected:return json.loads(state.read_text())
  for level in sorted((root/'assets/levels').glob('*.json')):
   base=established_world(level,out)
+  if base['match'].get('player_ai'):continue  # The stress scene runs every faction under AI control.
   # Mature leaves and sufficient nutrients separate manufacture from deployment.
   fast=units(producers(branches(base,count=1),growth=.01,establishment_seconds=.01,collection=100),cost=.1)
   for body in fast['bodies']:body['position'][0]*=10

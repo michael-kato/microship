@@ -25,7 +25,9 @@
       "root_limit": 3,
       "root_minimum_radius": 0.1,
       "root_offset_seconds": 10,
-      "additional_root_scale": 0.35
+      "additional_root_scale": 0.35,
+      "surface_clearance": 0.5,
+      "all_leaf_nodes": true
     }
   },
   "buildings": [
@@ -72,11 +74,13 @@
       "hits": 24,
       "branches": {
         "count": 9,
-        "spacing": 1.15,
+        "spacing": 0.4,
         "production": 0.12,
         "health": 900,
         "hits": 16,
-        "grammar": "fan"
+        "grammar": "fan",
+        "root_height": 1,
+        "spread_all_roots": true
       },
       "growth_meshes": {
         "segment": "../models/immune_stem.fmesh",
@@ -95,12 +99,12 @@
       "hits": 12,
       "branches": {
         "count": 21,
-        "spacing": 1.8,
+        "spacing": 2.2,
         "production": 0.12,
         "health": 50,
         "hits": 3,
         "grammar": "hypha",
-        "spread_scale": 1.6,
+        "spread_scale": 2.8,
         "production_leaf_limits": [
           {
             "roots": 1,

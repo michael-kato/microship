@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
         # Retain the full, regular-tree fixture; natural_factory checks the new defaults.
         for building in data['content']['buildings']:
             building.update(establishment_seconds=4,growth_seconds=.1,sprout_seconds=.1)
-            branch=building['branches'];branch.pop('additional_root_scale',None);branch.pop('root_limit',None);branch.pop('root_minimum_radius',None)
+            branch=building['branches'];branch.pop('surface_clearance',None);branch.pop('all_leaf_nodes',None);branch.pop('additional_root_scale',None);branch.pop('root_limit',None);branch.pop('root_minimum_radius',None)
             if branch['grammar']=='tree':
                 branch['count']=70
                 for key in ('branch_probability','angle_jitter_degrees','length_jitter','width_jitter'):branch['tree'].pop(key,None)

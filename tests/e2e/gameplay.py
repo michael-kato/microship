@@ -119,7 +119,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-gameplay-') as directory:
     # Continued play can establish a new friendly factory after enemy supports are lost.
     assert destroyed['colonies'][1]['faction']==destroyed['player_faction'] or all(s['health']==0 for s in destroyed['colonies'][1]['structures']),'Root death left live enemy branches'
     text=stage('virus')
-    capacity=units(text,group='fighter',cost=.01)
+    capacity=units(text,group='fighter',cost=.01,brood=2)
     capacity=change(capacity,'rules.economy',dict(storage=10000,manufacture_seconds=.001,landing_seconds=1.5,enemy_attack_seconds=300))
     capacity=producers(capacity,growth=1,collection=100)
     capacity=change(capacity,'rules.ai.expansion_delay',300)
