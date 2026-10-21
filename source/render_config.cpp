@@ -88,13 +88,16 @@ const char* render_config_error(const RenderConfig* config)
     if (direction_squared < CAMERA_BASIS_DEGENERACY_EPSILON || up_squared < CAMERA_BASIS_DEGENERACY_EPSILON
         || cross_squared <= direction_squared * up_squared * CAMERA_BASIS_DEGENERACY_EPSILON)
         return "camera position, target, and up must define a nondegenerate basis";
+    if (config->cascade_probes && (config->cascade_count<1 || config->cascade_probes%(1u<<(config->cascade_count-1))
+        || (config->cascade_probes>>(config->cascade_count-1))<2))
+        return "radiance cascade probes must halve evenly to at least 2 in the last cascade";
     return 0;
 }
 
 bool render_config_load(RenderConfig* config,const char* path)
 {
     JsonDocument document;if (!json_load(&document,path)) return false;
-    Json root=json_root(&document);json_object(root,"$schema|output|sampling|volume|geometry|camera|lighting|bloom|tilt_shift|subsurface");RenderConfig loaded={};
+    Json root=json_root(&document);json_object(root,"$schema|output|sampling|volume|geometry|camera|lighting|radiance_cascades|bloom|tilt_shift|subsurface");RenderConfig loaded={};
     {
         Json j=json_get(root,"output");json_object(j,"width|height|exposure");
         loaded.width=json_uint(json_get(j,"width"),1,MAX_RENDER_WIDTH);
@@ -172,6 +175,19 @@ bool render_config_load(RenderConfig* config,const char* path)
         loaded.shadow_grid_resolution=json_present(grid) ? json_uint(grid,0,64) : 0;
         if (loaded.shadow_grid_resolution && loaded.shadow_grid_resolution<8) json_error(grid,"shadow grid resolution must be zero or in [8,64]");
         loaded.microfacet_energy_compensation=json_bool(json_get(j,"microfacet_energy_compensation"));
+    }
+    Json cascades=json_find(root,"radiance_cascades");
+    if (json_present(cascades))
+    {
+        json_object(cascades,"probe_resolution|direction_resolution|cascade_count|first_interval|interval_growth|bounce_feedback|cells_per_frame");
+        loaded.cascade_probes=json_uint(json_get(cascades,"probe_resolution"),0,64);
+        if (loaded.cascade_probes && loaded.cascade_probes<4) json_error(cascades,"probe resolution must be zero or in [4,64]");
+        loaded.cascade_directions=json_uint(json_get(cascades,"direction_resolution"),2,16);
+        loaded.cascade_count=json_uint(json_get(cascades,"cascade_count"),1,6);
+        loaded.cascade_interval=json_positive(json_get(cascades,"first_interval"),64);
+        loaded.cascade_growth=json_float(json_get(cascades,"interval_growth"),1,8);
+        loaded.cascade_feedback=json_bool(json_get(cascades,"bounce_feedback"));
+        loaded.cascade_cells_per_frame=json_uint(json_get(cascades,"cells_per_frame"),0,64);
     }
     {
         Json j=json_get(root,"bloom");json_object(j,"radius|strength|threshold");

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Prepare or run bounded SSS checks in the real Windows application."""
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+from gpu_environment import gpu_process_timeout_seconds
 from copy import deepcopy
 import argparse
 import json
@@ -55,9 +59,8 @@ for name,world,settings in cases:
 if not a.run:print('Prepared six native 1920x1080 one-frame SSS checks; no GPU work started.');sys.exit(0)
 env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1';start=time.monotonic()
 for (name,_,_),command in zip(cases,commands):
-    remaining=5-(time.monotonic()-start)
-    if remaining<=0:raise RuntimeError('The five-second GPU batch limit expired')
-    result=subprocess.run(command,capture_output=True,text=True,env=env,timeout=min(2,remaining));(out/(name+'.log')).write_text(result.stdout+result.stderr)
+    remaining=gpu_process_timeout_seconds()
+    result=subprocess.run(command,capture_output=True,text=True,env=env,timeout=remaining);(out/(name+'.log')).write_text(result.stdout+result.stderr)
     assert result.returncode==0,(name,result.stdout,result.stderr)
     assert 'Vulkan validation: enabled.' in result.stdout
     archive_capture(out/(name+'.ppm'),'subsurface-'+name)

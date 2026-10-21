@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Measure glow on/off in the real window using a prepared self_glow.py scene."""
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+from gpu_environment import gpu_process_timeout_seconds
 import argparse
 import json
 import os
@@ -28,15 +32,15 @@ for pair in range(3):
         commands.append((name,command))
 (out/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
 if not a.run:
-    print('Prepared six sequential native 1920x1080 windows, 120 frames each, 8s/process, 20s/batch, no capture, no validation, no hardware tracing. No GPU work started.')
+    print('Prepared six sequential native 1920x1080 windows, 120 frames each, no capture, no validation, no hardware tracing. No GPU work started.')
     raise SystemExit(0)
 check_gpu_environment();env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0'
 if sys.platform!='win32':env['WINEDLLOVERRIDES']=env.get('WINEDLLOVERRIDES','')+';winepulse.drv,winealsa.drv=d'
 start=time.monotonic();runs={};state=None
 for name,command in commands:
-    remaining=20-(time.monotonic()-start);assert remaining>0,'Batch time limit reached'
+    remaining=gpu_process_timeout_seconds()
     process=subprocess.Popen(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
-    try:stdout,stderr=process.communicate(timeout=min(8,remaining))
+    try:stdout,stderr=process.communicate(timeout=remaining)
     except subprocess.TimeoutExpired:
         if sys.platform=='win32':process.terminate()
         else:os.killpg(process.pid,signal.SIGTERM)

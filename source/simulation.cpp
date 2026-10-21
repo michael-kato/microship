@@ -441,19 +441,32 @@ static void build_factory_path(Colony* c,uint32_t k,const ProducerDefinition& de
 {
     const BranchRules& f=definition.branches;Vec3 start=c->stems[k][0];
     Vec3 chord=subtract(c->stems[k][GROWTH_SEGMENTS],start),bow={};
+    float skew=0,amplitude=1,phase[FACTORY_CURVE_DETAIL_OCTAVES]={};
     if (f.smooth_path)
     {
         Vec3 direction=normalize(chord),side=factory_side(definition.growth_plane_normal,direction);
         float sign=signed_random(seed)<0 ? -1.0f : 1.0f;
         bow=scale(add(scale(side,sign),scale(cross(direction,side),signed_random(seed)*definition.growth_depth_ratio)),length(chord)*f.curvature);
+        skew=signed_random(seed)*f.curve_jitter*FACTORY_CURVE_SKEW_SCALE;
+        amplitude+=signed_random(seed)*f.curve_jitter*FACTORY_CURVE_AMPLITUDE_JITTER;
+        for (uint32_t octave=0;octave<FACTORY_CURVE_DETAIL_OCTAVES;++octave) phase[octave]=signed_random(seed)*FULL_TURN_RADIANS;
     }
-    // A quadratic Bezier bow keeps both endpoints fixed. Its maximum offset
-    // is one quarter of curvature times chord length.
     for (uint32_t j=0;j<=GROWTH_PATH_SEGMENTS;++j)
     {
         float t=j/(float)GROWTH_PATH_SEGMENTS;
         if (f.smooth_path)
-            c->paths[k][j]=add(add(start,scale(chord,t)),scale(bow,t*(1-t)));
+        {
+            // Unequal opposing lobes form the S. Smaller coherent bends repeat
+            // at half the scale; the envelope fixes both endpoints.
+            float envelope=t*(1-t),warped=t+skew*envelope;
+            float profile=FACTORY_CURVE_S_BEND_SCALE*(1-2*warped),frequency=FULL_TURN_RADIANS,weight=FACTORY_CURVE_DETAIL_DECAY;
+            for (uint32_t octave=0;octave<FACTORY_CURVE_DETAIL_OCTAVES;++octave)
+            {
+                profile+=f.curve_jitter*weight*std::sin(frequency*t+phase[octave]);
+                frequency*=2;weight*=FACTORY_CURVE_DETAIL_DECAY;
+            }
+            c->paths[k][j]=add(add(start,scale(chord,t)),scale(bow,envelope*profile*amplitude));
+        }
         else
         {
             float at=t*GROWTH_SEGMENTS;uint32_t segment=std::min((uint32_t)at,(uint32_t)GROWTH_SEGMENTS-1);
@@ -1084,7 +1097,7 @@ static void move_units(Simulation* s, float dt)
 {
     const CombatVisuals* flight=&s->world.combat;
     FactoryTargets targets;factory_targets(s,&targets);
-    FlightObstacles obstacles;flight_obstacles(s,&obstacles);
+    FlightObstacles& obstacles=s->flight_scratch;flight_obstacles(s,&obstacles);
     Vec3 positions[MAX_UNITS],velocities[MAX_UNITS];int32_t held_by[MAX_UNITS];
     for (uint32_t i=0;i<MAX_UNITS;++i)
     { positions[i]=s->units[i].position;velocities[i]=s->units[i].velocity;held_by[i]=-1;s->units[i].charging=false; }
@@ -2146,7 +2159,9 @@ void simulation_write_summary(const Simulation* s,uint32_t seed,FILE* file)
 
 bool simulation_write_state(const Simulation* s, const char* path)
 {
-    FILE* file=fopen(path,"wb");if (!file) { fprintf(stderr,"Cannot write state '%s'.\n",path);return false; }
+    FlightObstacles* obstacles=new(std::nothrow) FlightObstacles;
+    if (!obstacles) { fprintf(stderr,"Cannot allocate navigation state export.\n");return false; }
+    FILE* file=fopen(path,"wb");if (!file) { delete obstacles;fprintf(stderr,"Cannot write state '%s'.\n",path);return false; }
     fprintf(file,"{\"tick\":%u,\"time\":%.9f,\"unit_capacity\":%u,\"outcome\":%d,\"outcome_tick\":%u,\"births\":%u,\"losses\":%u,\"landings\":%u,\"blocked_landings\":%u,",
         s->tick_count,s->time_seconds,(uint32_t)MAX_UNITS,s->outcome,s->outcome_tick,s->births,s->losses,s->landings,s->blocked_landings);
     fprintf(file,"\"prepared_production_ticks\":%u,\"factory_path_segments\":%u,\"factory_growth_segments\":%u,",s->world.production_ticks,(uint32_t)GROWTH_PATH_SEGMENTS,(uint32_t)GROWTH_SEGMENTS);
@@ -2201,10 +2216,10 @@ bool simulation_write_state(const Simulation* s, const char* path)
         fprintf(file,"]}");
     }
     fprintf(file,"],\"flight\":{\"avoidance_events\":%u,\"contacts\":%u,\"obstacles\":[",s->avoidance_events,s->factory_contacts);
-    FlightObstacles obstacles;flight_obstacles(s,&obstacles);
-    for (uint32_t i=0;i<obstacles.count;++i)
+    flight_obstacles(s,obstacles);
+    for (uint32_t i=0;i<obstacles->count;++i)
     {
-        const FlightObstacle& o=obstacles.values[i];
+        const FlightObstacle& o=obstacles->values[i];
         fprintf(file,"%s{\"cell\":%u,\"structure\":%u,\"start\":[%.6f,%.6f,%.6f],\"end\":[%.6f,%.6f,%.6f],\"radius\":%.6f}",
             i ? "," : "",o.cell,o.structure,o.start.x,o.start.y,o.start.z,o.end.x,o.end.y,o.end.z,o.radius);
     }
@@ -2243,5 +2258,5 @@ bool simulation_write_state(const Simulation* s, const char* path)
         trails+=s->trails[i].count>1;flashes+=s->units[i].health>0 && s->units[i].flash>0;
         low+=s->units[i].health>0 && s->units[i].wounds+1>=simulation_unit_definition(s,&s->units[i])->hits;
     }
-    fprintf(file," ],\"recovery\":{\"healed\":%u,\"regrown\":%u,\"detached\":%u},\"order\":{\"cell\":%d,\"tick\":%u,\"count\":%u},\"effects\":{\"impacts\":%u,\"shots\":%u,\"hits\":%u,\"deaths\":%u,\"projectiles\":%u,\"pops\":%u,\"trails\":%u,\"flashes\":%u,\"low_health\":%u,\"last_flash_tick\":%u,\"last_low_tick\":%u,\"last_death_tick\":%u},\"biology\":%d,\"player_faction\":%d,\"ambient\":[%.6f,%.6f,%.6f]}\n",s->healed,s->regrown,s->detached,s->order_body,s->order_tick,s->order_count,impacts,s->shots,s->hits,s->deaths,projectiles,pops,trails,flashes,low,s->last_flash_tick,s->last_low_tick,s->last_death_tick,(int)s->world.player_faction,(int)s->world.player_faction,s->world.ambient.r,s->world.ambient.g,s->world.ambient.b);bool valid=!ferror(file);if (fclose(file)!=0) valid=false;return valid;
+    fprintf(file," ],\"recovery\":{\"healed\":%u,\"regrown\":%u,\"detached\":%u},\"order\":{\"cell\":%d,\"tick\":%u,\"count\":%u},\"effects\":{\"impacts\":%u,\"shots\":%u,\"hits\":%u,\"deaths\":%u,\"projectiles\":%u,\"pops\":%u,\"trails\":%u,\"flashes\":%u,\"low_health\":%u,\"last_flash_tick\":%u,\"last_low_tick\":%u,\"last_death_tick\":%u},\"biology\":%d,\"player_faction\":%d,\"ambient\":[%.6f,%.6f,%.6f]}\n",s->healed,s->regrown,s->detached,s->order_body,s->order_tick,s->order_count,impacts,s->shots,s->hits,s->deaths,projectiles,pops,trails,flashes,low,s->last_flash_tick,s->last_low_tick,s->last_death_tick,(int)s->world.player_faction,(int)s->world.player_faction,s->world.ambient.r,s->world.ambient.g,s->world.ambient.b);bool valid=!ferror(file);if (fclose(file)!=0) valid=false;delete obstacles;return valid;
 }

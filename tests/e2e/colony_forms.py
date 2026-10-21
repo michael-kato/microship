@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
                 else:branch.update(spread_scale=2.8,chain_length=1)
             if branch['grammar']=='tree':
                 branch['count']=70
-                for key in ('branch_probability','angle_jitter_degrees','length_jitter','width_jitter','curvature'):branch['tree'].pop(key,None)
+                for key in ('branch_probability','angle_jitter_degrees','length_jitter','width_jitter','curvature','curve_jitter'):branch['tree'].pop(key,None)
                 branch['tree']['bend']=.2
             else:branch['count']=16
         data['rules']['cell_infection'].update(tint_seconds=12,morph_seconds=12)

@@ -3,7 +3,7 @@
 
 Default diagnostics: native 1920x1080, 6 film + 1 volume + 1 background query, two frames, one round.
 Runs the Windows executable through scripts/proton_run.py on Linux. Game defaults stay
-unchanged. No hardware tracing is supported after the recorded driver lockup.
+unchanged. Set the workload and timeout to suit the measurement.
 """
 
 import argparse
@@ -16,17 +16,15 @@ import statistics
 import subprocess
 import sys
 import time
-from gpu_environment import check_gpu_environment
+from gpu_environment import check_gpu_environment, gpu_process_timeout_seconds
 from authored_assets import stage_world, write_world
 from copy import deepcopy
 
 NATIVE_WIDTH = 1920
 NATIVE_HEIGHT = 1080
 DEFAULT_FILM_SAMPLES = 6
-MAX_PROCESS_SECONDS = 10
+DEFAULT_PROCESS_SECONDS = gpu_process_timeout_seconds()
 FROZEN_SCENE_SECONDS = 60
-MAX_SAMPLE_STARTS = 8
-MAX_BATCH_SECONDS = 30
 MILLISECONDS_PER_SECOND = 1000
 
 def setting(data, name, value):
@@ -53,18 +51,15 @@ def main():
     parser.add_argument('--volume-samples', type=int, default=1)
     parser.add_argument('--frames', type=int, default=2)
     parser.add_argument('--rounds', type=int, default=1)
-    parser.add_argument('--timeout', type=float, default=MAX_PROCESS_SECONDS,
+    parser.add_argument('--timeout', type=float, default=DEFAULT_PROCESS_SECONDS,
                         help='Host timeout per process; cannot recover a hung GPU driver')
     parser.add_argument('--time', type=float, default=FROZEN_SCENE_SECONDS, help='Frozen scene timestamp; not workload duration')
     parser.add_argument('--output', type=Path, default=Path('build/profiling/diagnostic'))
     args = parser.parse_args()
     if args.binary.suffix.lower() != '.exe':
         parser.error('Profile the Windows .exe; Linux runs it through Proton')
-    if not ((args.width,args.height) == (NATIVE_WIDTH,NATIVE_HEIGHT)
-            and 1 <= args.samples <= MAX_SAMPLE_STARTS and 0 <= args.volume_samples <= MAX_SAMPLE_STARTS-args.samples and 1 <= args.frames <= 2
-            and 1 <= args.rounds <= 2 and 0 < args.timeout <= MAX_PROCESS_SECONDS):
-        parser.error('Diagnostics require native 1920x1080, 1-8 total surface/volume spp, 1-2 frames, '
-                     '1-2 rounds, and a process timeout of at most 10 seconds')
+    if min(args.width,args.height,args.samples,args.frames,args.rounds)<=0 or args.volume_samples<0 or args.timeout<=0:
+        parser.error('Use positive dimensions, samples, frames, rounds and timeout; volume samples can be zero')
     if args.run:
         check_gpu_environment()
     binary = args.binary.resolve()
@@ -81,8 +76,6 @@ def main():
                        ('samples_per_pixel',args.samples),('rays_per_pixel',args.volume_samples)):
         config=setting(config,name,value)
     background=int('soft' in world['appearance'].get('backdrop',{}))
-    if args.samples+args.volume_samples+background>MAX_SAMPLE_STARTS:
-        parser.error('Background queries count toward the eight-sample cap')
     single=deepcopy(world)
     for building in single['content']['buildings']:building['branches'].update(count=1,roots='single')
     spheres=deepcopy(world)
@@ -112,22 +105,18 @@ def main():
             'background_queries_per_pixel': background,
             'total_candidates_per_pixel': args.samples+args.volume_samples+background,
             'frames_per_run': args.frames, 'rounds': args.rounds,
-            'process_timeout_seconds': args.timeout, 'total_timeout_seconds': MAX_BATCH_SECONDS,
+            'process_timeout_seconds': args.timeout,
             'cases': [name for name, _, _ in cases],
             'note': 'Native-resolution direct ray tracing with fixed film samples and deterministic volume integration. No 256-sample reference is run.'}
     (output / 'plan.json').write_text(json.dumps(plan, indent=2))
     if not args.run:
         print(f'Prepared {len(cases)} cases at {args.width}x{args.height}, {args.samples} spp. '
-              'No application launched. Add --run only when GPU testing is resumed.')
+              'No application launched. Add --run to execute.')
         return 0
-    deadline = time.perf_counter() + MAX_BATCH_SECONDS
     for round_index in range(args.rounds):
         # Reverse alternate rounds to reduce systematic warmup/order bias.
         for name, _, _ in (cases if round_index % 2 == 0 else reversed(cases)):
             started = time.perf_counter()
-            remaining = deadline - time.perf_counter()
-            if remaining <= 0:
-                raise RuntimeError('Diagnostic run reached its 30-second host time limit')
             process = subprocess.Popen([*command, '--headless', '--frames', str(args.frames),
                                   '--time', str(args.time),
                                   '--world', str(levels / (name + '.json')),
@@ -135,7 +124,7 @@ def main():
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                        start_new_session=(sys.platform != 'win32'))
             try:
-                stdout, stderr = process.communicate(timeout=min(args.timeout, remaining))
+                stdout, stderr = process.communicate(timeout=args.timeout)
             except subprocess.TimeoutExpired:
                 # Stop this process group only. Wine may detach descendants;
                 # this timeout cannot guarantee recovery of a wedged driver.

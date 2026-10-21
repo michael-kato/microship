@@ -6,6 +6,7 @@ from pathlib import Path
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
 from authored_assets import stage_world,write_world
 from save_progress import archive_capture
+from gpu_environment import gpu_process_timeout_seconds
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/fog-appearance');p.add_argument('--run',action='store_true');p.add_argument('--timing',action='store_true');p.add_argument('--frames',type=int,choices=[1,2],default=1);a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 data=stage_world(root/'assets/levels/virus-player-level.json',out)
 data['spawns']=[dict(type='virus_fighter',position=[-45,0,6.4]),dict(type='immune_fighter',position=[-40,0,6.4])]
@@ -28,8 +29,8 @@ for name,world,ticks in cases:
 if not a.run:print('Prepared five native 1920x1080 cases; no GPU work started.');sys.exit(0)
 env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1';start=time.monotonic();report={};images={}
 for (name,_,_),command in zip(cases,commands):
- remaining=5-(time.monotonic()-start);assert remaining>0,'GPU batch limit expired'
- result=subprocess.run(command,capture_output=True,text=True,env=env,timeout=min(2,remaining));(out/(name+'.log')).write_text(result.stdout+result.stderr);assert result.returncode==0,(name,result.stdout,result.stderr)
+ remaining=gpu_process_timeout_seconds()
+ result=subprocess.run(command,capture_output=True,text=True,env=env,timeout=remaining);(out/(name+'.log')).write_text(result.stdout+result.stderr);assert result.returncode==0,(name,result.stdout,result.stderr)
  if not a.timing:assert 'Vulkan validation: enabled.' in result.stdout
  raw=(out/(name+'.ppm')).read_bytes();header=re.match(rb'P6\s+1920\s+1080\s+255\s',raw);assert header;images[name]=raw[header.end():]
  archive_capture(out/(name+'.ppm'),'fog-memory-'+name)

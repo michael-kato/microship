@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Prepare faction form captures and a native box-selection check. GPU use requires --run."""
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+from gpu_environment import gpu_process_timeout_seconds
 import argparse
 import json
 import os
@@ -33,9 +37,8 @@ if not args.run:
     print(f'Prepared {len(cases)} processes in {out}. Four one-frame captures and one two-frame native input check. No GPU work started.');sys.exit(0)
 environment=os.environ.copy();environment['NANOVA_VULKAN_VALIDATION']='1';started=time.monotonic();report=[]
 for name,capture,invocation in cases:
-    remaining=30-(time.monotonic()-started)
-    if remaining<=0:raise RuntimeError('The thirty-second GPU batch limit has expired')
-    p=subprocess.run(invocation,capture_output=True,text=True,env=environment,timeout=min(10,remaining))
+    remaining=gpu_process_timeout_seconds()
+    p=subprocess.run(invocation,capture_output=True,text=True,env=environment,timeout=remaining)
     (out/(name+'.log')).write_text(p.stdout+p.stderr)
     if p.returncode or 'Vulkan validation: enabled.' not in p.stdout:raise RuntimeError(name+': '+p.stdout+p.stderr)
     saved=archive_capture(capture,'forms-'+name)

@@ -119,6 +119,11 @@
                     "type": "number",
                     "minimum": 0,
                     "maximum": 2
+                  },
+                  "curve_jitter": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
                   }
                 },
                 "required": [
@@ -129,7 +134,10 @@
                   "angle_degrees",
                   "bend"
                 ],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "dependentRequired": {
+                  "curve_jitter": ["curvature"]
+                }
               },
               "root_interval_seconds": {
                 "type": "number",

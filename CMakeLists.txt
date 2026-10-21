@@ -20,6 +20,12 @@ add_custom_command(OUTPUT "${shadow_grid_output}"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DNANOVA_SHADOW_GRID_PASS=1
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/ray_trace.comp" -o "${shadow_grid_output}"
     DEPENDS assets/shaders/render_bindings.glsl assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl VERBATIM)
+set(cascade_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/radiance_cascade.comp.spv")
+add_custom_command(OUTPUT "${cascade_output}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
+    COMMAND ${GLSLC} --target-env=vulkan1.2 -O -DNANOVA_CASCADE_PASS=1
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/ray_trace.comp" -o "${cascade_output}"
+    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl VERBATIM)
 set(debug_outputs)
 foreach(debug_variant IN ITEMS surface volume guide_surface)
     set(debug_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/debug_${debug_variant}.comp.spv")
@@ -173,7 +179,7 @@ foreach(model IN LISTS model_files)
         DEPENDS "${model}" VERBATIM)
     list(APPEND model_outputs "${model_output}")
 endforeach()
-add_custom_target(nanova_assets DEPENDS "${focus_output}" "${medium_blur_output}" "${shadow_grid_output}" "${fog_output}" "${effects_output}" "${backdrop_output}" "${json_license}" "${shader_output}" "${bloom_output}" "${volume_output}" "${debug_overlay}" ${debug_outputs} ${model_outputs} ${asset_outputs})
+add_custom_target(nanova_assets DEPENDS "${focus_output}" "${medium_blur_output}" "${shadow_grid_output}" "${cascade_output}" "${fog_output}" "${effects_output}" "${backdrop_output}" "${json_license}" "${shader_output}" "${bloom_output}" "${volume_output}" "${debug_overlay}" ${debug_outputs} ${model_outputs} ${asset_outputs})
 
 if(WIN32)
     set(platform_sources source/window.cpp source/start_menu.cpp source/pause_menu.cpp)

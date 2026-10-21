@@ -143,18 +143,18 @@ bool scene_box_intersection(vec3 origin, vec3 direction, float distance, float m
     return box_intersection(origin,direction,distance,margin,render.scene_min.xyz,render.scene_max.xyz);
 }
 
-bool closest_hit(vec3 origin, vec3 direction, out uint triangle_index,
+bool closest_hit_within(vec3 origin, vec3 direction, float limit, out uint triangle_index,
                  out vec2 barycentric, out float distance)
 {
     distance=RAY_MAX;
-    if (!scene_box_intersection(origin,direction,RAY_MAX,0.0))
+    if (!scene_box_intersection(origin,direction,limit,0.0))
     { triangle_index=0u;barycentric=vec2(0);return false; }
     rayQueryEXT query;
 #if defined(NANOVA_DEBUG_BUFFERS) && !defined(NANOVA_NO_QUERY_COUNTERS)
     ++debug_closest_queries;
 #endif
     rayQueryInitializeEXT(query, scene_acceleration, gl_RayFlagsOpaqueEXT,
-                          SURFACE_RAY_MASK, origin, 0.0, direction, RAY_MAX);
+                          SURFACE_RAY_MASK, origin, 0.0, direction, limit);
     while (rayQueryProceedEXT(query))
     {
         // Opaque triangles are committed by traversal without an any-hit shader.
@@ -176,6 +176,9 @@ bool closest_hit(vec3 origin, vec3 direction, out uint triangle_index,
     distance = rayQueryGetIntersectionTEXT(query, true);
     return true;
 }
+bool closest_hit(vec3 origin, vec3 direction, out uint triangle_index,
+                 out vec2 barycentric, out float distance)
+{ return closest_hit_within(origin,direction,RAY_MAX,triangle_index,barycentric,distance); }
 
 bool medium_interval(Medium medium, vec3 origin, vec3 direction, float distance,
                      out float begin, out float end)
@@ -329,7 +332,7 @@ float membrane_transmission(float cosine)
 vec3 studio_visibility(vec3 origin,vec3 direction);
 vec3 sampled_visibility(vec3 point,vec3 normal,int light);
 
-vec3 volume_incident(vec3 point,uint medium_index,vec3 ambient,vec3 phases);
+vec3 volume_incident(vec3 point,uint medium_index,vec3 ambient,vec3 phases,vec3 view);
 
 vec3 single_scattering(vec3 origin,vec3 direction,float distance,float sharp_limit,out vec3 sharp)
 {
@@ -363,7 +366,7 @@ vec3 single_scattering(vec3 origin,vec3 direction,float distance,float sharp_lim
             }
             float d=volume_gauss ? begin+fraction*(end-begin) : begin+(float(step)+.5)*stride;
             vec3 point=origin+direction*d;
-            vec3 contribution=transmittance(origin,direction,d)*medium_density(medium,point)*(medium.scattering.rgb*volume_incident(point,i,ambient,phases))*(volume_gauss ? (end-begin)*weight : stride);
+            vec3 contribution=transmittance(origin,direction,d)*medium_density(medium,point)*(medium.scattering.rgb*volume_incident(point,i,ambient,phases,direction))*(volume_gauss ? (end-begin)*weight : stride);
             radiance+=contribution;
             if (path_offset+d<=sharp_limit) sharp+=contribution;
         }
@@ -704,13 +707,77 @@ float ambient_visibility(vec3 point,vec3 normal)
     return 1.0;
 }
 
+// Radiance cascades: per-cell world-space probe hierarchies. Each cascade halves
+// probe resolution per axis, doubles the octahedral direction side and traces a
+// longer interval. Cascade 0 is merged with all farther cascades and projected
+// to RGB L1 spherical harmonics, which surfaces and media read for ambient light.
+layout(set=0,binding=RENDER_BINDING_CASCADES,std430) buffer RadianceCascades { vec4 cascade_data[]; };
+#ifdef NANOVA_CASCADE_PASS
+const bool cascade_tracing=true;
+#else
+const bool cascade_tracing=false;
+#endif
+const float SH_Y0=.282094791773878;
+const float SH_Y1=.488602511902920;
+bool cascade_medium(uint i)
+{ return render.cascades.x>0u && media[i].lighting.z>0.0 && media[i].lighting.x>0.0 && media[i].center_radius.w>0.0; }
+uint cascade_probes(uint cascade) { return render.cascades.x>>cascade; }
+uint cascade_side(uint cascade) { return render.cascades.y<<cascade; }
+uint cascade_block(uint cascade)
+{ uint n=cascade_probes(cascade),s=cascade_side(cascade);return n*n*n*s*s; }
+uint cascade_index(uint cascade,uint medium,uint direction,uint probe)
+{
+    uint n0=render.cascades.x,base=render.scene.y*n0*n0*n0*CASCADE_SH_COEFFICIENTS;
+    for (uint k=0u;k<cascade;++k) base+=render.scene.y*cascade_block(k);
+    uint n=cascade_probes(cascade);
+    return base+medium*cascade_block(cascade)+direction*n*n*n+probe;
+}
+// Continuous probe coordinates; probes sit at cell centers of an n^3 grid over the medium cube.
+vec3 cascade_coordinates(uint medium,uint n,vec3 point)
+{
+    Medium m=media[medium];
+    return clamp((point-m.center_radius.xyz+m.center_radius.w)/(2.0*m.center_radius.w)*float(n)-.5,vec3(0),vec3(n-1u));
+}
+// Incoming radiance at a point inside an active cell, from the latest projection.
+// The cascade pass reads the previous projection only when bounce feedback is on.
+bool cascade_lighting(vec3 point,vec3 normal,out vec3 sh[4])
+{
+    sh[0]=sh[1]=sh[2]=sh[3]=vec3(0);
+    if (render.cascades.x==0u || (cascade_tracing && render.cascades.w==0u)) return false;
+    uint n=render.cascades.x;
+    for (uint i=0u;i<render.scene.y;++i)
+    {
+        if (!cascade_medium(i)) continue;
+        float radius=media[i].center_radius.w;
+        if (length(point-media[i].center_radius.xyz)>=radius) continue;
+        // Cells refresh in turns; one not yet projected keeps the authored ambient.
+        if (cascade_data[i*n*n*n*CASCADE_SH_COEFFICIENTS].a<=0.0) return false;
+        vec3 q=cascade_coordinates(i,n,point+normal*(2.0*radius/float(n)));
+        uvec3 low=min(uvec3(floor(q)),uvec3(n-2u));vec3 f=q-vec3(low);
+        for (uint z=0u;z<2u;++z) for (uint y=0u;y<2u;++y) for (uint x=0u;x<2u;++x)
+        {
+            vec3 w=mix(1.0-f,f,vec3(x,y,z));float weight=w.x*w.y*w.z;
+            uvec3 p=low+uvec3(x,y,z);
+            uint index=(i*n*n*n+(p.z*n+p.y)*n+p.x)*CASCADE_SH_COEFFICIENTS;
+            for (uint c=0u;c<CASCADE_SH_COEFFICIENTS;++c) sh[c]+=weight*cascade_data[index+c].rgb;
+        }
+        return true;
+    }
+    return false;
+}
+// Cosine-convolved irradiance divided by pi, and the band-limited radiance.
+vec3 sh_irradiance(vec3 sh[4],vec3 n)
+{ return max(vec3(0),SH_Y0*sh[0]+(2.0/3.0)*SH_Y1*(sh[1]*n.x+sh[2]*n.y+sh[3]*n.z)); }
+vec3 sh_radiance(vec3 sh[4],vec3 d,float band)
+{ return max(vec3(0),SH_Y0*sh[0]+band*SH_Y1*(sh[1]*d.x+sh[2]*d.y+sh[3]*d.z)); }
+
 // The incoming field is view-independent. Phase and outgoing integration stay
 // current and at full resolution. Unshadowed atmosphere never receives geometry
 // shadows from the cell grids, even when their volumes overlap.
-vec3 interpolated_volume_lighting(uint index,vec3 q,vec3 ambient,vec3 phases)
+vec3 interpolated_volume_lighting(uint index,vec3 q,vec3 ambient,vec3 phases,bool cascaded)
 {
     uint n=render.quality.y;
-    if (media[index].lighting.x>0.0)
+    if (media[index].lighting.x>0.0 && !cascaded)
     {
         // Cell interiors see the environment through their wall.
         if (texture_lighting_grid)
@@ -742,20 +809,24 @@ vec3 interpolated_volume_lighting(uint index,vec3 q,vec3 ambient,vec3 phases)
     return ambient+phases[0]*render.studio_color[0].rgb*key
         +phases[1]*render.studio_color[1].rgb*fill+phases[2]*render.studio_color[2].rgb*rim;
 }
-vec3 volume_incident(vec3 point,uint medium_index,vec3 ambient,vec3 phases)
+vec3 volume_incident(vec3 point,uint medium_index,vec3 ambient,vec3 phases,vec3 view)
 {
     Medium medium=media[medium_index];uint n=render.quality.y;
+    // Cascade radiance already includes wall, organelle and medium occlusion.
+    // The phase function keeps the authored first-order anisotropy.
+    vec3 sh[4];bool cascaded=medium.lighting.x>0.0 && cascade_lighting(point,vec3(0),sh);
+    if (cascaded) ambient=sh_radiance(sh,view,medium.absorption_phase.w);
     if (volume_lighting_grid && n>0u && medium.lighting.x<=0.0 && medium.lighting.z>0.0)
     {
         vec3 q=clamp((point-medium.center_radius.xyz+medium.center_radius.w)/(2.0*medium.center_radius.w)*float(n-1u),vec3(0),vec3(n-1u));
-        return interpolated_volume_lighting(medium_index,q,ambient,phases);
+        return interpolated_volume_lighting(medium_index,q,ambient,phases,cascaded);
     }
     bool shared_grid=n>0u && render.studio_direction[0].w>0.0 && render.studio_direction[1].w>0.0 && render.studio_direction[2].w>0.0;
     if (medium.lighting.x>0.0 && shared_grid)
         for (uint i=0u;i<render.scene.y;++i)
         {
             vec3 q;if (grid_coordinates(i,point,vec3(0),q))
-                return interpolated_volume_lighting(i,q,ambient,phases);
+                return interpolated_volume_lighting(i,q,ambient,phases,cascaded);
         }
     vec3 incident=ambient;
     for (int light=0;light<3;++light)
@@ -819,7 +890,9 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
         // shadows for surface reflection; light diffused under the surface keeps the
         // smooth field, since scattering blurs it over the mean free path anyway.
         diffused_visibility=baked_surface_visibility(s,selected,geometric_cosine<=0.0,origin);
-        visibility=s.translucent || geometric_cosine<=0.0 ? diffused_visibility : studio_visibility(origin,direction);
+        // Cascade rays shade indirect light; the smooth current field is enough there.
+        visibility=s.translucent || geometric_cosine<=0.0 ? diffused_visibility
+            : cascade_tracing ? sampled_visibility(origin,s.geometric_normal,selected) : studio_visibility(origin,direction);
     }
     sss*=(1.0-transmission)*render.studio_color[selected].rgb*diffused_visibility;
     return (weighted-sss)*visibility+sss;
@@ -909,15 +982,17 @@ const float COSINE_GRADIENT_DENOMINATOR=3.0;
 
 vec3 ambient_surface(Surface s,vec3 outgoing)
 {
-    // Cosine-weighted integral of the authored linear environment gradient.
-    // Ambient fill has no traced diffuse bounces. Inside cells it is scaled by
-    // the baked ambient visibility of walls, organelles and the medium.
-    vec3 diffuse=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5+s.normal.y/COSINE_GRADIENT_DENOMINATOR);
+    // Inside active cells, radiance cascades supply incoming light: occlusion,
+    // studio light and glow bounced from nearby surfaces. Elsewhere this is the
+    // cosine-weighted integral of the authored linear environment gradient.
+    vec3 sh[4];bool cascaded=cascade_lighting(s.point,s.geometric_normal,sh);
+    vec3 diffuse=cascaded ? sh_irradiance(sh,s.normal)
+        : render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5+s.normal.y/COSINE_GRADIENT_DENOMINATOR);
     float cosine=max(0.0,dot(s.normal,outgoing));
     // Rough lobes gather light around the normal: use the GGX dominant direction.
     float alpha=max(MIN_GGX_ALPHA,s.roughness*s.roughness);
     vec3 dominant=normalize(mix(s.normal,reflect(-outgoing,s.normal),(1.0-alpha)*(sqrt(1.0-alpha)+alpha)));
-    vec3 reflected=environment_radiance(dominant);
+    vec3 reflected=cascaded ? sh_radiance(sh,dominant,1.0) : environment_radiance(dominant);
     float transmission=s.translucent ? membrane_transmission(max(0.0,dot(s.normal,outgoing))) : 0.0;
     // Pre-integrated GGX albedo instead of a mirror Fresnel term, so rough surfaces
     // do not gain a bright grazing rim. Conductors keep their multiple-scattering gain.
@@ -930,11 +1005,19 @@ vec3 ambient_surface(Surface s,vec3 outgoing)
     result*=1.0-transmission;
     if (transmission>0.0)
     {
-        vec3 behind=render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5-s.normal.y/COSINE_GRADIENT_DENOMINATOR);
+        vec3 behind=cascaded ? sh_irradiance(sh,-s.normal)
+            : render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5-s.normal.y/COSINE_GRADIENT_DENOMINATOR);
         result+=s.color*behind*(transmission*(1.0-render.thin_material.w))*
             exp(-render.thin_material.y/max(MIN_MEMBRANE_DIRECTION_COSINE,cosine));
     }
-    return result*ambient_visibility(s.point,s.geometric_normal);
+    return cascaded ? result : result*ambient_visibility(s.point,s.geometric_normal);
+}
+
+vec3 surface_glow_color(Surface s)
+{
+    if ((uint(instance_style[s.instance].material.w)&8u)!=0u && render.emission_color.w>0.0)
+        return render.emission_color.rgb;
+    return s.color;
 }
 
 // The soft backdrop already has one current-frame center hit. Its unfiltered
@@ -992,9 +1075,7 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
             }
         }
 #endif
-        vec3 glow_color=s.color;
-        if ((uint(instance_style[s.instance].material.w)&8u)!=0u && render.emission_color.w>0.0)
-            glow_color=render.emission_color.rgb;
+        vec3 glow_color=surface_glow_color(s);
         vec3 direct=glow_color*s.emission;
         vec3 sss=vec3(0);
         for (int light=0;light<3;++light)
@@ -1132,7 +1213,134 @@ uint volume_anchor(uvec2 cell)
 }
 #endif
 
-#ifdef NANOVA_SHADOW_GRID_PASS
+#if defined(NANOVA_CASCADE_PASS)
+layout(push_constant) uniform CascadePass { uint cascade;uint pass;uint media;uint unused; } cascade_pass; // Media: bit per traced cell.
+const uint CASCADE_MAX_CROSSINGS=4u;
+
+vec3 octahedron_point(uvec2 texel,uint side)
+{
+    vec2 p=(vec2(texel)+.5)/float(side)*2.0-1.0;
+    vec3 v=vec3(p,1.0-abs(p.x)-abs(p.y));
+    if (v.z<0.0) v.xy=(1.0-abs(v.yx))*vec2(v.x>=0.0 ? 1.0 : -1.0,v.y>=0.0 ? 1.0 : -1.0);
+    return v;
+}
+// Solid angle of an octahedral texel, up to the map-area factor shared by all texels.
+float texel_weight(uvec2 texel,uint side)
+{ float l=length(octahedron_point(texel,side));return 1.0/(l*l*l); }
+float interval_start(uint cascade,float spacing)
+{
+    float growth=render.cascade_interval.y;
+    float steps=growth==1.0 ? float(cascade) : (pow(growth,float(cascade))-1.0)/(growth-1.0);
+    return render.cascade_interval.x*spacing*steps;
+}
+
+// Radiance from surfaces along one interval, and the mean fraction of light from
+// beyond its end that still arrives. The last cascade continues to the environment.
+vec4 trace_interval(vec3 origin,vec3 direction,float limit,bool last)
+{
+    vec3 radiance=vec3(0),weight=vec3(1);float remaining=limit;
+    for (uint layer=0u;layer<=CASCADE_MAX_CROSSINGS;++layer)
+    {
+        uint triangle;vec2 barycentric;float distance;
+        bool hit=closest_hit_within(origin,direction,last ? RAY_MAX : remaining,triangle,barycentric,distance);
+        weight*=transmittance(origin,direction,hit ? distance : (last ? RAY_MAX : remaining));
+        if (!hit)
+        {
+            if (last) return vec4(radiance+weight*environment_radiance(direction),0);
+            return vec4(radiance,dot(weight,vec3(1.0/3.0)));
+        }
+        Surface s;if (!surface_at(triangle,barycentric,direction,s)) break;
+        // A probe inside a solid sees its back faces and receives nothing from them.
+        if (!s.translucent && !s.front_face) break;
+        vec3 light=surface_glow_color(s)*s.emission+ambient_surface(s,-direction);
+        for (int l=0;l<3;++l) { vec3 sss;light+=evaluate_studio(s,-direction,l,sss); }
+        float view_cosine=abs(dot(s.normal,direction));
+        float opacity=s.translucent ? membrane_opacity(view_cosine) : 1.0;
+        radiance+=weight*light*opacity;
+        float clear=s.translucent ? membrane_clear(view_cosine) : 0.0;
+        if (clear<=0.0) break;
+        weight*=clear*mix(vec3(1),s.color,CLEAR_MEMBRANE_PIGMENT_WEIGHT*opacity)*exp(-render.thin_material.y*opacity/max(MIN_MEMBRANE_DIRECTION_COSINE,view_cosine));
+        remaining-=distance;
+        origin=s.point-s.geometric_normal*point_epsilon(s.point);
+    }
+    return vec4(radiance,0);
+}
+
+// Cascade 0 to RGB L1 spherical harmonics, one probe per invocation.
+void project_probe(uint medium,uint probe)
+{
+    uint n=render.cascades.x,side=render.cascades.y;
+    vec3 sh[4];sh[0]=sh[1]=sh[2]=sh[3]=vec3(0);float total=0.0;
+    for (uint d=0u;d<side*side;++d)
+    {
+        uvec2 texel=uvec2(d%side,d/side);float w=texel_weight(texel,side);
+        vec3 direction=normalize(octahedron_point(texel,side));
+        vec3 radiance=w*cascade_data[cascade_index(0u,medium,d,probe)].rgb;
+        sh[0]+=SH_Y0*radiance;sh[1]+=SH_Y1*direction.x*radiance;
+        sh[2]+=SH_Y1*direction.y*radiance;sh[3]+=SH_Y1*direction.z*radiance;total+=w;
+    }
+    uint index=(medium*n*n*n+probe)*CASCADE_SH_COEFFICIENTS;
+    for (uint c=0u;c<CASCADE_SH_COEFFICIENTS;++c) cascade_data[index+c]=vec4(sh[c]*(4.0*PI/total),1);
+}
+
+// Merged radiance beyond this interval: trilinear upper probes, each the
+// solid-angle weighted mean of the four child directions.
+vec3 upper_radiance(uint medium,uint cascade,vec3 position,uvec2 texel)
+{
+    uint upper=cascade+1u,n=cascade_probes(upper),side=cascade_side(upper);
+    uint child[4];float child_weight[4],total=0.0;
+    for (uint c=0u;c<4u;++c)
+    {
+        uvec2 t=texel*2u+uvec2(c&1u,c>>1u);
+        child[c]=t.y*side+t.x;child_weight[c]=texel_weight(t,side);total+=child_weight[c];
+    }
+    vec3 q=cascade_coordinates(medium,n,position);
+    uvec3 low=min(uvec3(floor(q)),uvec3(n-2u));vec3 f=q-vec3(low),radiance=vec3(0);
+    for (uint z=0u;z<2u;++z) for (uint y=0u;y<2u;++y) for (uint x=0u;x<2u;++x)
+    {
+        vec3 w=mix(1.0-f,f,vec3(x,y,z));uvec3 p=low+uvec3(x,y,z);uint probe=(p.z*n+p.y)*n+p.x;
+        for (uint c=0u;c<4u;++c)
+            radiance+=(w.x*w.y*w.z*child_weight[c]/total)*cascade_data[cascade_index(upper,medium,child[c],probe)].rgb;
+    }
+    return radiance;
+}
+
+void main()
+{
+    uint medium=gl_WorkGroupID.z;
+    if ((cascade_pass.media&(1u<<medium))==0u || !cascade_medium(medium)) return;
+    uint item=gl_WorkGroupID.x*COMPUTE_GROUP_SIZE*COMPUTE_GROUP_SIZE+gl_LocalInvocationIndex;
+    uint n0=render.cascades.x;
+    if (cascade_pass.pass==CASCADE_PASS_PROJECT)
+    {
+        if (item<n0*n0*n0) project_probe(medium,item);
+        return;
+    }
+    // One trace dispatch covers every cascade, so long intervals overlap short ones.
+    // Merge passes then run from the last cascade down, one cascade each.
+    uint cascade=cascade_pass.cascade;
+    if (cascade_pass.pass==CASCADE_PASS_TRACE)
+        for (cascade=0u;cascade+1u<render.cascades.z && item>=cascade_block(cascade);++cascade) item-=cascade_block(cascade);
+    uint n=cascade_probes(cascade),side=cascade_side(cascade),probes=n*n*n;
+    if (item>=probes*side*side) return;
+    // Direction-major order keeps neighboring invocations on parallel rays.
+    uint d=item/probes,probe=item%probes;
+    uvec2 texel=uvec2(d%side,d/side);uvec3 p=uvec3(probe%n,(probe/n)%n,probe/(n*n));
+    float radius=media[medium].center_radius.w;
+    vec3 position=media[medium].center_radius.xyz+radius*((2.0*vec3(p)+1.0)/float(n)-1.0);
+    uint index=cascade_index(cascade,medium,d,probe);
+    if (cascade_pass.pass==CASCADE_PASS_MERGE)
+    {
+        vec4 near=cascade_data[index];
+        if (near.a>0.0) cascade_data[index]=vec4(near.rgb+near.a*upper_radiance(medium,cascade,position,texel),near.a);
+        return;
+    }
+    float spacing=2.0*radius/float(n0);
+    vec3 direction=normalize(octahedron_point(texel,side));
+    float begin=interval_start(cascade,spacing),end=interval_start(cascade+1u,spacing);
+    cascade_data[index]=trace_interval(position+direction*begin,direction,end-begin,cascade+1u==render.cascades.z);
+}
+#elif defined(NANOVA_SHADOW_GRID_PASS)
 layout(push_constant) uniform GridPass { uint medium;uint pass;uint instance;uint triangle_count; } grid_pass;
 void main()
 {

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Compare real Vulkan game runs through Proton 10, Proton 11 and native Linux."""
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+from gpu_environment import gpu_process_timeout_seconds
 import argparse,json,os,re,signal,statistics,subprocess,sys,time
 from pathlib import Path
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
@@ -41,7 +45,7 @@ for pair in range(a.pairs):
   commands.append((name,platform,command))
 (out/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
 if not a.run:
- print('Prepared',len(commands),'sequential native 1080p two-frame runs;',a.samples,'film + 1 volume + 1 backdrop starts. 2s/process, 5s/batch; no hardware tracing. No GPU work started.');raise SystemExit(0)
+ print('Prepared',len(commands),'sequential native 1080p two-frame runs;',a.samples,'film + 1 volume + 1 backdrop starts.  no hardware tracing. No GPU work started.');raise SystemExit(0)
 check_gpu_environment();started=time.monotonic();report=dict(versions=versions,render_settings=config,capture=not a.no_capture,validation=not a.timing,runs={})
 for name,platform,command in commands:
  env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1'
@@ -51,14 +55,14 @@ for name,platform,command in commands:
  elif not a.timing:
   env['VK_LAYER_PATH']=str(root/'build/toolchains/validation/usr/share/vulkan/explicit_layer.d')
   env['VK_INSTANCE_LAYERS']='VK_LAYER_KHRONOS_validation'
- remaining=5-(time.monotonic()-started);assert remaining>0,'GPU batch expired'
+ remaining=gpu_process_timeout_seconds()
  before=time.monotonic();process=subprocess.Popen(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
- try:output,errors=process.communicate(timeout=min(2,remaining))
+ try:output,errors=process.communicate(timeout=remaining)
  except subprocess.TimeoutExpired:
   os.killpg(process.pid,signal.SIGTERM)
   try:output,errors=process.communicate(timeout=.2)
   except subprocess.TimeoutExpired:os.killpg(process.pid,signal.SIGKILL);output,errors=process.communicate()
-  (out/(name+'.log')).write_text(output+errors);raise RuntimeError('GPU process limit: '+name) from None
+  (out/(name+'.log')).write_text(output+errors);raise RuntimeError('GPU process timeout: '+name) from None
  (out/(name+'.log')).write_text(output+errors)
  assert process.returncode==0,(name,output,errors)
  if not a.timing:assert 'Vulkan validation: enabled.' in output

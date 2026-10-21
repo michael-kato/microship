@@ -11,7 +11,7 @@ import sys
 import time
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
 from authored_assets import stage_world,write_world
-from gpu_environment import check_gpu_environment
+from gpu_environment import check_gpu_environment, gpu_process_timeout_seconds
 from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/cell_animation_render');p.add_argument('--run',action='store_true')
@@ -29,12 +29,12 @@ for name,seconds,step,frames in [('pose_10',10,0,2),('pose_14',14,0,1),('after_p
     commands.append((name,[*prefix,'--headless','--frames',str(frames),'--no-stats','--ticks','600','--world-seed','1234','--time',str(seconds),'--step-seconds',str(step),'--world',str(out/'world.json'),'--config',str(out/'render.json'),'--capture',str(out/(name+'.ppm')),'--scene-state',str(out/(name+'_scene.json'))]))
 (out/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
 if not a.run:
-    print('Prepared three sequential native 1920x1080 processes, at most two frames each, host validation, ten seconds/process and thirty seconds/batch. No GPU work started.');raise SystemExit()
+    print('Prepared three sequential native 1920x1080 processes, at most two frames each, host validation. No GPU work started.');raise SystemExit()
 check_gpu_environment();env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1';start=time.monotonic();report={}
 for name,command in commands:
-    remaining=30-(time.monotonic()-start);assert remaining>0,'GPU batch expired'
+    remaining=gpu_process_timeout_seconds()
     process=subprocess.Popen(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
-    try:stdout,stderr=process.communicate(timeout=min(10,remaining))
+    try:stdout,stderr=process.communicate(timeout=remaining)
     except subprocess.TimeoutExpired:
         if sys.platform=='win32':process.kill()
         else:os.killpg(process.pid,signal.SIGKILL)

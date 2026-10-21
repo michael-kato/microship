@@ -31,6 +31,15 @@
     "texture_grid": true,
     "subgroup_size": 32
   },
+  "radiance_cascades": {
+    "probe_resolution": 16,
+    "direction_resolution": 4,
+    "cascade_count": 4,
+    "first_interval": 1,
+    "interval_growth": 4,
+    "bounce_feedback": true,
+    "cells_per_frame": 4
+  },
   "bloom": {
     "radius": 8,
     "strength": 0.14,

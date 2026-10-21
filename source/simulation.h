@@ -10,8 +10,18 @@ enum { MAX_UNITS = UNIT_STORAGE_CAPACITY, NO_BODY = -1, MAX_PROJECTILES=512, MAX
 enum { SIMULATION_MESSAGE_CAPACITY=96 };
 enum { UNIT_LAUNCH_SECONDS=2 };
 enum { MAX_SPIKES=32, MAX_EMBEDDED=2, GROWTH_SEGMENTS=4,MAX_LIMB_DEBRIS=256 };
-// Damage still removes quarters. Curves use three spans within each quarter.
-enum { GROWTH_PATH_SUBDIVISIONS=3, GROWTH_PATH_SEGMENTS=GROWTH_SEGMENTS*GROWTH_PATH_SUBDIVISIONS };
+// Damage still removes quarters. Curves use eight spans within each quarter.
+enum { GROWTH_PATH_SUBDIVISIONS=8, GROWTH_PATH_SEGMENTS=GROWTH_SEGMENTS*GROWTH_PATH_SUBDIVISIONS };
+// Bound: distance from center to the farthest point of the capsule. Each cell's
+// obstacles are contiguous, with a box around their bounding spheres.
+struct FlightObstacle { Vec3 start,end,center;float radius,bound;uint32_t cell,structure; };
+struct FlightObstacles
+{
+    FlightObstacle values[MAX_BODIES*MAX_FACTORY_STRUCTURES*(GROWTH_PATH_SEGMENTS+1)];
+    uint32_t count,cell_count,first[MAX_BODIES+1];
+    Vec3 low[MAX_BODIES],high[MAX_BODIES];
+};
+
 static const float SIMULATION_TICKS_PER_SECOND_FLOAT=(float)SIMULATION_TICKS_PER_SECOND;
 static const double SIMULATION_TICKS_PER_SECOND_DOUBLE=(double)SIMULATION_TICKS_PER_SECOND;
 struct EmbeddedSpike { Vec3 direction,anchor; Faction faction; };
@@ -166,6 +176,7 @@ struct Simulation
     Unit units[MAX_UNITS];
     Trail trails[MAX_UNITS];
     CombatScratch combat_scratch;
+    FlightObstacles flight_scratch; // Rebuilt by the movement phase.
     UnitGrid grid; // Scratch spatial index; positions may move up to UNIT_GRID_MOTION_MARGIN after a build.
     NeighborGrid neighbors; // Scratch; built from the positions at the start of movement.
     SightField fog_memory;

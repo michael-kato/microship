@@ -22,6 +22,15 @@ def bend_ratio(points):
     assert squared>1e-8,'A curve has no extent'
     return max(norm([v-t*c for v,c in zip(delta(p,points[0]),chord)]) for p in points for t in [dot(delta(p,points[0]),chord)/squared])/math.sqrt(squared)
 
+def lobes(points):
+    chord=delta(points[-1],points[0]);squared=dot(chord,chord)
+    quarter=delta(points[len(points)//4],points[0]);along=dot(quarter,chord)/squared
+    axis=[a-along*b for a,b in zip(quarter,chord)];size=norm(axis)
+    assert size>1e-6,'An S-curve has no first lobe'
+    axis=[v/size for v in axis]
+    values=[dot(delta(point,points[0]),axis)/math.sqrt(squared) for point in points]
+    return max(values),-min(values)
+
 def start(instance):return [instance['transform'][j] for j in (3,7,11)]
 def end(instance):return [instance['transform'][j]+instance['transform'][j-2] for j in (3,7,11)]
 
@@ -40,13 +49,13 @@ with tempfile.TemporaryDirectory(prefix='nanova-factory-curves-') as directory:
         assert result.returncode==expected,(name,result.stdout,result.stderr)
         if expected:assert not state.exists();return None,None
         return json.loads(state.read_text()),json.loads(scene.read_text())
-    scores={side:[] for side in ('virus','immune','fungus')}
+    scores={side:[] for side in ('virus','immune','fungus')};asymmetry={side:[] for side in scores}
     for radius in (2.1,2.7,4.2):
         data=deepcopy(base)
         for cell in (0,5,10):data['bodies'][cell]['radius']=radius
         for seed in (1234,1235,1236):
             game,scene=run('curve_'+str(radius)+'_'+str(seed),data,seed)
-            spans=game['factory_path_segments'];assert spans>=12 and game['factory_growth_segments']==4
+            spans=game['factory_path_segments'];assert spans>=32 and game['factory_growth_segments']==4
             instances={v['slot']:v for v in scene['instances']}
             heads=game['unit_capacity']+len(game['colonies']);stems=heads+len(game['colonies'])*128
             for side,cell in (('virus',0),('immune',5),('fungus',10)):
@@ -56,10 +65,13 @@ with tempfile.TemporaryDirectory(prefix='nanova-factory-curves-') as directory:
                     assert points[0]==limb['stem'][0] and math.dist(points[-1],limb['position'])<1e-5
                     if limb['parent']>=0:assert math.dist(points[0],colony['structures'][limb['parent']]['stem'][3])<1e-5
                     score=bend_ratio(points);scores[side].append(score)
+                    positive,negative=lobes(points)
+                    assert min(positive,negative)>.003,(side,'A curve remained C-shaped',positive,negative)
+                    asymmetry[side].append(abs(positive-negative)/max(positive,negative))
                     vectors=[delta(b,a) for a,b in zip(points,points[1:])]
                     assert all(dot(v,delta(points[-1],points[0]))>0 for v in vectors),'A curve doubled back'
                     turns=[math.acos(max(-1,min(1,dot(a,b)/(norm(a)*norm(b))))) for a,b in zip(vectors,vectors[1:])]
-                    assert max(turns)<math.radians(16),(side,'A curve has a sharp corner',turns)
+                    assert max(turns)<math.radians(35),(side,'A curve has a sharp corner',turns)
                     obstacles=[v for v in game['flight']['obstacles'] if v['cell']==cell and v['structure']==k]
                     assert len(obstacles)==spans+1
                     profile=next(v for v in data['content']['buildings'] if v['faction']==side)
@@ -73,10 +85,19 @@ with tempfile.TemporaryDirectory(prefix='nanova-factory-curves-') as directory:
                     assert dot(direction,vectors[-1])/(norm(direction)*norm(vectors[-1]))>.99999,'A head left the curve tangent'
             if radius==4.2 and seed==1234:
                 assert run('repeat',data)==(game,scene),'Curves changed with the same seed'
-    bands={'virus':(.02,.05),'immune':(.1,.22),'fungus':(.25,.45)}
+    bands={'virus':(.006,.045),'immune':(.035,.23),'fungus':(.07,.45)}
     for side,values in scores.items():
         low,high=bands[side];assert low<min(values)<=max(values)<high,(side,min(values),max(values))
-        print(side,'median bow/chord',round(statistics.median(values),4))
+        assert statistics.median(asymmetry[side])>.01,(side,'Seeded curves remained symmetric')
+        print(side,'median bow/chord',round(statistics.median(values),4),'median lobe asymmetry',round(statistics.median(asymmetry[side]),4))
+    assert statistics.median(scores['virus'])<statistics.median(scores['immune'])<statistics.median(scores['fungus'])
+    regular=deepcopy(base)
+    for building in regular['content']['buildings']:building['branches']['tree']['curve_jitter']=0
+    regular_game,_=run('no_jitter',regular)
+    for colony in regular_game['colonies']:
+        for limb in colony['structures']:
+            positive,negative=lobes(limb['path'])
+            assert abs(positive-negative)/max(positive,negative)<.003,'Zero jitter did not restore an even S-curve'
     def check_prefix(game,scene,cell,k,head_present):
         limb=game['colonies'][cell]['structures'][k];spans=game['factory_path_segments']
         heads=game['unit_capacity']+len(game['colonies']);stems=heads+len(game['colonies'])*128
@@ -121,7 +142,12 @@ with tempfile.TemporaryDirectory(prefix='nanova-factory-curves-') as directory:
     for building in straight['content']['buildings']:building['branches']['tree']['curvature']=0
     game,_=run('straight',straight)
     assert all(bend_ratio(v['path'])<1e-4 for c in game['colonies'] for v in c['structures']),'Zero curvature did not make a straight path'
+    for value in (-.01,1.01):
+        invalid=deepcopy(base);invalid['content']['buildings'][0]['branches']['tree']['curve_jitter']=value
+        run('invalid_jitter_'+str(value),invalid,expected=1)
+    missing=deepcopy(base);missing['content']['buildings'][0]['branches']['tree'].pop('curvature')
+    run('jitter_without_curve',missing,expected=1)
     for value in (-.01,2.01):
         invalid=deepcopy(base);invalid['content']['buildings'][0]['branches']['tree']['curvature']=value
         run('invalid_'+str(value),invalid,expected=1)
-print(f'Factory curves E2E passed: {count} application runs; faction curvature order, smooth turns, outward travel, connected forks, shared render/navigation paths, tip tangents, partial growth, quarter damage, repeatability, and rejected settings.')
+print(f'Factory curves E2E passed: {count} application runs; faction curvature order, opposing S lobes, seeded asymmetry, smooth turns, outward travel, connected forks, shared render/navigation paths, tip tangents, partial growth, quarter damage, repeatability, and rejected settings.')

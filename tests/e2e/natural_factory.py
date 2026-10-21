@@ -19,7 +19,8 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
         building.pop('repair',None);building.pop('haze',None)
         building['branches'].pop('root_interval_seconds',None)
         building.update(growth_seconds=.01,establishment_seconds=.01);building['branches']['seconds']=.01
-    for building in data['content']['buildings']:building['branches'].get('tree',{}).pop('curvature',None)
+    for building in data['content']['buildings']:
+        for key in ('curvature','curve_jitter'):building['branches'].get('tree',{}).pop(key,None)
     # Keep the earlier sparse-tree fixture; small_factories checks current full forks.
     data['content']['buildings'][0]['branches']['tree']['branch_probability']=.72
     data['rules']['ai']['expansion_delay']=300;data['rules']['economy'].update(enemy_attack_seconds=300,manufacture_seconds=1000)

@@ -1223,3 +1223,76 @@ was 13.864 ms. Raw reports are in `build/curved_factory_dense_before/` and
 `build/curved_factory_dense_after/`. CPU ticks, GPU work, application frames,
 and sustained performance remain separate measurements. Native Windows,
 the complete suite, and instrumented coverage remain unverified.
+
+
+## Irregular S-bends (Oct 21)
+
+The current factory paths use unequal opposing lobes and smaller bends at
+three scales. The smaller bends have half the wavelength and one quarter
+of the amplitude at each scale. Each seed varies their phase, the main
+bend position, and lobe size. Geometry stays fixed between growth changes.
+
+The design follows the use of related variation in
+[plant geometry research](https://algorithmicbotany.org/papers/variation.eg2005.html).
+This implementation controls curve shape directly. It retains the existing
+branch hierarchy, taper, outward roots, production, and damage rules.
+
+`branches.tree.curve_jitter` controls variation from zero through one.
+Defaults are 0.2 for Virus, 0.4 for Immune, and 0.65 for Fungus. Curvature
+remains 0.12, 0.65, and 1.4. Zero jitter produces an even S-curve; zero
+curvature produces a straight path. Jitter requires a curvature setting.
+
+Each limb has 32 shared path spans. Growth, rendering, navigation, and
+breakage use the same points. Four damage sections remain, with eight
+path spans per section. Navigation scratch now belongs to the simulation:
+its bounded array exceeds the Windows executable's 2 MiB stack reserve.
+The movement phase reuses that storage. Diagnostic state export allocates
+its separate buffer at the export boundary. No tick allocates this buffer.
+
+Twelve targeted application groups passed through Proton: smoke,
+factory_curves, small_factories, natural_factory, cell_animation,
+factory_emission, fungal_sources, navigation, factory_repair, data_assets,
+colony_forms, and three_factions. Checks include all factions, three cell
+sizes, three seeds, opposing lobes, asymmetry, repeatability, zero jitter,
+smooth sampled turns, matching render and navigation paths, partial growth,
+quarter cuts, regrowth, production limits, and invalid settings.
+
+### Native captures
+
+The RX 7800 XT used RADV Mesa 25.2.8 and the Windows Release application
+through Proton 11. Each frozen capture used one native 1920x1080 frame,
+default sampling, and the Khronos host Vulkan validation layer. All captures
+passed. Initial lighting bakes are included. These short captures measure
+bounded cost. Sustained GPU performance remains unverified.
+
+| Faction | Path | Total GPU ms | Application ms | Application FPS |
+| --- | --- | ---: | ---: | ---: |
+| virus | Earlier C-bend | 10.551 | 28.158 | 35.51 |
+| virus | Irregular S-bend | 11.418 | 32.578 | 30.70 |
+| immune | Earlier C-bend | 9.793 | 27.872 | 35.88 |
+| immune | Irregular S-bend | 12.506 | 32.705 | 30.58 |
+| fungus | Earlier C-bend | 9.831 | 27.709 | 36.09 |
+| fungus | Irregular S-bend | 11.186 | 30.904 | 32.36 |
+
+Final native captures are 001001 fungal, 001002 immune, and 001003 virus.
+Inputs, logs, the capture script, and measurements are in
+`build/s_curve_factory_review/`. The earlier 24-span review remains saved.
+
+### Dense combat cost
+
+Ryzen 9 9900X, Windows Release build through Proton 11. Three real matches
+per build used seed 1234, fifteen mature cells, 90 seconds of production,
+fungal sight radius 18, and 1,800 measured combat ticks. No other test ran
+during measurement. Setup is separate. Values below are run medians.
+
+| Path | Peak units | Mean tick ms | p99 tick ms |
+| --- | ---: | ---: | ---: |
+| Earlier C-bend | 3722 | 4.194 | 11.379 |
+| Irregular S-bend | 3723 | 5.201 | 12.950 |
+
+The mean increased by about 1.01 ms in this case. Movement is the largest
+added phase cost. Geometry changes also alter unit paths and fight results.
+The largest observed S-path tick was 16.572 ms. Raw records are in
+`build/s_curve_factory_dense_before/` and `build/s_curve_factory_dense_after/`.
+CPU simulation, GPU stages, and application frames are separate measures.
+The complete suite, native Windows, and long gameplay remain unverified.

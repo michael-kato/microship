@@ -29,7 +29,7 @@
 static_assert(SIGHT_FIELD_SIDE==FOG_FIELD_SIZE,"Fog CPU/GPU grid layout");
 static const int GPU_VERTEX_BYTES = 64;
 static const int GPU_MEDIUM_BYTES = 80;
-static const int GPU_RENDER_UNIFORM_BYTES = 592;
+static const int GPU_RENDER_UNIFORM_BYTES = 624;
 static const int GPU_DEBUG_PUSH_BYTES = 128;
 static const double MILLISECONDS_PER_SECOND = 1000.0;
 static const double BINARY_UNIT_SCALE = 1024.0;
@@ -40,7 +40,7 @@ static const double BACKDROP_TIME_WRAP_SECONDS = 10000.0;
 static const int GPU_DEBUG_PIXEL_BYTES = 96;
 static const int COMPANION_SHADER_PATH_CAPACITY = 1024;
 static const double NANOSECONDS_PER_MILLISECOND = 1000000.0;
-static const int RENDER_STORAGE_BUFFER_BINDINGS = 17;
+static const int RENDER_STORAGE_BUFFER_BINDINGS = 18;
 static const int RENDER_DESCRIPTOR_SET_COUNT = 3;
 static const int RENDER_STORAGE_IMAGE_BINDINGS = 3;
 static const int RENDER_SAMPLER_BINDINGS = 4;
@@ -54,12 +54,12 @@ static const uint32_t THIN_MEMBRANE_TRIANGLE = 3; // GpuTriangle material tag.
 static const int HUD_MAX_LINE_CHARACTERS = HUD_LINE_CAPACITY-1;
 static const unsigned int STATS_TEXT_WIDTH_UNSIGNED = STATS_TEXT_WIDTH;
 static const unsigned int STATS_TEXT_HEIGHT_UNSIGNED = STATS_TEXT_HEIGHT;
-static const int GPU_TIMESTAMP_COUNT = 16;
+static const int GPU_TIMESTAMP_COUNT = 17;
 static const int TIMESTAMP_WORD_BITS = 64;
 
 enum { SCENE_BUFFER_VERTICES=0, SCENE_BUFFER_TRIANGLES=1, SCENE_BUFFER_UNIFORM=2, SCENE_BUFFER_MEDIA=3, SCENE_BUFFER_ENERGY=4, SCENE_BUFFER_RESERVED=5, SCENE_BUFFER_DEBUG=6 };
 
-enum { GPU_TIME_FRAME_BEGIN=0, GPU_TIME_SURFACE_BEGIN=1, GPU_TIME_SURFACE_END=2, GPU_TIME_VOLUME_END=3, GPU_TIME_EFFECTS_BEGIN=4, GPU_TIME_BLOOM_END=5, GPU_TIME_OVERLAY_END=6, GPU_TIME_BACKDROP_END=7, GPU_TIME_UPLOAD_END=8, GPU_TIME_EFFECTS_END=9, GPU_TIME_GRID_END=10, GPU_TIME_MEDIUM_BLUR_END=11, GPU_TIME_FOG_END=12, GPU_TIME_FOCUS_END=13, GPU_TIME_COPY_END=14, GPU_TIME_BAKE_END=15 };
+enum { GPU_TIME_FRAME_BEGIN=0, GPU_TIME_SURFACE_BEGIN=1, GPU_TIME_SURFACE_END=2, GPU_TIME_VOLUME_END=3, GPU_TIME_EFFECTS_BEGIN=4, GPU_TIME_BLOOM_END=5, GPU_TIME_OVERLAY_END=6, GPU_TIME_BACKDROP_END=7, GPU_TIME_UPLOAD_END=8, GPU_TIME_EFFECTS_END=9, GPU_TIME_GRID_END=10, GPU_TIME_MEDIUM_BLUR_END=11, GPU_TIME_FOG_END=12, GPU_TIME_FOCUS_END=13, GPU_TIME_COPY_END=14, GPU_TIME_BAKE_END=15, GPU_TIME_CASCADE_END=16 };
 
 struct GpuBuffer
 {
@@ -102,6 +102,8 @@ struct RenderUniform
     uint32_t subsurface_quality[4];
     float fog_grid[4];
     float organelle_style[4],membrane_ripple[4],emission_fresnel[4],emission_color[4];
+    uint32_t cascades[4];
+    float cascade_interval[4];
 };
 
 static_assert(sizeof(GpuVertex) == GPU_VERTEX_BYTES, "Vertex shader layout");
@@ -150,7 +152,7 @@ enum { FRAMES_IN_FLIGHT=2 };
 struct FrameReport
 {
     RenderUniform uniform;
-    uint32_t disabled_features,lighting_bakes,lighting_reuses,lighting_surface_bakes,optical_depth_bakes;
+    uint32_t disabled_features,lighting_bakes,lighting_reuses,lighting_surface_bakes,optical_depth_bakes,cascade_updates;
     bool debug_views,debug_stats,background_layer;
 };
 // Everything the CPU writes for one frame. GPU-only images and caches are
@@ -204,6 +206,10 @@ struct RendererState
     GpuBuffer tlas_buffer;
     GpuBuffer tlas_scratch;
     GpuBuffer shadow_grid,sharp_layer,static_lighting,surface_lighting,dynamic_lighting;
+    GpuBuffer radiance_cascades; // Cascade 0 SH projection, then every cascade; persists as bounce feedback.
+    bool cascades_initialized;
+    std::vector<uint32_t> cascade_age; // Per medium: frames since its cascades were traced.
+    uint32_t cascade_updates;
     std::vector<LightingInstance> lighting_input; // Active instances in TLAS order.
     std::vector<uint32_t> slot_cache_first; // Per scene slot: first surface-cache triangle.
     uint32_t surface_cache_triangles;
@@ -222,6 +228,7 @@ struct RendererState
     std::vector<uint32_t> surface_cache_meshes;
     uint32_t medium_count;
     PFN_vkCmdCopyBufferToImage copy_buffer_to_image;
+    PFN_vkCmdFillBuffer fill_buffer;
     PFN_vkCmdCopyBuffer copy_buffer;
     VkImage lighting_image;
     VkDeviceMemory lighting_memory;
@@ -283,7 +290,7 @@ struct RendererState
     VkDescriptorSet debug_descriptors;
     VkPipelineLayout pipeline_layout;
     VkPipeline pipeline;
-    VkPipeline volume_pipeline,shadow_grid_pipeline,volume_coarse_pipeline,volume_filter_pipeline;
+    VkPipeline volume_pipeline,shadow_grid_pipeline,volume_coarse_pipeline,volume_filter_pipeline,cascade_pipeline;
     VkPipeline debug_surface_pipeline, debug_volume_pipeline, debug_overlay_pipeline;
     VkPipelineLayout debug_overlay_layout;
     double trace_ms, volume_ms, bloom_ms;
@@ -1169,6 +1176,12 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
     uniform.quality[1]=state->config.shadow_grid_resolution;
     uniform.scene[3]=state->config.static_lighting_cache && state->config.shadow_grid_resolution && !state->custom_shader ? 1 : 0;
     uniform.quality[2]=state->config.microfacet_energy_compensation;
+    if (!state->custom_shader && state->config.cascade_probes)
+    {
+        uniform.cascades[0]=state->config.cascade_probes;uniform.cascades[1]=state->config.cascade_directions;
+        uniform.cascades[2]=state->config.cascade_count;uniform.cascades[3]=state->config.cascade_feedback ? 1u : 0u;
+        uniform.cascade_interval[0]=state->config.cascade_interval;uniform.cascade_interval[1]=state->config.cascade_growth;
+    }
     uniform.focus_band[0]=state->config.focus_center;uniform.focus_band[1]=state->config.focus_half_width;
     uniform.focus_band[2]=state->config.focus_falloff;uniform.focus_band[3]=state->config.focus_radius;
     uniform.subsurface_quality[0]=state->config.subsurface_samples;
@@ -1239,6 +1252,8 @@ static bool create_optical_depth(RendererState* state)
 {
     state->copy_buffer_to_image=(PFN_vkCmdCopyBufferToImage)vkGetDeviceProcAddr(state->device,"vkCmdCopyBufferToImage");
     if (!state->copy_buffer_to_image) return false;
+    state->fill_buffer=(PFN_vkCmdFillBuffer)vkGetDeviceProcAddr(state->device,"vkCmdFillBuffer");
+    if (!state->fill_buffer) return false;
     bool enabled=state->config.optical_depth_lut && !state->custom_shader;
     state->optical_depth_size=enabled ? OPTICAL_DEPTH_TABLE_SIZE : 1;
     state->optical_depth_layers=enabled && state->medium_count ? state->medium_count : 1;
@@ -1434,6 +1449,17 @@ static bool create_output(RendererState* state)
     if (!create_buffer(state,&state->static_lighting,static_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
         || !create_buffer(state,&state->dynamic_lighting,static_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
         || !create_buffer(state,&state->surface_lighting,surface_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
+    // Every cascade holds half the texels of the one below it, per medium.
+    VkDeviceSize probes=state->uniform_data.cascades[0],side=state->uniform_data.cascades[1];
+    // Cascade passes select traced cells with a 32-bit push-constant mask.
+    if (probes && state->medium_count>32)
+    { fprintf(stderr,"Radiance cascades support at most 32 media.\n");return false; }
+    VkDeviceSize cascade_texels=probes*probes*probes*CASCADE_SH_COEFFICIENTS;
+    for (uint32_t c=0;c<state->uniform_data.cascades[2];++c) cascade_texels+=(probes>>c)*(probes>>c)*(probes>>c)*(side<<c)*(side<<c);
+    VkDeviceSize cascade_bytes=probes ? cascade_texels*(state->medium_count ? state->medium_count : 1)*4*sizeof(float) : 4*sizeof(float);
+    if (cascade_bytes>state->properties.limits.maxStorageBufferRange)
+    { fprintf(stderr,"Radiance cascades exceed the storage-buffer range.\n");return false; }
+    if (!create_buffer(state,&state->radiance_cascades,cascade_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
     VkDeviceSize sharp_bytes=(state->uniform_data.quality[3] || state->uniform_data.background_quality[3]) ? (VkDeviceSize)state->config.width*state->config.height*4*sizeof(float) : 4*sizeof(float);
     if (sharp_bytes>state->properties.limits.maxStorageBufferRange)
     { fprintf(stderr,"Medium sharp layer exceeds the storage-buffer range.\n");return false; }
@@ -1605,7 +1631,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
     for (uint32_t i = 0; i < RENDER_DESCRIPTOR_COUNT; ++i)
     {
         bindings[i].binding = i;
@@ -1705,6 +1731,8 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
         writes[RENDER_BINDING_MESH_RANGES].pBufferInfo=&range_buffer;
         VkDescriptorBufferInfo guide_buffer={state->guides.handle,0,state->guides.size};
         writes[RENDER_BINDING_GUIDES].pBufferInfo=&guide_buffer;
+        VkDescriptorBufferInfo cascade_buffer={state->radiance_cascades.handle,0,state->radiance_cascades.size};
+        writes[RENDER_BINDING_CASCADES].pBufferInfo=&cascade_buffer;
         vkUpdateDescriptorSets(state->device, RENDER_DESCRIPTOR_COUNT, writes, 0, 0);
         for (uint32_t i=0;i<RENDER_DESCRIPTOR_COUNT;++i) writes[i].dstSet=frame.effect_descriptors;
         vkUpdateDescriptorSets(state->device,RENDER_DESCRIPTOR_COUNT,writes,0,0);
@@ -1902,6 +1930,61 @@ static void record_lighting_fields(RendererState* state)
             vkCmdPushConstants(state->command,state->pipeline_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,BACKDROP_PUSH_BYTES,parameters);
             vkCmdDispatch(state->command,(n+7)/8,(n*n+7)/8,1);
         }
+        shader_buffer_barrier(state->command);
+    }
+}
+
+// Trace and merge cascades from the farthest down, then project cascade 0 to SH.
+// With bounce feedback, surfaces hit by cascade rays read the previous projection.
+static void record_radiance_cascades(RendererState* state)
+{
+    const RenderUniform& u=state->uniform_data;state->cascade_updates=0;
+    if (!u.cascades[0] || !state->medium_count) return;
+    if (!state->cascades_initialized)
+    {
+        state->fill_buffer(state->command,state->radiance_cascades.handle,0,VK_WHOLE_SIZE,0);
+        VkMemoryBarrier filled={};filled.sType=VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+        filled.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;filled.dstAccessMask=VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+        vkCmdPipelineBarrier(state->command,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,0,1,&filled,0,0,0,0);
+        state->cascades_initialized=true;
+    }
+    // Active cells refresh in turns, stalest first; newly visible cells have the oldest data.
+    const RenderMedium* media=(const RenderMedium*)frame_data(state).media.mapped;
+    if (state->cascade_age.size()!=state->medium_count)
+        state->cascade_age.assign(state->medium_count,UINT32_MAX);
+    uint32_t selected=0,count=0,limit=state->config.cascade_cells_per_frame;
+    for (uint32_t i=0;i<state->medium_count;++i)
+        if (state->cascade_age[i]<UINT32_MAX) ++state->cascade_age[i];
+    for (;;)
+    {
+        uint32_t best=UINT32_MAX;
+        for (uint32_t i=0;i<state->medium_count;++i)
+        {
+            const RenderMedium& m=media[i];
+            if (m.lighting[2]<=0 || m.lighting[0]<=0 || m.center_radius[3]<=0 || state->cascade_age[i]==0) continue;
+            if (best==UINT32_MAX || state->cascade_age[i]>state->cascade_age[best]) best=i;
+        }
+        if (best==UINT32_MAX || (limit && count==limit)) break;
+        selected|=1u<<best;++count;state->cascade_age[best]=0;
+    }
+    state->cascade_updates=count;
+    if (!count) return;
+    // Earlier submissions read the projection; this frame overwrites it.
+    shader_buffer_barrier(state->command);
+    vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->cascade_pipeline);
+    // One dispatch traces every interval; merges run from the second-to-last cascade down;
+    // the final pass projects cascade 0.
+    const uint32_t group=COMPUTE_GROUP_SIZE*COMPUTE_GROUP_SIZE,count_c=u.cascades[2];
+    uint32_t n0=u.cascades[0],block0=n0*n0*n0*u.cascades[1]*u.cascades[1],traced=0;
+    for (uint32_t c=0;c<count_c;++c) traced+=block0>>c;
+    for (uint32_t step=0;step<count_c+1;++step)
+    {
+        uint32_t pass=step==0 ? CASCADE_PASS_TRACE : step==count_c ? CASCADE_PASS_PROJECT : CASCADE_PASS_MERGE;
+        uint32_t cascade=pass==CASCADE_PASS_MERGE ? count_c-1-step : 0;
+        uint32_t items=pass==CASCADE_PASS_TRACE ? traced : pass==CASCADE_PASS_PROJECT ? n0*n0*n0 : block0>>cascade;
+        uint32_t parameters[4]={cascade,pass,selected,0};
+        vkCmdPushConstants(state->command,state->pipeline_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,BACKDROP_PUSH_BYTES,parameters);
+        vkCmdDispatch(state->command,(items+group-1)/group,1,state->medium_count);
         shader_buffer_barrier(state->command);
     }
 }
@@ -2250,6 +2333,7 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
         && create_swapchain(state) && upload_scene(state, scene) && create_output(state) && create_pipeline(state, shader_path)
         && load_companion(state,shader_path,"volume.comp.spv",state->pipeline_layout,&state->volume_pipeline)
         && load_companion(state,shader_path,"shadow_grid.comp.spv",state->pipeline_layout,&state->shadow_grid_pipeline)
+        && load_companion(state,shader_path,"radiance_cascade.comp.spv",state->pipeline_layout,&state->cascade_pipeline)
         && create_bloom(state, shader_path) && create_debug(state,builtin_shader_path)
         && create_surface_toggles(state,shader_path)
         && load_companion(state,builtin_shader_path,"effects.comp.spv",state->pipeline_layout,&state->effects_pipeline);
@@ -2430,6 +2514,11 @@ static bool report_frame(RendererState* state,Renderer* renderer,FrameResources&
     uint64_t grid_ticks=timestamps[GPU_TIME_GRID_END]-timestamps[GPU_TIME_BACKDROP_END];
     if (state->timestamp_bits<TIMESTAMP_WORD_BITS) grid_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1;
     if (renderer->frame_log) printf("GPU shadow grid: %.3f ms; resolution %u; current dynamic blockers.\n",grid_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND,state->config.shadow_grid_resolution);
+    uint64_t cascade_ticks=timestamps[GPU_TIME_CASCADE_END]-timestamps[GPU_TIME_GRID_END];
+    if (state->timestamp_bits<TIMESTAMP_WORD_BITS) cascade_ticks&=(UINT64_C(1)<<state->timestamp_bits)-1;
+    if (renderer->frame_log && uniform->cascades[0]) printf("GPU radiance cascades: %.3f ms; %u cells traced; %u probes, %u directions, %u cascades, bounce feedback %s; %llu bytes.\n",
+        cascade_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND,report.cascade_updates,uniform->cascades[0],uniform->cascades[1]*uniform->cascades[1],
+        uniform->cascades[2],uniform->cascades[3] ? "ON" : "OFF",(unsigned long long)state->radiance_cascades.size);
     uint64_t bake_ticks=timestamps[GPU_TIME_BAKE_END]-timestamps[GPU_TIME_BACKDROP_END];
     uint64_t dynamic_ticks=timestamps[GPU_TIME_GRID_END]-timestamps[GPU_TIME_BAKE_END];
     if (state->timestamp_bits<TIMESTAMP_WORD_BITS)
@@ -2473,8 +2562,8 @@ static bool report_frame(RendererState* state,Renderer* renderer,FrameResources&
         {PROFILE_GPU_SCENE,GPU_TIME_FRAME_BEGIN,GPU_TIME_VOLUME_END},
         {PROFILE_ACCELERATION,GPU_TIME_FRAME_BEGIN,GPU_TIME_UPLOAD_END},
         {PROFILE_BACKDROP,GPU_TIME_UPLOAD_END,GPU_TIME_BACKDROP_END},
-        {PROFILE_SHADOW_GRID,GPU_TIME_BACKDROP_END,GPU_TIME_GRID_END},
-        {PROFILE_SURFACE,GPU_TIME_GRID_END,GPU_TIME_SURFACE_END},
+        {PROFILE_SHADOW_GRID,GPU_TIME_BACKDROP_END,GPU_TIME_CASCADE_END},
+        {PROFILE_SURFACE,GPU_TIME_CASCADE_END,GPU_TIME_SURFACE_END},
         {PROFILE_VOLUME,GPU_TIME_SURFACE_END,GPU_TIME_VOLUME_END},
         {PROFILE_GPU_POST,GPU_TIME_VOLUME_END,GPU_TIME_BLOOM_END},
         {PROFILE_EFFECTS,GPU_TIME_VOLUME_END,GPU_TIME_EFFECTS_END},
@@ -2630,6 +2719,8 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     record_lighting_fields(state);
     record_lighting_texture(state);
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_GRID_END);
+    record_radiance_cascades(state);
+    vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_CASCADE_END);
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_SURFACE_BEGIN);
     bool no_sss=(renderer->disabled_features&RENDER_SSS)!=0;
     VkPipeline surface=renderer->debug_views ? (no_sss ? state->no_sss_debug_pipeline : state->debug_surface_pipeline)
@@ -2795,6 +2886,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     FrameReport& report=frame.report;report.uniform=*uniform;report.disabled_features=renderer->disabled_features;
     report.lighting_bakes=state->lighting_bakes;report.lighting_reuses=state->lighting_reuses;
     report.lighting_surface_bakes=state->lighting_surface_bakes;report.optical_depth_bakes=state->optical_depth_bakes;
+    report.cascade_updates=state->cascade_updates;
     report.debug_views=renderer->debug_views;report.debug_stats=renderer->debug_stats;report.background_layer=scene->background_blur>0;
     if (!submit_commands(state, !state->headless, image_index, false))
         return false;
@@ -2877,6 +2969,7 @@ bool renderer_shutdown(Renderer* renderer)
         }
         if (state->pipeline) vkDestroyPipeline(state->device, state->pipeline, 0);
         if (state->shadow_grid_pipeline) vkDestroyPipeline(state->device,state->shadow_grid_pipeline,0);
+        if (state->cascade_pipeline) vkDestroyPipeline(state->device,state->cascade_pipeline,0);
         if (state->volume_coarse_pipeline) vkDestroyPipeline(state->device,state->volume_coarse_pipeline,0);
         if (state->volume_filter_pipeline) vkDestroyPipeline(state->device,state->volume_filter_pipeline,0);
         if (state->volume_pipeline) vkDestroyPipeline(state->device,state->volume_pipeline,0);
@@ -2898,7 +2991,7 @@ bool renderer_shutdown(Renderer* renderer)
         GpuBuffer* buffers[] = { &state->vertices, &state->triangles, &state->indices, &state->mesh_ranges,
             &state->tlas_buffer, &state->tlas_scratch,
             &state->readback, &state->optical_depth_upload, &state->shadow_grid, &state->static_lighting, &state->surface_lighting, &state->dynamic_lighting, &state->sharp_layer, &state->energy,
-            &state->debug_pixels, &state->guides };
+            &state->debug_pixels, &state->guides, &state->radiance_cascades };
         for (uint32_t i = 0; i < sizeof(buffers)/sizeof(buffers[0]); ++i) destroy_buffer(state, buffers[i]);
         for (uint32_t f=0;f<FRAMES_IN_FLIGHT;++f)
         {

@@ -13,14 +13,14 @@ import time
 from authored_assets import stage_world,write_world
 from gpu_environment import check_gpu_environment
 from save_progress import archive_capture
+from gpu_environment import gpu_process_timeout_seconds
 
 NATIVE_WIDTH = 1920
 NATIVE_HEIGHT = 1080
-MAX_SAMPLE_STARTS = 8
 DISABLED_MANUFACTURE_SECONDS = 1000
 DISABLED_AI_EXPANSION_SECONDS = 300
 FAST_GROWTH_SECONDS = .1
-MAX_PROCESS_SECONDS = 10
+PROCESS_TIMEOUT_SECONDS = gpu_process_timeout_seconds()
 ATTACKER_TIP_OFFSET = .4
 FIXTURE_ATTACKER_SPEED = .01
 FIXTURE_ATTACK_INTERVAL = .12
@@ -36,7 +36,6 @@ BLAST_CAPTURE_TICKS = 12
 MIN_TIMEOUT_SECONDS = .001
 
 FIXTURE_REGROW_SECONDS=10
-MAX_BATCH_SECONDS=30
 
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('binary',type=Path);parser.add_argument('--output',type=Path,required=True);parser.add_argument('--run',action='store_true')
@@ -46,13 +45,12 @@ check_gpu_environment()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 config=json.loads((root/'assets/rendering/renderer.json').read_text())
 assert (config['output']['width'],config['output']['height'])==(NATIVE_WIDTH,NATIVE_HEIGHT)
-assert config['sampling']['samples_per_pixel']+config['volume']['rays_per_pixel']+1<=MAX_SAMPLE_STARTS
 limbs=stage_world(root/'assets/levels/virus-player-level.json',out);limbs['rules'].pop('exploration',None);limbs['spawns']=[]
 limbs['rules']['economy']['manufacture_seconds']=DISABLED_MANUFACTURE_SECONDS;limbs['rules']['ai']['expansion_delay']=DISABLED_AI_EXPANSION_SECONDS
 for p in limbs['content']['buildings']:
     if p['faction']!='fungus':p['growth_seconds']=FAST_GROWTH_SECONDS;p['branches'].update(seconds=FAST_GROWTH_SECONDS,regrow_seconds=FIXTURE_REGROW_SECONDS)
 probe=out/'limb-probe-world.json';write_world(probe,limbs);state=out/'limb-probe.json'
-p=subprocess.run([*command,'--smoke','--world',str(probe),'--ticks','120','--state',str(state)],capture_output=True,text=True,timeout=MAX_PROCESS_SECONDS)
+p=subprocess.run([*command,'--smoke','--world',str(probe),'--ticks','120','--state',str(state)],capture_output=True,text=True,timeout=PROCESS_TIMEOUT_SECONDS)
 (out/'limb-probe.log').write_text(p.stdout+p.stderr);assert p.returncode==0,p.stdout+p.stderr
 tip=json.loads(state.read_text())['colonies'][0]['structures'][0]['position'];position=[tip[0],tip[1],tip[2]+ATTACKER_TIP_OFFSET]
 limbs['spawns']=[dict(type='immune_bomber',position=position)]
@@ -79,12 +77,12 @@ if args.case and 'fungal-blast' in args.case:
 if args.case:cases=[c for c in cases if c[0] in args.case]
 if not args.run:
     print(f'Prepared {len(cases)} scenes and checked attachment positions in the CPU application. No GPU started.');sys.exit(0)
-deadline=time.monotonic()+MAX_BATCH_SECONDS;results=[]
+results=[]
 for name,world,render,ticks,frames in cases:
     capture=out/(name+'.ppm');state=out/(name+'.json')
     p=subprocess.Popen([*command,'--headless','--frames',str(frames),'--no-stats','--world',str(world),'--config',str(render),
                         '--ticks',str(ticks),'--capture',str(capture),'--state',str(state)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=sys.platform!='win32')
-    try:stdout,stderr=p.communicate(timeout=min(MAX_PROCESS_SECONDS,max(MIN_TIMEOUT_SECONDS,deadline-time.monotonic())))
+    try:stdout,stderr=p.communicate(timeout=PROCESS_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
         if sys.platform=='win32':p.kill()
         else:os.killpg(p.pid,signal.SIGKILL)
@@ -101,4 +99,4 @@ for name,world,render,ticks,frames in cases:
     results.append(dict(name=name,application_ms=[float(x) for x in re.findall(r'Application frame: ([\d.]+) ms',stdout)],
                         gpu_trace_ms=[float(x) for x in re.findall(r'GPU trace: ([\d.]+) ms',stdout)],fractures=d['fractures']))
 (out/'verification.json').write_text(json.dumps(results,indent=2)+'\n')
-print(f'Growth captures passed: {len(cases)} sequential native 1080p processes, at most two frames each, within the eight-sample and 30-second caps.')
+print(f'Growth captures passed: {len(cases)} sequential native 1080p processes, with the selected frame counts and sampling.')

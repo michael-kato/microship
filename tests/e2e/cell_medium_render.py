@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Prepare or render fixed wall-blur, depth-blur and miniature-focus application views."""
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+from gpu_environment import gpu_process_timeout_seconds
 import argparse
 import json
 from pathlib import Path
@@ -20,8 +24,7 @@ for name,extra in cases:
 (out/'commands.json').write_text(json.dumps([c for _,c in prepared],indent=2)+'\n')
 started=time.monotonic()
 for name,command in prepared:
-    remaining=5-(time.monotonic()-started)
-    if a.run and remaining<=0:raise RuntimeError('The five-second GPU batch limit expired')
+    remaining=gpu_process_timeout_seconds()
     result=subprocess.run(command,capture_output=True,text=True,timeout=max(.1,remaining) if a.run else 5)
     (out/(name+'.log')).write_text(result.stdout+result.stderr);print(result.stdout,end='',flush=True)
     assert result.returncode==0,(name,result.stdout,result.stderr)

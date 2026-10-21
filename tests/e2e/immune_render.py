@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Prepare or run two immune views and one bounded OS-control check."""
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+from gpu_environment import gpu_process_timeout_seconds
 from copy import deepcopy
 import argparse,json,os,re,subprocess,sys,time
 from pathlib import Path
@@ -34,14 +38,14 @@ for (name,_,ticks),cmd in zip(cases,commands):
  assert unit['charging'] if name=='charge' else unit['latch']>=0,(name,unit)
 os.environ['NANOVA_VULKAN_VALIDATION']='1';report={};start=time.monotonic()
 for (name,_,_),cmd in zip(cases,commands):
- remaining=5-(time.monotonic()-start);assert remaining>0
- result=subprocess.run(cmd,capture_output=True,text=True,timeout=min(2,remaining));(out/(name+'.log')).write_text(result.stdout+result.stderr);assert result.returncode==0,(name,result.stdout,result.stderr)
+ remaining=gpu_process_timeout_seconds()
+ result=subprocess.run(cmd,capture_output=True,text=True,timeout=remaining);(out/(name+'.log')).write_text(result.stdout+result.stderr);assert result.returncode==0,(name,result.stdout,result.stderr)
  assert 'Vulkan validation: enabled.' in result.stdout
  archive_capture(out/(name+'.ppm'),'immune-'+name)
  state=json.loads((out/(name+'-state.json')).read_text());scene=json.loads((out/(name+'-scene.json')).read_text());unit=next(u for u in state['units'] if u['faction']==2)
  if name=='charge':assert unit['charging'] and any(e[7]==4 for e in scene['effect_segments']),unit
  else:assert unit['latch']>=0 and not any(e[7]==4 for e in scene['effect_segments']),unit
  report[name]={'application_ms':list(map(float,re.findall(r'Application frame: ([0-9.]+)',result.stdout)))}
-remaining=5-(time.monotonic()-start);assert remaining>0;report['controls']=run_window(a.binary.resolve(),out,min(2,remaining));report['batch_seconds']=time.monotonic()-start
+remaining=gpu_process_timeout_seconds();report['controls']=run_window(a.binary.resolve(),out,remaining);report['batch_seconds']=time.monotonic()-start
 archive_capture(out/'controls.ppm','immune-controls')
 (out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))

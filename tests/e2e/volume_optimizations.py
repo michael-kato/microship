@@ -14,6 +14,7 @@ import time
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
 from authored_assets import stage_world,write_world
 from save_progress import archive_capture
+from gpu_environment import gpu_process_timeout_seconds
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('binary',type=Path)
 parser.add_argument('--case',choices=('near','normal','boundary','overlap','thin','opaque','solid','live','far'),default='near')
@@ -94,9 +95,8 @@ environment=os.environ.copy();environment['NANOVA_VULKAN_VALIDATION']='0' if arg
 started=time.monotonic();report=[];reference_state=None
 labels=dict(application='Application frame',surface='GPU surface',volume='GPU volumes',acceleration='GPU acceleration update',gpu_total='total render',shadow_grid='GPU shadow grid',medium_blur='GPU medium blur')
 for variant,prefix,invocation in prepared:
-    remaining=5-(time.monotonic()-started)
-    if not args.cpu and remaining<=0:raise RuntimeError('The five-second GPU batch limit expired')
-    process=subprocess.run(invocation,capture_output=True,text=True,env=environment,timeout=10 if args.cpu else min(2,remaining))
+    remaining=gpu_process_timeout_seconds()
+    process=subprocess.run(invocation,capture_output=True,text=True,env=environment,timeout=10 if args.cpu else remaining)
     (out/(prefix+'.log')).write_text(process.stdout+process.stderr)
     if process.returncode:raise RuntimeError(prefix+': '+process.stdout+process.stderr)
     if not args.cpu and not args.timing:assert 'Vulkan validation: enabled.' in process.stdout

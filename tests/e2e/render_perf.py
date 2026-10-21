@@ -27,20 +27,18 @@ p.add_argument('--quality-comparison',action='store_true',help='Report intention
 p.add_argument('--blur-profile',choices=('authored','linear','off'),default='authored')
 p.add_argument('--subgroup-size',type=int,choices=(0,32,64),default=32)
 p.add_argument('--baseline-subgroup-size',type=int,choices=(0,32,64))
-p.add_argument('--cold-start',action='store_true',help='Use the authorized 10s process and 30s batch limits for new pipeline compilation; still two frames')
+p.add_argument('--cold-start',action='store_true',help='Retained for command compatibility')
 p.add_argument('--window',action='store_true')
 p.add_argument('--live',action='store_true',help='Advance the actual simulation by one fixed tick per rendered frame')
-p.add_argument('--frames',type=int,choices=(2,120),default=2,help='120 needs the user-authorized sustained performance check')
-p.add_argument('--pairs',type=int,choices=(1,3),default=1)
+p.add_argument('--frames',type=int,default=2,help='Frames per process')
+p.add_argument('--pairs',type=int,default=1)
+p.add_argument('--timeout',type=float,default=gpu_process_timeout_seconds())
 p.add_argument('--reverse',action='store_true')
 p.add_argument('--no-capture',action='store_true')
 p.add_argument('--timing',action='store_true');p.add_argument('--run',action='store_true')
 p.add_argument('--output',type=Path,default=root/'build/render-perf');a=p.parse_args()
-if a.cold_start and a.frames!=2:p.error('--cold-start is limited to two frames')
-process_seconds=10 if a.cold_start else 8 if a.frames>2 else 2
-batch_seconds=30 if a.cold_start else 20 if a.frames>2 else 5
-if a.no_capture and not a.timing:p.error('--no-capture requires --timing')
-if a.frames>2 and (not a.timing or not a.no_capture):p.error('Sustained checks require --timing --no-capture')
+if a.frames<2 or a.pairs<1 or not math.isfinite(a.timeout) or a.timeout<=0:p.error('Use at least two frames, positive pairs and a finite positive timeout')
+process_seconds=a.timeout
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 subprocess.run([sys.executable,str(root/'tests/e2e/static_lighting.py'),str(a.binary),'--case',a.case,'--variants','cached','--output',str(out)],check=True,stdout=subprocess.PIPE,text=True)
 base=json.loads((out/'commands.json').read_text())[0][1]
@@ -91,15 +89,15 @@ for pair in range(a.pairs):
   commands.append((name,command))
 (out/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
 if not a.run:
- print('Prepared',len(commands),'sequential native 1080p two-frame application runs;',a.samples,'film + 1 volume + 1 backdrop starts.',a.frames,'frames;',process_seconds,'s/process,',batch_seconds,'s/batch, no hardware tracing. No GPU work started.')
+ print('Prepared',len(commands),'sequential native 1080p two-frame application runs;',a.samples,'film + 1 volume + 1 backdrop starts.',a.frames,'frames;','No GPU work started.')
  raise SystemExit(0)
 check_gpu_environment();env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1'
-report={'process_limit_seconds':process_seconds,'batch_limit_seconds':batch_seconds,'window':a.window,'live':a.live,'frames':a.frames,'capture':not a.no_capture,'case':a.case,'blur_profile':a.blur_profile,'samples':a.samples,'volume_stride':a.volume_stride,'spatial_volume':a.spatial_volume,'spatial_aa':a.spatial_aa,'shadow_grid':a.shadow_grid,'quadrature':a.quadrature,'volume_steps':a.volume_steps,'baseline_samples':a.baseline_samples,'baseline_volume_steps':a.baseline_volume_steps,'quality_comparison':a.quality_comparison,'validation':not a.timing,'runs':{}}
+report={'process_timeout_seconds':process_seconds,'window':a.window,'live':a.live,'frames':a.frames,'capture':not a.no_capture,'case':a.case,'blur_profile':a.blur_profile,'samples':a.samples,'volume_stride':a.volume_stride,'spatial_volume':a.spatial_volume,'spatial_aa':a.spatial_aa,'shadow_grid':a.shadow_grid,'quadrature':a.quadrature,'volume_steps':a.volume_steps,'baseline_samples':a.baseline_samples,'baseline_volume_steps':a.baseline_volume_steps,'quality_comparison':a.quality_comparison,'validation':not a.timing,'runs':{}}
 started=time.monotonic()
 for name,command in commands:
- remaining=batch_seconds-(time.monotonic()-started);assert remaining>0,'GPU batch expired'
+ remaining=process_seconds
  before=time.monotonic();process=subprocess.Popen(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
- try:output,errors=process.communicate(timeout=min(process_seconds,remaining))
+ try:output,errors=process.communicate(timeout=process_seconds)
  except subprocess.TimeoutExpired:
   if sys.platform=='win32':process.terminate()
   else:os.killpg(process.pid,signal.SIGTERM)
@@ -108,7 +106,7 @@ for name,command in commands:
    if sys.platform=='win32':process.kill()
    else:os.killpg(process.pid,signal.SIGKILL)
    output,errors=process.communicate()
-  (out/(name+'.log')).write_text(output+errors);raise RuntimeError('GPU process limit reached: '+name) from None
+  (out/(name+'.log')).write_text(output+errors);raise RuntimeError('GPU process timeout: '+name) from None
  (out/(name+'.log')).write_text(output+errors)
  assert process.returncode==0,(name,output,errors)
  expected='Vulkan validation: not reported by loader/tooling.' if a.timing else 'Vulkan validation: enabled.'

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Prepare or run bounded SSS/volume app comparisons at native resolution."""
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+from gpu_environment import gpu_process_timeout_seconds
 from copy import deepcopy
 import argparse,json,os,re,shutil,subprocess,sys,time
 from pathlib import Path
@@ -56,11 +60,11 @@ for case in a.cases:
   if case=='far':args+=['--camera-zoom','-1000']
   prepared.append((name,args))
 (out/'commands.json').write_text(json.dumps(prepared,indent=2)+'\n')
-if not a.run:print('Prepared',len(prepared),'sequential native 1920x1080 processes, 2 frames each, 3 film + 1 volume + 1 backdrop starts; 2s/process, 5s/batch. Diagnosis can disable SSS or volume. No GPU work started.');raise SystemExit(0)
+if not a.run:print('Prepared',len(prepared),'sequential native 1920x1080 processes, 2 frames each, 3 film + 1 volume + 1 backdrop starts Diagnosis can disable SSS or volume. No GPU work started.');raise SystemExit(0)
 env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1';report={};start=time.monotonic()
 for name,args in prepared:
- remaining=5-(time.monotonic()-start);assert remaining>0,'Five-second GPU batch expired'
- before=time.monotonic();process=subprocess.run(args,capture_output=True,text=True,env=env,timeout=min(2,remaining));(out/(name+'.log')).write_text(process.stdout+process.stderr)
+ remaining=gpu_process_timeout_seconds()
+ before=time.monotonic();process=subprocess.run(args,capture_output=True,text=True,env=env,timeout=remaining);(out/(name+'.log')).write_text(process.stdout+process.stderr)
  assert process.returncode==0,(name,process.stdout,process.stderr)
  expected='Vulkan validation: not reported by loader/tooling.' if a.timing else 'Vulkan validation: enabled.';assert expected in process.stdout
  labels={'SURFACE + SSS':'GPU surface','VOLUME':'GPU volumes','GPU RENDER':'total render','CPU FRAME':'Application frame'}

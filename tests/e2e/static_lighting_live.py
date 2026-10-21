@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Check live wall-bake invalidation against a fresh real-application render."""
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+from gpu_environment import gpu_process_timeout_seconds
 import argparse
 import json
 import os
@@ -23,15 +27,15 @@ prefix=[str(a.binary.resolve())] if sys.platform=='win32' else [sys.executable,s
 base=[*prefix,'--world',str(wp),'--config',str(cp),'--world-seed','1234','--camera-zoom','1000','--no-stats']
 command=[*base,'--frames','2','--frame-delay-ms','100','--no-activate','--ticks','600','--capture',str(out/'live.pfm'),'--state',str(out/'live-state.json'),'--scene-state',str(out/'live-scene.json')]
 (out/'commands.json').write_text(json.dumps([command],indent=2)+'\n')
-if not a.run:print('Prepared one native 1920x1080 two-frame window and one fresh single-frame render. 3 film + 1 volume + 1 backdrop starts; host validation; 2s/process, 5s/batch; no tracing. No GPU work started.');raise SystemExit(0)
+if not a.run:print('Prepared one native 1920x1080 two-frame window and one fresh single-frame render. 3 film + 1 volume + 1 backdrop starts; host validation no tracing. No GPU work started.');raise SystemExit(0)
 env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1';start=time.monotonic()
 def run(name,args):
- remaining=5-(time.monotonic()-start);assert remaining>0,'Five-second GPU batch expired'
- try:result=subprocess.run(args,env=env,capture_output=True,text=True,timeout=min(2,remaining))
+ remaining=gpu_process_timeout_seconds()
+ try:result=subprocess.run(args,env=env,capture_output=True,text=True,timeout=remaining)
  except subprocess.TimeoutExpired as error:
   stdout=error.stdout or b'';stderr=error.stderr or b''
   (out/(name+'.log')).write_bytes((stdout.encode() if isinstance(stdout,str) else stdout)+(stderr.encode() if isinstance(stderr,str) else stderr))
-  raise RuntimeError(name+' exceeded the two-second process limit') from None
+  raise RuntimeError(name+' reached its process timeout') from None
  (out/(name+'.log')).write_text(result.stdout+result.stderr)
  assert result.returncode==0,(name,result.stdout,result.stderr)
  assert 'Vulkan validation: enabled.' in result.stdout

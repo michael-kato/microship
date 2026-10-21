@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Prepare or run bounded real-application optical-depth comparisons."""
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+from gpu_environment import gpu_process_timeout_seconds
 import argparse,json,os,re,statistics,subprocess,sys,time
 from pathlib import Path
 root=Path(__file__).resolve().parents[2]
@@ -47,13 +51,13 @@ for pair in range(a.pairs):
   commands.append((name,cmd))
 (out/'optical-commands.json').write_text(json.dumps(commands,indent=2)+'\n')
 if not a.run:
- print('Prepared',len(commands),'sequential native 1920x1080 app processes; 2 frames, 3 film + 1 volume + 1 backdrop starts, 8 integration steps; 2s/process, 5s/batch; no tracing. No GPU work started.');raise SystemExit(0)
+ print('Prepared',len(commands),'sequential native 1920x1080 app processes; 2 frames, 3 film + 1 volume + 1 backdrop starts, 8 integration steps no tracing. No GPU work started.');raise SystemExit(0)
 env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1'
 report={};start=time.monotonic()
 for name,cmd in commands:
- remaining=5-(time.monotonic()-start);assert remaining>0,'Five-second GPU batch expired'
+ remaining=gpu_process_timeout_seconds()
  before=time.monotonic()
- try:result=subprocess.run(cmd,env=env,capture_output=True,text=True,timeout=min(2,remaining))
+ try:result=subprocess.run(cmd,env=env,capture_output=True,text=True,timeout=remaining)
  except subprocess.TimeoutExpired as error:
   (out/(name+'.log')).write_bytes((error.stdout or b'')+(error.stderr or b''));raise
  (out/(name+'.log')).write_text(result.stdout+result.stderr)

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Prepare or run native cell depth and SSS application captures."""
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+from gpu_environment import gpu_process_timeout_seconds
 from copy import deepcopy
 import argparse,json,math,os,re,struct,subprocess,sys,time
 from pathlib import Path
@@ -48,8 +52,8 @@ base=json.loads((out/'probe-state.json').read_text())['unit_capacity']
 scene=json.loads(probe.read_text());assert all(any(i['slot']==base+n for i in scene['instances']) for n in (0,2,3,4))
 env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1';images={};report={};start=time.monotonic()
 for (name,*_),cmd in zip(cases,commands):
- remaining=5-(time.monotonic()-start);assert remaining>0,'Five-second GPU batch limit expired'
- result=subprocess.run(cmd,capture_output=True,text=True,env=env,timeout=min(2,remaining));(out/(name+'.log')).write_text(result.stdout+result.stderr)
+ remaining=gpu_process_timeout_seconds()
+ result=subprocess.run(cmd,capture_output=True,text=True,env=env,timeout=remaining);(out/(name+'.log')).write_text(result.stdout+result.stderr)
  assert result.returncode==0,(name,result.stdout,result.stderr)
  assert 'Vulkan validation: enabled.' in result.stdout
  raw=(out/(name+'.ppm')).read_bytes();header=re.match(rb'P6\s+1920\s+1080\s+255\s',raw);assert header;images[name]=raw[header.end():]

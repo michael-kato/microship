@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Prepare or run bounded native-1080p anatomical backdrop application captures."""
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+from gpu_environment import gpu_process_timeout_seconds
 from copy import deepcopy
 import argparse
 import json
@@ -46,9 +50,8 @@ for name in a.variants.split(','):
 if not a.run:print('Prepared native 1920x1080 backdrop checks; no GPU work started.');sys.exit(0)
 env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1';start=time.monotonic();report={}
 for name,command in commands:
-    remaining=5-(time.monotonic()-start)
-    if remaining<=0:raise RuntimeError('The five-second GPU batch limit expired')
-    result=subprocess.run(command,capture_output=True,text=True,env=env,timeout=min(2,remaining));(out/(name+'.log')).write_text(result.stdout+result.stderr)
+    remaining=gpu_process_timeout_seconds()
+    result=subprocess.run(command,capture_output=True,text=True,env=env,timeout=remaining);(out/(name+'.log')).write_text(result.stdout+result.stderr)
     assert result.returncode==0,(name,result.stdout,result.stderr)
     if not a.timing:assert 'Vulkan validation: enabled.' in result.stdout
     raw=(out/(name+'.ppm')).read_bytes();header=re.match(rb'P6\s+1920\s+1080\s+255\s',raw);assert header and len(raw)-header.end()==1920*1080*3

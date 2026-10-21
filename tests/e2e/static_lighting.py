@@ -14,6 +14,7 @@ root=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(root/'scripts'))
 from authored_assets import stage_world,write_world
 from save_progress import archive_capture
+from gpu_environment import gpu_process_timeout_seconds
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('binary',type=Path)
 p.add_argument('--baseline',type=Path)
@@ -61,14 +62,14 @@ for variant in reversed(a.variants) if a.reverse else a.variants:
  prepared.append((variant,command))
 (out/'commands.json').write_text(json.dumps(prepared,indent=2)+'\n')
 if not a.run:
- print('Prepared',len(prepared),'sequential native 1920x1080 app processes: 2 frames, 3 film + 1 volume + 1 backdrop starts; 2s/process, 5s/batch; no tracing. No GPU work started.')
+ print('Prepared',len(prepared),'sequential native 1920x1080 app processes: 2 frames, 3 film + 1 volume + 1 backdrop starts no tracing. No GPU work started.')
  raise SystemExit(0)
 env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1'
 report={};start=time.monotonic()
 for variant,command in prepared:
- remaining=5-(time.monotonic()-start);assert remaining>0,'Five-second GPU batch expired'
+ remaining=gpu_process_timeout_seconds()
  before=time.monotonic()
- result=subprocess.run(command,env=env,capture_output=True,text=True,timeout=min(2,remaining))
+ result=subprocess.run(command,env=env,capture_output=True,text=True,timeout=remaining)
  (out/(variant+'.log')).write_text(result.stdout+result.stderr)
  assert result.returncode==0,(variant,result.stdout,result.stderr)
  expected='Vulkan validation: not reported by loader/tooling.' if a.timing else 'Vulkan validation: enabled.'

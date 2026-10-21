@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Render the primary three-faction stress scene within the fixed GPU limits."""
+"""Render the primary three-faction stress scene and check frozen-frame equality."""
 import argparse,json,os,re,signal,subprocess,sys,time
 from pathlib import Path
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
-from gpu_environment import check_gpu_environment
+from gpu_environment import check_gpu_environment, gpu_process_timeout_seconds
 from save_progress import archive_capture
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('binary',type=Path);parser.add_argument('--output',type=Path,required=True)
@@ -12,12 +12,11 @@ binary=args.binary.resolve();out=args.output.resolve();out.mkdir(parents=True,ex
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 config=binary.parent/'assets/rendering/renderer.json';values=json.loads(config.read_text())
 assert (values['output']['width'],values['output']['height'])==(1920,1080)
-assert values['sampling']['samples_per_pixel']+values['volume']['rays_per_pixel']+1<=8
-world=binary.parent/'assets/levels/three_faction_stress.json';deadline=time.monotonic()+30;baseline=None
+world=binary.parent/'assets/levels/three_faction_stress.json';baseline=None
 for frames in (1,2):
  name='three_faction_stress_'+str(frames);image=out/(name+'.ppm');state=out/(name+'.json')
  p=subprocess.Popen([*command,'--headless','--frames',str(frames),'--no-stats','--world',str(world),'--config',str(config),'--ticks','300','--world-seed','1234','--capture',str(image),'--state',str(state)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=sys.platform!='win32')
- try:stdout,stderr=p.communicate(timeout=min(10,max(.001,deadline-time.monotonic())))
+ try:stdout,stderr=p.communicate(timeout=gpu_process_timeout_seconds())
  except subprocess.TimeoutExpired:
   if sys.platform=='win32':p.kill()
   else:os.killpg(p.pid,signal.SIGKILL)

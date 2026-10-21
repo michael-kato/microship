@@ -14,13 +14,13 @@ import time
 
 from authored_assets import stage_world,write_world
 from save_progress import archive_capture
+from gpu_environment import gpu_process_timeout_seconds
 
 root=Path(__file__).resolve().parents[1]
 parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('binary',type=Path)
 parser.add_argument('--output',type=Path,default=root/'build/zoom-profile')
-parser.add_argument('--film-samples',type=int,choices=(3,6),default=3)
-parser.add_argument('--process-seconds',type=float,default=2)
-parser.add_argument('--batch-seconds',type=float,default=5)
+parser.add_argument('--film-samples',type=int,default=3)
+parser.add_argument('--process-seconds',type=float,default=gpu_process_timeout_seconds())
 mode=parser.add_mutually_exclusive_group();mode.add_argument('--cpu',action='store_true');mode.add_argument('--run',action='store_true')
 args=parser.parse_args();binary=args.binary.resolve();out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
@@ -28,11 +28,10 @@ base=stage_world(root/'assets/levels/virus-player-level.json',out)
 config=json.loads((root/'assets/rendering/renderer-quality.json').read_text())
 assert config['output']['width']==1920 and config['output']['height']==1080
 assert config['sampling']['samples_per_pixel']==6 and all(config['volume'][k]==v for k,v in dict(rays_per_pixel=1,integration_steps=8).items())
-if not 0<args.process_seconds<=10 or not 0<args.batch_seconds<=30:parser.error('Process and batch limits must be in (0,10] and (0,30] seconds')
-# BUILDING.md's current ordinary budget is reduced. Higher budgets need explicit approval.
+if args.process_seconds<=0 or args.film_samples<=0:parser.error('Use positive samples and timeout')
 config['sampling']['samples_per_pixel']=args.film_samples
 budget=dict(film_samples=args.film_samples,volume_film_rays=1,backdrop_queries=1,frames_per_process=2,
-    process_seconds=args.process_seconds,batch_seconds=args.batch_seconds,validation=True)
+    process_seconds=args.process_seconds,validation=True)
 (out/'budget.json').write_text(json.dumps(budget,indent=2)+'\n')
 orders=out/'settle.orders';orders.write_text('0 select all\n0 order 0\n600 ratio 65\n')
 cases=[]
@@ -81,18 +80,17 @@ if args.cpu:
     print(json.dumps(result,indent=2));print('Five CPU application cases passed: identical simulation and geometry; only camera or diagnostic presentation changed.')
     sys.exit(0)
 if not args.run:
-    print(f'Prepared five native 1920x1080 cases in {out}; {args.film_samples} film samples, two frames per process, {args.process_seconds:g} seconds per process, {args.batch_seconds:g} seconds for the batch. No GPU work started.')
+    print(f'Prepared five native 1920x1080 cases in {out}; {args.film_samples} film samples, two frames per process, {args.process_seconds:g} seconds per process. No GPU work started.')
     sys.exit(0)
 
 environment=os.environ.copy();environment['NANOVA_VULKAN_VALIDATION']='1';started=time.monotonic();report=[]
 labels={'application':'Application frame','surface':'GPU surface','volume':'GPU volumes','backdrop':'GPU backdrop',
     'acceleration':'GPU acceleration update','effects':'GPU effects','display':'GPU fog/bloom/display','gpu_total':'total render'}
 for case in cases:
-    name=case['name'];remaining=args.batch_seconds-(time.monotonic()-started)
-    if remaining<=0:raise RuntimeError('The GPU batch limit has expired')
+    name=case['name']
     invocation=case['common']+['--headless','--frames','2','--capture',str(case['capture']),
         '--state',str(out/(name+'-state.json')),'--scene-state',str(out/(name+'-scene.json'))]
-    p=subprocess.run(invocation,capture_output=True,text=True,env=environment,timeout=min(args.process_seconds,remaining))
+    p=subprocess.run(invocation,capture_output=True,text=True,env=environment,timeout=args.process_seconds)
     (out/(name+'.log')).write_text(p.stdout+p.stderr)
     if p.returncode or 'Vulkan validation: enabled.' not in p.stdout:raise RuntimeError(name+': '+p.stdout+p.stderr)
     frames={key:[float(v) for v in re.findall(re.escape(label)+r': ([0-9.]+) ms',p.stdout)] for key,label in labels.items()}

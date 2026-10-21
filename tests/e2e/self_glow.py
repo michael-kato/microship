@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Prepare or run native 1080p self-glow comparisons in the real application."""
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+from gpu_environment import gpu_process_timeout_seconds
 import argparse
 from copy import deepcopy
 import json
@@ -48,15 +52,14 @@ for view in ['near','wide']:
         commands.append((name,command))
 (out/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
 if not a.run:
-    print('Prepared six sequential native 1920x1080 captures, two frames/process, host validation, 10s/process, 30s/batch, no hardware tracing. No GPU work started.')
+    print('Prepared six sequential native 1920x1080 captures, two frames/process, host validation, no hardware tracing. No GPU work started.')
     raise SystemExit(0)
 check_gpu_environment();env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1'
 start=time.monotonic();report={};state=None
 for name,command in commands:
-    folder=out/name;remaining=30-(time.monotonic()-start)
-    assert remaining>0,'GPU batch expired'
+    folder=out/name;remaining=gpu_process_timeout_seconds()
     proc=subprocess.Popen(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
-    try:stdout,stderr=proc.communicate(timeout=min(10,remaining))
+    try:stdout,stderr=proc.communicate(timeout=remaining)
     except subprocess.TimeoutExpired:
         if sys.platform=='win32':proc.terminate()
         else:os.killpg(proc.pid,signal.SIGTERM)

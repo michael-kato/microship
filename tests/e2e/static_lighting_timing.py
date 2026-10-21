@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Prepare or run three alternating-order app timing pairs within one GPU budget."""
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+from gpu_environment import gpu_process_timeout_seconds
 import argparse,json,os,re,statistics,subprocess,sys,time
 from pathlib import Path
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
@@ -14,11 +18,11 @@ for pair in range(3):
   cmd[cmd.index('--capture')+1]=str(out/(name+'.ppm'));cmd[cmd.index('--state')+1]=str(out/(name+'-state.json'))
   commands.append((name,cmd))
 (out/'timing-commands.json').write_text(json.dumps(commands,indent=2)+'\n')
-if not a.run:print('Prepared six sequential native 1920x1080 processes, two frames each; 3 film + 1 volume + 1 backdrop starts; validation off; 2s/process, 5s/batch; no tracing. No GPU work started.');raise SystemExit(0)
+if not a.run:print('Prepared six sequential native 1920x1080 processes, two frames each; 3 film + 1 volume + 1 backdrop starts; validation off no tracing. No GPU work started.');raise SystemExit(0)
 env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0';report={};start=time.monotonic()
 for name,cmd in commands:
- remaining=5-(time.monotonic()-start);assert remaining>0,'Five-second GPU batch expired'
- result=subprocess.run(cmd,env=env,capture_output=True,text=True,timeout=min(2,remaining));(out/(name+'.log')).write_text(result.stdout+result.stderr)
+ remaining=gpu_process_timeout_seconds()
+ result=subprocess.run(cmd,env=env,capture_output=True,text=True,timeout=remaining);(out/(name+'.log')).write_text(result.stdout+result.stderr)
  assert result.returncode==0,(name,result.stdout,result.stderr)
  assert 'Vulkan validation: not reported by loader/tooling.' in result.stdout
  labels={'surface':'GPU surface','volume':'GPU volumes','grid':'GPU shadow grid','gpu':'total render','cpu':'Application frame'}

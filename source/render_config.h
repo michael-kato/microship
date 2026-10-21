@@ -36,6 +36,10 @@ struct RenderConfig
     float focus_center,focus_half_width,focus_falloff,focus_radius;
     uint32_t subsurface_samples;
     float subsurface_strength,subsurface_wrap,subsurface_transmission,subsurface_thickness;
+    // Radiance cascades; zero probes disables them. Interval in cascade-0 probe spacings.
+    uint32_t cascade_probes,cascade_directions,cascade_count,cascade_cells_per_frame; // Zero cells: all active cells each frame.
+    float cascade_interval,cascade_growth;
+    bool cascade_feedback;
 };
 
 const char* render_config_error(const RenderConfig*);

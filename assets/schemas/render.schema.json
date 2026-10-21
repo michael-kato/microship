@@ -142,6 +142,52 @@
       "required": ["microfacet_energy_compensation"],
       "additionalProperties": false
     },
+    "radiance_cascades": {
+      "type": "object",
+      "properties": {
+        "probe_resolution": {
+          "anyOf": [{"const": 0}, {"type": "integer", "minimum": 4, "maximum": 64}]
+        },
+        "direction_resolution": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 16
+        },
+        "cascade_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "first_interval": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 64
+        },
+        "interval_growth": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "bounce_feedback": {
+          "type": "boolean"
+        },
+        "cells_per_frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        }
+      },
+      "required": [
+        "probe_resolution",
+        "direction_resolution",
+        "cascade_count",
+        "first_interval",
+        "interval_growth",
+        "bounce_feedback",
+        "cells_per_frame"
+      ],
+      "additionalProperties": false
+    },
     "bloom": {
       "type": "object",
       "properties": {

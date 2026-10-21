@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Prepare fixed-camera appearance cases. --run opts in to five bounded GPU processes."""
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+from gpu_environment import gpu_process_timeout_seconds
 import argparse
 from copy import deepcopy
 import json
@@ -48,9 +52,8 @@ if not args.run:
 environment=os.environ.copy();environment['NANOVA_VULKAN_VALIDATION']='1'
 started=time.monotonic();report=[]
 for name,capture,invocation in prepared:
-    remaining=30-(time.monotonic()-started)
-    if remaining<=0:raise RuntimeError('The thirty-second GPU batch limit has expired')
-    process=subprocess.run(invocation,capture_output=True,text=True,env=environment,timeout=min(10,remaining))
+    remaining=gpu_process_timeout_seconds()
+    process=subprocess.run(invocation,capture_output=True,text=True,env=environment,timeout=remaining)
     (out/(name+'.log')).write_text(process.stdout+process.stderr)
     if process.returncode or 'Vulkan validation: enabled.' not in process.stdout:
         raise RuntimeError(name+' failed validation or application shutdown: '+process.stdout+process.stderr)

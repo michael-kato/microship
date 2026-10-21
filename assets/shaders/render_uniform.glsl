@@ -29,4 +29,6 @@ layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
     vec4 membrane_ripple; // Normal amplitude, spatial frequency, current phase.
     vec4 emission_fresnel; // Strength and power for instances with angle-masked emission.
     vec4 emission_color; // RGB override for those instances; W enables it.
+    uvec4 cascades; // Probe resolution, octahedral side, cascade count, bounce feedback.
+    vec4 cascade_interval; // First interval in probe spacings, interval growth per cascade.
 } render;

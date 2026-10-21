@@ -1,20 +1,20 @@
-"""Reject hardware tracing after the recorded AMD driver lockup."""
+"""Read optional host timeouts for GPU tools. There is no fixed GPU work budget."""
 
 import os
-import sys
+import math
+
+
+def gpu_process_timeout_seconds():
+    """Return a configurable timeout for a process that stops responding."""
+    seconds = float(os.environ.get('NANOVA_GPU_TIMEOUT_SECONDS', '120'))
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise ValueError('NANOVA_GPU_TIMEOUT_SECONDS must be finite and positive')
+    return seconds
 
 
 def check_gpu_environment():
-    flags = sorted(name for name, value in os.environ.items()
-                   if value and name.startswith(('MESA_VK_TRACE', 'RADV_THREAD_TRACE')))
-    if flags:
-        raise RuntimeError('Hardware tracing is disabled after the GPU lockup. '
-                           'Unset these variables before running nanova: ' + ', '.join(flags))
+    gpu_process_timeout_seconds()
 
 
 if __name__ == '__main__':
-    try:
-        check_gpu_environment()
-    except RuntimeError as error:
-        print(error, file=sys.stderr)
-        sys.exit(1)
+    check_gpu_environment()

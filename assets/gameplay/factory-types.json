@@ -57,7 +57,8 @@
           "angle_jitter_degrees": 16,
           "length_jitter": 0.25,
           "width_jitter": 0.15,
-          "curvature": 0.12
+          "curvature": 0.12,
+          "curve_jitter": 0.2
         },
         "root_height": 1.4
       },
@@ -96,7 +97,8 @@
           "angle_jitter_degrees": 10,
           "length_jitter": 0.18,
           "width_jitter": 0.1,
-          "curvature": 0.65
+          "curvature": 0.65,
+          "curve_jitter": 0.4
         }
       },
       "growth_meshes": {
@@ -149,7 +151,8 @@
           "angle_jitter_degrees": 14,
           "length_jitter": 0.22,
           "width_jitter": 0.12,
-          "curvature": 1.4
+          "curvature": 1.4,
+          "curve_jitter": 0.65
         }
       },
       "growth_meshes": {
