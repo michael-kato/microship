@@ -358,26 +358,74 @@ def cpu_checks(args):
 
 
 def gpu_check(args):
+    from PIL import Image
+
+    def preview(active):
+        # The capture must be ready while the production menu is still open.
+        active.app.wait_line(r'Pause menu ready:')
+        path = args.output / (active.name + '.ppm')
+        assert path.is_file(), 'No paused frame was rendered before the menu opened'
+        with Image.open(path) as image:
+            assert image.size == (1920, 1080), image.size
+            pixels = image.convert('RGB').crop((0, 80, 1920, 1080)).tobytes()
+        assert sum(pixels) / len(pixels) > 1, 'Paused preview is dark'
+        return pixels
+
     preferences = args.output / 'gpu_settings.json'
     preferences.write_text(json.dumps(dict(version=1)))
-    active = Application(args, 'graphics_apply', preferences, gpu=True, pause=False)
+    active = Application(args, 'graphics_apply', preferences, gpu=True)
     try:
+        initial = preview(active)
         active.ui('game_dirty')
         active.ui('click|Settings')
-        active.ui('set|Exposure|2')
+        for exposure in ('2', '4'):
+            active.ui('set|Exposure|' + exposure)
+            active.ui('click|Apply')
+            active.ui('wait_text|Settings applied and saved.')
+            changed = preview(active)
+            assert sum(changed) > sum(initial), 'Exposure did not update the paused frame'
+            initial = changed
+        # This path updates feature flags without rebuilding the renderer.
+        active.ui('click|Effects')
+        active.ui('set|Glow and bloom|Off')
         active.ui('click|Apply')
         active.ui('wait_text|Settings applied and saved.')
+        effects = preview(active)
+        assert effects != initial, 'Feature toggle did not update the paused frame'
+        active.ui('click|Restore Defaults')
+        active.ui('click|Apply')
+        active.ui('wait_text|Settings applied and saved.')
+        restored = preview(active)
+        assert sum(restored) < sum(initial), 'Defaults did not update the paused frame'
         active.ui('click|Cancel')
         active.ui('click|Resume')
         log = active.done()
-        assert log.count('Renderer: direct ray tracing;') == 2, log
+        assert log.count('Renderer: direct ray tracing;') == 4, log
         assert 'Camera keyboard:' not in log and 'Camera input:' not in log, log
         assert json.loads(active.state.read_text())['order']['count'] == 0
-        assert json.loads(preferences.read_text())['display']['exposure'] == 2
-        print('Pause graphics passed: apply, renderer rebuild, input isolation, resume, two native-1080p frames, host Vulkan validation.')
+        assert abs(json.loads(preferences.read_text())['display']['exposure'] - 1.6) < .000001
     finally:
         active.close()
 
+    failure = args.output / 'gpu_missing_folder' / 'player_settings.json'
+    active = Application(args, 'graphics_rollback', failure, gpu=True)
+    try:
+        initial = preview(active)
+        active.ui('click|Settings')
+        active.ui('set|Exposure|4')
+        active.ui('click|Apply')
+        active.ui('wait_text|Settings were not saved. Previous settings restored.')
+        assert preview(active) == initial, 'Failed save did not redraw the previous settings'
+        assert active.ui('get|Exposure') == ['VALUE|1.6']
+        active.ui('click|Cancel')
+        active.ui('click|Resume')
+        log = active.done()
+        assert log.count('Renderer: direct ray tracing;') == 3, log
+        assert not failure.exists()
+        print('Pause graphics passed: live captures before resume; repeated Apply, feature toggle, '
+              'defaults and failed-save rollback; frozen simulation; host Vulkan validation.')
+    finally:
+        active.close()
 
 
 def physical_gpu_check(args):

@@ -489,6 +489,16 @@ static PauseAction pause_session(Game* game,Presentation* presentation,Audio* au
     PlayerSettings draft=*settings;int page=-1;char status[256]={};PauseAction action=PAUSE_ERROR;
     for (;;)
     {
+        if (rendered)
+        {
+            // Present the frozen scene before opening the modal menu, including
+            // after Apply or rollback replaces the renderer and its swapchain.
+            profiler_begin(&game->renderer.profiler,profiler_clock_ms());
+            overlay_enabled(game,config);
+            if (!presentation_build(presentation,&game->simulation,&game->camera,config)
+                || !renderer_render(&game->renderer,&presentation->scene,&game->camera,options->capture_path))
+            { action=PAUSE_ERROR;break; }
+        }
         action=pause_menu(rendered ? renderer_window(&game->renderer) : 0,&draft,defaults,&page,status);
         if (action!=PAUSE_APPLY) break;
         const char* error=player_settings_error(&draft);

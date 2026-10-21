@@ -994,7 +994,14 @@ Build the input driver with `cmake --build build/windows-cross --target nanova_i
 
 `--smoke --pause-on-start --settings PATH.json` opens the production pause menu after game loading and before the smoke check continues. The explicit player file keeps the diagnostic separate from normal preferences. The smoke path does not check graphics resource changes. `--pause-on-start` also works with bounded window runs.
 
-Add `--gpu` to the pause-menu check for two native 1920x1080 frames with host Vulkan validation. It opens the menu with Esc, applies graphics changes, rebuilds the renderer, checks input isolation and resumes the match. It uses one film sample, a 10-second process limit and no hardware tracing. This is a bounded graphics check, not a performance result or full graphics-setting matrix.
+Add `--gpu` to the pause-menu check for native 1920x1080 captures with host
+Vulkan validation. It checks the frozen scene before Resume, repeated Apply,
+feature changes without a renderer rebuild, Restore Defaults, and recovery
+after a settings save failure. Apply redraws the scene before the settings
+menu opens again. The match stays paused. The check compares captured pixels,
+checks input isolation, then resumes for two frames. It uses one film sample,
+a 10-second process limit and no hardware tracing. It does not measure sustained
+performance or cover every graphics-setting combination.
 
 
 Run `python3 tests/e2e/pause_menu.py build/windows-cross/nanova.exe --gpu --os-input` to check OS Esc input, mouse navigation, Esc back and Enter resume. This captures only the menu window's native client pixels. Game captures remain native 1920x1080.
