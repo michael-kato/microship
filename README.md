@@ -6,6 +6,8 @@ Virus forces use large swarms of light craft and spike projectiles. Immune force
 
 Seeded membranes, organelles, branching factories, and wet anatomical backgrounds form the world. Units grow at factory tips. Damaged limbs break away. Fog returns gradually and strongly blurs unseen areas. Direct ray tracing provides light, shadows, and atmospheric scattering. Colors come from vertices; each frame uses current data only.
 
+Textures are permitted on any object when the game generates them. Noise and other procedural methods may generate color, normal, roughness, opacity, emission, and environment maps. Vertex colors remain supported.
+
 Simulation rules remain separate from rendering. The project uses direct functions and contiguous data, with real application checks.
 
 C++ and Vulkan target Windows. Linux builds use MinGW, `glslc`, and an initialized Steam Proton 11 prefix:
