@@ -2,8 +2,8 @@
   "$schema": "../schemas/buildings.schema.json",
   "shared": {
     "growth_seconds": 14,
-    "sprout_seconds": 4.285714285714286,
-    "establishment_seconds": 257.14285714285717,
+    "sprout_seconds": 8.571428571428571,
+    "establishment_seconds": 514.2857142857143,
     "collection": 2.5,
     "height": 3.5,
     "width": 1.35,
@@ -24,7 +24,7 @@
       "roots": "organelles",
       "root_limit": 3,
       "root_minimum_radius": 0.1,
-      "root_offset_seconds": 2.857142857142857
+      "root_offset_seconds": 10
     }
   },
   "buildings": [
@@ -98,8 +98,7 @@
         "production": 0.12,
         "health": 150,
         "hits": 8,
-        "grammar": "hypha",
-        "root_interval_seconds": 17.142857142857142
+        "grammar": "hypha"
       },
       "growth_meshes": {
         "segment": "../models/fungal_stem.fmesh",
