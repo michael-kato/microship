@@ -27,18 +27,21 @@ static const int DISPLACEMENT_LOW_FREQUENCY = 3;
 static const int DISPLACEMENT_HIGH_FREQUENCY = 4;
 
 namespace {
-struct Part { uint32_t first,count;Vec3 pivot,attachment;float minimum_scale,radius;bool anchor,movable; };
+struct Part { uint32_t first,count;Vec3 pivot,attachment;float minimum_scale,radius;bool anchor,movable,origin; };
 struct Parts { Part values[MAX_MESH_PARTS];uint32_t count; };
 bool load(const char* path,Parts* parts)
 {
     JsonDocument doc;if (!json_load(&doc,path)) return false;Json root=json_root(&doc);
     json_object(root,"$schema|vertices|parts");uint32_t vertices=json_uint(json_get(root,"vertices"),3,MAX_PART_VERTEX_COUNT),next=0;
-    JsonArray a=json_array(json_get(root,"parts"),MAX_MESH_PARTS);Json j={};
+    JsonArray a=json_array(json_get(root,"parts"),MAX_MESH_PARTS);Json j={};bool origin_seen=false;
     while (json_next(&a,&j))
     {
-        json_object(j,"first|count|pivot|movable|attachment|minimum_scale|attachment_radius");Part p={};
+        json_object(j,"first|count|pivot|movable|attachment|minimum_scale|attachment_radius|anchor_origin");Part p={};
         p.first=json_uint(json_get(j,"first"),0,vertices-1);p.count=json_uint(json_get(j,"count"),1,vertices);
         p.pivot=json_vector(json_get(j,"pivot"),-MAX_LOCAL_COORDINATE,MAX_LOCAL_COORDINATE);p.movable=json_bool(json_get(j,"movable"));
+        Json origin=json_find(j,"anchor_origin");p.origin=json_present(origin) && json_bool(origin);
+        if (p.origin && origin_seen) return json_error(j,"mesh parts require at most one anchor origin");
+        origin_seen=origin_seen || p.origin;
         Json anchor=json_find(j,"attachment");p.anchor=json_present(anchor);
         if (p.anchor) p.attachment=json_vector(anchor,-MAX_LOCAL_COORDINATE,MAX_LOCAL_COORDINATE);
         Json radius=json_find(j,"attachment_radius");if (json_present(radius)) p.radius=json_positive(radius,MAX_LOCAL_COORDINATE);
@@ -77,15 +80,21 @@ Vec3 transform(Vec3 v,const Part& p,const MeshSource& source,uint32_t index)
         v.z+a*std::sin(DISPLACEMENT_LOW_FREQUENCY*v.x-phase)*std::sin(DISPLACEMENT_HIGH_FREQUENCY*v.y-phase)};
 }
 }
-bool geometry_attachments(const MeshSource& source,Vec3 direction,Vec3* points,float* radii,uint32_t capacity,uint32_t* count)
+bool geometry_attachments(const MeshSource& source,Vec3 direction,Vec3* points,Vec3* centers,float* radii,uint32_t capacity,uint32_t* count,Vec3* origin)
 {
-    *count=0;
+    *count=0;*origin=source.position;
     if (!source.parts_path || !source.parts_path[0])
     {
         if (!capacity || !geometry_surface_point(source.path,source.position,source.scale,direction,points)) return false;
-        radii[0]=1;*count=1;return true;
+        centers[0]=source.position;radii[0]=1;*count=1;return true;
     }
     Parts parts={};if (!load(source.parts_path,&parts)) return false;
+    for (uint32_t i=0;i<parts.count;++i) if (parts.values[i].origin)
+    {
+        if (source.scale<parts.values[i].minimum_scale)
+        { fprintf(stderr,"%s: anchor origin cannot be hidden by the body scale\n",source.parts_path);return false; }
+        *origin=add(source.position,scale(transform(parts.values[i].pivot,parts.values[i],source,i),source.scale));
+    }
     for (uint32_t i=0;i<parts.count;++i) if (parts.values[i].anchor && source.scale>=parts.values[i].minimum_scale)
     {
         if (*count==capacity) { fprintf(stderr,"%s: attachment capacity exceeded\n",source.parts_path);return false; }
@@ -98,6 +107,7 @@ bool geometry_attachments(const MeshSource& source,Vec3 direction,Vec3* points,f
             size+=random(&seed)*source.part_variation;
         }
         radii[*count]=part.radius*size;
+        centers[*count]=transform(part.pivot,part,source,i);
         points[(*count)++]=transform(part.attachment,part,source,i);
     }
     if (!*count) { fprintf(stderr,"%s: no active attachment points in mesh parts\n",source.parts_path);return false; }
@@ -105,8 +115,16 @@ bool geometry_attachments(const MeshSource& source,Vec3 direction,Vec3* points,f
     uint32_t best=0;
     for (uint32_t i=1;i<*count;++i) if (dot(normalize(points[i]),direction)>dot(normalize(points[best]),direction)) best=i;
     Vec3 first=points[best];points[best]=points[0];points[0]=first;
+    Vec3 center=centers[best];centers[best]=centers[0];centers[0]=center;
     float radius=radii[best];radii[best]=radii[0];radii[0]=radius;
-    for (uint32_t i=0;i<*count;++i) points[i]=add(source.position,scale(points[i],source.scale));
+    for (uint32_t i=0;i<*count;++i)
+    {
+        points[i]=add(source.position,scale(points[i],source.scale));
+        centers[i]=add(source.position,scale(centers[i],source.scale));
+        Vec3 aim=subtract(centers[i],*origin),anchor=subtract(points[i],*origin);
+        if (dot(aim,aim)<=MIN_GENERATED_NORMAL_SQUARED_LENGTH && dot(anchor,anchor)<=MIN_GENERATED_NORMAL_SQUARED_LENGTH)
+        { fprintf(stderr,"%s: attachment requires an outward direction\n",source.parts_path);return false; }
+    }
     return true;
 }
 bool geometry_self_glow(Geometry* geometry,uint32_t mesh_index,const char* path,float interior,float organelles)

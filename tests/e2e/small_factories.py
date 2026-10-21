@@ -20,6 +20,17 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
         result=subprocess.run([*command,'--smoke','--world',str(world),'--world-seed',str(seed),'--ticks',str(ticks),'--state',str(state),'--scene-state',str(scene)],capture_output=True,text=True,timeout=10);count+=1
         assert result.returncode==expected,(name,result.stdout,result.stderr)
         return (json.loads(state.read_text()),json.loads(scene.read_text())) if not expected else (None,None)
+    def check_directions(colony,center,side,radius):
+        origin=colony['factory_origin'];centers=colony['attachment_centers']
+        assert math.dist(origin,center)>.01
+        for k in range(colony['root_count']):
+            organ=colony['root_attachments'][k];aim=[a-b for a,b in zip(centers[organ],origin)]
+            if math.dist(aim,[0,0,0])<.0001:
+                aim=[a-b for a,b in zip(colony['attachments'][organ],origin)]
+            stem=colony['structures'][k]['stem'];direction=[a-b for a,b in zip(stem[-1],stem[0])]
+            cosine=sum(a*b for a,b in zip(aim,direction))/(math.dist(aim,[0,0,0])*math.dist(direction,[0,0,0]))
+            assert cosine>math.cos(math.radians(30)),(side,radius,k,'root left the nucleus-to-organelle route',cosine)
+            assert all(sum((b-a)*v for a,b,v in zip(start,end,aim))>0 for start,end in zip(stem,stem[1:])),(side,k,'root turned inward')
     for side,home in [('virus',0),('immune',1),('fungus',0)]:
         data=stage_world(root/'assets/levels'/(side+'-player-level.json'),out)
         for start in data['match'].pop('starts'):data['bodies'][start['cell']]['owner']=start['faction']
@@ -39,14 +50,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
             assert sorted(indices)==list(range(roots)),'A visible organelle has no factory'
             assert all(colony['leaf_births'][k]>0 for k in range(large,roots)),(side,radius,colony['leaf_births'])
             assert all(colony['leaf_births'][k]>0 for k,s in enumerate(colony['structures']) if s['health']>0 and s['visible_growth']==1),(side,radius,colony['leaf_births'])
-            if side=='immune':
-                center=case['bodies'][home]['position'];directions=[[x-y for x,y in zip(v['position'],center)] for v in colony['structures'][:roots]]
-                expected_dot=math.cos(2*math.pi/roots)
-                for i,a in enumerate(directions):
-                    nearest=max(sum(x*y for x,y in zip(a,b))/(math.dist(a,[0,0,0])*math.dist(b,[0,0,0])) for j,b in enumerate(directions) if i!=j)
-                    assert math.isclose(nearest,expected_dot,abs_tol=1e-4),(radius,nearest,expected_dot)
-                closest=math.cos(2*math.pi*(roots//large)/roots)
-                assert all(sum(x*y for x,y in zip(a,b))/(math.dist(a,[0,0,0])*math.dist(b,[0,0,0]))<=closest+1e-4 for i,a in enumerate(directions[:large]) for j,b in enumerate(directions[:large]) if i!=j)
+            check_directions(colony,case['bodies'][home]['position'],side,radius)
             membrane=scene['meshes'][home]['deformation'];wall={i for t in membrane['indices'] if t[3]==3 for i in t[:3]}
             actual_radius=max(math.dist(membrane['vertices'][i][:3],case['bodies'][home]['position']) for i in wall)
             assert all(math.dist(v['position'],case['bodies'][home]['position'])>actual_radius for v in colony['structures'] if v['health']>0)
@@ -90,6 +94,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
                 assert all(v['generation']==1 and v['health']>0 for k,v in enumerate(b['structures'][:roots]) if k!=target)
         for seed in (1235,1236):
             varied,draw=run(side+'_surface_seed_'+str(seed),case,seed=seed);c=varied['colonies'][home]
+            check_directions(c,case['bodies'][home]['position'],side,4.2)
             membrane=draw['meshes'][home]['deformation'];wall={i for t in membrane['indices'] if t[3]==3 for i in t[:3]}
             surface=max(math.dist(membrane['vertices'][i][:3],case['bodies'][home]['position']) for i in wall)
             assert all(math.dist(v['position'],case['bodies'][home]['position'])>surface for v in c['structures'])

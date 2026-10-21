@@ -6,6 +6,7 @@
 #include <cmath>
 #include "asset_limits.h"
 
+static const uint32_t DEFAULT_HYPHA_CHAIN_LENGTH = 3;
 static const int MAX_BUILDING_SEED = 16777215;
 static const int MAX_BUILDING_PRODUCTION = 10;
 static const int MAX_BUILDING_SPACING = 10;
@@ -378,7 +379,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
         p.height=json_positive(json_get(shared,"height"),MAX_BUILDING_HEIGHT);
         p.width=json_positive(json_get(shared,"width"),MAX_BUILDING_WIDTH);
         p.hits=json_uint(json_get(j,"hits"),1,MAX_HIT_COUNT);Json b=json_get(j,"branches");
-        json_object(b,"count|spacing|spread_scale|production|production_leaf_limits|production_reference_count|health|hits|root_height|spread_all_roots|root_interval_seconds|grammar|tree");
+        json_object(b,"count|spacing|spread_scale|chain_length|production|production_leaf_limits|production_reference_count|health|hits|root_height|root_interval_seconds|grammar|tree");
         char roots[ASSET_NAME_CAPACITY]={},grammar[ASSET_NAME_CAPACITY]={};
         Json roots_json=json_find(shared_branches,"roots"),grammar_json=json_find(b,"grammar");
         if (json_present(roots_json))
@@ -402,9 +403,8 @@ static bool load_buildings(Content* c,Json root,const char* path)
         if (json_present(all_leaves)) p.branches.all_leaf_nodes=json_bool(all_leaves);
         Json root_offset=json_find(shared_branches,"root_offset_seconds");
         if (json_present(root_offset)) p.branches.root_offset_seconds=json_float(root_offset,0,MAX_ESTABLISHMENT_SECONDS);
-        Json root_height=json_find(b,"root_height"),spread_all=json_find(b,"spread_all_roots");
+        Json root_height=json_find(b,"root_height");
         if (json_present(root_height)) p.branches.root_height=json_positive(root_height,MAX_BUILDING_HEIGHT);
-        if (json_present(spread_all)) p.branches.spread_all_roots=json_bool(spread_all);
         Json root_interval=json_find(b,"root_interval_seconds");
         if (json_present(root_interval)) p.branches.root_interval_seconds=json_float(root_interval,0,MAX_ESTABLISHMENT_SECONDS);
         p.branches.branch_probability=1;
@@ -415,6 +415,13 @@ static bool load_buildings(Content* c,Json root,const char* path)
             else if (!strcmp(grammar,"hypha")) p.branches.grammar=GROWTH_HYPHA;
             else if (!strcmp(grammar,"tree")) p.branches.grammar=GROWTH_TREE;
             else if (strcmp(grammar,"axial")) json_error(grammar_json,"grammar must be axial, fan, hypha or tree");
+        }
+        p.branches.chain_length=DEFAULT_HYPHA_CHAIN_LENGTH;
+        Json chain=json_find(b,"chain_length");
+        if (json_present(chain))
+        {
+            if (p.branches.grammar!=GROWTH_HYPHA) json_error(chain,"chain length requires the hypha grammar");
+            p.branches.chain_length=json_uint(chain,1,MAX_FACTORY_STRUCTURES);
         }
         Json tree=json_find(b,"tree");
         if (p.branches.grammar==GROWTH_TREE)

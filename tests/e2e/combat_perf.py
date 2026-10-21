@@ -75,7 +75,9 @@ def main():
             report['runs'].append(dict(build=label, repeat=repeat, timing=timing, phases=phases))
             (output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
             print(label, repeat, json.dumps(timing), flush=True)
-    print('Combat comparison passed: full state and match results match; raw times saved to', output)
+    message = ('Combat comparison passed: full state and match results match; raw times saved to'
+               if args.baseline else 'Combat benchmark passed: raw times saved to')
+    print(message, output)
 
 
 if __name__ == '__main__':

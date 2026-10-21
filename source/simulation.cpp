@@ -38,6 +38,7 @@ static const float INITIAL_ENEMY_DISTANCE = 1e30f;
 static const float INITIAL_FACTORY_GROWTH = .02f;
 static const float MANUFACTURE_COMPLETION_EPSILON = .000001f;
 static const float FACTORY_AXIS_PARALLEL_LIMIT = .9f;
+static const float MIN_FACTORY_SIDE_SQUARED_LENGTH = .000001f;
 static const float CHILD_LIMB_LENGTH_SCALE = 1.8f;
 static const float AXIAL_SPREAD = .12f;
 static const float FAN_SPREAD = .8f;
@@ -51,7 +52,6 @@ static const float BRANCH_MIN_HEIGHT_SCALE = .65f;
 static const int BRANCH_HEIGHT_VARIANTS = 100;
 static const float BRANCH_HEIGHT_STEP = .003f;
 static const float BRANCH_NORMAL_JITTER_SCALE = .4f;
-static const int HYPHA_CHAIN_LIMBS = 3;
 static const int FIRE_COOLDOWN_PHASE_COUNT = 5;
 static const float FIRE_COOLDOWN_PHASE_SECONDS = .04f;
 static const float SHOT_ENDPOINT_EPSILON = .001f;
@@ -354,7 +354,7 @@ float simulation_production(const Simulation* s,uint32_t p)
 }
 static Vec3 factory_direction(Vec3 direction,const ProducerDefinition& definition)
 {
-    if (!definition.growth_plane_enabled) return direction;
+    if (!definition.growth_plane_enabled || definition.spread_roots) return direction;
     Vec3 n=definition.growth_plane_normal;float depth=dot(direction,n);
     Vec3 flat=subtract(direction,scale(n,depth));
     if (dot(flat,flat)<.000001f) flat=cross(n,std::fabs(n.y)<.9f ? Vec3{0,1,0} : Vec3{1,0,0});
@@ -407,46 +407,27 @@ static uint32_t select_factory_roots(const Body& body,const BranchRules& f,uint3
         for (uint32_t j=0;j<body.factory_root_count;++j) if (!used[j]) indices[count++]=j;
     return count;
 }
-static Vec3 spread_root_direction(const Simulation* s,uint32_t p,uint32_t root,Vec3 plane)
+static Vec3 outward_root_direction(const Simulation* s,uint32_t p,uint32_t root)
 {
-    const Colony& c=s->colonies[p];const Body& b=s->world.bodies[p];
-    bool all=simulation_producer_definition(s,p)->branches.spread_all_roots;
-    if (!all && root>=c.large_root_count) return factory_direction(normalize(subtract(b.factory_roots[c.root_attachments[root]],b.position)),*simulation_producer_definition(s,p));
-    uint32_t count=all ? c.root_count : c.large_root_count;
-    Vec3 right=normalize(cross(std::fabs(plane.y)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0},plane));
-    Vec3 up=cross(plane,right);float angles[MAX_FACTORY_STRUCTURES];uint32_t ranks[MAX_FACTORY_STRUCTURES]={};
-    for (uint32_t k=0;k<count;++k)
+    const Colony& c=s->colonies[p];const Body& body=s->world.bodies[p];
+    uint32_t organ=c.root_attachments[root];
+    Vec3 direction=subtract(body.factory_centers[organ],body.factory_origin);
+    // The nucleus also has an attachment. Its surface anchor supplies that
+    // root's outward direction when the two centers are the same point.
+    float squared=dot(direction,direction);
+    if (squared<=POSITION_EPSILON*POSITION_EPSILON)
     {
-        Vec3 offset=subtract(b.factory_roots[c.root_attachments[k]],b.position);
-        angles[k]=std::atan2(dot(offset,up),dot(offset,right));
+        Vec3 anchor=subtract(body.factory_roots[organ],body.factory_origin);
+        if (dot(anchor,anchor)>squared) direction=anchor;
     }
-    if (all)
-    {
-        // Reserve evenly spaced slots for the large factories. Fill the gaps with small factories.
-        bool occupied[MAX_FACTORY_STRUCTURES]={},assigned[MAX_FACTORY_STRUCTURES]={};
-        for (uint32_t k=0;k<c.large_root_count;++k)
-        {
-            uint32_t rank=0;
-            for (uint32_t j=0;j<c.large_root_count;++j) rank+=angles[j]<angles[k] || (angles[j]==angles[k] && j<k);
-            ranks[k]=rank*count/c.large_root_count;occupied[ranks[k]]=true;
-        }
-        for (uint32_t slot=0;slot<count;++slot) if (!occupied[slot])
-        {
-            uint32_t best=count;
-            for (uint32_t j=c.large_root_count;j<count;++j) if (!assigned[j]
-                && (best==count || angles[j]<angles[best])) best=j;
-            ranks[best]=slot;assigned[best]=true;
-        }
-    }
-    else for (uint32_t k=0;k<count;++k)
-        for (uint32_t j=0;j<count;++j) ranks[k]+=angles[j]<angles[k] || (angles[j]==angles[k] && j<k);
-    float sine=0,cosine=0,step=FULL_TURN_RADIANS/count;
-    for (uint32_t k=0;k<count;++k)
-    {
-        float residual=angles[k]-ranks[k]*step;sine+=std::sin(residual);cosine+=std::cos(residual);
-    }
-    float angle=std::atan2(sine,cosine)+ranks[root]*step;
-    return add(scale(right,std::cos(angle)),scale(up,std::sin(angle)));
+    return normalize(direction);
+}
+static Vec3 factory_side(Vec3 plane,Vec3 direction)
+{
+    Vec3 side=cross(plane,direction);
+    if (dot(side,side)<MIN_FACTORY_SIDE_SQUARED_LENGTH)
+        side=cross(std::fabs(direction.y)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0},direction);
+    return normalize(side);
 }
 
 static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* seed)
@@ -455,17 +436,17 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
     const Body& body=s->world.bodies[p];Vec3 right,up,normal;
     simulation_producer_axes(simulation_producer_definition(s,p),&right,&up,&normal);
     int32_t parent=c->parents[k];
+    const ProducerDefinition& definition=*simulation_producer_definition(s,p);
     Vec3 start=parent>=0 ? c->stems[parent][GROWTH_SEGMENTS-1] : body.factory_roots[c->root_attachments[k]];
     c->stems[k][0]=start;
-    Vec3 radial=normalize(subtract(start,body.position));
+    Vec3 radial=parent<0 && definition.spread_roots ? outward_root_direction(s,p,k) : normalize(subtract(start,body.position));
     Vec3 side=normalize(cross(std::fabs(radial.y)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0},radial));
     Vec3 other=cross(radial,side);float sign=k%2 ? -1.0f : 1.0f;
-    const ProducerDefinition& definition=*simulation_producer_definition(s,p);
     if (definition.growth_plane_enabled && definition.spread_roots)
     {
-        radial=parent<0 ? spread_root_direction(s,p,k,definition.growth_plane_normal)
+        radial=parent<0 ? outward_root_direction(s,p,k)
             : normalize(subtract(c->stems[parent][GROWTH_SEGMENTS],c->stems[parent][GROWTH_SEGMENTS-1]));
-        side=normalize(cross(definition.growth_plane_normal,radial));other=cross(radial,side);
+        side=factory_side(definition.growth_plane_normal,radial);other=cross(radial,side);
     }
     float extent=parent>=0 ? f->spacing*CHILD_LIMB_LENGTH_SCALE : f->root_height>0 ? f->root_height : definition.height;
     float spread=f->grammar==GROWTH_AXIAL ? AXIAL_SPREAD : f->grammar==GROWTH_FAN ? FAN_SPREAD : HYPHA_SPREAD;
@@ -492,7 +473,7 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
         if (dot(tangent,tangent)<.000001f) tangent=cross(std::fabs(radial.y)<.9f ? Vec3{0,1,0} : Vec3{1,0,0},radial);
         side=normalize(tangent);other=cross(radial,side);
     }
-    // Hypha chains spread at the root fork, then continue along that heading.
+    // Hypha side branches fan around the trunk direction.
     if (f->grammar==GROWTH_HYPHA && definition.spread_roots)
     {
         if (parent>=0 && parent<(int32_t)c->large_root_count)
@@ -501,8 +482,9 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
             for (uint32_t j=c->root_count;j<c->structure_count;++j) if (c->parents[j]==parent)
             { ++siblings;rank+=j<k; }
             float fan=siblings>1 ? 2.0f*rank/(siblings-1)-1 : 0;
-            radial=normalize(add(scale(radial,LIMB_RADIAL_DIRECTION_WEIGHT),scale(side,fan*spread)));
-            side=normalize(cross(definition.growth_plane_normal,radial));other=cross(radial,side);
+            float angle=fan*std::atan2(spread,LIMB_RADIAL_DIRECTION_WEIGHT);
+            radial=normalize(add(scale(radial,std::cos(angle)),scale(side,std::sin(angle))));
+            side=factory_side(definition.growth_plane_normal,radial);other=cross(radial,side);
         }
         spread=0;
     }
@@ -518,12 +500,15 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
     {
         Vec3 tip=c->stems[k][GROWTH_SEGMENTS],offset=subtract(tip,body.position);
         float radius=body.factory_surface_radius+f->surface_clearance;
-        if (dot(offset,offset)<radius*radius || (parent<0 && f->spread_all_roots))
+        if (dot(offset,offset)<radius*radius)
         {
-            // Extend the intact stem to open space; keep its organelle anchor fixed.
-            Vec3 outward=parent<0 && f->spread_all_roots ? spread_root_direction(s,p,k,definition.growth_plane_normal)
-                : dot(offset,offset)>POSITION_EPSILON*POSITION_EPSILON ? normalize(offset) : radial;
-            Vec3 extension=subtract(add(body.position,scale(outward,radius)),tip);
+            // Continue along the organelle's route until the tip clears the wall.
+            // Do not pull the tip onto a ring around the cell center.
+            Vec3 outward=definition.spread_roots ? (parent<0 ? outward_root_direction(s,p,k)
+                : normalize(subtract(tip,start))) : normalize(offset);
+            float along=dot(offset,outward);
+            float distance=-along+std::sqrt(std::fmax(0.0f,along*along+radius*radius-dot(offset,offset)));
+            Vec3 extension=scale(outward,distance);
             for (uint32_t j=1;j<=GROWTH_SEGMENTS;++j)
                 c->stems[k][j]=add(c->stems[k][j],scale(extension,j/(float)GROWTH_SEGMENTS));
         }
@@ -560,9 +545,9 @@ static void prepare_factory(Simulation* s,uint32_t p)
         else if (f->grammar==GROWTH_TREE) c->parents[k]=(k-c->root_count)/f->children;
         else if (!f->organelle_roots) c->parents[k]=(k-1)/2;
         else if (f->grammar==GROWTH_FAN) c->parents[k]=((k-c->root_count)/2)%c->large_root_count;
-        else if (f->grammar==GROWTH_HYPHA && (k-c->root_count)%HYPHA_CHAIN_LIMBS) c->parents[k]=k-1;
+        else if (f->grammar==GROWTH_HYPHA && (k-c->root_count)%f->chain_length) c->parents[k]=k-1;
         else c->parents[k]=f->grammar==GROWTH_AXIAL ? (k-c->root_count<c->large_root_count ? k-c->root_count : k-c->large_root_count)
-            : f->grammar==GROWTH_HYPHA ? ((k-c->root_count)/HYPHA_CHAIN_LIMBS)%c->large_root_count
+            : f->grammar==GROWTH_HYPHA ? ((k-c->root_count)/f->chain_length)%c->large_root_count
             : (k-c->root_count)%c->large_root_count;
         c->factory_scale[k]=c->parents[k]>=0 ? c->factory_scale[c->parents[k]]
             : k<c->large_root_count ? 1 : f->additional_root_scale*std::fmin(1.0f,body.factory_root_radii[c->root_attachments[k]]/minimum_radius);
@@ -685,7 +670,7 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
     {
         Body& b=s->world.bodies[i];const BodyDefinition& d=s->world.content.bodies[b.type];
         MeshSource source={b.model_path,b.position,b.radius,0,b.color,d.parts_path,b.seed,d.shape_variation,d.part_variation,d.layout_rotation};
-        if (d.hosts_site && !geometry_attachments(source,b.colony_normal,b.factory_roots,b.factory_root_radii,MAX_FACTORY_STRUCTURES,&b.factory_root_count)) return false;
+        if (d.hosts_site && !geometry_attachments(source,b.colony_normal,b.factory_roots,b.factory_centers,b.factory_root_radii,MAX_FACTORY_STRUCTURES,&b.factory_root_count,&b.factory_origin)) return false;
         b.factory_root=b.factory_roots[0];
         if (d.hosts_site)
         {
@@ -2122,7 +2107,9 @@ bool simulation_write_state(const Simulation* s, const char* path)
         const Body& body=s->world.bodies[p];
         fprintf(file,",\"active\":%s,\"establishment_age\":%.6f,\"root_count\":%u,\"production\":%.6f,\"attachments\":[",c->active ? "true" : "false",c->establishment_age,c->root_count,c->active ? simulation_production(s,p) : 0);
         for (uint32_t k=0;k<body.factory_root_count;++k) { Vec3 v=body.factory_roots[k];fprintf(file,"%s[%.6f,%.6f,%.6f]",k ? "," : "",v.x,v.y,v.z); }
-        fprintf(file,"],\"attachment_radii\":[");
+        fprintf(file,"],\"attachment_centers\":[");
+        for (uint32_t k=0;k<body.factory_root_count;++k) { Vec3 v=body.factory_centers[k];fprintf(file,"%s[%.6f,%.6f,%.6f]",k ? "," : "",v.x,v.y,v.z); }
+        fprintf(file,"],\"factory_origin\":[%.6f,%.6f,%.6f],\"attachment_radii\":[",body.factory_origin.x,body.factory_origin.y,body.factory_origin.z);
         for (uint32_t k=0;k<body.factory_root_count;++k) fprintf(file,"%s%.9g",k ? "," : "",body.factory_root_radii[k]);
         fprintf(file,"],\"surface_radius\":%.6f,\"large_root_count\":%u,\"root_attachments\":[",body.factory_surface_radius,c->large_root_count);
         for (uint32_t k=0;k<c->root_count;++k) fprintf(file,"%s%u",k ? "," : "",c->root_attachments[k]);

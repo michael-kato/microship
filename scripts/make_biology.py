@@ -239,10 +239,10 @@ bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=Fals
 parts=[];models=[]
 component=0;components=[]
 
-def cell_part(pivot,movable=True,attachment=None,minimum_scale=0):
+def cell_part(pivot,movable=True,attachment=None,minimum_scale=0,anchor_origin=False):
     global component
     component=len(components)
-    components.append(dict(pivot=list(pivot),movable=movable,attachment=attachment,minimum_scale=minimum_scale))
+    components.append(dict(pivot=list(pivot),movable=movable,attachment=attachment,minimum_scale=minimum_scale,anchor_origin=anchor_origin))
 
 def finish(obj,color,roughness=DEFAULT_ROUGHNESS,ior=DEFAULT_IOR,smooth=True,material=0,surface=None,subsurface=None,emission=0):
     obj.data.transform(Matrix.LocRotScale(obj.location,obj.rotation_euler.to_quaternion(),obj.scale))
@@ -338,6 +338,7 @@ def export(name,anatomy=False,subsurface_weight=None):
                 points=records[first:first+count]
                 d['attachment_radius']=max(max(v[k] for v in points)-min(v[k] for v in points) for k in range(3))*.5
             if part['minimum_scale']:d['minimum_scale']=part['minimum_scale']
+            if part['anchor_origin']:d['anchor_origin']=True
             definitions.append(d);first+=count
         (out/(name+'.parts.json')).write_text(json.dumps({'$schema':'../schemas/mesh-parts.schema.json','vertices':len(records),'parts':definitions},indent=2)+'\n')
     if any(abs(x)>MAX_LOCAL_COORDINATE for row in records for x in row[:3]):raise RuntimeError(name+' exceeds local mesh bounds')
@@ -365,7 +366,7 @@ def cell(name,key):
     finish(obj,pigment,material=3,surface='membrane')
     inner=profiles['interior']
     center=Vector(inner['nucleus_center'])
-    cell_part(center,attachment=center+center.normalized()*inner['nucleus_size'][0])
+    cell_part(center,attachment=center+center.normalized()*inner['nucleus_size'][0],anchor_origin=True)
     sphere(inner['nucleus_center'],inner['nucleus_size'],p['nucleus'],3,surface='nucleus')
     sphere(inner['nucleolus_center'],inner['nucleolus_size'],p['vesicle'],2,surface='nucleolus')
     for index,center in enumerate(inner['mitochondria']):

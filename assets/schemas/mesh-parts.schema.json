@@ -44,6 +44,9 @@
             "type": "number",
             "exclusiveMinimum": 0,
             "maximum": 1.5
+          },
+          "anchor_origin": {
+            "type": "boolean"
           }
         },
         "required": ["first", "count", "pivot", "movable"],

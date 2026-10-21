@@ -18,6 +18,7 @@ struct Body
     Vec3 colony_normal;
     Vec3 factory_root;
     Vec3 factory_roots[MAX_FACTORY_STRUCTURES];
+    Vec3 factory_centers[MAX_FACTORY_STRUCTURES],factory_origin; // Transformed organelle centers and nucleus center.
     float factory_root_radii[MAX_FACTORY_STRUCTURES]; // Local major radii after startup part scaling.
     uint32_t factory_root_count;
     float factory_surface_radius; // Startup bound includes every faction wall shape.

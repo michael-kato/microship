@@ -52,6 +52,23 @@ For the frame profiler checks, build the small Win32 input driver with `cmake --
 
 To compare SSS and volume changes, preserve the old executable and its `assets/` folder before rebuilding. Then run `python3 tests/e2e/scattering_perf.py build/windows-cross/nanova.exe --baseline build/scattering-baseline/nanova.exe --cases near grown --run`. Without `--run`, the script prepares inputs only. Add `--timing` to disable host validation for timing comparisons. Use `--diagnose` instead of `--baseline` to measure SSS and volume controls. The script keeps the GPU limits above and checks full-image differences and simulation state for comparisons.
 
+Factory roots use the transformed nucleus center and each organelle center
+for all factions. The nucleus part has `anchor_origin: true` in its mesh-part
+metadata. Meshes, centers, and attachment points use the same startup transform.
+When a factory belongs to the nucleus itself, its authored surface attachment
+provides the outward direction. The trunk continues along that route until
+it clears the cell wall. The former ring arrangement is removed.
+
+Fungal `branches.chain_length: 1` places all side limbs directly on their
+large trunk. `root_height: 1` and `spacing: 0.8` keep the exposed trunk and limbs
+short. The existing fan control spreads siblings evenly. Structure count,
+output limits, and nutrient collection remain controlled by their existing
+fields. A fixed-seed mature 4.2-radius cell has six direct limbs per large
+trunk, compared with two before. Maximum reach fell from 14.98 to 6.77 units;
+its longest side limb fell from 3.96 to 1.53 units. The source generator exports
+the nucleus marker for future mesh rebuilds. The Blender generator was not run
+for this change; existing mesh vertices are unchanged.
+
 CPU combat profiles run the real application without a GPU. Add
 `--smoke --matches 1 --ticks 3600 --world-seed 1234 --cpu-benchmark` to a
 Proton command. The output includes tick percentiles and mean phase times
@@ -75,8 +92,9 @@ factory production, the Fungal player, and 18-unit sight. This prepares
 more units through normal production. It does not inject units into the
 simulation. The dense case also exercises fog during combat.
 
-On Oct 21, the Windows Release build through Proton 11 on the Ryzen 9 9900X
-had these results. The ordinary case uses three alternating pairs; the
+On Oct 21, combat optimization commit `c0f4b82`, before the later factory-shape
+update, had these results in the Windows Release build through Proton 11 on
+the Ryzen 9 9900X. The ordinary case uses three alternating pairs; the
 dense case uses one pair. Each pair uses identical scene data and seed 1234.
 
 | Battle | Peak units | Mean tick before / after | p99 tick before / after |
@@ -91,8 +109,14 @@ checks, and game outcomes stay the same. Complete exported states matched
 before and after both battles. Rebuilds occur at movement and combat phase
 boundaries, so later growth and damage cannot leave stale target positions.
 
-Evidence is in `build/combat_profile_final/` and
-`build/dense_combat_profile_final/`. These are tick measurements from the
+After the factory-shape update, a separate 1,800-tick dense run reached
+3,801 units. Mean tick time was 3.941 ms, p99 was 10.461 ms, and maximum was
+11.178 ms. This run used the new factory shapes and was not an equivalence
+comparison with the old shapes. Its report is in
+`build/fungal_bush_combat_profile/`.
+
+Evidence for the earlier code comparison is in `build/combat_profile_final/`
+and `build/dense_combat_profile_final/`. These are tick measurements from the
 real application. They do not establish performance for every match or
 native Windows. The reported 200 ms simulation frame was not reproduced.
 

@@ -79,8 +79,7 @@
         "health": 900,
         "hits": 16,
         "grammar": "fan",
-        "root_height": 1,
-        "spread_all_roots": true
+        "root_height": 1
       },
       "growth_meshes": {
         "segment": "../models/immune_stem.fmesh",
@@ -99,7 +98,7 @@
       "hits": 12,
       "branches": {
         "count": 21,
-        "spacing": 2.2,
+        "spacing": 0.8,
         "production": 0.12,
         "health": 50,
         "hits": 3,
@@ -120,7 +119,9 @@
             "leaves": 4
           }
         ],
-        "production_reference_count": 9
+        "production_reference_count": 9,
+        "chain_length": 1,
+        "root_height": 1
       },
       "growth_meshes": {
         "segment": "../models/fungal_stem.fmesh",

@@ -172,8 +172,10 @@
                 "exclusiveMinimum": 0,
                 "maximum": 10000
               },
-              "spread_all_roots": {
-                "type": "boolean"
+              "chain_length": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 128
               }
             },
             "required": ["count", "spacing", "production"],

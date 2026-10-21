@@ -48,6 +48,11 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-sources-') as directory:
         assert b['root_count']==len(b['attachments'])
         assert all(b['leaf_births'][k]>a['leaf_births'][k] for k in range(roots,b['root_count']))
         assert min(chains)>0 and max(chains)-min(chains)<=1,(radius,chains)
+        assert fungus(data)['branches']['chain_length']==1
+        assert all(v['parent']<roots for v in b['structures'][b['root_count']:]),'A long fungal chain remains'
+        lengths=[sum(math.dist(a,b) for a,b in zip(v['stem'],v['stem'][1:])) for v in b['structures'][b['root_count']:]]
+        assert max(lengths)<3,(radius,'Fungal side branches are too long',lengths)
+
         assert later['faction_stats'][2]['built']==sum(b['produced'])
         print(f'Radius {radius}: {roots} roots, {len(leaves)} producing tips, {actual} spores/5 minutes, expected {expected}.')
     # Measure sibling fan width against the earlier spread setting in the application.
@@ -61,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-sources-') as directory:
             total+=max((math.dist(a,b) for a in tips for b in tips),default=0)
         return total
     assert fan_width(wide)>1.2*fan_width(narrow),(fan_width(wide),fan_width(narrow))
-    for field,value in [('spread_scale',0),('spread_scale',3.01),('production_reference_count',0),('production_leaf_limits',[dict(roots=3,leaves=0)]),('production_leaf_limits',[dict(roots=3,leaves=4)]*2),('production_leaf_limits',[dict(roots=3,leaves=4,establishing_leaves=0)])]:
+    for field,value in [('chain_length',0),('chain_length',129),('chain_length',1.5),('spread_scale',0),('spread_scale',3.01),('production_reference_count',0),('production_leaf_limits',[dict(roots=3,leaves=0)]),('production_leaf_limits',[dict(roots=3,leaves=4)]*2),('production_leaf_limits',[dict(roots=3,leaves=4,establishing_leaves=0)])]:
         bad=deepcopy(base);fungus(bad)['branches'][field]=value
         run('invalid_'+str(count),bad,expected=1)
 print(f'Fungal sources E2E passed: {count} application runs; distributed roots, more producing tips, retained mature output and nutrient income, and rejected settings.')
