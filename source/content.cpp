@@ -9,6 +9,7 @@
 static const int MAX_BUILDING_SEED = 16777215;
 static const int MAX_BUILDING_PRODUCTION = 10;
 static const int MAX_BUILDING_SPACING = 10;
+static const float MAX_BRANCH_SPREAD_SCALE = 3;
 static const int MAX_BRANCH_EMERGENCE_SECONDS = 300;
 static const int MAX_BUILDING_WIDTH = 10000;
 static const int MAX_BUILDING_HEIGHT = 10000;
@@ -375,7 +376,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
         p.height=json_positive(json_get(shared,"height"),MAX_BUILDING_HEIGHT);
         p.width=json_positive(json_get(shared,"width"),MAX_BUILDING_WIDTH);
         p.hits=json_uint(json_get(j,"hits"),1,MAX_HIT_COUNT);Json b=json_get(j,"branches");
-        json_object(b,"count|spacing|production|health|hits|root_interval_seconds|grammar|tree");
+        json_object(b,"count|spacing|spread_scale|production|production_leaf_limits|production_reference_count|health|hits|root_interval_seconds|grammar|tree");
         char roots[ASSET_NAME_CAPACITY]={},grammar[ASSET_NAME_CAPACITY]={};
         Json roots_json=json_find(shared_branches,"roots"),grammar_json=json_find(b,"grammar");
         if (json_present(roots_json))
@@ -424,6 +425,22 @@ static bool load_buildings(Content* c,Json root,const char* path)
         p.branches.count=json_uint(json_get(b,"count"),1,MAX_FACTORY_STRUCTURES);
         p.branches.spacing=json_positive(json_get(b,"spacing"),MAX_BUILDING_SPACING);
         p.branches.production=json_positive(json_get(b,"production"),MAX_BUILDING_PRODUCTION);
+        Json spread=json_find(b,"spread_scale"),limits=json_find(b,"production_leaf_limits");
+        p.branches.spread_scale=json_present(spread) ? json_float(spread,.1f,MAX_BRANCH_SPREAD_SCALE) : 1;
+        if (json_present(limits))
+        {
+            JsonArray entries=json_array(limits,MAX_FACTORY_STRUCTURES);Json entry={};
+            while (json_next(&entries,&entry))
+            {
+                json_object(entry,"roots|leaves|establishing_leaves");uint32_t roots=json_uint(json_get(entry,"roots"),1,MAX_FACTORY_STRUCTURES);
+                if (p.branches.production_leaf_limits[roots-1]) json_error(entry,"duplicate root count in leaf limits");
+                p.branches.production_leaf_limits[roots-1]=json_uint(json_get(entry,"leaves"),1,MAX_FACTORY_STRUCTURES);
+                Json early=json_find(entry,"establishing_leaves");
+                if (json_present(early)) p.branches.establishing_leaf_limits[roots-1]=json_uint(early,1,MAX_FACTORY_STRUCTURES);
+            }
+        }
+        Json reference=json_find(b,"production_reference_count");
+        if (json_present(reference)) p.branches.production_reference_count=json_uint(reference,1,MAX_FACTORY_STRUCTURES);
         p.branches.seed=json_uint(json_get(shared_branches,"seed"),0,MAX_BUILDING_SEED);
         p.branches.normal=p.growth_plane_normal;p.branches.fields=BRANCH_FIELDS_COMPLETE;
         if (content_producer(c,p.name)>=0) return json_error(j,"duplicate building definition");

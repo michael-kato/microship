@@ -82,8 +82,8 @@
         "tip": "../models/immune_head.fmesh"
       },
       "navigation": {
-        "stem_radius": 0.55,
-        "head_radius": 0.55
+        "stem_radius": 1,
+        "head_radius": 1
       }
     },
     {
@@ -93,12 +93,29 @@
       "health": 240,
       "hits": 12,
       "branches": {
-        "count": 9,
-        "spacing": 1.15,
+        "count": 21,
+        "spacing": 1.8,
         "production": 0.12,
-        "health": 150,
-        "hits": 8,
-        "grammar": "hypha"
+        "health": 50,
+        "hits": 3,
+        "grammar": "hypha",
+        "spread_scale": 1.6,
+        "production_leaf_limits": [
+          {
+            "roots": 1,
+            "leaves": 3
+          },
+          {
+            "roots": 2,
+            "leaves": 3,
+            "establishing_leaves": 2
+          },
+          {
+            "roots": 3,
+            "leaves": 4
+          }
+        ],
+        "production_reference_count": 9
       },
       "growth_meshes": {
         "segment": "../models/fungal_stem.fmesh",
@@ -106,7 +123,7 @@
       },
       "navigation": {
         "stem_radius": 0.55,
-        "head_radius": 0.55
+        "head_radius": 0.31
       },
       "haze": {
         "reach": 4,

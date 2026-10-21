@@ -1,14 +1,14 @@
 {
   "seed": 4721,
   "infected_cell": {
-    "membrane": [0.38, 0.16, 0.43],
-    "rim": [0.55, 0.34, 0.61],
+    "membrane": [0.25, 0.43, 0.72],
+    "rim": [0.48, 0.68, 0.94],
     "nucleus": [0.48, 0.16, 0.68],
     "vesicle": [0.24, 0.66, 0.78]
   },
   "healthy_cell": {
-    "membrane": [0.4, 0.65, 0.6],
-    "rim": [0.65, 0.82, 0.73],
+    "membrane": [0.25, 0.43, 0.72],
+    "rim": [0.48, 0.68, 0.94],
     "nucleus": [0.48, 0.16, 0.68],
     "vesicle": [0.24, 0.66, 0.78]
   },
@@ -40,8 +40,8 @@
     "blood": [0.6, 0.1, 0.14]
   },
   "neutral_cell": {
-    "membrane": [0.56, 0.43, 0.23],
-    "rim": [0.8, 0.65, 0.4],
+    "membrane": [0.25, 0.43, 0.72],
+    "rim": [0.48, 0.68, 0.94],
     "nucleus": [0.48, 0.16, 0.68],
     "vesicle": [0.24, 0.66, 0.78]
   },
@@ -111,14 +111,16 @@
       "shaft_radius": 0.12,
       "lobes": 3,
       "spread": 0.22,
-      "crown_lobes": 5
+      "crown_lobes": 5,
+      "width_scale": 1.8
     },
     "fungal_spore": {
       "shaft_radius": 0.07,
       "forks": 3,
       "spread": 0.23,
       "cap_radius": 0.43,
-      "spores": 9
+      "spores": 9,
+      "head_scale": 0.55
     }
   }
 }

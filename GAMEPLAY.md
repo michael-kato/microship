@@ -6,7 +6,7 @@ Fighters prefer units. Bombers prefer structures. Their fallback attack uses one
 
 Virus fighters carry eleven detachable spikes. Each spike regrows in three seconds. Virus bombers launch their six visible payload sacs in sequence. Each sac regrows over eight seconds. An empty bomber waits for a sac to finish. Bombs keep their shape and size in flight and do not leave embedded spike shafts. These weapons use the existing projectile hit rules.
 
-Immune fighters are white blood cells. A free cell shoots a blob (the 80-triangle `immune_blob` mesh) at an enemy unit up to 4.5 units away, beyond contact, every 3 seconds. The blob does no damage but incapacitates the unit for 1.5 seconds: it cannot move or fire. The cell then charges in and latches on to devour it with its digest attack. A cell whose held victim dies glows green for 8 seconds; friendly units within 4 units of it heal one wound every second, even in combat. `attack.blob` and `attack.aura` in `unit-types.json` set these values; the glow uses `heal_aura` in `combat-effects.json`. Immune fighters have 864 health and take twenty-four hits. Immune bombers have 1440 health and take twenty-four hits. Virus fighters have 72 health; bombers have 120. Both take four hits. Immune roots have 1440 health and take twenty-four hits; immune child limbs have 900 health and take sixteen hits. Virus roots have 480 health and take twelve hits; their child limbs have 300 health and take eight hits. Fungal roots have 240 health and take twelve hits; their child limbs have 150 health and take eight hits.
+Immune fighters are white blood cells. A free cell shoots a blob (the 80-triangle `immune_blob` mesh) at an enemy unit up to 4.5 units away, beyond contact, every 3 seconds. The blob does no damage but incapacitates the unit for 1.5 seconds: it cannot move or fire. The cell then charges in and latches on to devour it with its digest attack. A cell whose held victim dies glows green for 8 seconds; friendly units within 4 units of it heal one wound every second, even in combat. `attack.blob` and `attack.aura` in `unit-types.json` set these values; the glow uses `heal_aura` in `combat-effects.json`. Immune fighters have 864 health and take twenty-four hits. Immune bombers have 1440 health and take twenty-four hits. Virus fighters have 72 health; bombers have 120. Both take four hits. Immune roots have 1440 health and take twenty-four hits; immune child limbs have 900 health and take sixteen hits. Virus roots have 480 health and take twelve hits; their child limbs have 300 health and take eight hits. Fungal roots have 240 health and take twelve hits; their child limbs have 50 health and take three hits.
 
 Virus and Immune use per-unit manufacture times. These times apply before leaf
 rate modifiers. Fungal production and damage settings retain their prior values.
@@ -32,7 +32,8 @@ health divided by hit count. More health with the same hit count increases
 resistance to fungal damage. It does not add resistance to projectile hits.
 
 Fungal factories release individual spores with a 20-triangle mesh. A complete leaf
-releases one spore every 0.5 seconds at the base rate, with no brood burst.
+can release one spore every 0.5 seconds at the base rate, with no brood burst.
+When more leaves are ready, they share the cell output budget described below.
 This gives 50 percent more spores per second than the former 16-spore job
 that took 12 seconds. Each spore costs 0.1 nutrients and moves at 5.04 world
 units per second, 20 percent faster than before. A spore takes one hit, can
@@ -46,7 +47,7 @@ use the global value.
 
 Factory deployment takes about 514 seconds, at half the previous rate (`shared.establishment_seconds`). All factions start their factory roots in parallel: the first starts at colonization, and the others have independent random delays of 0–10 seconds (`shared.branches.root_offset_seconds`). During deployment each structure grows in about 8.57 seconds (`shared.sprout_seconds`). Each root's limbs then emerge one at a time, depth first, at even intervals so the last one matures as deployment ends. The first child of the first root stays a leaf, so production can start before the rest of the factory completes. Each completed leaf can grow one unit at a time. Base manufacture takes twelve seconds per leaf, except where a unit defines its own time. Leaves share the cell nutrient store. AI manufacture uses the full 1.0 rate. Base collection is 2.5 nutrients per second. Damage regrowth uses fourteen seconds of growth (`growth_seconds`) and thirty-two-second child emergence intervals. Destroyed limbs wait at least forty-eight seconds and require paid repair before regrowth. Mature roots share the base rate. Child limbs add to that rate. Leaves can start production while other factories are still growing. Virus production uses terminal leaves.
 
-Each virus organelle root grows a curved trunk, two forked sub-trunks, and four smaller branches with terminal leaves. Factories root on the three largest organelles, so a virus cell has at most twenty-one structures; each fork has a 72 percent chance of a second branch. Child lengths and widths use a 0.62 scale at each level. Child production contribution is 0.05 per mature limb, so a full virus tree roughly matches an immune fan's nutrient income. Immune and fungal factories have nine structures and a 0.12 child contribution. Storage supports 128 structures per cell.
+Each virus organelle root grows a curved trunk, two forked sub-trunks, and four smaller branches with terminal leaves. Factories root on the three largest organelles, so a virus cell has at most twenty-one structures; each fork has a 72 percent chance of a second branch. Child lengths and widths use a 0.62 scale at each level. Child production contribution is 0.05 per mature limb, so a full virus tree roughly matches an immune fan's nutrient income. Immune factories have nine structures and a 0.12 child contribution. Fungal factories have 21 structures; their total mature contribution retains the prior nine-structure budget. Storage supports 128 structures per cell.
 
 Factory roots use `branches.root_limit` and `root_minimum_radius` in
 `assets/gameplay/factory-types.json`. The defaults select up to three of the
@@ -67,7 +68,7 @@ after growth. The separate slow sway animation still moves the tree.
 
 Virus trees grow side by side. New units grow at terminal leaves. Support damage removes descendants. The growth plane is authored to match the startup view. Moving the camera does not change geometry or gameplay.
 
-Ownership changes the existing cell wall shape over 18 seconds. Tint uses a shared 24-second transition rate. These timings apply to all factions. Seeded pigment variation changes the wall brightness and shifts its hue between pink and blue-green. Virus control blends in a pointed radial displacement and a shinier blue-green material. Fungal control blends in broad rounded displacement and a rougher brown material. Immune control returns the wall to its neutral shape and moves its material toward pink and white. Vertex and triangle counts stay fixed. Normals and render bounds follow the current positions. No separate spines or lobes appear. Organelle geometry, collision rules, attachment points, and game outcomes do not change.
+Ownership changes the existing cell wall shape over 18 seconds. Tint uses a shared 24-second transition rate. These timings apply to all factions. Seeded pigment variation changes the wall brightness and shifts its hue between indigo and cyan. Virus control blends in a pointed radial displacement and a shinier green material. Fungal control blends in broad rounded displacement and a rougher brown material. Immune control returns the wall to its neutral shape and tints it white. The base wall is blue; Virus tints it green and Fungus tints it brown. Vertex and triangle counts stay fixed. Normals and render bounds follow the current positions. No separate spines or lobes appear. Organelle geometry, collision rules, attachment points, and game outcomes do not change.
 
 Every intact factory branch ends in a faction leaf head. This includes trunks
 that extend past their forks. The head follows the stem during sway. Tips exposed
@@ -331,3 +332,55 @@ After the fixture updates, 29 CPU application test groups passed. The existing
 `world_files` failure remains: its empty building fixture omits the required
 `shared` field. JSON formatting and the three changed asset schemas passed.
 No GPU rendering, native Windows, or player session was tested for this buff.
+
+
+Cells use a blue base membrane with procedural indigo and cyan variation.
+Control tints the membrane white for Immune, green for Virus, and brown for
+Fungus. The normal and trial faction assets use the same colors. The existing
+24-second tint transition remains. Internal organelle colors remain distinct.
+
+Immune factory stems and heads are 1.8 times as wide and deep. Their height
+and triangle counts stay the same. `factories.immune.width_scale` in the mesh
+source profile sets this shape. Navigation bounds include the wider meshes.
+
+Fungal factories have 21 structures instead of 9. Their chains attach across
+all available roots. `branches.spacing` is 1.8 and `spread_scale` is 1.6,
+so the branches extend farther and turn farther from their parent direction.
+Fungal heads use 0.55 of their previous size. `factories.fungal_spore.head_scale`
+sets the head size in the mesh source profile. Run `scripts/make_biology.py`
+with Blender to regenerate these meshes and the editable source scene.
+
+A large fungal cell has six mature producing tips instead of four. A small
+cell with two roots has seven instead of three. Ready tips share the rates
+of four and three prior leaves, respectively. `branches.production_leaf_limits`
+sets these budgets by root count. `establishing_leaves` holds the two-root
+budget to two leaves during initial deployment. An omitted budget leaves
+per-tip production unchanged. `production_reference_count: 9` retains the
+prior mature nutrient income while distributing it across more limbs.
+A small completion tolerance prevents float rounding from adding a tick to
+normalized manufacture jobs.
+
+Application comparisons from normal settlement measured 360 spores per minute
+before and 361 after on a small cell, and 480 before and after on a large cell.
+At ten minutes, cumulative production was 2400 before and 2397 after for the
+small cell, and 3987 before and 3885 after for the large cell. New branch growth
+changes early birth times; mature output is retained. Test spores expired after
+0.2 seconds to keep storage from limiting the measurements. Production uses
+the real application through Proton. `tests/e2e/fungal_sources.py` checks the
+mature output, source distribution, nutrient income, and invalid budget data.
+
+Smaller fungal child limbs have 50 health and take three hits. Roots retain
+240 health and twelve hits. A full three-root factory retains 1620 total
+health across its larger structure count. This prevents a threefold increase
+in child-limb health from the added branches. The large-cell projected stem
+area increased from 166 to 510 square world units in the application state.
+The mean child opening angle increased from 19 to 27 degrees.
+
+Thirty CPU application test groups passed for this update. The known
+`world_files` empty-fixture failure was excluded. Four final focused
+1920x1080 captures passed with the host Vulkan validation layer, one frame
+per process. Their application frame times were 17.05, 19.04, 17.12, and
+18.80 ms for neutral, Virus, Immune, and Fungus. These are single-frame
+checks, not steady performance measurements. Native Windows remains untested.
+The final three-seed AI trial retained 12/12 wins against Fungus for both
+Virus and Immune; equal faction strength remains unverified.

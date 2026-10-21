@@ -5,15 +5,15 @@
       "id": 1,
       "name": "virus",
       "label": "VIRUS",
-      "color": [0.45, 0.9, 0.75],
+      "color": [0.24, 0.86, 0.32],
       "production": {
         "building": "virus_factory",
         "default_unit": "virus_fighter",
         "assault_unit": "virus_bomber"
       },
       "cell_appearance": {
-        "tint": [0.12, 0.68, 0.58],
-        "strength": 0.42,
+        "tint": [0.16, 0.72, 0.18],
+        "strength": 0.72,
         "roughness": 0.18,
         "displacement": {
           "features": 256,
@@ -28,15 +28,15 @@
       "id": 2,
       "name": "immune",
       "label": "IMMUNE",
-      "color": [1.0, 0.55, 0.65],
+      "color": [0.94, 0.97, 1],
       "production": {
         "building": "immune_factory",
         "default_unit": "immune_fighter",
         "assault_unit": "immune_bomber"
       },
       "cell_appearance": {
-        "tint": [0.98, 0.83, 0.9],
-        "strength": 0.22,
+        "tint": [0.96, 0.98, 1],
+        "strength": 0.78,
         "roughness": 0.6
       }
     },
@@ -44,7 +44,7 @@
       "id": 3,
       "name": "fungus",
       "label": "FUNGUS TRIAL",
-      "color": [0.82, 0.65, 0.35],
+      "color": [0.65, 0.43, 0.22],
       "production": {
         "building": "fungal_emitter",
         "default_unit": "fungal_spore",

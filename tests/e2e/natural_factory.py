@@ -98,7 +98,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
         d['spawns']=[];d['rules']['ai']['expansion_delay']=300;d['rules']['economy'].update(enemy_attack_seconds=300,manufacture_seconds=1000)
         state,_=run(side,d,ticks=120);home=1 if side=='immune' else 0;c=state['colonies'][home]
         definition=next(b for b in d['content']['buildings'] if b['faction']==side)
-        check_roots(c,definition['branches']);assert len(c['structures'])==9
+        check_roots(c,definition['branches']);assert len(c['structures'])==definition['branches']['count']
     # One expendable attacker removes one root, then leaves each faction to regrow.
     for side in ('virus','immune','fungus'):
         regrow=deepcopy(data);enemy='virus' if side=='fungus' else 'fungus'

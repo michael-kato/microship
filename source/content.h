@@ -63,7 +63,9 @@ struct BranchRules
     uint32_t fields,count,seed;
     uint32_t hits;
     float health;
-    float seconds,spacing,production,regrow_seconds;
+    float seconds,spacing,spread_scale,production,regrow_seconds;
+    uint32_t production_leaf_limits[MAX_FACTORY_STRUCTURES],establishing_leaf_limits[MAX_FACTORY_STRUCTURES];
+    uint32_t production_reference_count;
     Vec3 normal;
     uint32_t children,levels,root_limit;
     float root_minimum_radius,branch_probability,angle_jitter,length_jitter,width_jitter;

@@ -35,6 +35,7 @@ static const float INITIAL_NEAREST_DISTANCE = 1e20f;
 static const unsigned int TARGET_SEED_MULTIPLIER = 2891336453u;
 static const float INITIAL_ENEMY_DISTANCE = 1e30f;
 static const float INITIAL_FACTORY_GROWTH = .02f;
+static const float MANUFACTURE_COMPLETION_EPSILON = .000001f;
 static const float FACTORY_AXIS_PARALLEL_LIMIT = .9f;
 static const float CHILD_LIMB_LENGTH_SCALE = 1.8f;
 static const float AXIAL_SPREAD = .12f;
@@ -328,12 +329,14 @@ float simulation_structure_growth(const Simulation* s,uint32_t p,uint32_t k)
 float simulation_production(const Simulation* s,uint32_t p)
 {
     const Colony& c=s->colonies[p];const ProducerDefinition& d=*simulation_producer_definition(s,p);
-    float production=0;
+    float production=0,limb_production=d.branches.production;
+    if (d.branches.production_reference_count && c.structure_count>c.root_count)
+        limb_production*=std::fmax(0.0f,(float)d.branches.production_reference_count-c.root_count)/(c.structure_count-c.root_count);
     for (uint32_t k=0;k<c.structure_count;++k)
     {
         if ((k ? c.branches[k-1].health : c.health)<=0) continue;
         float growth=simulation_structure_growth(s,p,k);
-        production+=growth*growth*(c.parents[k]<0 ? 1.0f/c.root_count : d.branches.production);
+        production+=growth*growth*(c.parents[k]<0 ? 1.0f/c.root_count : limb_production);
     }
     return production;
 }
@@ -424,6 +427,7 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
     }
     float extent=parent>=0 ? f->spacing*CHILD_LIMB_LENGTH_SCALE : simulation_producer_definition(s,p)->height;
     float spread=f->grammar==GROWTH_AXIAL ? AXIAL_SPREAD : f->grammar==GROWTH_FAN ? FAN_SPREAD : HYPHA_SPREAD;
+    spread*=f->spread_scale;
     float bend=f->grammar==GROWTH_AXIAL ? AXIAL_BEND : f->grammar==GROWTH_FAN ? FAN_BEND : HYPHA_BEND;
     if (f->grammar==GROWTH_TREE)
     {
@@ -483,7 +487,9 @@ static void prepare_factory(Simulation* s,uint32_t p)
         else if (!f->organelle_roots) c->parents[k]=(k-1)/2;
         else if (f->grammar==GROWTH_FAN) c->parents[k]=((k-c->root_count)/2)%c->root_count;
         else if (f->grammar==GROWTH_HYPHA && (k-c->root_count)%HYPHA_CHAIN_LIMBS) c->parents[k]=k-1;
-        else c->parents[k]=f->grammar==GROWTH_AXIAL ? k-c->root_count : (k-c->root_count)%c->root_count;
+        else c->parents[k]=f->grammar==GROWTH_AXIAL ? k-c->root_count
+            : f->grammar==GROWTH_HYPHA ? ((k-c->root_count)/HYPHA_CHAIN_LIMBS)%c->root_count
+            : (k-c->root_count)%c->root_count;
         c->limb_scale[k]=c->parents[k]<0 ? 1 : c->limb_scale[c->parents[k]]*f->width_scale;
     }
     if (f->grammar==GROWTH_TREE)
@@ -1725,6 +1731,11 @@ static void grow_colonies(Simulation* s, float dt)
         }
         float rate=s->world.ai_production_set && (c->faction!=s->world.player_faction || s->world.player_ai) ? s->world.ai_production : 1;
 
+        // Share the authored leaf-rate budget across all ready sources.
+        uint32_t leaf_limit=c->root_count ? f.production_leaf_limits[c->root_count-1] : 0;
+        if (c->root_count && c->establishment_age<d.establishment_seconds && f.establishing_leaf_limits[c->root_count-1])
+            leaf_limit=f.establishing_leaf_limits[c->root_count-1];
+        if (leaf_limit && count>leaf_limit) rate*=leaf_limit/(float)count;
         c->building=false;c->manufacturing=0;c->capacity_blocked=false;
         for (uint32_t k=0;k<c->structure_count;++k)
         {
@@ -1732,7 +1743,7 @@ static void grow_colonies(Simulation* s, float dt)
             const UnitDefinition& product=s->world.content.units[job->type];
             float seconds=product.manufacture_seconds>0 ? product.manufacture_seconds : rules->manufacture_seconds;
             job->progress=std::fmin(1.0f,job->progress+dt*rate/seconds);
-            if (job->progress>=1)
+            if (job->progress>=1-MANUFACTURE_COMPLETION_EPSILON)
             {
                 const UnitDefinition* definition=&s->world.content.units[job->type];
                 Vec3 normal=s->world.bodies[p].colony_normal;

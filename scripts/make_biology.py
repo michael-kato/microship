@@ -491,11 +491,13 @@ def factory(side):
             y=(i+.5)/f['lobes'];sign=-1 if i%2 else 1
             sphere((sign*IMMUNE_STEM_LOBE_X,y,0),IMMUNE_STEM_LOBE_SIZE,p['body'],2,surface='immune_surface')
             branches((0,y,0),(sign,IMMUNE_FACTORY_BRANCH_UP_COMPONENT,IMMUNE_FACTORY_BRANCH_DEPTH_COMPONENT),f['spread'],FACTORY_BRANCH_RADIUS,2,p['body'],buds=p['granules'],surface='immune_surface',bud_surface='immune_granule')
+        for obj in parts:obj.data.transform(Matrix.Diagonal((f['width_scale'],1,f['width_scale'],1)))
         export('immune_stem',subsurface_weight=0)
         for i in range(f['crown_lobes']):
             a=i*math.tau/f['crown_lobes']
             sphere((IMMUNE_CROWN_RADIUS*math.cos(a),IMMUNE_CROWN_Y,IMMUNE_CROWN_RADIUS*math.sin(a)),IMMUNE_CROWN_SIZE,p['body'],2,surface='immune_surface')
         sphere((0,FACTORY_GRANULE_Y,IMMUNE_FACTORY_GRANULE_Z),IMMUNE_FACTORY_GRANULE_SIZE,p['granules'],2,surface='immune_granule')
+        for obj in parts:obj.data.transform(Matrix.Diagonal((f['width_scale'],1,f['width_scale'],1)))
         export('immune_head',subsurface_weight=0)
     else:
         rod((0,0,0),(0,1,0),f['shaft_radius'],p['rays'],'fungal_stalk')
@@ -508,6 +510,7 @@ def factory(side):
         for i in range(f['spores']):
             a=i*GOLDEN_ANGLE_RADIANS
             sphere((FUNGAL_SPORE_RING_RADIUS*math.cos(a),FUNGAL_SPORE_RING_Y,FUNGAL_SPORE_RING_RADIUS*math.sin(a)),(FUNGAL_FACTORY_SPORE_RADIUS,)*3,p['core'],1,surface='fungal_spore')
+        for obj in parts:obj.data.transform(Matrix.Diagonal((f['head_scale'],f['head_scale'],f['head_scale'],1)))
         export('fungal_head',subsurface_weight=0)
     # The complete model is used by the non-staged presentation path.
     for i,source in enumerate(models[-2:]):

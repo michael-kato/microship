@@ -130,6 +130,42 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 10000
+              },
+              "spread_scale": {
+                "type": "number",
+                "minimum": 0.1,
+                "maximum": 3
+              },
+              "production_leaf_limits": {
+                "type": "array",
+                "maxItems": 128,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "roots": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 128
+                    },
+                    "leaves": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 128
+                    },
+                    "establishing_leaves": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 128
+                    }
+                  },
+                  "required": ["roots", "leaves"],
+                  "additionalProperties": false
+                }
+              },
+              "production_reference_count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 128
               }
             },
             "required": ["count", "spacing", "production"],
