@@ -57,8 +57,22 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
             distance=math.dist(v0[:3],v2[:3]);moved+=distance>1e-5
             for axis in range(3):assert abs(v1[axis]-(v0[axis]+b['factions'][faction]*(v2[axis]-v0[axis])))<1e-5,'Wall positions did not lerp'
             assert abs(math.dist(v2[3:],[0,0,0])-1)<1e-5
-            assert distance<=data['bodies'][home]['radius']*profile['cell_appearance'].get('displacement',{}).get('height',0)+1e-5
-        assert moved>100 if side!='immune' else moved==0
+            body=data['bodies'][home];appearance=profile['cell_appearance']
+            limit=body['radius']*appearance.get('displacement',{}).get('height',0)
+            limit+=abs(math.dist(v0[:3],body['position'])-body['radius'])*appearance.get('roundness',0)
+            assert distance<=limit+1e-5
+        assert moved>100
+        if side=='immune':
+            center=data['bodies'][home]['position']
+            radii=lambda mesh:[math.dist(mesh['vertices'][i][:3],center) for i in wall]
+            original=radii(base);rounded=radii(full)
+            before=max(original)-min(original);after=max(rounded)-min(rounded)
+            assert .1*before<after<.25*before,(before,after)
+            unchanged=deepcopy(data)
+            next(f for f in unchanged['content']['factions'] if f['name']=='immune')['cell_appearance']['roundness']=0
+            plain,_=run('immune-roundness-off',unchanged,1800,orders)
+            assert plain==mature,'Wall roundness changed the simulation'
+            print(f'Immune radial variation: {before:.6f} before, {after:.6f} after; some variation remains.')
         colors=base['wall_colors'];wall_colors=[colors[i] for i in wall]
         assert len({tuple(c) for c in wall_colors})>100
         assert max(c[0]/max(c[2],1e-6) for c in wall_colors)-min(c[0]/max(c[2],1e-6) for c in wall_colors)>.08,'Wall pigment only changed brightness'
@@ -155,11 +169,16 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
     assert after['colonies'][0]['faction']==2 and after['colonies'][0]['appearance']['factions'][1]==0
     assert after['colonies'][0]['appearance']['factions'][2]==1
     _,neutral_scene=run('ownership-neutral-wall',changeover,1,extra=('--restart',))
-    assert after_scene['meshes'][0]['deformation']['vertices']==neutral_scene['meshes'][0]['deformation']['vertices'],'Immune control did not restore the neutral wall'
+    regular=neutral_scene['meshes'][0]['deformation'];rounded=after_scene['meshes'][0]['deformation']
+    wall={i for triangle in regular['indices'] if triangle[3]==3 for i in triangle[:3]}
+    center=changeover['bodies'][0]['position']
+    span=lambda mesh:max(math.dist(mesh['vertices'][i][:3],center) for i in wall)-min(math.dist(mesh['vertices'][i][:3],center) for i in wall)
+    assert .1*span(regular)<span(rounded)<.25*span(regular),'Immune capture did not round the wall'
+    assert all(a==b for i,(a,b) in enumerate(zip(regular['vertices'],rounded['vertices'])) if i not in wall),'Immune capture moved an organelle'
     for field,value in [('children',1),('levels',0),('length_scale',1.1),('width_scale',0),('angle_degrees',0),('bend',0)]:
         run('bad-tree-'+field,change(virus,'content.buildings.0.branches.tree.'+field,value),expected=1)
-    for field,value in [('roughness',-1),('displacement.features',257),('displacement.features',0),('displacement.width_degrees',5),('displacement.height',0),('displacement.profile','missing')]:
+    for field,value in [('roughness',-1),('roundness',-.01),('roundness',1.01),('displacement.features',257),('displacement.features',0),('displacement.width_degrees',5),('displacement.height',0),('displacement.profile','missing')]:
         run('bad-surface-'+field.replace('.','-'),change(virus,'content.factions.0.cell_appearance.'+field,value),expected=1)
     run('tree-capacity',change(virus,'content.buildings.0.branches.count',12),expected=1)
     run('old-surface-pieces',change(virus,'content.factions.0.cell_appearance.surface',dict(model='missing.fmesh')),expected=1)
-print(f'Colony forms E2E passed: {count} application runs; fixed wall topology, vertex interpolation, unchanged organelles, valid normals, immune restoration, faction materials, curved forked trees, terminal production, restart, deterministic results and invalid assets.')
+print(f'Colony forms E2E passed: {count} application runs; fixed wall topology, vertex interpolation, unchanged organelles, valid normals, immune roundness and capture, faction materials, curved forked trees, terminal production, restart, deterministic results and invalid assets.')

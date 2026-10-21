@@ -37,7 +37,8 @@
       "cell_appearance": {
         "tint": [0.96, 0.98, 1],
         "strength": 0.78,
-        "roughness": 0.6
+        "roughness": 0.6,
+        "roundness": 0.8
       }
     },
     {

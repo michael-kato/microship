@@ -68,7 +68,7 @@ after growth. The separate slow sway animation still moves the tree.
 
 Virus trees grow side by side. New units grow at terminal leaves. Support damage removes descendants. The growth plane is authored to match the startup view. Moving the camera does not change geometry or gameplay.
 
-Ownership changes the existing cell wall shape over 18 seconds. Tint uses a shared 24-second transition rate. These timings apply to all factions. Seeded pigment variation changes the wall brightness and shifts its hue between indigo and cyan. Virus control blends in a pointed radial displacement and a shinier green material. Fungal control blends in broad rounded displacement and a rougher brown material. Immune control returns the wall to its neutral shape and tints it white. The base wall is blue; Virus tints it green and Fungus tints it brown. Vertex and triangle counts stay fixed. Normals and render bounds follow the current positions. No separate spines or lobes appear. Organelle geometry, collision rules, attachment points, and game outcomes do not change.
+Ownership changes the existing cell wall shape over 18 seconds. Tint uses a shared 24-second transition rate. These timings apply to all factions. Seeded pigment variation changes the wall brightness and shifts its hue between indigo and cyan. Virus control blends in a pointed radial displacement and a shinier green material. Fungal control blends in broad rounded displacement and a rougher brown material. Immune control makes the wall nearly spherical and tints it white. The base wall is blue; Virus tints it green and Fungus tints it brown. Vertex and triangle counts stay fixed. Normals and render bounds follow the current positions. No separate spines or lobes appear. Organelle geometry, collision rules, attachment points, and game outcomes do not change.
 
 Every intact factory branch ends in a faction leaf head. This includes trunks
 that extend past their forks. The head follows the stem during sway. Tips exposed
@@ -384,3 +384,19 @@ per process. Their application frame times were 17.05, 19.04, 17.12, and
 checks, not steady performance measurements. Native Windows remains untested.
 The final three-seed AI trial retained 12/12 wins against Fungus for both
 Virus and Immune; equal faction strength remains unverified.
+
+
+Immune-controlled cell walls retain 20 percent of the original radial shape
+variation. `cell_appearance.roundness: 0.8` blends each existing wall vertex
+80 percent toward the nominal cell radius. A value of zero keeps the original
+shape; one gives a sphere. This follows the existing ownership morph timing.
+The normal and trial Immune factions use the same value. Vertex and triangle
+counts stay fixed. Organelles, attachment points, factories, mobile units,
+collision radii, and simulation results retain their previous behavior.
+
+Seven CPU application test groups passed for roundness. Two native 1920x1080
+single-frame captures passed with host Vulkan validation. In the fixed-seed
+view, normalized wall radii changed from 0.847–1.096 to 0.969–1.019. Radial
+standard deviation changed from 0.04753 to 0.00951. Simulation state matched
+exactly with roundness disabled and enabled. The after capture is
+`screenshots/000964_immune_roundness_after.png`. Native Windows remains untested.

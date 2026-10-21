@@ -142,10 +142,12 @@ static bool load_factions(Content* c,Json root)
         Json appearance=json_find(j,"cell_appearance");
         if (json_present(appearance))
         {
-            json_object(appearance,"tint|strength|roughness|displacement");f.cell_tint=json_color(json_get(appearance,"tint"));
+            json_object(appearance,"tint|strength|roughness|roundness|displacement");f.cell_tint=json_color(json_get(appearance,"tint"));
             f.cell_strength=json_float(json_get(appearance,"strength"),0,1);
             Json roughness=json_find(appearance,"roughness");
             if (json_present(roughness)) { f.cell_roughness=json_float(roughness,.02f,1);f.cell_material=true; }
+            Json roundness=json_find(appearance,"roundness");
+            if (json_present(roundness)) f.cell_roundness=json_float(roundness,0,1);
             Json displacement=json_find(appearance,"displacement");
             if (json_present(displacement))
             {

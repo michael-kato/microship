@@ -89,6 +89,11 @@
                 },
                 "required": ["features", "height", "width_degrees", "profile", "seed"],
                 "additionalProperties": false
+              },
+              "roundness": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
               }
             },
             "required": ["tint", "strength"],

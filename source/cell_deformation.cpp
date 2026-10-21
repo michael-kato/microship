@@ -27,8 +27,9 @@ static void displacement_centers(const Body& body,const FactionDefinition& profi
 // rounding margin at the angular boundary; accepted peaks use the same formula.
 static Vec3 target_displacement(Vec3 point,const Body& body,const FactionDefinition& profile,const Vec3* centers,float support)
 {
-    if (!profile.displacement_features) return Vec3{};
-    Vec3 radial=normalize(subtract(point,body.position));float height=0;
+    if (!profile.displacement_features && profile.cell_roundness<=0) return Vec3{};
+    Vec3 offset=subtract(point,body.position),radial=normalize(offset);
+    float radial_change=profile.cell_roundness*(body.radius-std::sqrt(dot(offset,offset))),height=0;
     for (uint32_t k=0;k<profile.displacement_features;++k)
     {
         float alignment=dot(radial,centers[k]);if (alignment<support) continue;
@@ -37,7 +38,7 @@ static Vec3 target_displacement(Vec3 point,const Body& body,const FactionDefinit
         float shape=profile.displacement_pointed ? t : .5f-.5f*std::cos(t*PI_RADIANS);
         height=std::fmax(height,shape);
     }
-    return scale(radial,height*body.radius*profile.displacement_height);
+    return scale(radial,radial_change+height*body.radius*profile.displacement_height);
 }
 
 static void wall_pigment(GpuVertex* v,const Body& body,const BodyDefinition& d)
@@ -60,7 +61,7 @@ static void wall_pigment(GpuVertex* v,const Body& body,const BodyDefinition& d)
 bool presentation_prepare_membranes(Presentation* p,const Simulation* s)
 {
     bool enabled=false;
-    for (uint32_t f=1;f<MAX_FACTIONS;++f) enabled=enabled || s->world.content.factions[f].displacement_features>0;
+    for (uint32_t f=1;f<MAX_FACTIONS;++f) enabled=enabled || s->world.content.factions[f].displacement_features>0 || s->world.content.factions[f].cell_roundness>0;
     for (uint32_t b=0;b<s->world.content.body_count;++b) enabled=enabled || s->world.content.bodies[b].wall_noise_strength>0;
     if (!enabled) return true;
     Geometry& g=p->scene.geometry;p->membrane_groups.resize(g.vertices.size(),NO_MEMBRANE_GROUP);
@@ -145,7 +146,8 @@ bool presentation_update_membranes(Presentation* p,const Simulation* s)
         CellMembrane& membrane=p->membranes[m];bool changed=false,neutral=true;
         for (uint32_t f=1;f<MAX_FACTIONS;++f)
         {
-            float weight=s->visible_bodies[membrane.body] && s->world.content.factions[f].displacement_features
+            const FactionDefinition& profile=s->world.content.factions[f];
+            float weight=s->visible_bodies[membrane.body] && (profile.displacement_features || profile.cell_roundness>0)
                 ? s->cell_appearance[membrane.body].factions[f] : 0;
             changed=changed || weight!=membrane.weights[f];neutral=neutral && weight==0;membrane.weights[f]=weight;
         }
