@@ -14,374 +14,111 @@
       },
       {
         "faction": "immune",
-        "cell": 5
+        "cell": 1
       },
       {
         "faction": "fungus",
-        "cell": 10
+        "cell": 2
       }
     ],
     "auto_colonize": true
   },
-  "bodies": [
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [-32.0, -18.47520861, 0.0],
-      "radius": 4.2,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
+  "layout": {
+    "field_radius": 36.95041723,
+    "cells": 15,
+    "first_home_degrees": 210,
+    "minimum_gap": 4,
+    "centroid_steps": 1,
+    "home": {
+      "count": 3,
+      "cell": {
+        "type": "unclaimed",
+        "owner": "neutral",
+        "radius": 4.2,
+        "tint": [1.0, 1.0, 1.0],
+        "site": {
+          "availability": 1.0,
+          "normal": [0, 0, 1]
+        },
+        "medium": {
+          "radius_fraction": 0.94,
+          "edge_fade": 0.28,
+          "scattering": [0.1, 0.075, 0.085],
+          "absorption": 0.018,
+          "anisotropy": 0.2,
+          "depth_blur": {
+            "start_fraction": 0.3333333333333333,
+            "full_fraction": 0.6666666666666666,
+            "max_radius": 18
+          }
         }
       }
     },
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [-16.0, -18.47520861, 0.0],
-      "radius": 2.7,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
+    "center": {
+      "jitter": 3,
+      "cell": {
+        "type": "unclaimed",
+        "owner": "neutral",
+        "radius": 6.0,
+        "tint": [1.0, 1.0, 1.0],
+        "site": {
+          "availability": 1.0,
+          "normal": [0, 0, 1]
+        },
+        "medium": {
+          "radius_fraction": 0.94,
+          "edge_fade": 0.28,
+          "scattering": [0.1, 0.075, 0.085],
+          "absorption": 0.018,
+          "anisotropy": 0.2,
+          "depth_blur": {
+            "start_fraction": 0.3333333333333333,
+            "full_fraction": 0.6666666666666666,
+            "max_radius": 18
+          }
         }
       }
     },
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [-24.0, -4.61880215, 0.0],
-      "radius": 2.7,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
-        }
-      }
-    },
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [0.0, -18.47520861, 0.0],
-      "radius": 2.1,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
-        }
-      }
-    },
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [-8.0, -4.61880215, 0.0],
-      "radius": 2.1,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
-        }
-      }
-    },
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [32.0, -18.47520861, 0.0],
-      "radius": 4.2,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
-        }
-      }
-    },
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [24.0, -4.61880215, 0.0],
-      "radius": 2.7,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
-        }
-      }
-    },
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [16.0, -18.47520861, 0.0],
-      "radius": 2.7,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
-        }
-      }
-    },
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [16.0, 9.23760431, 0.0],
-      "radius": 2.1,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
-        }
-      }
-    },
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [8.0, -4.61880215, 0.0],
-      "radius": 2.1,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
-        }
-      }
-    },
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [0.0, 36.95041723, 0.0],
-      "radius": 4.2,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
-        }
-      }
-    },
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [-8.0, 23.09401077, 0.0],
-      "radius": 2.7,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
-        }
-      }
-    },
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [8.0, 23.09401077, 0.0],
-      "radius": 2.7,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
-        }
-      }
-    },
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [-16.0, 9.23760431, 0.0],
-      "radius": 2.1,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
-        }
-      }
-    },
-    {
-      "type": "unclaimed",
-      "owner": "neutral",
-      "position": [0.0, 9.23760431, 0.0],
-      "radius": 2.1,
-      "tint": [1.0, 1.0, 1.0],
-      "site": {
-        "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.1, 0.075, 0.085],
-        "absorption": 0.018,
-        "anisotropy": 0.2,
-        "depth_blur": {
-          "start_fraction": 0.3333333333333333,
-          "full_fraction": 0.6666666666666666,
-          "max_radius": 18
+    "neutral": {
+      "radius_range": [1.5, 3.7],
+      "cell": {
+        "type": "unclaimed",
+        "owner": "neutral",
+        "tint": [1.0, 1.0, 1.0],
+        "site": {
+          "availability": 1.0,
+          "normal": [0, 0, 1]
+        },
+        "medium": {
+          "radius_fraction": 0.94,
+          "edge_fade": 0.28,
+          "scattering": [0.1, 0.075, 0.085],
+          "absorption": 0.018,
+          "anisotropy": 0.2,
+          "depth_blur": {
+            "start_fraction": 0.3333333333333333,
+            "full_fraction": 0.6666666666666666,
+            "max_radius": 18
+          }
         }
       }
     }
-  ],
+  },
   "spawns": [
     {
       "type": "virus_fighter",
-      "position": [-32.0, -18.47520861, 7]
+      "cell": 0,
+      "offset": [0, 0, 7]
     },
     {
       "type": "immune_fighter",
-      "position": [32.0, -18.47520861, 7]
+      "cell": 1,
+      "offset": [0, 0, 7]
     },
     {
       "type": "fungal_spore",
-      "position": [0.0, 36.95041723, 7]
+      "cell": 2,
+      "offset": [0, 0, 7]
     }
   ]
 }

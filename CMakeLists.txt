@@ -193,7 +193,7 @@ add_executable(nanova
     source/main.cpp
     source/microfacet.cpp
     source/camera.cpp
-    source/world.cpp
+    source/world.cpp source/map_layout.cpp
     source/render_config.cpp
     source/presentation.cpp source/cell_deformation.cpp source/render_scene.cpp
     source/geometry.cpp source/geometry_variation.cpp

@@ -35,9 +35,10 @@ def start(instance):return [instance['transform'][j] for j in (3,7,11)]
 def end(instance):return [instance['transform'][j]+instance['transform'][j-2] for j in (3,7,11)]
 
 with tempfile.TemporaryDirectory(prefix='nanova-factory-curves-') as directory:
-    out=Path(directory);base=stage_world(root/'assets/levels/virus_large_level.json',out)
-    for placement in base['match'].pop('starts'):base['bodies'][placement['cell']]['owner']=placement['faction']
-    base['match']['fully_established']=True;base['spawns']=[];base['rules'].pop('exploration',None)
+    # The stress scene keeps authored cells; homes 0, 5 and 10 belong to the three factions.
+    out=Path(directory);base=stage_world(root/'assets/levels/three_faction_stress.json',out)
+    for key in ('production_seconds','formation_spacing','rally_point','player_ai'):base['match'].pop(key)
+    base['spawns']=[];base['rules'].pop('exploration',None)
     base['rules']['ai']['expansion_delay']=300;base['rules']['economy']['enemy_attack_seconds']=300
     base['appearance']['animation']['factories']['sway_degrees']=0
     for unit in base['content']['units']:unit['manufacture_seconds']=10000

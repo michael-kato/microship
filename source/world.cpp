@@ -6,6 +6,7 @@
 #include <cmath>
 #include "asset_limits.h"
 #include "geometry.h"
+#include "map_layout.h"
 
 static const int MAX_PLACEMENT_COORDINATE = 1000000;
 static const int MAX_MEDIUM_ABSORPTION = 1000;
@@ -65,6 +66,9 @@ static const float MIN_LIGHT_DIRECTION_SQUARED = .0001f;
 static const int MAX_BACKDROP_SAMPLES = 4096;
 static const int MAX_AUTHORED_SEED = 16777215;
 static const int DEFAULT_BODY_SEED_MULTIPLIER = 4721;
+static const int MAX_FIELD_RADIUS = 10000;
+static const int MAX_CENTROID_STEPS = 32;
+static_assert((int)MAX_LAYOUT_CELLS==(int)MAX_BODIES,"Layout scratch covers every body");
 static const float MAX_MEDIUM_ANISOTROPY = .95f;
 static const int MAX_FLIGHT_LOOKAHEAD_SECONDS = 5;
 static const int MAX_OBSTACLE_CLEARANCE = 5;
@@ -412,62 +416,126 @@ static bool load_appearance(World* w,const char* path,uint32_t seed)
     }
     return d.valid;
 }
-static bool load_placements(World* w,Json root)
+// Authored placements have a position and may set a seed. Layout templates have
+// neither, and the neutral template takes its radius from the layout.
+static bool read_body(World* w,Json j,bool placed,bool sized,Body* out)
 {
-    JsonArray bodies=json_array(json_get(root,"bodies"),MAX_BODIES);Json j={};
-    while (json_next(&bodies,&j))
+    json_object(j,placed ? "type|owner|position|radius|tint|site|medium|seed" : sized ? "type|owner|radius|tint|site|medium" : "type|owner|tint|site|medium");
+    Body b={};b.availability=-1;
+    Json seed=placed ? json_find(j,"seed") : Json{};b.seed=json_present(seed) ? json_uint(seed,0,MAX_AUTHORED_SEED) : 0;
+    char type[ASSET_NAME_CAPACITY]={};Json name=json_get(j,"type");json_string(name,type,ASSET_NAME_CAPACITY);int index=content_body(&w->content,type);
+    if (index<0) return json_error(name,"unknown body type reference");
+    b.type=(uint32_t)index;strcpy(b.model_path,w->content.bodies[index].model_path);b.owner=read_owner(w,json_get(j,"owner"));
+    if (placed) b.position=json_vector(json_get(j,"position"),-MAX_PLACEMENT_COORDINATE,MAX_PLACEMENT_COORDINATE);
+    if (sized) b.radius=json_positive(json_get(j,"radius"),MAX_BODY_RADIUS);
+    b.color=json_color(json_get(j,"tint"));Json site=json_find(j,"site");
+    if (json_present(site))
     {
-        json_object(j,"type|owner|position|radius|tint|site|medium|seed");Body b={};b.availability=-1;
-        Json seed=json_find(j,"seed");b.seed=json_present(seed) ? json_uint(seed,0,MAX_AUTHORED_SEED) : (w->body_count+1)*DEFAULT_BODY_SEED_MULTIPLIER;
-        char type[ASSET_NAME_CAPACITY]={};Json name=json_get(j,"type");json_string(name,type,ASSET_NAME_CAPACITY);int index=content_body(&w->content,type);
-        if (index<0) return json_error(name,"unknown body type reference");
-        b.type=(uint32_t)index;strcpy(b.model_path,w->content.bodies[index].model_path);b.owner=read_owner(w,json_get(j,"owner"));
-        b.position=json_vector(json_get(j,"position"),-MAX_PLACEMENT_COORDINATE,MAX_PLACEMENT_COORDINATE);b.radius=json_positive(json_get(j,"radius"),MAX_BODY_RADIUS);
-        b.color=json_color(json_get(j,"tint"));Json site=json_find(j,"site");
-        if (json_present(site))
+        json_object(site,"normal|availability");b.colony_normal=read_normal(json_get(site,"normal"));
+        b.availability=json_float(json_get(site,"availability"),0,1);
+        if (!w->content.bodies[index].hosts_site) return json_error(site,"body type cannot host a production site");
+    }
+    Json medium=json_find(j,"medium");
+    if (json_present(medium))
+    {
+        json_object(medium,"radius_fraction|edge_fade|scattering|absorption|anisotropy|depth_blur");
+        Json blur=json_find(medium,"depth_blur");
+        if (json_present(blur))
         {
-            json_object(site,"normal|availability");b.colony_normal=read_normal(json_get(site,"normal"));
-            b.availability=json_float(json_get(site,"availability"),0,1);
-            if (!w->content.bodies[index].hosts_site) return json_error(site,"body type cannot host a production site");
-        }
-        Json medium=json_find(j,"medium");
-        if (json_present(medium))
-        {
-            json_object(medium,"radius_fraction|edge_fade|scattering|absorption|anisotropy|depth_blur");
-            Json blur=json_find(medium,"depth_blur");
-            if (json_present(blur))
+            json_object(blur,"pixels_per_unit|sharp_distance|max_radius|start_fraction|full_fraction");
+            b.interior_blur_fraction=json_present(json_find(blur,"start_fraction")) || json_present(json_find(blur,"full_fraction"));
+            if (b.interior_blur_fraction)
             {
-                json_object(blur,"pixels_per_unit|sharp_distance|max_radius|start_fraction|full_fraction");
-                b.interior_blur_fraction=json_present(json_find(blur,"start_fraction")) || json_present(json_find(blur,"full_fraction"));
-                if (b.interior_blur_fraction)
-                {
-                    b.interior_blur_rate=json_float(json_get(blur,"start_fraction"),0,1);
-                    b.interior_blur_sharp=json_float(json_get(blur,"full_fraction"),0,1);
-                    if (b.interior_blur_sharp<=b.interior_blur_rate || json_present(json_find(blur,"pixels_per_unit")) || json_present(json_find(blur,"sharp_distance")))
-                        json_error(blur,"fractional blur requires start < full and no distance fields");
-                }
-                else
-                {
-                    b.interior_blur_rate=json_float(json_get(blur,"pixels_per_unit"),0,32);
-                    b.interior_blur_sharp=json_float(json_get(blur,"sharp_distance"),0,100);
-                }
-                b.interior_blur_max=json_float(json_get(blur,"max_radius"),0,32);
+                b.interior_blur_rate=json_float(json_get(blur,"start_fraction"),0,1);
+                b.interior_blur_sharp=json_float(json_get(blur,"full_fraction"),0,1);
+                if (b.interior_blur_sharp<=b.interior_blur_rate || json_present(json_find(blur,"pixels_per_unit")) || json_present(json_find(blur,"sharp_distance")))
+                    json_error(blur,"fractional blur requires start < full and no distance fields");
             }
-            b.interior_radius=json_positive(json_get(medium,"radius_fraction"),1);
-            b.interior_fade=json_float(json_get(medium,"edge_fade"),0,1);
-            b.interior_scattering=json_color(json_get(medium,"scattering"),MAX_MEDIUM_SCATTERING);
-            b.interior_absorption=json_float(json_get(medium,"absorption"),0,MAX_MEDIUM_ABSORPTION);
-            Json anisotropy=json_get(medium,"anisotropy");b.interior_anisotropy=json_float(anisotropy,-MAX_MEDIUM_ANISOTROPY,MAX_MEDIUM_ANISOTROPY);
-            if (std::fabs(b.interior_anisotropy)>=MAX_MEDIUM_ANISOTROPY) json_error(anisotropy,"anisotropy must be in (-.95,.95)");
+            else
+            {
+                b.interior_blur_rate=json_float(json_get(blur,"pixels_per_unit"),0,32);
+                b.interior_blur_sharp=json_float(json_get(blur,"sharp_distance"),0,100);
+            }
+            b.interior_blur_max=json_float(json_get(blur,"max_radius"),0,32);
         }
+        b.interior_radius=json_positive(json_get(medium,"radius_fraction"),1);
+        b.interior_fade=json_float(json_get(medium,"edge_fade"),0,1);
+        b.interior_scattering=json_color(json_get(medium,"scattering"),MAX_MEDIUM_SCATTERING);
+        b.interior_absorption=json_float(json_get(medium,"absorption"),0,MAX_MEDIUM_ABSORPTION);
+        Json anisotropy=json_get(medium,"anisotropy");b.interior_anisotropy=json_float(anisotropy,-MAX_MEDIUM_ANISOTROPY,MAX_MEDIUM_ANISOTROPY);
+        if (std::fabs(b.interior_anisotropy)>=MAX_MEDIUM_ANISOTROPY) json_error(anisotropy,"anisotropy must be in (-.95,.95)");
+    }
+    *out=b;return j.document->valid;
+}
+// Homes come first, evenly on the field circle, then an optional center cell
+// near the middle; neutral cells follow at the centroids of their seeded Voronoi
+// regions, sized by region area. The world seed selects the layout.
+static bool load_layout(World* w,Json j,uint32_t seed)
+{
+    json_object(j,"field_radius|cells|first_home_degrees|minimum_gap|centroid_steps|home|center|neutral");
+    VoronoiLayout layout={};
+    layout.field_radius=json_positive(json_get(j,"field_radius"),MAX_FIELD_RADIUS);
+    layout.cells=json_uint(json_get(j,"cells"),1,MAX_LAYOUT_CELLS);
+    layout.first_home_degrees=json_float(json_get(j,"first_home_degrees"),-360,360);
+    layout.minimum_gap=json_float(json_get(j,"minimum_gap"),0,MAX_FIELD_RADIUS);
+    layout.centroid_steps=json_uint(json_get(j,"centroid_steps"),1,MAX_CENTROID_STEPS);
+    Body home,center={},neutral;
+    Json h=json_get(j,"home");json_object(h,"count|cell");
+    layout.homes=json_uint(json_get(h,"count"),1,layout.cells);
+    if (!read_body(w,json_get(h,"cell"),false,true,&home)) return false;
+    layout.home_radius=home.radius;
+    Json c=json_find(j,"center");
+    if (json_present(c))
+    {
+        json_object(c,"jitter|cell");layout.center_jitter=json_float(json_get(c,"jitter"),0,MAX_FIELD_RADIUS);
+        if (!read_body(w,json_get(c,"cell"),false,true,&center)) return false;
+        layout.center_radius=center.radius;
+        if (layout.homes+1>layout.cells) return json_error(c,"the center cell needs a place in the cell count");
+    }
+    Json n=json_get(j,"neutral");json_object(n,"radius_range|cell");
+    Json range=json_get(n,"radius_range");JsonArray bounds=json_array(range,2);Json value={};uint32_t count=0;
+    while (json_next(&bounds,&value)) layout.neutral_radius[count++]=json_positive(value,MAX_BODY_RADIUS);
+    if (count!=2 || layout.neutral_radius[0]>layout.neutral_radius[1]) return json_error(range,"radius_range requires [smallest, largest]");
+    if (!read_body(w,json_get(n,"cell"),false,false,&neutral)) return false;
+    if (!j.document->valid) return false;
+    LayoutCell cells[MAX_LAYOUT_CELLS];
+    if (!voronoi_layout(layout,seed,cells)) return json_error(j,"no seeded layout keeps the minimum gap between cells");
+    uint32_t fixed=layout.homes+(layout.center_radius>0 ? 1u : 0u);
+    for (uint32_t i=0;i<layout.cells;++i)
+    {
+        Body b=i<layout.homes ? home : i<fixed ? center : neutral;
+        b.position=cells[i].position;b.radius=cells[i].radius;b.seed=(i+1)*DEFAULT_BODY_SEED_MULTIPLIER;
         w->bodies[w->body_count++]=b;
     }
+    return true;
+}
+static bool load_placements(World* w,Json root,uint32_t seed)
+{
+    Json bodies=json_find(root,"bodies"),layout=json_find(root,"layout");Json j={};
+    if (json_present(bodies)==json_present(layout)) return json_error(root,"a world requires either bodies or a layout");
+    if (json_present(layout) && !load_layout(w,layout,seed)) return false;
+    JsonArray placed=json_present(bodies) ? json_array(bodies,MAX_BODIES) : JsonArray{};
+    while (json_present(bodies) && json_next(&placed,&j))
+    {
+        Body b;if (!read_body(w,j,true,true,&b)) return false;
+        if (!json_present(json_find(j,"seed"))) b.seed=(w->body_count+1)*DEFAULT_BODY_SEED_MULTIPLIER;
+        w->bodies[w->body_count++]=b;
+    }
+    // A spawn names a position, or a cell and an offset from its center.
     JsonArray spawns=json_array(json_get(root,"spawns"),MAX_SPAWNS);
     while (json_next(&spawns,&j))
     {
-        json_object(j,"type|position");Spawn s={};Json name=json_get(j,"type");json_string(name,s.type_name,ASSET_NAME_CAPACITY);
+        json_object(j,"type|position|cell|offset");Spawn s={};Json name=json_get(j,"type");json_string(name,s.type_name,ASSET_NAME_CAPACITY);
         int index=content_unit(&w->content,s.type_name);if (index<0) return json_error(name,"unknown unit type reference");
-        s.type=(uint32_t)index;s.position=json_vector(json_get(j,"position"),-MAX_PLACEMENT_COORDINATE,MAX_PLACEMENT_COORDINATE);w->spawns[w->spawn_count++]=s;
+        s.type=(uint32_t)index;Json cell=json_find(j,"cell");
+        if (json_present(cell))
+        {
+            if (!w->body_count || json_present(json_find(j,"position"))) return json_error(j,"a spawn names either a position or a cell");
+            uint32_t p=json_uint(cell,0,w->body_count-1);
+            s.position=add(w->bodies[p].position,json_vector(json_get(j,"offset"),-MAX_PLACEMENT_COORDINATE,MAX_PLACEMENT_COORDINATE));
+        }
+        else s.position=json_vector(json_get(j,"position"),-MAX_PLACEMENT_COORDINATE,MAX_PLACEMENT_COORDINATE);
+        w->spawns[w->spawn_count++]=s;
     }
     return root.document->valid;
 }
@@ -517,7 +585,7 @@ static bool validate_world(const World* world,const char* path)
 bool world_load(World* world,const char* path,uint32_t seed)
 {
     JsonDocument d;if (!json_load(&d,path)) return false;Json root=json_root(&d);
-    json_object(root,"$schema|content|rules|appearance|effects|match|bodies|spawns");
+    json_object(root,"$schema|content|rules|appearance|effects|match|bodies|layout|spawns");
     World loaded={};loaded.ambient_top=loaded.ambient_bottom=Color{1,1,1};
     if (!json_path(json_get(root,"content"),path,loaded.content_path) || !content_load(&loaded.content,loaded.content_path)) return false;
     char file[ASSET_PATH_CAPACITY]={};
@@ -530,7 +598,7 @@ bool world_load(World* world,const char* path,uint32_t seed)
     loaded.player_faction=read_owner(&loaded,json_get(match,"player"));loaded.opponent_faction=read_owner(&loaded,json_get(match,"opponent"));
     if (!loaded.player_faction || !loaded.opponent_faction || loaded.player_faction==loaded.opponent_faction)
         return json_error(match,"match requires two distinct non-neutral factions");
-    if (!load_placements(&loaded,root)) return false;
+    if (!load_placements(&loaded,root,seed)) return false;
     for (uint32_t p=0;p<loaded.body_count;++p) loaded.start_owner[p]=loaded.bodies[p].owner;
     loaded.active_factions=(1u<<loaded.player_faction)|(1u<<loaded.opponent_faction);
     for (uint32_t p=0;p<loaded.body_count;++p) if (loaded.start_owner[p]) loaded.active_factions|=1u<<loaded.start_owner[p];

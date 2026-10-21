@@ -204,6 +204,96 @@
       },
       "maxItems": 16
     },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "field_radius": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "cells": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "first_home_degrees": {
+          "type": "number",
+          "minimum": -360,
+          "maximum": 360
+        },
+        "minimum_gap": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "centroid_steps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "home": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "cell": {
+              "$ref": "#/$defs/cell_template"
+            }
+          },
+          "required": ["count", "cell"],
+          "additionalProperties": false
+        },
+        "center": {
+          "type": "object",
+          "properties": {
+            "jitter": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "cell": {
+              "$ref": "#/$defs/cell_template"
+            }
+          },
+          "required": ["jitter", "cell"],
+          "additionalProperties": false
+        },
+        "neutral": {
+          "type": "object",
+          "properties": {
+            "radius_range": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1000000
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "cell": {
+              "$ref": "#/$defs/neutral_template"
+            }
+          },
+          "required": ["radius_range", "cell"],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "field_radius",
+        "cells",
+        "first_home_degrees",
+        "minimum_gap",
+        "centroid_steps",
+        "home",
+        "neutral"
+      ],
+      "additionalProperties": false
+    },
     "spawns": {
       "type": "array",
       "items": {
@@ -214,15 +304,37 @@
           },
           "position": {
             "$ref": "shared.schema.json#/$defs/position"
+          },
+          "cell": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 15
+          },
+          "offset": {
+            "$ref": "shared.schema.json#/$defs/position"
           }
         },
-        "required": ["type", "position"],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "required": ["type"],
+        "oneOf": [
+          {
+            "required": ["position"],
+            "not": {
+              "anyOf": [{"required": ["cell"]}, {"required": ["offset"]}]
+            }
+          },
+          {
+            "required": ["cell", "offset"],
+            "not": {
+              "required": ["position"]
+            }
+          }
+        ]
       },
       "maxItems": 64
     }
   },
-  "required": ["content", "appearance", "match", "bodies", "spawns"],
+  "required": ["content", "appearance", "match", "spawns"],
   "additionalProperties": false,
   "anyOf": [
     {
@@ -230,7 +342,11 @@
         "bodies": {
           "minItems": 1
         }
-      }
+      },
+      "required": ["bodies"]
+    },
+    {
+      "required": ["layout"]
     },
     {
       "properties": {
@@ -239,5 +355,254 @@
         }
       }
     }
-  ]
+  ],
+  "oneOf": [
+    {
+      "required": ["bodies"],
+      "not": {
+        "required": ["layout"]
+      }
+    },
+    {
+      "required": ["layout"],
+      "not": {
+        "required": ["bodies"]
+      }
+    }
+  ],
+  "$defs": {
+    "cell_template": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "shared.schema.json#/$defs/name"
+        },
+        "owner": {
+          "$ref": "shared.schema.json#/$defs/name"
+        },
+        "radius": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1000000
+        },
+        "tint": {
+          "$ref": "shared.schema.json#/$defs/color"
+        },
+        "site": {
+          "type": "object",
+          "properties": {
+            "normal": {
+              "$ref": "shared.schema.json#/$defs/normal"
+            },
+            "availability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": ["normal", "availability"],
+          "additionalProperties": false
+        },
+        "medium": {
+          "type": "object",
+          "properties": {
+            "radius_fraction": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "edge_fade": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "scattering": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "absorption": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "anisotropy": {
+              "type": "number",
+              "exclusiveMinimum": -0.95,
+              "exclusiveMaximum": 0.95
+            },
+            "depth_blur": {
+              "type": "object",
+              "properties": {
+                "pixels_per_unit": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 32
+                },
+                "sharp_distance": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "max_radius": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 32
+                },
+                "start_fraction": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "full_fraction": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["max_radius"],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "required": ["pixels_per_unit", "sharp_distance"],
+                  "not": {
+                    "anyOf": [{"required": ["start_fraction"]}, {"required": ["full_fraction"]}]
+                  }
+                },
+                {
+                  "required": ["start_fraction", "full_fraction"],
+                  "not": {
+                    "anyOf": [{"required": ["pixels_per_unit"]}, {"required": ["sharp_distance"]}]
+                  }
+                }
+              ]
+            }
+          },
+          "required": ["radius_fraction", "edge_fade", "scattering", "absorption", "anisotropy"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "owner", "radius", "tint"],
+      "additionalProperties": false
+    },
+    "neutral_template": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "shared.schema.json#/$defs/name"
+        },
+        "owner": {
+          "$ref": "shared.schema.json#/$defs/name"
+        },
+        "tint": {
+          "$ref": "shared.schema.json#/$defs/color"
+        },
+        "site": {
+          "type": "object",
+          "properties": {
+            "normal": {
+              "$ref": "shared.schema.json#/$defs/normal"
+            },
+            "availability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": ["normal", "availability"],
+          "additionalProperties": false
+        },
+        "medium": {
+          "type": "object",
+          "properties": {
+            "radius_fraction": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "edge_fade": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "scattering": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "absorption": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "anisotropy": {
+              "type": "number",
+              "exclusiveMinimum": -0.95,
+              "exclusiveMaximum": 0.95
+            },
+            "depth_blur": {
+              "type": "object",
+              "properties": {
+                "pixels_per_unit": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 32
+                },
+                "sharp_distance": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "max_radius": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 32
+                },
+                "start_fraction": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "full_fraction": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["max_radius"],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "required": ["pixels_per_unit", "sharp_distance"],
+                  "not": {
+                    "anyOf": [{"required": ["start_fraction"]}, {"required": ["full_fraction"]}]
+                  }
+                },
+                {
+                  "required": ["start_fraction", "full_fraction"],
+                  "not": {
+                    "anyOf": [{"required": ["pixels_per_unit"]}, {"required": ["sharp_distance"]}]
+                  }
+                }
+              ]
+            }
+          },
+          "required": ["radius_fraction", "edge_fade", "scattering", "absorption", "anisotropy"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "owner", "tint"],
+      "additionalProperties": false
+    }
+  }
 }

@@ -2180,6 +2180,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
         fprintf(file,",\"fighter_percent\":%u,\"ratio_enabled\":%s,\"produced\":[%u,%u],\"building_type\":\"%s\"",c->fighter_percent,c->ratio_enabled ? "true" : "false",c->produced[0],c->produced[1],c->building ? s->world.content.units[c->building_kind].name : "");
         fprintf(file,",\"repairing\":%s,\"repair_nutrients\":%.6f",c->repairing ? "true" : "false",c->repair_nutrients);
         const Body& body=s->world.bodies[p];
+        fprintf(file,",\"position\":[%.6f,%.6f,%.6f],\"radius\":%.6f",body.position.x,body.position.y,body.position.z,body.radius);
         fprintf(file,",\"active\":%s,\"establishment_age\":%.6f,\"root_count\":%u,\"production\":%.6f,\"attachments\":[",c->active ? "true" : "false",c->establishment_age,c->root_count,c->active ? simulation_production(s,p) : 0);
         for (uint32_t k=0;k<body.factory_root_count;++k) { Vec3 v=body.factory_roots[k];fprintf(file,"%s[%.6f,%.6f,%.6f]",k ? "," : "",v.x,v.y,v.z); }
         fprintf(file,"],\"attachment_centers\":[");
