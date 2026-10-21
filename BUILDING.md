@@ -1154,3 +1154,72 @@ and fog as the largest costs. Raw reports are in
 `build/fractal_factory_dense_before/` and `build/fractal_factory_dense_after/`.
 CPU tick times, GPU work, and application frame times are separate values.
 Long gameplay and sustained GPU performance remain unverified.
+
+
+## Curved factory paths (Oct 21)
+
+All factions use quadratic Bezier paths. Virus curvature is 0.12, Immune
+is 0.65, and Fungus is 1.4. `branches.tree.curvature` sets the bow relative
+to the distance between endpoints. The maximum offset is about one quarter
+of that setting: 3, 16.25, and 35 percent of endpoint distance. Zero makes
+a straight path. The setting accepts values from zero through two.
+
+Each limb has twelve path spans. Growth, rendering, navigation, head
+direction, and detached pieces use those points. The four damage sections
+remain separate: losing one section removes three path spans. Child limbs
+join at the parent curve and use its local direction. A bound on outward
+growth keeps curved children from crossing back through the cell.
+Paths are built when a factory starts or regrows. Simulation ticks read
+the fixed arrays. Curvature adds no per-unit allocation or synchronization.
+
+Twelve real-application groups passed through Proton: smoke, factory_curves,
+natural_factory, small_factories, cell_animation, factory_emission,
+data_assets, colony_forms, navigation, factory_repair, fungal_sources,
+and three_factions. The new curve check uses all factions, radii 2.1, 2.7,
+and 4.2, and seeds 1234 through 1236. It measures bow, gradual turns,
+outward travel, connected forks, head directions, and agreement between
+rendered and navigation paths. It checks partial growth, a quarter-damage
+cut, zero curvature, maximum curvature, repeatability, and invalid settings.
+Existing checks cover regrowth and joints during animation.
+
+### Native captures and bounded GPU cost
+
+RX 7800 XT, RADV Mesa 25.2.8, Windows Release executable through Proton 11.
+Each capture uses one frozen native 1920x1080 frame with default sampling
+and the Khronos host Vulkan validation layer. All six captures passed.
+Initial lighting bakes are included. Each process completed in about one
+second. These values describe bounded captures; sustained play remains
+unverified.
+
+| Faction | Paths | GPU trace ms | Total GPU ms | Application ms | Application FPS |
+| --- | --- | ---: | ---: | ---: | ---: |
+| virus | Earlier | 11.155 | 12.977 | 30.161 | 33.16 |
+| virus | Curved | 11.157 | 13.165 | 33.414 | 29.93 |
+| immune | Earlier | 9.515 | 11.505 | 29.155 | 34.30 |
+| immune | Curved | 11.016 | 13.009 | 32.119 | 31.13 |
+| fungus | Earlier | 9.471 | 10.934 | 27.400 | 36.50 |
+| fungus | Curved | 9.946 | 11.927 | 30.095 | 33.23 |
+
+Native captures: 000990 fungal, 000992 immune, and 000994 virus.
+Earlier paths: 000989, 000991, and 000993. The input files, logs, capture
+script, and render report are in `build/curved_factory_review/`.
+
+### Dense combat cost
+
+Ryzen 9 9900X, Windows Release cross-build through Proton 11. Each build
+ran three real matches with fifteen mature cells, seed 1234, 90 seconds
+of production, fungal sight radius 18, and 1,800 measured combat ticks.
+No other test ran during measurement. Setup is separate. Values below
+are medians across three runs.
+
+| Paths | Peak units | Mean tick ms | p99 tick ms |
+| --- | ---: | ---: | ---: |
+| Earlier | 3721 | 4.251 | 11.389 |
+| Curved | 3722 | 4.244 | 11.691 |
+
+Curves change unit paths and fight results. These values measure content
+cost across different match states. The largest observed curved-path tick
+was 13.864 ms. Raw reports are in `build/curved_factory_dense_before/` and
+`build/curved_factory_dense_after/`. CPU ticks, GPU work, application frames,
+and sustained performance remain separate measurements. Native Windows,
+the complete suite, and instrumented coverage remain unverified.

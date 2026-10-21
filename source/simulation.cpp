@@ -312,10 +312,16 @@ static uint32_t branch_random(uint32_t* seed)
 { *seed=*seed*BRANCH_RANDOM_MULTIPLIER+BRANCH_RANDOM_INCREMENT;return *seed; }
 Vec3 simulation_growth_point(const Simulation* s,uint32_t p,uint32_t k,float growth)
 {
-    float t=std::fmax(0.0f,std::fmin(1.0f,growth))*GROWTH_SEGMENTS;
-    uint32_t j=std::min((uint32_t)t,(uint32_t)GROWTH_SEGMENTS-1);
-    const Vec3* points=s->colonies[p].stems[k];
+    float t=std::fmax(0.0f,std::fmin(1.0f,growth))*GROWTH_PATH_SEGMENTS;
+    uint32_t j=std::min((uint32_t)t,(uint32_t)GROWTH_PATH_SEGMENTS-1);
+    const Vec3* points=s->colonies[p].paths[k];
     return add(points[j],scale(subtract(points[j+1],points[j]),t-j));
+}
+Vec3 simulation_growth_tangent(const Simulation* s,uint32_t p,uint32_t k,float growth)
+{
+    uint32_t j=std::min((uint32_t)(std::fmax(0.0f,std::fmin(1.0f,growth))*GROWTH_PATH_SEGMENTS),(uint32_t)GROWTH_PATH_SEGMENTS-1);
+    const Vec3* points=s->colonies[p].paths[k];
+    return normalize(subtract(points[j+1],points[j]));
 }
 static float signed_random(uint32_t* seed) { return (branch_random(seed)>>RANDOM_DISCARDED_BITS)*(1.0f/RANDOM_SIGNED_HALF_RANGE)-1; }
 static float structure_max_health(const Simulation* s,uint32_t p,uint32_t k)
@@ -431,6 +437,32 @@ static Vec3 factory_side(Vec3 plane,Vec3 direction)
     return normalize(side);
 }
 
+static void build_factory_path(Colony* c,uint32_t k,const ProducerDefinition& definition,uint32_t* seed)
+{
+    const BranchRules& f=definition.branches;Vec3 start=c->stems[k][0];
+    Vec3 chord=subtract(c->stems[k][GROWTH_SEGMENTS],start),bow={};
+    if (f.smooth_path)
+    {
+        Vec3 direction=normalize(chord),side=factory_side(definition.growth_plane_normal,direction);
+        float sign=signed_random(seed)<0 ? -1.0f : 1.0f;
+        bow=scale(add(scale(side,sign),scale(cross(direction,side),signed_random(seed)*definition.growth_depth_ratio)),length(chord)*f.curvature);
+    }
+    // A quadratic Bezier bow keeps both endpoints fixed. Its maximum offset
+    // is one quarter of curvature times chord length.
+    for (uint32_t j=0;j<=GROWTH_PATH_SEGMENTS;++j)
+    {
+        float t=j/(float)GROWTH_PATH_SEGMENTS;
+        if (f.smooth_path)
+            c->paths[k][j]=add(add(start,scale(chord,t)),scale(bow,t*(1-t)));
+        else
+        {
+            float at=t*GROWTH_SEGMENTS;uint32_t segment=std::min((uint32_t)at,(uint32_t)GROWTH_SEGMENTS-1);
+            c->paths[k][j]=add(c->stems[k][segment],scale(subtract(c->stems[k][segment+1],c->stems[k][segment]),at-segment));
+        }
+    }
+    if (f.smooth_path) for (uint32_t j=0;j<=GROWTH_SEGMENTS;++j) c->stems[k][j]=c->paths[k][j*GROWTH_PATH_SUBDIVISIONS];
+}
+
 static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* seed)
 {
     Colony* c=&s->colonies[p];const BranchRules* f=&simulation_producer_definition(s,p)->branches;
@@ -440,13 +472,17 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
     const ProducerDefinition& definition=*simulation_producer_definition(s,p);
     Vec3 start=parent>=0 ? c->stems[parent][GROWTH_SEGMENTS-1] : body.factory_roots[c->root_attachments[k]];
     c->stems[k][0]=start;
+    uint32_t junction=GROWTH_PATH_SEGMENTS-GROWTH_PATH_SUBDIVISIONS;
+    Vec3 parent_direction=parent<0 ? Vec3{} : f->smooth_path
+        ? normalize(subtract(c->paths[parent][junction+1],c->paths[parent][junction-1]))
+        : normalize(subtract(c->stems[parent][GROWTH_SEGMENTS],c->stems[parent][GROWTH_SEGMENTS-1]));
     Vec3 radial=parent<0 && definition.spread_roots ? outward_root_direction(s,p,k) : normalize(subtract(start,body.position));
     Vec3 side=normalize(cross(std::fabs(radial.y)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0},radial));
     Vec3 other=cross(radial,side);float sign=k%2 ? -1.0f : 1.0f;
     if (definition.growth_plane_enabled && definition.spread_roots)
     {
         radial=parent<0 ? outward_root_direction(s,p,k)
-            : normalize(subtract(c->stems[parent][GROWTH_SEGMENTS],c->stems[parent][GROWTH_SEGMENTS-1]));
+            : parent_direction;
         side=factory_side(definition.growth_plane_normal,radial);other=cross(radial,side);
     }
     float extent=parent>=0 ? f->spacing*CHILD_LIMB_LENGTH_SCALE : f->root_height>0 ? f->root_height : definition.height;
@@ -461,7 +497,7 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
         if (f->width_jitter>0) c->limb_scale[k]=std::pow(f->width_scale,(float)depth)*(1+signed_random(seed)*f->width_jitter);
         if (parent>=0)
         {
-            radial=normalize(subtract(c->stems[parent][GROWTH_SEGMENTS],c->stems[parent][GROWTH_SEGMENTS-1]));
+            radial=parent_direction;
             Vec3 axis=definition.growth_plane_enabled ? definition.growth_plane_normal : normal;
             uint32_t rank=0,siblings=0;
             for (uint32_t j=c->root_count;j<c->structure_count;++j) if (c->parents[j]==parent)
@@ -470,6 +506,16 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
             if (f->angle_jitter>0) angle+=signed_random(seed)*f->angle_jitter;
             // Split in the local branch plane, including growth parallel to its normal.
             radial=normalize(add(scale(radial,std::cos(angle)),scale(factory_side(axis,radial),std::sin(angle))));
+        }
+        if (f->smooth_path && parent>=0)
+        {
+            Vec3 outward=normalize(subtract(start,body.position));float along=dot(radial,outward);
+            if (along<MIN_FACTORY_OUTWARD_COMPONENT)
+            {
+                Vec3 tangent=subtract(radial,scale(outward,along));
+                if (dot(tangent,tangent)<MIN_FACTORY_SIDE_SQUARED_LENGTH) tangent=factory_side(normal,outward);
+                radial=add(scale(normalize(tangent),std::sqrt(1-MIN_FACTORY_OUTWARD_COMPONENT*MIN_FACTORY_OUTWARD_COMPONENT)),scale(outward,MIN_FACTORY_OUTWARD_COMPONENT));
+            }
         }
         radial=factory_direction(radial,*simulation_producer_definition(s,p));
         Vec3 plane=simulation_producer_definition(s,p)->growth_plane_enabled ? simulation_producer_definition(s,p)->growth_plane_normal : normal;
@@ -517,6 +563,7 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
                 c->stems[k][j]=add(c->stems[k][j],scale(extension,j/(float)GROWTH_SEGMENTS));
         }
     }
+    build_factory_path(c,k,definition,seed);
     if (k) c->branches[k-1].offset=subtract(start,c->surface);
 }
 static void regrow_factory_stems(Simulation* s,uint32_t p,uint32_t root,uint32_t generation)
@@ -1348,13 +1395,13 @@ static void fracture_limb(Simulation* s,uint32_t p,uint32_t k,float old_growth,f
     const CombatVisuals& fx=s->world.combat;if (fx.break_seconds<=0) return;
     float growth=old_growth;
     uint32_t seed=s->world.bodies[p].seed^s->tick_count^(k*SEED_INDEX_MULTIPLIER);
-    for (uint32_t j=0;j<=GROWTH_SEGMENTS;++j)
+    for (uint32_t j=0;j<=GROWTH_PATH_SEGMENTS;++j)
     {
-        bool tip=j==GROWTH_SEGMENTS;
-        float amount=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_SEGMENTS-j));
+        bool tip=j==GROWTH_PATH_SEGMENTS;
+        float amount=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_PATH_SEGMENTS-j));
         if (tip)
         { if (growth<=0 || growth<(k ? c.branches[k-1].growth : c.growth)) continue; }
-        else if (j<retained*GROWTH_SEGMENTS || amount<=MIN_FRACTURE_SEGMENT_FRACTION) continue;
+        else if (j<retained*GROWTH_PATH_SEGMENTS || amount<=MIN_FRACTURE_SEGMENT_FRACTION) continue;
         uint32_t slot=0;while (slot<MAX_LIMB_DEBRIS && s->debris[slot].seconds>0) ++slot;
         if (slot==MAX_LIMB_DEBRIS)
         {
@@ -1365,16 +1412,16 @@ static void fracture_limb(Simulation* s,uint32_t p,uint32_t k,float old_growth,f
         if (tip)
         {
             d.start=simulation_growth_point(s,p,k,growth);
-            d.end=add(d.start,normalize(subtract(d.start,c.stems[k][0])));
+            d.end=add(d.start,simulation_growth_tangent(s,p,k,growth));
         }
-        else { d.start=c.stems[k][j];d.end=add(d.start,scale(subtract(c.stems[k][j+1],d.start),amount)); }
+        else { d.start=c.paths[k][j];d.end=add(d.start,scale(subtract(c.paths[k][j+1],d.start),amount)); }
         Vec3 radial=normalize(subtract(d.start,s->world.bodies[p].position));
         Vec3 jitter={signed_random(&seed),signed_random(&seed),signed_random(&seed)};
         d.velocity=scale(add(radial,scale(jitter,DEBRIS_VELOCITY_JITTER)),fx.break_speed);
         // This axis always has a nonzero radial component.
         d.axis=normalize(add(radial,scale(jitter,DEBRIS_AXIS_JITTER)));d.spin=signed_random(&seed)*fx.break_spin;
         d.radius=tip ? definition.width*simulation_structure_head_scale(s,p,k)*(FACTORY_HEAD_START_WIDTH_SCALE+DEBRIS_VELOCITY_JITTER*growth)
-            : definition.width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j)*simulation_structure_scale(s,p,k)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
+            : definition.width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j/GROWTH_PATH_SUBDIVISIONS)*simulation_structure_scale(s,p,k)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
         d.seconds=fx.break_seconds;d.producer=c.type;d.faction=c.faction;s->debris[slot]=d;
     }
 }
@@ -2102,7 +2149,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
     FILE* file=fopen(path,"wb");if (!file) { fprintf(stderr,"Cannot write state '%s'.\n",path);return false; }
     fprintf(file,"{\"tick\":%u,\"time\":%.9f,\"unit_capacity\":%u,\"outcome\":%d,\"outcome_tick\":%u,\"births\":%u,\"losses\":%u,\"landings\":%u,\"blocked_landings\":%u,",
         s->tick_count,s->time_seconds,(uint32_t)MAX_UNITS,s->outcome,s->outcome_tick,s->births,s->losses,s->landings,s->blocked_landings);
-    fprintf(file,"\"prepared_production_ticks\":%u,",s->world.production_ticks);
+    fprintf(file,"\"prepared_production_ticks\":%u,\"factory_path_segments\":%u,\"factory_growth_segments\":%u,",s->world.production_ticks,(uint32_t)GROWTH_PATH_SEGMENTS,(uint32_t)GROWTH_SEGMENTS);
     write_faction_stats(s,file);
     fprintf(file,",\"haze\":{\"damage\":%.6f,\"healing\":%.6f}",s->haze_damage,s->haze_healing);
     uint32_t clouds=0;for (uint32_t i=0;i<MAX_SPORE_CLOUDS;++i) clouds+=s->clouds[i].age<s->clouds[i].seconds;
@@ -2147,6 +2194,8 @@ bool simulation_write_state(const Simulation* s, const char* path)
             fprintf(file,",\"exposure\":%.6f,\"parent\":%d,\"visible_growth\":%.6f,\"scale\":%.6f,\"terminal\":%s",k ? b->exposure : c->exposure,c->parents[k],simulation_structure_growth(s,p,k),simulation_structure_scale(s,p,k),simulation_structure_terminal(s,p,k) ? "true" : "false");
             fprintf(file,",\"factory_scale\":%.6f,\"head_scale\":%.6f,\"stem\":[",c->factory_scale[k],simulation_structure_head_scale(s,p,k));
             for (uint32_t j=0;j<=GROWTH_SEGMENTS;++j) { Vec3 v=c->stems[k][j];fprintf(file,"%s[%.6f,%.6f,%.6f]",j ? "," : "",v.x,v.y,v.z); }
+            fprintf(file,"],\"path\":[");
+            for (uint32_t j=0;j<=GROWTH_PATH_SEGMENTS;++j) { Vec3 v=c->paths[k][j];fprintf(file,"%s[%.6f,%.6f,%.6f]",j ? "," : "",v.x,v.y,v.z); }
             fprintf(file,"]}");
         }
         fprintf(file,"]}");

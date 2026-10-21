@@ -19,17 +19,18 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
         building.pop('repair',None);building.pop('haze',None)
         building['branches'].pop('root_interval_seconds',None)
         building.update(growth_seconds=.01,establishment_seconds=.01);building['branches']['seconds']=.01
+    for building in data['content']['buildings']:building['branches'].get('tree',{}).pop('curvature',None)
     # Keep the earlier sparse-tree fixture; small_factories checks current full forks.
     data['content']['buildings'][0]['branches']['tree']['branch_probability']=.72
     data['rules']['ai']['expansion_delay']=300;data['rules']['economy'].update(enemy_attack_seconds=300,manufacture_seconds=1000)
     def check_leaf_caps(game,scene):
         instances={item['slot']:item for item in scene['instances']}
         factory_base=game['unit_capacity']+len(game['colonies'])
-        stem_base=factory_base+len(game['colonies'])*128
+        stem_base=factory_base+len(game['colonies'])*128;spans=game['factory_path_segments']
         for p,colony in enumerate(game['colonies']):
             for k,limb in enumerate(colony['structures']):
                 leaf=instances.get(factory_base+p*128+k)
-                stems=[instances[slot] for slot in range(stem_base+(p*128+k)*4,stem_base+(p*128+k+1)*4) if slot in instances]
+                stems=[instances[slot] for slot in range(stem_base+(p*128+k)*spans,stem_base+(p*128+k+1)*spans) if slot in instances]
                 visible=colony['active'] and colony['visible'] and limb['health']>0 and bool(stems) and limb['visible_growth']>=limb['growth']
                 assert bool(leaf)==visible,(p,k,'An intact branch has no leaf, or a hidden or cut branch has a leaf')
                 if not visible:continue

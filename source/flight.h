@@ -8,7 +8,7 @@
 struct FlightObstacle { Vec3 start,end,center;float radius,bound;uint32_t cell,structure; };
 struct FlightObstacles
 {
-    FlightObstacle values[MAX_BODIES*MAX_FACTORY_STRUCTURES*(GROWTH_SEGMENTS+1)];
+    FlightObstacle values[MAX_BODIES*MAX_FACTORY_STRUCTURES*(GROWTH_PATH_SEGMENTS+1)];
     uint32_t count,cell_count,first[MAX_BODIES+1];
     Vec3 low[MAX_BODIES],high[MAX_BODIES];
 };

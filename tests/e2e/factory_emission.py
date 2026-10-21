@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-factory-emission-') as directory
         assert result.returncode==expected,(name,result.stdout,result.stderr)
         if expected:assert result.stderr and not state.exists();return None,None
         game=json.loads(state.read_text());render=json.loads(scene.read_text())
-        first=game['unit_capacity']+len(game['colonies']);buds=first+len(game['colonies'])*128*5
+        first=game['unit_capacity']+len(game['colonies']);buds=first+len(game['colonies'])*128*(game['factory_path_segments']+1)
         debris=buds+len(game['colonies'])*128
         tagged=0
         for instance in render['instances']:

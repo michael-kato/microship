@@ -50,12 +50,12 @@ void flight_obstacles(const Simulation* s,FlightObstacles* out)
         {
             if ((k ? c.branches[k-1].health : c.health)<=0) continue;
             float growth=simulation_structure_growth(s,p,k);
-            for (uint32_t j=0;j<GROWTH_SEGMENTS;++j)
+            for (uint32_t j=0;j<GROWTH_PATH_SEGMENTS;++j)
             {
-                float extension=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_SEGMENTS-j));
+                float extension=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_PATH_SEGMENTS-j));
                 if (extension<=OBSTACLE_DIRECTION_EPSILON) continue;
-                float width=d.width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j)*simulation_structure_scale(s,p,k)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
-                Vec3 a=c.stems[k][j],b=add(a,scale(subtract(c.stems[k][j+1],a),extension));
+                float width=d.width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j/GROWTH_PATH_SUBDIVISIONS)*simulation_structure_scale(s,p,k)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
+                Vec3 a=c.paths[k][j],b=add(a,scale(subtract(c.paths[k][j+1],a),extension));
                 out->values[out->count++]=capsule(a,b,width*d.stem_radius,p,k);
             }
             if (growth>=(k ? c.branches[k-1].growth : c.growth))

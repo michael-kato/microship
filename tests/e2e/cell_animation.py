@@ -47,7 +47,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-animation-') as directory:
         assert instances[body_base+body]['transform']==stationary[body_base+body]['transform']
         if not colony['active'] or not colony['visible']:continue
         for k,structure in enumerate(colony['structures']):
-            slots=[stem_base+(body*128+k)*4+j for j in range(4)]
+            slots=[stem_base+(body*128+k)*game['factory_path_segments']+j for j in range(game['factory_path_segments'])]
             if not all(slot in instances for slot in slots):continue
             for left,right in zip(slots,slots[1:]):
                 assert math.dist(point(instances[left]['transform'],[0,1,0]),point(instances[right]['transform'],[0,0,0]))<3e-5,'A swaying stem joint opened'

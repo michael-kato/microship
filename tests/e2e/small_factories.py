@@ -71,7 +71,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
             membrane=scene['meshes'][home]['deformation'];wall={i for t in membrane['indices'] if t[3]==3 for i in t[:3]}
             actual_radius=max(math.dist(membrane['vertices'][i][:3],case['bodies'][home]['position']) for i in wall)
             assert all(math.dist(v['position'],case['bodies'][home]['position'])>actual_radius for v in colony['structures'] if v['health']>0)
-            instances={v['slot']:v for v in scene['instances']};head_base=game['unit_capacity']+len(game['colonies']);stem_base=head_base+len(game['colonies'])*128
+            instances={v['slot']:v for v in scene['instances']};head_base=game['unit_capacity']+len(game['colonies']);stem_base=head_base+len(game['colonies'])*128;spans=game['factory_path_segments']
             for k in range(roots):
                 limb=colony['structures'][k];scale=limb['factory_scale']
                 expected_scale=1 if k<large else branch['additional_root_scale']*min(1,radii[indices[k]]/min(radii[j] for j in indices[:large]))
@@ -82,17 +82,17 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
                 if not branch.get('spread_all_roots'):assert length>=nominal*(1-jitter)-1e-4
                 assert math.dist(limb['position'],case['bodies'][home]['position'])>=colony['surface_radius']+branch['surface_clearance']-1e-4
                 assert math.isclose(limb['health'],profile['health']*scale*scale,rel_tol=2e-5)
-                head=instances[head_base+home*128+k];stem=instances[stem_base+(home*128+k)*4+3]
+                head=instances[head_base+home*128+k];stem=instances[stem_base+(home*128+k)*spans+spans-1]
                 tip=[stem['transform'][j+1]+stem['transform'][j+3] for j in (0,4,8)]
                 assert math.dist(tip,[head['transform'][j] for j in (3,7,11)])<.001,'A rendered factory head detached'
                 head_width=math.sqrt(sum(head['transform'][j]**2 for j in (0,4,8)))
                 assert math.isclose(head_width,profile['width']*limb['head_scale'],rel_tol=2e-5)
                 obstacles=[o for o in game['flight']['obstacles'] if o['cell']==home and o['structure']==k]
                 has_head=True
-                assert len(obstacles)==4+has_head,(side,k,obstacles)
+                assert len(obstacles)==spans+has_head,(side,k,obstacles)
                 if has_head:assert math.isclose(obstacles[-1]['radius'],head_width*profile['navigation']['head_radius'],rel_tol=2e-5)
                 stem_width=math.sqrt(sum(stem['transform'][j]**2 for j in (0,4,8)))
-                assert math.isclose(obstacles[3]['radius'],stem_width*profile['navigation']['stem_radius'],rel_tol=2e-5),'Navigation missed the wider trunk'
+                assert math.isclose(obstacles[spans-1]['radius'],stem_width*profile['navigation']['stem_radius'],rel_tol=2e-5),'Navigation missed the wider trunk'
             if radius==4.2:
                 # A spore removes one small root. Other roots must survive; the small root must regrow.
                 target=max(range(large,roots),key=lambda k:math.dist(colony['structures'][k]['position'],case['bodies'][home]['position']));original=colony['structures'][target];tip=original['position'];damaged=deepcopy(case)

@@ -432,10 +432,12 @@ static bool load_buildings(Content* c,Json root,const char* path)
         Json tree=json_find(b,"tree");
         if (p.branches.grammar==GROWTH_TREE)
         {
-            json_object(tree,"children|levels|length_scale|width_scale|angle_degrees|bend|branch_probability|angle_jitter_degrees|length_jitter|width_jitter");
+            json_object(tree,"children|levels|length_scale|width_scale|angle_degrees|bend|branch_probability|angle_jitter_degrees|length_jitter|width_jitter|curvature");
             p.branches.children=json_uint(json_get(tree,"children"),2,3);p.branches.levels=json_uint(json_get(tree,"levels"),2,5);
             p.branches.length_scale=json_float(json_get(tree,"length_scale"),.2,.9);p.branches.width_scale=json_float(json_get(tree,"width_scale"),.2,.9);
             p.branches.angle=json_float(json_get(tree,"angle_degrees"),10,65)*.01745329252f;p.branches.bend=json_float(json_get(tree,"bend"),.05,.5);
+            Json curvature=json_find(tree,"curvature");p.branches.smooth_path=json_present(curvature);
+            if (p.branches.smooth_path) p.branches.curvature=json_float(curvature,0,2);
             Json probability=json_find(tree,"branch_probability"),angle=json_find(tree,"angle_jitter_degrees");
             Json length=json_find(tree,"length_jitter"),width=json_find(tree,"width_jitter");
             if (json_present(probability)) p.branches.branch_probability=json_float(probability,0,1);

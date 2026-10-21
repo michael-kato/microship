@@ -139,7 +139,7 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
         p->unit_base=0;p->body_base=w->gameplay.enabled ? (uint32_t)MAX_UNITS : w->spawn_count;
         p->factory_base=p->body_base+w->body_count;
         p->stem_base=p->factory_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES : 0);
-        p->bud_base=p->stem_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES*GROWTH_SEGMENTS : 0);
+        p->bud_base=p->stem_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES*GROWTH_PATH_SEGMENTS : 0);
         p->debris_base=p->bud_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES : 0);
         p->attached_base=p->debris_base+(w->gameplay.enabled ? MAX_LIMB_DEBRIS : 0);
         p->flying_base=p->attached_base+(w->spikes.enabled ? MAX_ATTACHED_INSTANCES : 0);
@@ -305,7 +305,7 @@ static void animate_factories(Presentation* p,const Simulation* s)
             float angle=s->world.factory_sway*(float)std::sin(phase),sine=std::sin(angle),cosine=std::cos(angle);
             Vec3 pivot=colony.stems[root][0];
             sway_factory_instance(p,factory_instance_slot(p,body,k),pivot,sine,cosine);
-            for (uint32_t j=0;j<GROWTH_SEGMENTS;++j) sway_factory_instance(p,p->stem_base+(body*MAX_FACTORY_STRUCTURES+k)*GROWTH_SEGMENTS+j,pivot,sine,cosine);
+            for (uint32_t j=0;j<GROWTH_PATH_SEGMENTS;++j) sway_factory_instance(p,p->stem_base+(body*MAX_FACTORY_STRUCTURES+k)*GROWTH_PATH_SEGMENTS+j,pivot,sine,cosine);
             sway_factory_instance(p,p->bud_base+body*MAX_FACTORY_STRUCTURES+k,pivot,sine,cosine);
             if (s->world.spikes.enabled) for (uint32_t j=0;j<MAX_EMBEDDED;++j)
                 sway_factory_instance(p,p->structure_embedded_base+(body*MAX_FACTORY_STRUCTURES+k)*MAX_EMBEDDED+j,pivot,sine,cosine);
@@ -360,15 +360,15 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                 {
                     if ((k ? colony->branches[k-1].health : colony->health)<=0) continue;
                     float growth=simulation_structure_growth(s,p,k);
-                    if (growth*GROWTH_SEGMENTS<=MIN_VISIBLE_STEM_EXTENSION) continue;
-                    for (uint32_t j=0;j<GROWTH_SEGMENTS;++j)
+                    if (growth*GROWTH_PATH_SEGMENTS<=MIN_VISIBLE_STEM_EXTENSION) continue;
+                    for (uint32_t j=0;j<GROWTH_PATH_SEGMENTS;++j)
                     {
-                        float extension=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_SEGMENTS-j));
+                        float extension=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_PATH_SEGMENTS-j));
                         if (extension<=MIN_VISIBLE_STEM_EXTENSION) continue;
-                        Vec3 start=colony->stems[k][j],delta=scale(subtract(colony->stems[k][j+1],start),extension);
+                        Vec3 start=colony->paths[k][j],delta=scale(subtract(colony->paths[k][j+1],start),extension);
                         Vec3 y=normalize(delta),x=normalize(cross(std::fabs(y.z)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
-                        float width=definition->width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j)*simulation_structure_scale(s,p,k)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
-                        uint32_t slot=state->stem_base+(p*MAX_FACTORY_STRUCTURES+k)*GROWTH_SEGMENTS+j;
+                        float width=definition->width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j/GROWTH_PATH_SUBDIVISIONS)*simulation_structure_scale(s,p,k)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
+                        uint32_t slot=state->stem_base+(p*MAX_FACTORY_STRUCTURES+k)*GROWTH_PATH_SEGMENTS+j;
                         set_instance(state,slot,state->segment_meshes[colony->type],start,scale(x,width),delta,scale(z,width));
                         uint32_t wounds=k ? colony->branches[k-1].wounds : colony->wounds;
                         Color tint=wounds ? s->world.spikes.injury[std::min(1u,wounds-1)] : color;
@@ -377,7 +377,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                     }
                     float size=definition->width*simulation_structure_head_scale(s,p,k)*(FACTORY_HEAD_START_WIDTH_SCALE+FACTORY_HEAD_GROWTH_WIDTH_SCALE*growth);
                     uint32_t slot=factory_instance_slot(state,p,k);
-                    Vec3 tip=simulation_structure_position(s,p,k),y=normalize(subtract(tip,colony->stems[k][0]));
+                    Vec3 tip=simulation_structure_position(s,p,k),y=simulation_growth_tangent(s,p,k,growth);
                     Vec3 x=normalize(cross(std::fabs(y.z)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
                     // Children join before the stem end; an intact end keeps its leaf past the fork.
                     if (growth>=(k ? colony->branches[k-1].growth : colony->growth))

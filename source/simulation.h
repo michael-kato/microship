@@ -10,6 +10,8 @@ enum { MAX_UNITS = UNIT_STORAGE_CAPACITY, NO_BODY = -1, MAX_PROJECTILES=512, MAX
 enum { SIMULATION_MESSAGE_CAPACITY=96 };
 enum { UNIT_LAUNCH_SECONDS=2 };
 enum { MAX_SPIKES=32, MAX_EMBEDDED=2, GROWTH_SEGMENTS=4,MAX_LIMB_DEBRIS=256 };
+// Damage still removes quarters. Curves use three spans within each quarter.
+enum { GROWTH_PATH_SUBDIVISIONS=3, GROWTH_PATH_SEGMENTS=GROWTH_SEGMENTS*GROWTH_PATH_SUBDIVISIONS };
 static const float SIMULATION_TICKS_PER_SECOND_FLOAT=(float)SIMULATION_TICKS_PER_SECOND;
 static const double SIMULATION_TICKS_PER_SECOND_DOUBLE=(double)SIMULATION_TICKS_PER_SECOND;
 struct EmbeddedSpike { Vec3 direction,anchor; Faction faction; };
@@ -138,6 +140,7 @@ struct Colony
     float establishment_age;
     FactoryStructure branches[MAX_FACTORY_STRUCTURES-1];
     Vec3 stems[MAX_FACTORY_STRUCTURES][GROWTH_SEGMENTS+1];
+    Vec3 paths[MAX_FACTORY_STRUCTURES][GROWTH_PATH_SEGMENTS+1];
     uint32_t production_tip,production_cursor;
     LeafProduction leaves[MAX_FACTORY_STRUCTURES];
     uint32_t leaf_births[MAX_FACTORY_STRUCTURES];
@@ -220,6 +223,7 @@ void simulation_unit_axes(const Unit*,Vec3* right,Vec3* up,Vec3* forward);
 void simulation_producer_axes(const ProducerDefinition*,Vec3* right,Vec3* up,Vec3* normal);
 Vec3 simulation_structure_position(const Simulation*,uint32_t cell,uint32_t structure);
 Vec3 simulation_growth_point(const Simulation*,uint32_t cell,uint32_t structure,float growth);
+Vec3 simulation_growth_tangent(const Simulation*,uint32_t cell,uint32_t structure,float growth);
 float simulation_structure_scale(const Simulation*,uint32_t cell,uint32_t structure);
 float simulation_structure_head_scale(const Simulation*,uint32_t cell,uint32_t structure);
 bool simulation_structure_terminal(const Simulation*,uint32_t cell,uint32_t structure);
