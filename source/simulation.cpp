@@ -3,6 +3,7 @@
 #include "factory_shape.h"
 #include "geometry.h"
 #include "flight.h"
+#include "profiler.h"
 #include <stdio.h>
 #include <string.h>
 #include <stddef.h>
@@ -897,12 +898,51 @@ static bool clear_shot(const Simulation* s, Vec3 from, Vec3 to,int32_t structure
 static float structure_health(const Colony*,uint32_t);
 static uint32_t structure_generation(const Colony*,uint32_t);
 
+// Factory heads do not move within a movement or combat phase. Rebuild this
+// scratch at each phase boundary; growth and damage invalidate the next phase.
+struct FactoryTargets
+{
+    Vec3 points[MAX_BODIES][MAX_FACTORY_STRUCTURES];
+    Vec3 low[MAX_BODIES],high[MAX_BODIES];
+    bool active[MAX_BODIES];
+};
+static void factory_targets(const Simulation* s,FactoryTargets* targets)
+{
+    for (uint32_t p=0;p<s->world.body_count;++p)
+    {
+        const Colony& c=s->colonies[p];targets->active[p]=false;
+        if (!c.active) continue;
+        for (uint32_t k=0;k<c.structure_count;++k)
+        {
+            if (structure_health(&c,k)<=0) continue;
+            Vec3 point=simulation_structure_position(s,p,k);targets->points[p][k]=point;
+            if (!targets->active[p]) { targets->low[p]=targets->high[p]=point;targets->active[p]=true; }
+            else
+            {
+                Vec3& low=targets->low[p];Vec3& high=targets->high[p];
+                low=Vec3{std::fmin(low.x,point.x),std::fmin(low.y,point.y),std::fmin(low.z,point.z)};
+                high=Vec3{std::fmax(high.x,point.x),std::fmax(high.y,point.y),std::fmax(high.z,point.z)};
+            }
+        }
+    }
+}
+static bool factory_in_range(const FactoryTargets& targets,uint32_t p,Vec3 point,float radius)
+{
+    if (!targets.active[p]) return false;
+    const Vec3& low=targets.low[p];const Vec3& high=targets.high[p];
+    Vec3 distance={std::fmax(0.0f,std::fmax(low.x-point.x,point.x-high.x)),
+        std::fmax(0.0f,std::fmax(low.y-point.y,point.y-high.y)),
+        std::fmax(0.0f,std::fmax(low.z-point.z,point.z-high.z))};
+    // Keep a small outward margin. Exact range and tie checks stay in each query.
+    return length(distance)<=radius+POSITION_EPSILON;
+}
+
 static bool within_leash(const Simulation* s,const Unit& u,Vec3 point)
 {
     const UnitDefinition& d=*simulation_unit_definition(s,&u);
     return u.commanded || d.leash_radius<=0 || length(subtract(point,s->world.bodies[u.target].position))<=s->world.bodies[u.target].radius+d.leash_radius;
 }
-static bool attention_valid(const Simulation* s,const Unit& u,const Vec3* positions)
+static bool attention_valid(const Simulation* s,const Unit& u,const Vec3* positions,const FactoryTargets& targets)
 {
     if (u.attention<0) return false;
     const UnitDefinition& d=*simulation_unit_definition(s,&u);
@@ -918,15 +958,15 @@ static bool attention_valid(const Simulation* s,const Unit& u,const Vec3* positi
         const Colony& c=s->colonies[u.attention];
         if (!c.active || c.faction==u.faction || c.generation!=u.attention_colony_generation
             || structure_health(&c,u.attention_structure)<=0 || structure_generation(&c,u.attention_structure)!=u.attention_generation) return false;
-        point=simulation_structure_position(s,u.attention,u.attention_structure);radius=d.structure_radius;
+        point=targets.points[u.attention][u.attention_structure];radius=d.structure_radius;
     }
     else return false;
     return within_leash(s,u,point) && length(subtract(point,u.position))<=radius*ATTENTION_RETENTION_RADIUS_SCALE;
 }
-static void local_task(Simulation* s,Unit* u,const Vec3* positions,const int32_t settlers[MAX_BODIES][MAX_FACTIONS],float dt)
+static void local_task(Simulation* s,Unit* u,const Vec3* positions,const int32_t settlers[MAX_BODIES][MAX_FACTIONS],const FactoryTargets& targets,float dt)
 {
     const UnitDefinition& d=*simulation_unit_definition(s,u);
-    bool valid=attention_valid(s,*u,positions);
+    bool valid=attention_valid(s,*u,positions,targets);
     if (!valid) { u->attention=-1;u->task=TASK_PATROL; }
     u->response_timer-=dt;
     if (u->response_timer>0) return;
@@ -947,11 +987,12 @@ static void local_task(Simulation* s,Unit* u,const Vec3* positions,const int32_t
         nearest=d.structure_radius;
         if (mask&TARGET_STRUCTURES) for (uint32_t p=0;p<s->world.body_count;++p)
         {
-            const Colony& c=s->colonies[p];if (!c.active || c.faction==u->faction) continue;
+            const Colony& c=s->colonies[p];
+            if (!c.active || c.faction==u->faction || !factory_in_range(targets,p,u->position,nearest)) continue;
             for (uint32_t k=0;k<s->colonies[p].structure_count;++k)
             {
                 if (structure_health(&c,k)<=0) continue;
-                Vec3 point=simulation_structure_position(s,p,k);float distance=length(subtract(point,u->position));
+                Vec3 point=targets.points[p][k];float distance=length(subtract(point,u->position));
                 if (distance>=nearest || !within_leash(s,*u,point) || !clear_shot(s,u->position,point,p)) continue;
                 nearest=distance;u->task=TASK_ATTACK_STRUCTURE;u->attention=p;u->attention_structure=k;
                 u->attention_generation=structure_generation(&c,k);u->attention_colony_generation=c.generation;
@@ -997,6 +1038,7 @@ int32_t simulation_held_by(const Simulation* s,uint32_t unit)
 static void move_units(Simulation* s, float dt)
 {
     const CombatVisuals* flight=&s->world.combat;
+    FactoryTargets targets;factory_targets(s,&targets);
     FlightObstacles obstacles;flight_obstacles(s,&obstacles);
     Vec3 positions[MAX_UNITS],velocities[MAX_UNITS];int32_t held_by[MAX_UNITS];
     for (uint32_t i=0;i<MAX_UNITS;++i)
@@ -1061,9 +1103,9 @@ static void move_units(Simulation* s, float dt)
                 goal=add(s->world.bodies[p].position,scale(normal,height));
             }
             goal=add(goal,add(scale(tangent,std::cos(angle)*spread),scale(bitangent,std::sin(angle)*spread)));
-            local_task(s,u,positions,settlers,dt);
+            local_task(s,u,positions,settlers,targets,dt);
             if (u->task==TASK_ATTACK_UNIT) goal=positions[u->attention];
-            else if (u->task==TASK_ATTACK_STRUCTURE) goal=simulation_structure_position(s,u->attention,u->attention_structure);
+            else if (u->task==TASK_ATTACK_STRUCTURE) goal=targets.points[u->attention][u->attention_structure];
             else if (u->task==TASK_COLONIZE) goal=add(s->colonies[u->target].surface,scale(s->world.bodies[u->target].colony_normal,COLONIZE_SURFACE_OFFSET));
             else if (u->commanded && s->colonies[p].active && s->colonies[p].faction!=u->faction)
             {
@@ -1071,7 +1113,7 @@ static void move_units(Simulation* s, float dt)
                 for (uint32_t k=0;k<s->colonies[p].structure_count;++k)
                 {
                     if (structure_health(&s->colonies[p],k)<=0) continue;
-                    Vec3 point=simulation_structure_position(s,p,k);float distance=length(subtract(point,u->position));
+                    Vec3 point=targets.points[p][k];float distance=length(subtract(point,u->position));
                     if (distance<nearest)
                     {
                         nearest=distance;goal=point;u->task=TASK_ATTACK_STRUCTURE;u->attention=p;u->attention_structure=k;
@@ -1375,7 +1417,7 @@ static void cell_haze(Simulation* s,float dt,uint32_t* hit_count)
     }
 }
 
-static void spore_clouds(Simulation* s,float dt,uint32_t* hit_count)
+static void spore_clouds(Simulation* s,float dt,uint32_t* hit_count,const FactoryTargets& targets)
 {
     uint16_t near[MAX_UNITS];
     for (uint32_t c=0;c<MAX_SPORE_CLOUDS;++c)
@@ -1391,11 +1433,14 @@ static void spore_clouds(Simulation* s,float dt,uint32_t* hit_count)
         }
         for (uint32_t p=0;p<s->world.body_count;++p)
         {
-            Colony& colony=s->colonies[p];if (!colony.active || (!cloud.friendly_fire && colony.faction==cloud.faction)) continue;
+            Colony& colony=s->colonies[p];
+            if (!colony.active || (!cloud.friendly_fire && colony.faction==cloud.faction)
+                || !factory_in_range(targets,p,cloud.position,cloud.radius)) continue;
             for (uint32_t k=0;k<colony.structure_count;++k)
             {
-                Vec3 point=simulation_structure_position(s,p,k);
-                if (structure_health(&colony,k)<=0 || length(subtract(point,cloud.position))>=cloud.radius || !clear_shot(s,cloud.position,point,(int32_t)p)) continue;
+                if (structure_health(&colony,k)<=0) continue;
+                Vec3 point=targets.points[p][k];
+                if (length(subtract(point,cloud.position))>=cloud.radius || !clear_shot(s,cloud.position,point,(int32_t)p)) continue;
                 float* exposure=k ? &colony.branches[k-1].exposure : &colony.exposure;
                 uint32_t hits=expose(exposure,damage,structure_max_health(s,p,k)/structure_hits(s,p,k));
                 hit_count[structure_slot(p,k)]+=hits;s->hits+=hits;
@@ -1420,6 +1465,7 @@ static void launch_blob(Simulation* s,Unit* u,const UnitDefinition& d,uint32_t v
 static void projectile_combat(Simulation* s,float dt)
 {
     const CombatVisuals* v=&s->world.combat;
+    FactoryTargets factory_heads;factory_targets(s,&factory_heads);
     CombatScratch& scratch=s->combat_scratch;memset(&scratch,0,offsetof(CombatScratch,landed));
     uint32_t* hit_count=scratch.hit_count;uint32_t* incoming=scratch.incoming;EmbeddedSpike (*landed)[2]=scratch.landed;
     bool* digest_heal=scratch.digest_heal;bool* burst=scratch.burst;bool* expired=scratch.expired;bool* held=scratch.held;
@@ -1474,12 +1520,13 @@ static void projectile_combat(Simulation* s,float dt)
                 if (d<nearest && clear_shot(s,u->position,s->units[j].position)) { nearest=d;target=(int)j; }
             }
         if (target<0 && (targets&TARGET_STRUCTURES)) for (uint32_t j=0;j<s->world.body_count;++j)
-            if (s->colonies[j].active && s->colonies[j].faction!=u->faction)
+            if (s->colonies[j].active && s->colonies[j].faction!=u->faction
+                && factory_in_range(factory_heads,j,u->position,nearest))
             {
                 uint32_t count=s->colonies[j].structure_count;
                 for (uint32_t k=0;k<count;++k) if (structure_health(&s->colonies[j],k)>0)
                 {
-                    Vec3 point=simulation_structure_position(s,j,k);float d=length(subtract(u->position,point));
+                    Vec3 point=factory_heads.points[j][k];float d=length(subtract(u->position,point));
                     if (d<nearest && clear_shot(s,u->position,point,(int32_t)j)) { nearest=d;target=(int)j;colony=true;structure=k; }
                 }
             }
@@ -1602,7 +1649,7 @@ static void projectile_combat(Simulation* s,float dt)
             p->active=false;++s->hits;sound(s,SOUND_HIT,target);
         }
     }
-    spore_clouds(s,dt,hit_count);
+    spore_clouds(s,dt,hit_count,factory_heads);
     cell_haze(s,dt,hit_count);
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (s->units[i].health>0 && (hit_count[i]>0 || digest_heal[i] || burst[i] || expired[i]))
@@ -1957,8 +2004,16 @@ static void outcome(Simulation* s)
     else if (!friendly && !units) { s->outcome=-1;s->outcome_tick=s->tick_count;sound(s,SOUND_LOSE,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"COLONY LOST. R TO RESTART."); }
 }
 
-void simulation_step(Simulation* s)
+static void simulation_phase_end(SimulationTimings* timings,SimulationPhase phase,double* start)
 {
+    if (!timings) return;
+    double end=profiler_clock_ms();timings->ms[phase]+=end-*start;*start=end;
+}
+
+void simulation_step(Simulation* s,SimulationTimings* timings)
+{
+    double phase_start=timings ? profiler_clock_ms() : 0;
+    if (timings) *timings=SimulationTimings();
     if (s->paused) return;
     const float dt=1.0f/SIMULATION_TICKS_PER_SECOND_FLOAT;
     if (s->outcome<0)
@@ -1971,10 +2026,19 @@ void simulation_step(Simulation* s)
         for (uint32_t f=1;f<MAX_FACTIONS;++f)
             if ((s->world.active_factions&(1u<<f)) && (f!=s->world.player_faction || s->world.player_ai)) ai_orders(s,(Faction)f);
         if (!s->world.player_ai) automatic_player_orders(s);
+        simulation_phase_end(timings,SIM_AI,&phase_start);
         if (s->world.combat.enabled) advance_visuals(s,dt);
-        recover_units(s,dt);move_units(s,dt);
+        simulation_phase_end(timings,SIM_VISUALS,&phase_start);
+        recover_units(s,dt);
+        simulation_phase_end(timings,SIM_RECOVERY,&phase_start);
+        move_units(s,dt);
+        simulation_phase_end(timings,SIM_MOVEMENT,&phase_start);
         projectile_combat(s,dt);
-        colonize_cells(s,dt);grow_colonies(s,dt);outcome(s);simulation_update_sight(s);
+        simulation_phase_end(timings,SIM_COMBAT,&phase_start);
+        colonize_cells(s,dt);grow_colonies(s,dt);outcome(s);
+        simulation_phase_end(timings,SIM_GROWTH,&phase_start);
+        simulation_update_sight(s);
+        simulation_phase_end(timings,SIM_SIGHT,&phase_start);
         uint32_t alive[MAX_FACTIONS]={};
         for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) ++alive[s->units[i].faction];
         for (uint32_t f=0;f<MAX_FACTIONS;++f) s->faction_stats[f].peak_units=std::max(s->faction_stats[f].peak_units,alive[f]);
@@ -2004,7 +2068,9 @@ void simulation_step(Simulation* s)
             }
         }
     }
+    simulation_phase_end(timings,SIM_APPEARANCE,&phase_start);
     simulation_update_fog(s,dt);
+    simulation_phase_end(timings,SIM_FOG,&phase_start);
     ++s->tick_count;simulation_set_time(s,s->time_seconds+1.0/SIMULATION_TICKS_PER_SECOND_DOUBLE);
 }
 

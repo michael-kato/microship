@@ -81,6 +81,8 @@ Vec3 flight_avoid(Simulation* s,const FlightObstacles& obstacles,const Unit& u,V
     const CombatVisuals& f=s->world.combat;
     if (f.lookahead<=0) return desired;
     const UnitDefinition& d=*simulation_unit_definition(s,&u);
+    // These units ignore every factory obstacle. Skip the entire query.
+    if (d.attack==ATTACK_SPORE || (u.hatched && u.age<UNIT_LAUNCH_SECONDS)) return desired;
     Vec3 ahead=scale(u.velocity,f.lookahead),force={};
     if (dot(ahead,ahead)<MIN_LOOKAHEAD_SQUARED_LENGTH) ahead=scale(desired,f.lookahead);
     bool avoided=false;
@@ -126,7 +128,9 @@ Vec3 flight_avoid(Simulation* s,const FlightObstacles& obstacles,const Unit& u,V
 }
 void flight_clip(Simulation* s,const FlightObstacles& obstacles,Unit* u,Vec3 previous)
 {
-    const UnitDefinition& d=*simulation_unit_definition(s,u);float craft=d.scale*CRAFT_COLLISION_RADIUS_SCALE;
+    const UnitDefinition& d=*simulation_unit_definition(s,u);
+    if (d.attack==ATTACK_SPORE || (u->hatched && u->age<UNIT_LAUNCH_SECONDS)) return;
+    float craft=d.scale*CRAFT_COLLISION_RADIUS_SCALE;
     for (uint32_t c=0;c<obstacles.cell_count;++c)
     {
         if (box_distance(u->position,obstacles.low[c],obstacles.high[c])>=craft) continue;

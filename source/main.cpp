@@ -73,7 +73,7 @@ static void print_usage(FILE* output)
         "              [--pointer-drag X1 Y1 X2 Y2] (client pixels)\n"
         "              [--smoke] [--stats|--no-stats] [--debug-views] [--no-activate]\n"
         "              [--replay PATH.orders] [--ticks N] [--state PATH.json] [--scene-state PATH.json]\n"
-        "              [--matches N] (with --smoke and --ticks: N seeded matches from --world-seed, each until its outcome)\n"
+        "              [--matches N] [--cpu-benchmark] (with --smoke and --ticks: seeded matches, optional tick timings)\n"
         "              [--audio-capture PATH.wav] (with --smoke and --ticks, at most 3600 ticks)\n"
         "              [--camera-pan X Y SECONDS] [--world-seed N] [--audio PATH.json] [--menu|--no-menu] [--menu-select 1..3]\n"
         "              [--settings PATH.json] [--pause-on-start] (production menu diagnostic)\n"
@@ -158,6 +158,8 @@ int main(int argc, char** argv)
         }
         else if (strcmp(argv[i], "--smoke") == 0)
             options.smoke = true;
+        else if (strcmp(argv[i], "--cpu-benchmark") == 0)
+            options.cpu_benchmark = true;
         else if (strcmp(argv[i], "--vsync") == 0)
             options.vsync = true;
         else if (strcmp(argv[i], "--headless") == 0)
@@ -304,6 +306,8 @@ int main(int argc, char** argv)
     { fprintf(stderr,"--audio-capture requires --smoke and --ticks in [1,3600].\n");return 2; }
     if (options.matches && (!options.smoke || !options.ticks || options.replay_path || options.state_path || options.scene_state_path || options.audio_capture_path))
     { fprintf(stderr,"--matches requires --smoke and --ticks, without replay, state or audio capture.\n");return 2; }
+    if (options.cpu_benchmark && !options.matches)
+    { fprintf(stderr,"--cpu-benchmark requires --matches.\n");return 2; }
     if (options.smoke && (options.headless || options.capture_path || options.frames))
     {
         fprintf(stderr, "--smoke cannot be combined with GPU frame controls.\n");

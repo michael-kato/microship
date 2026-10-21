@@ -36,6 +36,7 @@ struct GameOptions
     const char* scene_state_path;
     uint32_t ticks;
     uint32_t matches; // Balance runs: seeded matches played back to back, each until its outcome or --ticks.
+    bool cpu_benchmark; // Measure initialization and each real simulation tick in --matches.
     PointerInput camera_input;
 };
 

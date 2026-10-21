@@ -197,7 +197,11 @@ struct Simulation
 bool simulation_attachment_valid(const Simulation*,const Unit*);
 int32_t simulation_held_by(const Simulation*,uint32_t unit);
 bool simulation_initialize(Simulation* simulation, const char* world_path,uint32_t seed=0);
-void simulation_step(Simulation* simulation);
+enum SimulationPhase { SIM_AI,SIM_VISUALS,SIM_RECOVERY,SIM_MOVEMENT,SIM_COMBAT,
+    SIM_GROWTH,SIM_SIGHT,SIM_APPEARANCE,SIM_FOG,SIM_PHASE_COUNT };
+struct SimulationTimings { double ms[SIM_PHASE_COUNT]; };
+// Optional phase times are collected only by real-application CPU benchmarks.
+void simulation_step(Simulation* simulation,SimulationTimings* timings=0);
 void simulation_set_time(Simulation* simulation, double seconds);
 void simulation_select(Simulation* simulation, int group); // Asset group ID; a negative value selects all.
 void simulation_order(Simulation* simulation, uint32_t cell);

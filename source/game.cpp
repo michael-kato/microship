@@ -414,12 +414,49 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
 static int run_matches(const GameOptions* options)
 {
     std::unique_ptr<Simulation> simulation(new (std::nothrow) Simulation());if (!simulation) return 1;
+    std::unique_ptr<double[]> timings;
+    if (options->cpu_benchmark)
+    {
+        timings.reset(new (std::nothrow) double[options->ticks]);
+        if (!timings) { fprintf(stderr,"Cannot allocate tick timing records.\n");return 1; }
+    }
     for (uint32_t i=0;i<options->matches;++i)
     {
         uint32_t seed=options->world_seed+i;
+        double setup_start=options->cpu_benchmark ? profiler_clock_ms() : 0;
         if (!simulation_initialize(simulation.get(),options->world_path,seed)) return 1;
-        while (!simulation->outcome && simulation->tick_count<options->ticks) simulation_step(simulation.get());
+        double setup_ms=options->cpu_benchmark ? profiler_clock_ms()-setup_start : 0;
+        uint32_t count=0,peak_units=0,worst_tick=0;double total_ms=0,maximum_ms=0;
+        SimulationTimings phase_total={},worst_phases={};
+        while (!simulation->outcome && simulation->tick_count<options->ticks)
+        {
+            double start=options->cpu_benchmark ? profiler_clock_ms() : 0;
+            SimulationTimings phases;
+            simulation_step(simulation.get(),options->cpu_benchmark ? &phases : 0);
+            if (options->cpu_benchmark)
+            {
+                double elapsed=profiler_clock_ms()-start;timings[count++]=elapsed;total_ms+=elapsed;
+                for (uint32_t p=0;p<SIM_PHASE_COUNT;++p) phase_total.ms[p]+=phases.ms[p];
+                if (elapsed>maximum_ms) { maximum_ms=elapsed;worst_tick=simulation->tick_count;worst_phases=phases; }
+                uint32_t live=0;for (uint32_t u=0;u<MAX_UNITS;++u) live+=simulation->units[u].health>0;
+                peak_units=std::max(peak_units,live);
+            }
+        }
         simulation_write_summary(simulation.get(),seed,stdout);fflush(stdout);
+        if (options->cpu_benchmark && count)
+        {
+            std::sort(timings.get(),timings.get()+count);
+            // Nearest-rank percentiles, with integer arithmetic and one-based ranks.
+            fprintf(stdout,"{\"cpu_benchmark\":true,\"seed\":%u,\"ticks\":%u,\"setup_ms\":%.6f,\"total_tick_ms\":%.6f,\"mean_ms\":%.6f,\"p50_ms\":%.6f,\"p95_ms\":%.6f,\"p99_ms\":%.6f,\"max_ms\":%.6f,\"peak_units\":%u}\n",
+                seed,count,setup_ms,total_ms,total_ms/count,timings[((uint64_t)count*50+99)/100-1],
+                timings[((uint64_t)count*95+99)/100-1],timings[((uint64_t)count*99+99)/100-1],timings[count-1],peak_units);
+            static const char* phases[]={"ai","visuals","recovery","movement","combat","growth","sight","appearance","fog"};
+            fprintf(stdout,"{\"cpu_phases\":true,\"seed\":%u,\"worst_tick\":%u,\"mean_ms\":{",seed,worst_tick);
+            for (uint32_t p=0;p<SIM_PHASE_COUNT;++p) fprintf(stdout,"%s\"%s\":%.6f",p ? "," : "",phases[p],phase_total.ms[p]/count);
+            fprintf(stdout,"},\"worst_tick_ms\":{");
+            for (uint32_t p=0;p<SIM_PHASE_COUNT;++p) fprintf(stdout,"%s\"%s\":%.6f",p ? "," : "",phases[p],worst_phases.ms[p]);
+            fprintf(stdout,"}}\n");fflush(stdout);
+        }
     }
     return 0;
 }

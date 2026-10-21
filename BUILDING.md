@@ -52,6 +52,50 @@ For the frame profiler checks, build the small Win32 input driver with `cmake --
 
 To compare SSS and volume changes, preserve the old executable and its `assets/` folder before rebuilding. Then run `python3 tests/e2e/scattering_perf.py build/windows-cross/nanova.exe --baseline build/scattering-baseline/nanova.exe --cases near grown --run`. Without `--run`, the script prepares inputs only. Add `--timing` to disable host validation for timing comparisons. Use `--diagnose` instead of `--baseline` to measure SSS and volume controls. The script keeps the GPU limits above and checks full-image differences and simulation state for comparisons.
 
+CPU combat profiles run the real application without a GPU. Add
+`--smoke --matches 1 --ticks 3600 --world-seed 1234 --cpu-benchmark` to a
+Proton command. The output includes tick percentiles and mean phase times
+for AI, visuals, recovery, movement, combat, growth, sight, appearance, and
+fog. It also records the phase times of the slowest tick. Phase clocks run
+only when the benchmark requests them. Setup time is separate from tick time.
+
+To compare a saved build with the current build, use:
+
+```sh
+python3 tests/e2e/combat_perf.py build/windows-cross/nanova.exe \
+  --baseline /path/to/baseline/nanova.exe --world /path/to/unchanged/world.json
+```
+
+Keep the baseline executable and its assets together. Both builds use the
+same selected world and its referenced assets. The check compares complete
+exported game states after 1,200 ticks, then alternates the build order for
+three 3,600-tick timing pairs. Match summaries must also match. Logs and
+`report.json` go to `build/combat_profile/`. Add `--dense` for 90 seconds of
+factory production, the Fungal player, and 18-unit sight. This prepares
+more units through normal production. It does not inject units into the
+simulation. The dense case also exercises fog during combat.
+
+On Oct 21, the Windows Release build through Proton 11 on the Ryzen 9 9900X
+had these results. The ordinary case uses three alternating pairs; the
+dense case uses one pair. Each pair uses identical scene data and seed 1234.
+
+| Battle | Peak units | Mean tick before / after | p99 tick before / after |
+| --- | ---: | ---: | ---: |
+| Original stress scene, 3,600 ticks | 2,563 | 3.153 / 0.821 ms | 8.267 / 3.615 ms |
+| Dense scene with sight, 1,800 ticks | 3,743 | 9.446 / 4.370 ms | 18.205 / 10.893 ms |
+
+The optimization calculates live factory-head positions once per phase,
+rejects colonies outside each query range, and skips obstacle queries for
+units that already ignore all factory obstacles. Query order, exact range
+checks, and game outcomes stay the same. Complete exported states matched
+before and after both battles. Rebuilds occur at movement and combat phase
+boundaries, so later growth and damage cannot leave stale target positions.
+
+Evidence is in `build/combat_profile_final/` and
+`build/dense_combat_profile_final/`. These are tick measurements from the
+real application. They do not establish performance for every match or
+native Windows. The reported 200 ms simulation frame was not reproduced.
+
 ## Static lighting and frame history
 
 Persistent static lighting and scattering bakes are permitted. Compute them
