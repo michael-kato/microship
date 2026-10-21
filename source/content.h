@@ -68,7 +68,7 @@ struct BranchRules
     uint32_t production_reference_count;
     Vec3 normal;
     uint32_t children,levels,root_limit;
-    float root_minimum_radius,branch_probability,angle_jitter,length_jitter,width_jitter;
+    float root_minimum_radius,additional_root_scale,branch_probability,angle_jitter,length_jitter,width_jitter;
     float length_scale,width_scale,angle,bend,root_offset_seconds,root_interval_seconds;
 };
 struct ProducerDefinition

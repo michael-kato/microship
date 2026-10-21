@@ -32,19 +32,24 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-sources-') as directory:
         return json.loads(state.read_text()) if not expected else None
     for radius in (.6,2.1,4.2):
         data=deepcopy(base);data['bodies'][0]['radius']=radius
-        early=run('start_'+str(radius),data);later=run('minute_'+str(radius),data,3720)
-        a=early['colonies'][0];b=later['colonies'][0];roots=b['root_count']
+        early=run('start_'+str(radius),data);later=run('minute_'+str(radius),data,18120)
+        a=early['colonies'][0];b=later['colonies'][0];roots=b['large_root_count']
         leaves=[k for k,s in enumerate(b['structures']) if s['terminal']]
         budget=next(v['leaves'] for v in fungus(data)['branches']['production_leaf_limits'] if v['roots']==roots)
         assert len(leaves)>budget and all(b['leaf_births'][k]>a['leaf_births'][k] for k in leaves),(radius,roots,leaves,b['leaf_births'])
-        actual=sum(b['produced'])-sum(a['produced']);expected=budget*120
-        assert abs(actual-expected)<=len(leaves),(radius,actual,expected)
+        actual=sum(b['produced'])-sum(a['produced']);expected=budget*600
+        # A job completes on a simulation tick. Fractional factory rates can
+        # lose less than one tick per completion, plus one partial job per tip.
+        rounding=math.ceil(expected/(.5*60))+len(leaves)
+        assert expected-rounding<=actual<=expected+len(leaves),(radius,actual,expected,rounding)
         assert not a['capacity_blocked'] and not b['capacity_blocked']
         assert math.isclose(b['production'],1+.12*(9-roots),abs_tol=.00001),(radius,b['production'])
         chains=[sum(s['parent']==k for s in b['structures']) for k in range(roots)]
+        assert b['root_count']==len(b['attachments'])
+        assert all(b['leaf_births'][k]>a['leaf_births'][k] for k in range(roots,b['root_count']))
         assert min(chains)>0 and max(chains)-min(chains)<=1,(radius,chains)
         assert later['faction_stats'][2]['built']==sum(b['produced'])
-        print(f'Radius {radius}: {roots} roots, {len(leaves)} producing tips, {actual} spores/minute, expected {expected}.')
+        print(f'Radius {radius}: {roots} roots, {len(leaves)} producing tips, {actual} spores/5 minutes, expected {expected}.')
     for field,value in [('spread_scale',0),('spread_scale',3.01),('production_reference_count',0),('production_leaf_limits',[dict(roots=3,leaves=0)]),('production_leaf_limits',[dict(roots=3,leaves=4)]*2),('production_leaf_limits',[dict(roots=3,leaves=4,establishing_leaves=0)])]:
         bad=deepcopy(base);fungus(bad)['branches'][field]=value
         run('invalid_'+str(count),bad,expected=1)

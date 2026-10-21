@@ -375,7 +375,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                         float* style=state->scene.instances[slot].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=wounds ? INJURY_TINT_STRENGTH : FACTORY_FACTION_TINT_STRENGTH;
                         style[4]=state->stem_glow_mask[colony->type] ? 0 : s->world.glow_stems;style[7]=INSTANCE_EMISSION_FRESNEL;
                     }
-                    float size=definition->width*(definition->branches.grammar==GROWTH_TREE ? simulation_structure_scale(s,p,k) : (colony->parents[k]>=0 ? FACTORY_CHILD_HEAD_WIDTH_SCALE : 1))*(FACTORY_HEAD_START_WIDTH_SCALE+FACTORY_HEAD_GROWTH_WIDTH_SCALE*growth);
+                    float size=definition->width*simulation_structure_head_scale(s,p,k)*(FACTORY_HEAD_START_WIDTH_SCALE+FACTORY_HEAD_GROWTH_WIDTH_SCALE*growth);
                     uint32_t slot=factory_instance_slot(state,p,k);
                     Vec3 tip=simulation_structure_position(s,p,k),y=normalize(subtract(tip,colony->stems[k][0]));
                     Vec3 x=normalize(cross(std::fabs(y.z)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);

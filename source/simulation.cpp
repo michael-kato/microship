@@ -317,26 +317,37 @@ Vec3 simulation_growth_point(const Simulation* s,uint32_t p,uint32_t k,float gro
     return add(points[j],scale(subtract(points[j+1],points[j]),t-j));
 }
 static float signed_random(uint32_t* seed) { return (branch_random(seed)>>RANDOM_DISCARDED_BITS)*(1.0f/RANDOM_SIGNED_HALF_RANGE)-1; }
-float simulation_structure_growth(const Simulation* s,uint32_t p,uint32_t k)
+static float structure_max_health(const Simulation* s,uint32_t p,uint32_t k)
 {
     const Colony& c=s->colonies[p];const ProducerDefinition& d=*simulation_producer_definition(s,p);
+    return (c.parents[k]<0 ? d.health : d.branches.health)*c.factory_scale[k]*c.factory_scale[k];
+}
+static uint32_t structure_hits(const Simulation* s,uint32_t p,uint32_t k)
+{
+    const Colony& c=s->colonies[p];const ProducerDefinition& d=*simulation_producer_definition(s,p);
+    return std::max(1u,(uint32_t)std::ceil((c.parents[k]<0 ? d.hits : d.branches.hits)*c.factory_scale[k]*c.factory_scale[k]));
+}
+float simulation_structure_growth(const Simulation* s,uint32_t p,uint32_t k)
+{
+    const Colony& c=s->colonies[p];
     float growth=k ? c.branches[k-1].growth : c.growth;
     uint32_t wounds=k ? c.branches[k-1].wounds : c.wounds;
-    uint32_t hits=c.parents[k]<0 ? d.hits : d.branches.hits;
+    uint32_t hits=structure_hits(s,p,k);
     uint32_t lost=std::min((uint32_t)GROWTH_SEGMENTS,wounds*GROWTH_SEGMENTS/hits);
     return std::fmin(growth,(GROWTH_SEGMENTS-lost)/(float)GROWTH_SEGMENTS);
 }
 float simulation_production(const Simulation* s,uint32_t p)
 {
     const Colony& c=s->colonies[p];const ProducerDefinition& d=*simulation_producer_definition(s,p);
-    float production=0,limb_production=d.branches.production;
+    float production=0,root_weight=0,limb_production=d.branches.production;
+    for (uint32_t k=0;k<c.root_count;++k) root_weight+=c.factory_scale[k]*c.factory_scale[k];
     if (d.branches.production_reference_count && c.structure_count>c.root_count)
-        limb_production*=std::fmax(0.0f,(float)d.branches.production_reference_count-c.root_count)/(c.structure_count-c.root_count);
+        limb_production*=std::fmax(0.0f,(float)d.branches.production_reference_count-c.large_root_count)/(c.structure_count-c.root_count);
     for (uint32_t k=0;k<c.structure_count;++k)
     {
         if ((k ? c.branches[k-1].health : c.health)<=0) continue;
         float growth=simulation_structure_growth(s,p,k);
-        production+=growth*growth*(c.parents[k]<0 ? 1.0f/c.root_count : limb_production);
+        production+=growth*growth*(c.parents[k]<0 ? c.factory_scale[k]*c.factory_scale[k]/root_weight : limb_production);
     }
     return production;
 }
@@ -351,7 +362,12 @@ static Vec3 factory_direction(Vec3 direction,const ProducerDefinition& definitio
 float simulation_structure_scale(const Simulation* s,uint32_t p,uint32_t k)
 {
     const Colony& c=s->colonies[p];const BranchRules& f=simulation_producer_definition(s,p)->branches;
-    return f.grammar==GROWTH_TREE ? c.limb_scale[k] : c.parents[k]>=0 ? FACTORY_CHILD_STEM_WIDTH_SCALE : 1;
+    return c.factory_scale[k]*(f.grammar==GROWTH_TREE ? c.limb_scale[k] : c.parents[k]>=0 ? FACTORY_CHILD_STEM_WIDTH_SCALE : 1);
+}
+float simulation_structure_head_scale(const Simulation* s,uint32_t p,uint32_t k)
+{
+    const Colony& c=s->colonies[p];const BranchRules& f=simulation_producer_definition(s,p)->branches;
+    return c.factory_scale[k]*(f.grammar==GROWTH_TREE ? c.limb_scale[k] : c.parents[k]>=0 ? FACTORY_CHILD_HEAD_WIDTH_SCALE : 1);
 }
 bool simulation_structure_terminal(const Simulation* s,uint32_t p,uint32_t k)
 {
@@ -371,9 +387,9 @@ static void depth_first(const Colony* c,uint32_t node,uint32_t* order,uint32_t* 
     order[(*count)++]=node;
     for (uint32_t j=node+1;j<c->structure_count;++j) if (c->parents[j]==(int32_t)node) depth_first(c,j,order,count);
 }
-static uint32_t select_factory_roots(const Body& body,const BranchRules& f,uint32_t* indices)
+static uint32_t select_factory_roots(const Body& body,const BranchRules& f,uint32_t* indices,uint32_t* large_count)
 {
-    if (!f.organelle_roots) { indices[0]=0;return 1; }
+    if (!f.organelle_roots) { indices[0]=0;*large_count=1;return 1; }
     uint32_t count=0,limit=f.root_limit ? std::min(f.root_limit,body.factory_root_count) : body.factory_root_count;
     bool used[MAX_FACTORY_STRUCTURES]={};
     for (uint32_t k=0;k<limit;++k)
@@ -385,22 +401,27 @@ static uint32_t select_factory_roots(const Body& body,const BranchRules& f,uint3
         if (best==body.factory_root_count) break;
         used[best]=true;indices[count++]=best;
     }
+    *large_count=count;
+    if (count && f.additional_root_scale>0)
+        for (uint32_t j=0;j<body.factory_root_count;++j) if (!used[j]) indices[count++]=j;
     return count;
 }
 static Vec3 spread_root_direction(const Simulation* s,uint32_t p,uint32_t root,Vec3 plane)
 {
     const Colony& c=s->colonies[p];const Body& b=s->world.bodies[p];
+    if (root>=c.large_root_count) return factory_direction(normalize(subtract(b.factory_roots[c.root_attachments[root]],b.position)),*simulation_producer_definition(s,p));
+    uint32_t count=c.large_root_count;
     Vec3 right=normalize(cross(std::fabs(plane.y)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0},plane));
     Vec3 up=cross(plane,right);float angles[MAX_FACTORY_STRUCTURES];uint32_t ranks[MAX_FACTORY_STRUCTURES]={};
-    for (uint32_t k=0;k<c.root_count;++k)
+    for (uint32_t k=0;k<count;++k)
     {
         Vec3 offset=subtract(b.factory_roots[c.root_attachments[k]],b.position);
         angles[k]=std::atan2(dot(offset,up),dot(offset,right));
     }
-    float sine=0,cosine=0,step=FULL_TURN_RADIANS/c.root_count;
-    for (uint32_t k=0;k<c.root_count;++k)
+    float sine=0,cosine=0,step=FULL_TURN_RADIANS/count;
+    for (uint32_t k=0;k<count;++k)
     {
-        for (uint32_t j=0;j<c.root_count;++j) ranks[k]+=angles[j]<angles[k] || (angles[j]==angles[k] && j<k);
+        for (uint32_t j=0;j<count;++j) ranks[k]+=angles[j]<angles[k] || (angles[j]==angles[k] && j<k);
         float residual=angles[k]-ranks[k]*step;sine+=std::sin(residual);cosine+=std::cos(residual);
     }
     float angle=std::atan2(sine,cosine)+ranks[root]*step;
@@ -450,6 +471,7 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
         if (dot(tangent,tangent)<.000001f) tangent=cross(std::fabs(radial.y)<.9f ? Vec3{0,1,0} : Vec3{1,0,0},radial);
         side=normalize(tangent);other=cross(radial,side);
     }
+    extent*=c->factory_scale[k];
     for (uint32_t j=1;j<=GROWTH_SEGMENTS;++j)
     {
         Vec3 direction=normalize(add(scale(radial,LIMB_RADIAL_DIRECTION_WEIGHT),add(scale(side,(parent>=0 ? sign*spread : 0)+signed_random(seed)*bend),scale(other,signed_random(seed)*bend))));
@@ -478,18 +500,23 @@ static void prepare_factory(Simulation* s,uint32_t p)
     Vec3 right,up,normal;simulation_producer_axes(simulation_producer_definition(s,p),&right,&up,&normal);
     uint32_t seed=f->seed+p*SEED_INDEX_MULTIPLIER;
     const Body& body=s->world.bodies[p];
-    c->root_count=select_factory_roots(body,*f,c->root_attachments);
-    c->structure_count=factory_count(*f,c->root_count);
+    c->root_count=select_factory_roots(body,*f,c->root_attachments,&c->large_root_count);
+    c->structure_count=factory_count(*f,c->large_root_count)+c->root_count-c->large_root_count;
+    // Keep the selected large roots. Each remaining organelle receives one small factory.
+    float minimum_radius=body.factory_root_radii[c->root_attachments[0]];
+    for (uint32_t k=1;k<c->large_root_count;++k) minimum_radius=std::fmin(minimum_radius,body.factory_root_radii[c->root_attachments[k]]);
     for (uint32_t k=0;k<c->structure_count;++k)
     {
         if (k<c->root_count) c->parents[k]=-1;
         else if (f->grammar==GROWTH_TREE) c->parents[k]=(k-c->root_count)/f->children;
         else if (!f->organelle_roots) c->parents[k]=(k-1)/2;
-        else if (f->grammar==GROWTH_FAN) c->parents[k]=((k-c->root_count)/2)%c->root_count;
+        else if (f->grammar==GROWTH_FAN) c->parents[k]=((k-c->root_count)/2)%c->large_root_count;
         else if (f->grammar==GROWTH_HYPHA && (k-c->root_count)%HYPHA_CHAIN_LIMBS) c->parents[k]=k-1;
-        else c->parents[k]=f->grammar==GROWTH_AXIAL ? k-c->root_count
-            : f->grammar==GROWTH_HYPHA ? ((k-c->root_count)/HYPHA_CHAIN_LIMBS)%c->root_count
-            : (k-c->root_count)%c->root_count;
+        else c->parents[k]=f->grammar==GROWTH_AXIAL ? (k-c->root_count<c->large_root_count ? k-c->root_count : k-c->large_root_count)
+            : f->grammar==GROWTH_HYPHA ? ((k-c->root_count)/HYPHA_CHAIN_LIMBS)%c->large_root_count
+            : (k-c->root_count)%c->large_root_count;
+        c->factory_scale[k]=c->parents[k]>=0 ? c->factory_scale[c->parents[k]]
+            : k<c->large_root_count ? 1 : f->additional_root_scale*std::fmin(1.0f,body.factory_root_radii[c->root_attachments[k]]/minimum_radius);
         c->limb_scale[k]=c->parents[k]<0 ? 1 : c->limb_scale[c->parents[k]]*f->width_scale;
     }
     if (f->grammar==GROWTH_TREE)
@@ -500,12 +527,13 @@ static void prepare_factory(Simulation* s,uint32_t p)
         {
             uint32_t depth=0;for (int32_t node=c->parents[parent];node>=0;node=c->parents[node]) ++depth;
             // The first child of the first root stays a leaf, so production can start soon after colonization.
-            if (depth+1>=f->levels || parent==c->root_count) continue;
+            if (depth+1>=f->levels || parent==c->root_count || (parent>=c->large_root_count && parent<c->root_count)) continue;
             uint32_t children=1;
             for (uint32_t child=1;child<f->children;++child) if ((signed_random(&topology_seed)+1)*.5f<f->branch_probability) ++children;
             for (uint32_t child=0;child<children;++child)
             {
                 uint32_t k=c->structure_count++;c->parents[k]=(int32_t)parent;
+                c->factory_scale[k]=c->factory_scale[parent];
                 c->limb_scale[k]=c->limb_scale[parent]*f->width_scale;
             }
         }
@@ -611,10 +639,11 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
         for (uint32_t t=0;d.hosts_site && t<s->world.content.producer_count;++t)
             {
                 const BranchRules& f=s->world.content.producers[t].branches;
-                uint32_t indices[MAX_FACTORY_STRUCTURES];uint32_t roots=select_factory_roots(b,f,indices);
+                uint32_t indices[MAX_FACTORY_STRUCTURES],large_roots=0;uint32_t roots=select_factory_roots(b,f,indices,&large_roots);
                 if (!roots) { fprintf(stderr,"Factory root filter found no eligible large organelle.\n");return false; }
-                uint32_t required=f.grammar==GROWTH_TREE ? factory_count(f,roots) : roots;
-                if (f.count<required || required>MAX_FACTORY_STRUCTURES)
+                uint32_t required=f.grammar==GROWTH_TREE ? factory_count(f,large_roots) : large_roots;
+                uint32_t total=factory_count(f,large_roots)+roots-large_roots;
+                if (f.count<required || total>MAX_FACTORY_STRUCTURES)
                 { fprintf(stderr,"Factory structure capacity is smaller than the authored tree or attachment count.\n");return false; }
             }
         if (d.hosts_site && !geometry_surface_point(b.model_path,b.position,b.radius,b.colony_normal,&s->colonies[i].surface)) return false;
@@ -627,7 +656,7 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
                 Colony& c=s->colonies[p];const ProducerDefinition& d=*simulation_producer_definition(s,p);
                 c.establishment_age=d.establishment_seconds;
                 for (uint32_t k=1;k<c.root_count;++k)
-                { c.branches[k-1].health=d.health;c.branches[k-1].growth=1;c.branches[k-1].generation=1; }
+                { c.branches[k-1].health=structure_max_health(s,p,k);c.branches[k-1].growth=1;c.branches[k-1].generation=1; }
             }
     if (s->world.auto_colonize && s->world.neutral_start)
         for (uint32_t i=0;i<MAX_UNITS;++i)
@@ -1215,7 +1244,7 @@ static void fracture_limb(Simulation* s,uint32_t p,uint32_t k,float old_growth,f
         d.velocity=scale(add(radial,scale(jitter,DEBRIS_VELOCITY_JITTER)),fx.break_speed);
         // This axis always has a nonzero radial component.
         d.axis=normalize(add(radial,scale(jitter,DEBRIS_AXIS_JITTER)));d.spin=signed_random(&seed)*fx.break_spin;
-        d.radius=tip ? definition.width*(definition.branches.grammar==GROWTH_TREE ? simulation_structure_scale(s,p,k) : (c.parents[k]>=0 ? FACTORY_CHILD_HEAD_WIDTH_SCALE : 1))*(FACTORY_HEAD_START_WIDTH_SCALE+DEBRIS_VELOCITY_JITTER*growth)
+        d.radius=tip ? definition.width*simulation_structure_head_scale(s,p,k)*(FACTORY_HEAD_START_WIDTH_SCALE+DEBRIS_VELOCITY_JITTER*growth)
             : definition.width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j)*simulation_structure_scale(s,p,k)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
         d.seconds=fx.break_seconds;d.producer=c.type;d.faction=c.faction;s->debris[slot]=d;
     }
@@ -1274,13 +1303,12 @@ static void spore_clouds(Simulation* s,float dt,uint32_t* hit_count)
         for (uint32_t p=0;p<s->world.body_count;++p)
         {
             Colony& colony=s->colonies[p];if (!colony.active || (!cloud.friendly_fire && colony.faction==cloud.faction)) continue;
-            const ProducerDefinition& d=*simulation_producer_definition(s,p);
             for (uint32_t k=0;k<colony.structure_count;++k)
             {
                 Vec3 point=simulation_structure_position(s,p,k);
                 if (structure_health(&colony,k)<=0 || length(subtract(point,cloud.position))>=cloud.radius || !clear_shot(s,cloud.position,point,(int32_t)p)) continue;
-                bool root=colony.parents[k]<0;float* exposure=k ? &colony.branches[k-1].exposure : &colony.exposure;
-                uint32_t hits=expose(exposure,damage,root ? d.health/d.hits : d.branches.health/d.branches.hits);
+                float* exposure=k ? &colony.branches[k-1].exposure : &colony.exposure;
+                uint32_t hits=expose(exposure,damage,structure_max_health(s,p,k)/structure_hits(s,p,k));
                 hit_count[structure_slot(p,k)]+=hits;s->hits+=hits;
             }
         }
@@ -1385,9 +1413,9 @@ static void projectile_combat(Simulation* s,float dt)
             burst[i]=true;++s->spore_bursts;sound(s,SOUND_HIT,u->position);
             if (colony)
             {
-                Colony& c=s->colonies[target];const ProducerDefinition& d=*simulation_producer_definition(s,(uint32_t)target);bool root=c.parents[structure]<0;
+                Colony& c=s->colonies[target];
                 float* exposure=structure ? &c.branches[structure-1].exposure : &c.exposure;
-                uint32_t hits=expose(exposure,definition->burst_damage,root ? d.health/d.hits : d.branches.health/d.branches.hits);
+                uint32_t hits=expose(exposure,definition->burst_damage,structure_max_health(s,(uint32_t)target,structure)/structure_hits(s,(uint32_t)target,structure));
                 hit_count[structure_slot((uint32_t)target,structure)]+=hits;s->hits+=hits;
             }
             else
@@ -1542,9 +1570,8 @@ static void projectile_combat(Simulation* s,float dt)
             EmbeddedSpike* embedded=k ? branch->embedded : c->embedded;
             uint32_t index=structure_slot(i,k);
             const ProducerDefinition& definition=*simulation_producer_definition(s,i);
-            bool root=c->parents[k]<0;
-            uint32_t maximum=root ? definition.hits : definition.branches.hits;
-            float maximum_health=root ? definition.health : definition.branches.health;
+            uint32_t maximum=structure_hits(s,i,k);
+            float maximum_health=structure_max_health(s,i,k);
             uint32_t old=*wounds;*wounds=std::min(maximum,old+hit_count[index]);
             for (uint32_t j=old;j<*wounds && j<2;++j) embedded[j]=(scratch.landed_mask[index]>>(j-old))&1u ? landed[index][j-old] : EmbeddedSpike();
             *health=maximum_health*(maximum-*wounds)/maximum;
@@ -1619,8 +1646,8 @@ static bool repair_colony(Simulation* s,uint32_t p,float dt)
         if (!generation || (*health>0 && !*wounds)) continue;
         damaged=true;int32_t parent=c.parents[k];
         if (c.repair_delay[k]>0 || (parent>=0 && (structure_health(&c,parent)<=0 || simulation_structure_growth(s,p,parent)<1))) continue;
-        bool root=parent<0;float maximum=root ? d.health : d.branches.health;
-        uint32_t hits=root ? d.hits : d.branches.hits;
+        float maximum=structure_max_health(s,p,k);
+        uint32_t hits=structure_hits(s,p,k);
         float missing=*health<=0 ? maximum : maximum*(*wounds)/(float)hits;
         float work=std::fmin(budget,std::fmin(std::fmax(0.0f,missing-c.repair_credit[k]),c.energy/d.repair_nutrients_per_health));
         c.repair_credit[k]+=work;budget-=work;
@@ -1666,13 +1693,13 @@ static void grow_colonies(Simulation* s, float dt)
             bool ready=parent<0 || ((parent ? c->branches[parent-1].health : c->health)>0 && simulation_structure_growth(s,p,parent)>=1);
             bool first=establishing && *generation==0;
             bool due=first ? c->establishment_age>c->deployment_start[k] : c->branch_timer>=f.seconds;
-            float maximum=parent<0 ? d.health : f.health;
+            float maximum=structure_max_health(s,p,k);
             bool funded=d.repair_health_per_second<=0 || !*generation || c->repair_credit[k]>=maximum;
             if (*health<=0 && *timer<=0 && ready && due && funded)
             {
                 if (f.grammar!=GROWTH_TREE) c->branch_timer=0;
                 if (*generation>0 && d.segment_path[0]) regrow_factory_stems(s,p,k,*generation+1);
-                c->repair_credit[k]=0;emerged=true;*health=parent<0 ? d.health : f.health;*growth=first ? 0 : INITIAL_FACTORY_GROWTH;*wounds=0;*exposure=0;++*generation;
+                c->repair_credit[k]=0;emerged=true;*health=maximum;*growth=first ? 0 : INITIAL_FACTORY_GROWTH;*wounds=0;*exposure=0;++*generation;
                 memset(embedded,0,sizeof(EmbeddedSpike)*MAX_EMBEDDED);sound(s,SOUND_GROW,simulation_structure_position(s,p,k));
             }
             if (*health<=0) continue;
@@ -1731,18 +1758,21 @@ static void grow_colonies(Simulation* s, float dt)
         }
         float rate=s->world.ai_production_set && (c->faction!=s->world.player_faction || s->world.player_ai) ? s->world.ai_production : 1;
 
+        // Smaller factories work in proportion to their cross-sectional area.
+        float tip_weight=0;
+        for (uint32_t i=0;i<count;++i) tip_weight+=c->factory_scale[tips[i]]*c->factory_scale[tips[i]];
         // Share the authored leaf-rate budget across all ready sources.
-        uint32_t leaf_limit=c->root_count ? f.production_leaf_limits[c->root_count-1] : 0;
-        if (c->root_count && c->establishment_age<d.establishment_seconds && f.establishing_leaf_limits[c->root_count-1])
-            leaf_limit=f.establishing_leaf_limits[c->root_count-1];
-        if (leaf_limit && count>leaf_limit) rate*=leaf_limit/(float)count;
+        uint32_t leaf_limit=c->root_count ? f.production_leaf_limits[c->large_root_count-1] : 0;
+        if (c->root_count && c->establishment_age<d.establishment_seconds && f.establishing_leaf_limits[c->large_root_count-1])
+            leaf_limit=f.establishing_leaf_limits[c->large_root_count-1];
+        if (leaf_limit && tip_weight>leaf_limit) rate*=leaf_limit/tip_weight;
         c->building=false;c->manufacturing=0;c->capacity_blocked=false;
         for (uint32_t k=0;k<c->structure_count;++k)
         {
             LeafProduction* job=&c->leaves[k];if (!job->active || !ready[k]) continue;
             const UnitDefinition& product=s->world.content.units[job->type];
             float seconds=product.manufacture_seconds>0 ? product.manufacture_seconds : rules->manufacture_seconds;
-            job->progress=std::fmin(1.0f,job->progress+dt*rate/seconds);
+            job->progress=std::fmin(1.0f,job->progress+dt*rate*c->factory_scale[k]*c->factory_scale[k]/seconds);
             if (job->progress>=1-MANUFACTURE_COMPLETION_EPSILON)
             {
                 const UnitDefinition* definition=&s->world.content.units[job->type];
@@ -1929,7 +1959,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
         for (uint32_t k=0;k<body.factory_root_count;++k) { Vec3 v=body.factory_roots[k];fprintf(file,"%s[%.6f,%.6f,%.6f]",k ? "," : "",v.x,v.y,v.z); }
         fprintf(file,"],\"attachment_radii\":[");
         for (uint32_t k=0;k<body.factory_root_count;++k) fprintf(file,"%s%.9g",k ? "," : "",body.factory_root_radii[k]);
-        fprintf(file,"],\"root_attachments\":[");
+        fprintf(file,"],\"large_root_count\":%u,\"root_attachments\":[",c->large_root_count);
         for (uint32_t k=0;k<c->root_count;++k) fprintf(file,"%s%u",k ? "," : "",c->root_attachments[k]);
         fprintf(file,"]");
         fprintf(file,",\"appearance\":{\"tint\":[%.6f,%.6f,%.6f],\"strength\":%.6f,\"factions\":[",s->cell_appearance[p].tint.r,s->cell_appearance[p].tint.g,s->cell_appearance[p].tint.b,s->cell_appearance[p].strength);
@@ -1950,7 +1980,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
             fprintf(file,"%s{\"health\":%.6f,\"growth\":%.6f,\"wounds\":%u,\"generation\":%u,\"position\":[%.6f,%.6f,%.6f]",k ? "," : "",
                 k ? b->health : c->health,k ? b->growth : c->growth,k ? b->wounds : c->wounds,k ? b->generation : c->root_generation,position.x,position.y,position.z);
             fprintf(file,",\"exposure\":%.6f,\"parent\":%d,\"visible_growth\":%.6f,\"scale\":%.6f,\"terminal\":%s",k ? b->exposure : c->exposure,c->parents[k],simulation_structure_growth(s,p,k),simulation_structure_scale(s,p,k),simulation_structure_terminal(s,p,k) ? "true" : "false");
-            fprintf(file,",\"stem\":[");
+            fprintf(file,",\"factory_scale\":%.6f,\"stem\":[",c->factory_scale[k]);
             for (uint32_t j=0;j<=GROWTH_SEGMENTS;++j) { Vec3 v=c->stems[k][j];fprintf(file,"%s[%.6f,%.6f,%.6f]",j ? "," : "",v.x,v.y,v.z); }
             fprintf(file,"]}");
         }

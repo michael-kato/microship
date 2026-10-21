@@ -127,8 +127,8 @@ struct Colony
     bool building, capacity_blocked;
     bool active;
     float root_regrow_timer;
-    uint32_t root_generation,root_count,structure_count;
-    float limb_scale[MAX_FACTORY_STRUCTURES],deployment_start[MAX_FACTORY_STRUCTURES],deployment_seconds[MAX_FACTORY_STRUCTURES];
+    uint32_t root_generation,root_count,large_root_count,structure_count;
+    float factory_scale[MAX_FACTORY_STRUCTURES],limb_scale[MAX_FACTORY_STRUCTURES],deployment_start[MAX_FACTORY_STRUCTURES],deployment_seconds[MAX_FACTORY_STRUCTURES];
     int32_t parents[MAX_FACTORY_STRUCTURES];
     uint32_t root_attachments[MAX_FACTORY_STRUCTURES];
     uint32_t wounds;
@@ -217,6 +217,7 @@ void simulation_producer_axes(const ProducerDefinition*,Vec3* right,Vec3* up,Vec
 Vec3 simulation_structure_position(const Simulation*,uint32_t cell,uint32_t structure);
 Vec3 simulation_growth_point(const Simulation*,uint32_t cell,uint32_t structure,float growth);
 float simulation_structure_scale(const Simulation*,uint32_t cell,uint32_t structure);
+float simulation_structure_head_scale(const Simulation*,uint32_t cell,uint32_t structure);
 bool simulation_structure_terminal(const Simulation*,uint32_t cell,uint32_t structure);
 float simulation_structure_growth(const Simulation*,uint32_t cell,uint32_t structure);
 float simulation_production(const Simulation*,uint32_t cell);

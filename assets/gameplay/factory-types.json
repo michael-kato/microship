@@ -24,7 +24,8 @@
       "roots": "organelles",
       "root_limit": 3,
       "root_minimum_radius": 0.1,
-      "root_offset_seconds": 10
+      "root_offset_seconds": 10,
+      "additional_root_scale": 0.35
     }
   },
   "buildings": [

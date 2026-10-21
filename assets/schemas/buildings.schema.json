@@ -338,6 +338,11 @@
               "type": "number",
               "minimum": 0,
               "maximum": 10000
+            },
+            "additional_root_scale": {
+              "type": "number",
+              "minimum": 0.05,
+              "maximum": 0.5
             }
           },
           "required": ["seconds", "seed"],

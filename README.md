@@ -6,6 +6,8 @@ Virus forces use large swarms of light craft and spike projectiles. Immune force
 
 Seeded membranes, organelles, branching factories, and wet anatomical backgrounds form the world. Units grow at factory tips. Damaged limbs break away. Fog returns gradually and strongly blurs unseen areas. Direct ray tracing provides light, shadows, and atmospheric scattering. Colors come from vertices; each frame uses current data only.
 
+Each visible organelle supports a factory. Large organelles support branching factories. Smaller organelles support short stems and small heads that also produce units. `shared.branches.additional_root_scale` sets their maximum size relative to a large factory; organelle radius reduces it further. Navigation bounds follow the same scale. Small-factory health and manufacture rates scale with cross-sectional area. Fungal sources share the existing cell output limit.
+
 Textures are permitted on any object when the game generates them. Noise and other procedural methods may generate color, normal, roughness, opacity, emission, and environment maps. Vertex colors remain supported.
 
 Simulation rules remain separate from rendering. The project uses direct functions and contiguous data, with real application checks.

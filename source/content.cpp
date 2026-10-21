@@ -326,7 +326,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
     json_object(root,"$schema|shared|buildings");
     Json shared=json_get(root,"shared"),shared_branches=json_get(shared,"branches");
     json_object(shared,"growth_seconds|sprout_seconds|establishment_seconds|collection|height|width|repair|growth_plane|branches");
-    json_object(shared_branches,"seconds|seed|regrow_seconds|roots|root_limit|root_minimum_radius|root_offset_seconds");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
+    json_object(shared_branches,"seconds|seed|regrow_seconds|roots|root_limit|root_minimum_radius|additional_root_scale|root_offset_seconds");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
     while (json_next(&a,&j))
     {
         json_object(j,"name|faction|model|health|hits|branches|growth_meshes|navigation|haze");ProducerDefinition p={};
@@ -391,6 +391,12 @@ static bool load_buildings(Content* c,Json root,const char* path)
         if (json_present(root_limit)) p.branches.root_limit=json_uint(root_limit,1,MAX_FACTORY_STRUCTURES);
         if (json_present(root_radius)) p.branches.root_minimum_radius=json_float(root_radius,0,1.5f);
         if (!p.branches.organelle_roots && (json_present(root_limit) || json_present(root_radius))) json_error(b,"root filters require organelle roots");
+        Json additional=json_find(shared_branches,"additional_root_scale");
+        if (json_present(additional))
+        {
+            p.branches.additional_root_scale=json_float(additional,.05f,.5f);
+            if (!p.branches.organelle_roots) json_error(additional,"additional roots require organelle roots");
+        }
         Json root_offset=json_find(shared_branches,"root_offset_seconds");
         if (json_present(root_offset)) p.branches.root_offset_seconds=json_float(root_offset,0,MAX_ESTABLISHMENT_SECONDS);
         Json root_interval=json_find(b,"root_interval_seconds");

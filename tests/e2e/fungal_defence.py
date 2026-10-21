@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-defence-') as directory:
     for b in base['content']['buildings']:
         b.update(growth_seconds=.01,sprout_seconds=.01,establishment_seconds=.01)
         b['branches'].update(count=1,roots='single',grammar='axial',seconds=.01)
-        for key in ('root_limit','root_minimum_radius','tree'):b['branches'].pop(key,None)
+        for key in ('root_limit','root_minimum_radius','additional_root_scale','tree'):b['branches'].pop(key,None)
     def run(name,data=base,ticks=120,expected=0,orders=''):
         global count
         world=out/(name+'_world.json');write_world(world,data)
@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-defence-') as directory:
     for ticks,roots in (((1800,3),) if quick else ((1200,3),(1800,3),(3000,3))):
         growth,_=run('staged_factories_'+str(ticks),staged,ticks=ticks)
         colony=growth['colonies'][0]
-        assert colony['root_count']==3 and sum(limb['health']>0 for limb in colony['structures'][:3])==roots,(ticks,colony['structures'][:3])
+        assert colony['root_count']==len(colony['attachments']) and colony['large_root_count']==3 and sum(limb['health']>0 for limb in colony['structures'][:3])==roots,(ticks,colony['structures'][:3])
     # Check each emitted unit, not only the final average. One ready leaf cannot burst.
     previous=0
     for ticks in ((30,60) if quick else (30,60,90,120,150,180)):
