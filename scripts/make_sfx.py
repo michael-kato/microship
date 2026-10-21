@@ -30,10 +30,12 @@ profiles=json.loads((root/'sound-synthesis.json').read_text(),object_pairs_hook=
 if set(profiles)-{'$schema','sounds'}:raise ValueError('Unknown synthesis fields')
 bank=json.loads((root/'audio.json').read_text(),object_pairs_hook=unique)
 if set(profiles['sounds'])!=set(bank['events']):raise ValueError('Synthesis events must match the sound bank')
-ranges={'seconds':(.03,2),'start_hz':(20,20000),'end_hz':(20,20000),'noise':(0,1),'decay':(0,12),'seed':(0,16777215)}
+ranges={'seconds':(.005,2),'start_hz':(20,20000),'end_hz':(20,20000),'noise':(0,1),'decay':(0,12),'seed':(0,16777215)}
+optional={'attack_seconds':(.0001,.1),'release_seconds':(.0001,.1)}
 for name,p in profiles['sounds'].items():
-    if set(p)!=set(ranges):raise ValueError(name+': incomplete or unknown synthesis fields')
-    for key,(low,high) in ranges.items():
+    if set(p)-set(ranges)-set(optional) or set(ranges)-set(p):raise ValueError(name+': incomplete or unknown synthesis fields')
+    for key,(low,high) in dict(ranges,**optional).items():
+        if key not in p:continue
         value=p[key]
         if type(value) not in (int,float) or not math.isfinite(value) or not low<=value<=high:raise ValueError(name+': invalid '+key)
     if type(p['seed']) is not int:raise ValueError(name+': seed must be an integer')
@@ -45,7 +47,7 @@ for name,p in profiles['sounds'].items():
         frequency=p['start_hz']*(p['end_hz']/p['start_hz'])**u
         phase+=math.tau*frequency/SAMPLE_RATE_HZ
         filtered=filtered*NOISE_MEMORY_WEIGHT+rng.uniform(-1,1)*NOISE_INPUT_WEIGHT
-        attack=min(1,t/ATTACK_SECONDS);release=min(1,(count-1-i)/(SAMPLE_RATE_HZ*RELEASE_SECONDS))
+        attack=min(1,t/p.get('attack_seconds',ATTACK_SECONDS));release=min(1,(count-1-i)/(SAMPLE_RATE_HZ*p.get('release_seconds',RELEASE_SECONDS)))
         envelope=attack*release*math.exp(-p['decay']*u)
         signal=(math.sin(phase)+OVERTONE_GAIN*math.sin(phase*OVERTONE_FREQUENCY_RATIO))*(1-p['noise'])+filtered*p['noise']*NOISE_GAIN
         samples.append(round(max(-MAX_SIGNAL_AMPLITUDE,min(MAX_SIGNAL_AMPLITUDE,signal*envelope*OUTPUT_GAIN))*PCM16_MAX_SAMPLE))

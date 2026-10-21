@@ -240,3 +240,10 @@ in `factory-types.json`: `reach`, `damage_per_second`, and `heal_per_second`.
 Set its visible color and strength under `cell_haze` in `combat-effects.json`.
 The soft haze uses the existing cloud drawing pass and adds no volume rays.
 Enemy haze is visible only when its cell is in current sight.
+
+Unit births use a 16 ms noise click; attack hits use a 12 ms click. Their
+playback gains are 0.14 and 0.13. Birth clicks have a 0.18-second cooldown;
+hit clicks have a 0.1-second cooldown. Set gain and cooldown in
+`assets/audio/audio.json`. Set duration and envelope in
+`assets/audio/sound-synthesis.json`, then run `python3 scripts/make_sfx.py`.
+Other sound clips keep their existing waveforms.

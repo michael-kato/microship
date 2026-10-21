@@ -26,12 +26,14 @@
       "seed": 4723
     },
     "birth": {
-      "seconds": 0.18,
-      "start_hz": 330,
-      "end_hz": 900,
-      "noise": 0.15,
-      "decay": 1.7,
-      "seed": 4724
+      "seconds": 0.016,
+      "start_hz": 900,
+      "end_hz": 650,
+      "noise": 0.9,
+      "decay": 6,
+      "seed": 4724,
+      "attack_seconds": 0.0005,
+      "release_seconds": 0.005
     },
     "shot": {
       "seconds": 0.07,
@@ -42,12 +44,14 @@
       "seed": 4725
     },
     "hit": {
-      "seconds": 0.1,
-      "start_hz": 180,
-      "end_hz": 55,
-      "noise": 0.8,
-      "decay": 3,
-      "seed": 4726
+      "seconds": 0.012,
+      "start_hz": 650,
+      "end_hz": 450,
+      "noise": 0.95,
+      "decay": 5,
+      "seed": 4726,
+      "attack_seconds": 0.0004,
+      "release_seconds": 0.004
     },
     "death": {
       "seconds": 0.3,

@@ -19,8 +19,8 @@
     },
     "birth": {
       "file": "birth.wav",
-      "gain": 0.45,
-      "cooldown": 0.12
+      "gain": 0.14,
+      "cooldown": 0.18
     },
     "shot": {
       "file": "shot.wav",
@@ -29,8 +29,8 @@
     },
     "hit": {
       "file": "hit.wav",
-      "gain": 0.24,
-      "cooldown": 0.065
+      "gain": 0.13,
+      "cooldown": 0.1
     },
     "death": {
       "file": "death.wav",

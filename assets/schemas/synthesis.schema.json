@@ -14,7 +14,7 @@
           "properties": {
             "seconds": {
               "type": "number",
-              "minimum": 0.03,
+              "minimum": 0.005,
               "maximum": 2
             },
             "start_hz": {
@@ -41,6 +41,16 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 16777215
+            },
+            "attack_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
+            },
+            "release_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
             }
           },
           "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
@@ -51,7 +61,7 @@
           "properties": {
             "seconds": {
               "type": "number",
-              "minimum": 0.03,
+              "minimum": 0.005,
               "maximum": 2
             },
             "start_hz": {
@@ -78,6 +88,16 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 16777215
+            },
+            "attack_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
+            },
+            "release_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
             }
           },
           "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
@@ -88,7 +108,7 @@
           "properties": {
             "seconds": {
               "type": "number",
-              "minimum": 0.03,
+              "minimum": 0.005,
               "maximum": 2
             },
             "start_hz": {
@@ -115,6 +135,16 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 16777215
+            },
+            "attack_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
+            },
+            "release_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
             }
           },
           "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
@@ -125,7 +155,7 @@
           "properties": {
             "seconds": {
               "type": "number",
-              "minimum": 0.03,
+              "minimum": 0.005,
               "maximum": 2
             },
             "start_hz": {
@@ -152,6 +182,16 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 16777215
+            },
+            "attack_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
+            },
+            "release_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
             }
           },
           "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
@@ -162,7 +202,7 @@
           "properties": {
             "seconds": {
               "type": "number",
-              "minimum": 0.03,
+              "minimum": 0.005,
               "maximum": 2
             },
             "start_hz": {
@@ -189,6 +229,16 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 16777215
+            },
+            "attack_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
+            },
+            "release_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
             }
           },
           "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
@@ -199,7 +249,7 @@
           "properties": {
             "seconds": {
               "type": "number",
-              "minimum": 0.03,
+              "minimum": 0.005,
               "maximum": 2
             },
             "start_hz": {
@@ -226,6 +276,16 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 16777215
+            },
+            "attack_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
+            },
+            "release_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
             }
           },
           "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
@@ -236,7 +296,7 @@
           "properties": {
             "seconds": {
               "type": "number",
-              "minimum": 0.03,
+              "minimum": 0.005,
               "maximum": 2
             },
             "start_hz": {
@@ -263,6 +323,16 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 16777215
+            },
+            "attack_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
+            },
+            "release_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
             }
           },
           "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
@@ -273,7 +343,7 @@
           "properties": {
             "seconds": {
               "type": "number",
-              "minimum": 0.03,
+              "minimum": 0.005,
               "maximum": 2
             },
             "start_hz": {
@@ -300,6 +370,16 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 16777215
+            },
+            "attack_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
+            },
+            "release_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
             }
           },
           "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
@@ -310,7 +390,7 @@
           "properties": {
             "seconds": {
               "type": "number",
-              "minimum": 0.03,
+              "minimum": 0.005,
               "maximum": 2
             },
             "start_hz": {
@@ -337,6 +417,16 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 16777215
+            },
+            "attack_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
+            },
+            "release_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
             }
           },
           "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
@@ -347,7 +437,7 @@
           "properties": {
             "seconds": {
               "type": "number",
-              "minimum": 0.03,
+              "minimum": 0.005,
               "maximum": 2
             },
             "start_hz": {
@@ -374,6 +464,16 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 16777215
+            },
+            "attack_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
+            },
+            "release_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
             }
           },
           "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
@@ -384,7 +484,7 @@
           "properties": {
             "seconds": {
               "type": "number",
-              "minimum": 0.03,
+              "minimum": 0.005,
               "maximum": 2
             },
             "start_hz": {
@@ -411,6 +511,16 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 16777215
+            },
+            "attack_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
+            },
+            "release_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
             }
           },
           "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
@@ -421,7 +531,7 @@
           "properties": {
             "seconds": {
               "type": "number",
-              "minimum": 0.03,
+              "minimum": 0.005,
               "maximum": 2
             },
             "start_hz": {
@@ -448,6 +558,16 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 16777215
+            },
+            "attack_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
+            },
+            "release_seconds": {
+              "type": "number",
+              "minimum": 0.0001,
+              "maximum": 0.1
             }
           },
           "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
