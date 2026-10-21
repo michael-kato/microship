@@ -12,7 +12,7 @@ Textures are permitted on any object when the game generates them. Noise and oth
 
 Simulation rules remain separate from rendering. The project uses direct functions and contiguous data, with real application checks.
 
-Normal faction choices use `virus_large_level.json`, `immune_large_level.json`, and `fungus_large_level.json`. Older two-side levels remain diagnostic fixtures. Every intact, mature factory head produces units, including heads below forks. Stems extend through the cell wall. Immune factories form a short, evenly spaced ring; fungal chains spread at their root forks.
+Normal faction choices use `virus_large_level.json`, `immune_large_level.json`, and `fungus_large_level.json`. Home cells form an equilateral triangle with 64-unit sides. All 15 cells use a triangular grid with 16 units between neighboring centers. Each side has the same cell sizes and spacing. Older two-side levels remain diagnostic fixtures. Every intact, mature factory head produces units, including heads below forks. Stems extend through the cell wall. Immune factories form a short, evenly spaced ring; fungal chains spread at their root forks.
 
 The primary stress scene is `assets/levels/three_faction_stress.json`: five fully developed cells and 60 seconds of actual production per faction, with all armies and reinforcements ordered to the center. Preparation runs 3,600 normal production steps with full initial nutrient storage and no combat or unit expiry. The produced armies assemble at their front cells. Counts follow faction production; unit storage holds 4,096. Run it with `python3 scripts/proton_run.py build/windows-cross/nanova.exe --world assets/levels/three_faction_stress.json`.
 

@@ -7,6 +7,21 @@ from asset_data import stage_world,write_world
 root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
+
+def check_layout(world):
+ points=[body['position'] for body in world['bodies']]
+ homes=[points[i] for i in (0,5,10)]
+ edges=[math.dist(homes[i],homes[(i+1)%3]) for i in range(3)]
+ assert max(edges)-min(edges)<1e-6 and abs(edges[0]-64)<1e-6,edges
+ nearest=[min(math.dist(p,q) for j,q in enumerate(points) if i!=j) for i,p in enumerate(points)]
+ assert max(nearest)-min(nearest)<1e-6 and abs(nearest[0]-16)<1e-6,nearest
+ for i,p in enumerate(points):
+  for j,q in enumerate(points):
+   if i<j:assert math.dist(p,q)>world['bodies'][i]['radius']+world['bodies'][j]['radius']
+ for group in (0,5,10):
+  assert [b['radius'] for b in world['bodies'][group:group+5]]==[4.2,2.7,2.7,2.1,2.1]
+ return points
+
 with tempfile.TemporaryDirectory(prefix='nanova-three-factions-') as directory:
  out=Path(directory)
  def run(name,world,ticks=1,expected=0,extra=()):
@@ -20,6 +35,8 @@ with tempfile.TemporaryDirectory(prefix='nanova-three-factions-') as directory:
  for side in ('virus','immune','fungus'):
   path=root/'assets/levels'/(side+'_large_level.json');d=json.loads(path.read_text())
   assert len(d['bodies'])==15 and {v['faction'] for v in d['match']['starts']}=={'virus','immune','fungus'}
+  layout=check_layout(d)
+  assert all(spawn['position'][:2]==layout[start['cell']][:2] for spawn,start in zip(d['spawns'],d['match']['starts']))
   initial=run(side+'_initial',path);assert {u['faction'] for u in initial['units']}=={1,2,3}
   game=run(side+'_settled',path,2400)
   homes={v['faction']:v['cell'] for v in d['match']['starts']}
@@ -36,7 +53,9 @@ with tempfile.TemporaryDirectory(prefix='nanova-three-factions-') as directory:
  game=run('third_founder_prevents_win',pending,900)
  assert game['colonies'][0]['active'] and not game['colonies'][5]['active'] and not game['colonies'][10]['active']
  assert any(u['faction']==3 for u in game['units']) and game['outcome']==0
- stress=root/'assets/levels/three_faction_stress.json';a=run('stress_initial',stress,extra=('--restart',))
+ stress=root/'assets/levels/three_faction_stress.json'
+ assert check_layout(json.loads(stress.read_text()))==layout
+ a=run('stress_initial',stress,extra=('--restart',))
  assert len(a['colonies'])==15 and 0<len(a['units'])<a['unit_capacity'] and a['prepared_production_ticks']==3600
  assert all(c['active'] and all(s['health']>0 and s['growth']==1 for s in c['structures']) for c in a['colonies'])
  assert all(sum(c['faction']==f for c in a['colonies'])==5 for f in (1,2,3))
@@ -70,4 +89,4 @@ with tempfile.TemporaryDirectory(prefix='nanova-three-factions-') as directory:
  bad=json.loads(stress.read_text());bad['match']['production_seconds']=0;run('zero_production',bad,expected=1)
  bad=json.loads(stress.read_text());bad['match']['production_seconds']=120;run('production_overflow',bad,expected=1)
  bad=json.loads(stress.read_text());bad['spawns']=[dict(type='virus_fighter',position=[0,0,0])];run('mixed_starting_units',bad,expected=1)
-print(f'Three factions E2E passed: {count} application runs; 15-cell maps, three settlements, pending third faction, one minute of actual factory production, full development, shared battle point, combat losses on every side, restart and invalid setup rejection.')
+print(f'Three factions E2E passed: {count} application runs; 15-cell maps, equal home distances, uniform cell spacing, three settlements, pending third faction, one minute of actual factory production, full development, shared battle point, combat losses on every side, restart and invalid setup rejection.')

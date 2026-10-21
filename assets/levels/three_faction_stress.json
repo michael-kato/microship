@@ -17,7 +17,7 @@
     {
       "type": "unclaimed",
       "owner": "virus",
-      "position": [-18, -10, 0],
+      "position": [-32.0, -18.47520861, 0.0],
       "radius": 4.2,
       "tint": [1.0, 1.0, 1.0],
       "site": {
@@ -40,7 +40,7 @@
     {
       "type": "unclaimed",
       "owner": "virus",
-      "position": [-95, -34, 0],
+      "position": [-16.0, -18.47520861, 0.0],
       "radius": 2.7,
       "tint": [1.0, 1.0, 1.0],
       "site": {
@@ -63,7 +63,7 @@
     {
       "type": "unclaimed",
       "owner": "virus",
-      "position": [-65, -34, 0],
+      "position": [-24.0, -4.61880215, 0.0],
       "radius": 2.7,
       "tint": [1.0, 1.0, 1.0],
       "site": {
@@ -86,7 +86,7 @@
     {
       "type": "unclaimed",
       "owner": "virus",
-      "position": [-90, -16, 0],
+      "position": [0.0, -18.47520861, 0.0],
       "radius": 2.1,
       "tint": [1.0, 1.0, 1.0],
       "site": {
@@ -109,7 +109,7 @@
     {
       "type": "unclaimed",
       "owner": "virus",
-      "position": [-70, -16, 0],
+      "position": [-8.0, -4.61880215, 0.0],
       "radius": 2.1,
       "tint": [1.0, 1.0, 1.0],
       "site": {
@@ -132,7 +132,7 @@
     {
       "type": "unclaimed",
       "owner": "immune",
-      "position": [18, -10, 0],
+      "position": [32.0, -18.47520861, 0.0],
       "radius": 4.2,
       "tint": [1.0, 1.0, 1.0],
       "site": {
@@ -155,7 +155,7 @@
     {
       "type": "unclaimed",
       "owner": "immune",
-      "position": [65, -34, 0],
+      "position": [24.0, -4.61880215, 0.0],
       "radius": 2.7,
       "tint": [1.0, 1.0, 1.0],
       "site": {
@@ -178,7 +178,7 @@
     {
       "type": "unclaimed",
       "owner": "immune",
-      "position": [95, -34, 0],
+      "position": [16.0, -18.47520861, 0.0],
       "radius": 2.7,
       "tint": [1.0, 1.0, 1.0],
       "site": {
@@ -201,7 +201,7 @@
     {
       "type": "unclaimed",
       "owner": "immune",
-      "position": [70, -16, 0],
+      "position": [16.0, 9.23760431, 0.0],
       "radius": 2.1,
       "tint": [1.0, 1.0, 1.0],
       "site": {
@@ -224,7 +224,7 @@
     {
       "type": "unclaimed",
       "owner": "immune",
-      "position": [90, -16, 0],
+      "position": [8.0, -4.61880215, 0.0],
       "radius": 2.1,
       "tint": [1.0, 1.0, 1.0],
       "site": {
@@ -247,7 +247,7 @@
     {
       "type": "unclaimed",
       "owner": "fungus",
-      "position": [0, 20, 0],
+      "position": [0.0, 36.95041723, 0.0],
       "radius": 4.2,
       "tint": [1.0, 1.0, 1.0],
       "site": {
@@ -270,7 +270,7 @@
     {
       "type": "unclaimed",
       "owner": "fungus",
-      "position": [-15, 104, 0],
+      "position": [-8.0, 23.09401077, 0.0],
       "radius": 2.7,
       "tint": [1.0, 1.0, 1.0],
       "site": {
@@ -293,7 +293,7 @@
     {
       "type": "unclaimed",
       "owner": "fungus",
-      "position": [15, 104, 0],
+      "position": [8.0, 23.09401077, 0.0],
       "radius": 2.7,
       "tint": [1.0, 1.0, 1.0],
       "site": {
@@ -316,7 +316,7 @@
     {
       "type": "unclaimed",
       "owner": "fungus",
-      "position": [-10, 122, 0],
+      "position": [-16.0, 9.23760431, 0.0],
       "radius": 2.1,
       "tint": [1.0, 1.0, 1.0],
       "site": {
@@ -339,7 +339,7 @@
     {
       "type": "unclaimed",
       "owner": "fungus",
-      "position": [10, 122, 0],
+      "position": [0.0, 9.23760431, 0.0],
       "radius": 2.1,
       "tint": [1.0, 1.0, 1.0],
       "site": {
