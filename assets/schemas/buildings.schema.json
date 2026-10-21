@@ -361,10 +361,22 @@
             },
             "all_leaf_nodes": {
               "type": "boolean"
+            },
+            "additional_root_width_scale": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "additional_root_branch": {
+              "type": "boolean"
             }
           },
           "required": ["seconds", "seed"],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "dependentRequired": {
+            "additional_root_width_scale": ["additional_root_scale"],
+            "additional_root_branch": ["additional_root_scale"]
+          }
         }
       },
       "required": ["growth_seconds", "collection", "height", "width", "branches", "growth_plane"],

@@ -363,7 +363,8 @@ static Vec3 factory_direction(Vec3 direction,const ProducerDefinition& definitio
 float simulation_structure_scale(const Simulation* s,uint32_t p,uint32_t k)
 {
     const Colony& c=s->colonies[p];const BranchRules& f=simulation_producer_definition(s,p)->branches;
-    return c.factory_scale[k]*(f.grammar==GROWTH_TREE ? c.limb_scale[k] : c.parents[k]>=0 ? FACTORY_CHILD_STEM_WIDTH_SCALE : 1);
+    float width=c.factory_scale[k]<1 ? f.additional_root_width_scale : 1;
+    return width*c.factory_scale[k]*(f.grammar==GROWTH_TREE ? c.limb_scale[k] : c.parents[k]>=0 ? FACTORY_CHILD_STEM_WIDTH_SCALE : 1);
 }
 float simulation_structure_head_scale(const Simulation* s,uint32_t p,uint32_t k)
 {
@@ -455,17 +456,20 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
     if (f->grammar==GROWTH_TREE)
     {
         uint32_t depth=0;for (int32_t v=parent;v>=0;v=c->parents[v]) ++depth;
-        extent=simulation_producer_definition(s,p)->height*std::pow(f->length_scale,(float)depth);bend=f->bend;spread=0;
+        extent=(f->root_height>0 ? f->root_height : definition.height)*std::pow(f->length_scale,(float)depth);bend=f->bend;spread=0;
         if (f->length_jitter>0) extent*=1+signed_random(seed)*f->length_jitter;
         if (f->width_jitter>0) c->limb_scale[k]=std::pow(f->width_scale,(float)depth)*(1+signed_random(seed)*f->width_jitter);
         if (parent>=0)
         {
             radial=normalize(subtract(c->stems[parent][GROWTH_SEGMENTS],c->stems[parent][GROWTH_SEGMENTS-1]));
-            Vec3 axis=simulation_producer_definition(s,p)->growth_plane_normal;
-            if (dot(axis,axis)<.01f) axis=normal;
-            float angle=((k-c->root_count)%f->children-(f->children-1)*.5f)*2*f->angle;
+            Vec3 axis=definition.growth_plane_enabled ? definition.growth_plane_normal : normal;
+            uint32_t rank=0,siblings=0;
+            for (uint32_t j=c->root_count;j<c->structure_count;++j) if (c->parents[j]==parent)
+            { ++siblings;rank+=j<k; }
+            float angle=(siblings>1 ? rank-(siblings-1)*.5f : (k%2 ? -.5f : .5f))*2*f->angle;
             if (f->angle_jitter>0) angle+=signed_random(seed)*f->angle_jitter;
-            radial=normalize(add(add(scale(radial,std::cos(angle)),scale(cross(axis,radial),std::sin(angle))),scale(axis,dot(axis,radial)*(1-std::cos(angle)))));
+            // Split in the local branch plane, including growth parallel to its normal.
+            radial=normalize(add(scale(radial,std::cos(angle)),scale(factory_side(axis,radial),std::sin(angle))));
         }
         radial=factory_direction(radial,*simulation_producer_definition(s,p));
         Vec3 plane=simulation_producer_definition(s,p)->growth_plane_enabled ? simulation_producer_definition(s,p)->growth_plane_normal : normal;
@@ -560,10 +564,13 @@ static void prepare_factory(Simulation* s,uint32_t p)
         for (uint32_t parent=0;parent<c->structure_count;++parent)
         {
             uint32_t depth=0;for (int32_t node=c->parents[parent];node>=0;node=c->parents[node]) ++depth;
-            // The first child of the first root stays a leaf, so production can start soon after colonization.
-            if (depth+1>=f->levels || parent==c->root_count || (parent>=c->large_root_count && parent<c->root_count)) continue;
+            // Terminal-only definitions keep one early leaf. Small roots get one child.
+            bool small=c->factory_scale[parent]<1;
+            if (depth+1>=f->levels || (!f->all_leaf_nodes && parent==c->root_count)
+                || (small && (depth || !f->additional_root_branch))) continue;
             uint32_t children=1;
-            for (uint32_t child=1;child<f->children;++child) if ((signed_random(&topology_seed)+1)*.5f<f->branch_probability) ++children;
+            if (!small) for (uint32_t child=1;child<f->children;++child)
+                if ((signed_random(&topology_seed)+1)*.5f<f->branch_probability) ++children;
             for (uint32_t child=0;child<children;++child)
             {
                 uint32_t k=c->structure_count++;c->parents[k]=(int32_t)parent;
@@ -572,6 +579,12 @@ static void prepare_factory(Simulation* s,uint32_t p)
             }
         }
     }
+    if (f->grammar!=GROWTH_TREE && f->additional_root_branch)
+        for (uint32_t parent=c->large_root_count;parent<c->root_count;++parent)
+        {
+            uint32_t k=c->structure_count++;c->parents[k]=(int32_t)parent;
+            c->factory_scale[k]=c->factory_scale[parent];c->limb_scale[k]=1;
+        }
     // Roots start at the authored interval, with a bounded offset after each start.
     // Each structure grows for sprout_seconds. A root's limbs emerge depth first at even intervals,
     // so its first child follows the mature trunk and its last limb matures when establishment ends.
@@ -686,7 +699,7 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
                 uint32_t indices[MAX_FACTORY_STRUCTURES],large_roots=0;uint32_t roots=select_factory_roots(b,f,indices,&large_roots);
                 if (!roots) { fprintf(stderr,"Factory root filter found no eligible large organelle.\n");return false; }
                 uint32_t required=f.grammar==GROWTH_TREE ? factory_count(f,large_roots) : large_roots;
-                uint32_t total=factory_count(f,large_roots)+roots-large_roots;
+                uint32_t total=factory_count(f,large_roots)+(roots-large_roots)*(f.additional_root_branch ? 2 : 1);
                 if (f.count<required || total>MAX_FACTORY_STRUCTURES)
                 { fprintf(stderr,"Factory structure capacity is smaller than the authored tree or attachment count.\n");return false; }
             }
@@ -2132,7 +2145,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
             fprintf(file,"%s{\"health\":%.6f,\"growth\":%.6f,\"wounds\":%u,\"generation\":%u,\"position\":[%.6f,%.6f,%.6f]",k ? "," : "",
                 k ? b->health : c->health,k ? b->growth : c->growth,k ? b->wounds : c->wounds,k ? b->generation : c->root_generation,position.x,position.y,position.z);
             fprintf(file,",\"exposure\":%.6f,\"parent\":%d,\"visible_growth\":%.6f,\"scale\":%.6f,\"terminal\":%s",k ? b->exposure : c->exposure,c->parents[k],simulation_structure_growth(s,p,k),simulation_structure_scale(s,p,k),simulation_structure_terminal(s,p,k) ? "true" : "false");
-            fprintf(file,",\"factory_scale\":%.6f,\"stem\":[",c->factory_scale[k]);
+            fprintf(file,",\"factory_scale\":%.6f,\"head_scale\":%.6f,\"stem\":[",c->factory_scale[k],simulation_structure_head_scale(s,p,k));
             for (uint32_t j=0;j<=GROWTH_SEGMENTS;++j) { Vec3 v=c->stems[k][j];fprintf(file,"%s[%.6f,%.6f,%.6f]",j ? "," : "",v.x,v.y,v.z); }
             fprintf(file,"]}");
         }

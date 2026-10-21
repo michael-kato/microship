@@ -48,8 +48,12 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-sources-') as directory:
         assert b['root_count']==len(b['attachments'])
         assert all(b['leaf_births'][k]>a['leaf_births'][k] for k in range(roots,b['root_count']))
         assert min(chains)>0 and max(chains)-min(chains)<=1,(radius,chains)
-        assert fungus(data)['branches']['chain_length']==1
-        assert all(v['parent']<roots for v in b['structures'][b['root_count']:]),'A long fungal chain remains'
+        assert chains==[2]*roots,(radius,'A large trunk did not fork',chains)
+        for k in range(roots):
+            children=[i for i,v in enumerate(b['structures']) if v['parent']==k]
+            assert all(sum(v['parent']==i for v in b['structures'])==2 for i in children),'A fork did not repeat'
+        for k in range(roots,b['root_count']):
+            assert sum(v['parent']==k for v in b['structures'])==1,'A small root has no fork'
         lengths=[sum(math.dist(a,b) for a,b in zip(v['stem'],v['stem'][1:])) for v in b['structures'][b['root_count']:]]
         assert max(lengths)<3,(radius,'Fungal side branches are too long',lengths)
 
@@ -57,7 +61,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-sources-') as directory:
         print(f'Radius {radius}: {roots} roots, {len(leaves)} producing tips, {actual} spores/5 minutes, expected {expected}.')
     # Measure sibling fan width against the earlier spread setting in the application.
     wide=run('fan_wide',base)['colonies'][0];narrow_data=deepcopy(base)
-    fungus(narrow_data)['branches']['spread_scale']=1.6
+    fungus(narrow_data)['branches']['tree']['angle_degrees']=20
     narrow=run('fan_narrow',narrow_data)['colonies'][0]
     def fan_width(colony):
         total=0

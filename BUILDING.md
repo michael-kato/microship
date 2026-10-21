@@ -1077,3 +1077,80 @@ Run `python3 tests/e2e/pause_menu.py build/windows-cross/nanova.exe --gpu --os-i
 Checked Oct 20: 24 CPU menu and audio application runs passed. Captured PCM confirmed volume gain and mute. The smoke, camera, screen selection and polish checks passed. All three faction choices passed through the main menu. Bounded GPU runs checked graphics Apply, renderer cleanup during a faction change, recovery after a settings save failure, input isolation and resume with the host Vulkan validation layer. OS menu input also passed.
 
 The broader `world_files` check failed because its empty building fixture has no `shared` field. The existing content loader requires that field. The loader and fixture helper were not changed for this feature. The complete suite, all graphics combinations, native Windows and audible device output remain unverified.
+
+
+## Repeated factory forks (Oct 21)
+
+All factions use repeated tree forks. Large roots split twice. Child limbs
+get shorter and thinner. Seeded angles and bends change the shape within
+the authored bounds. Each small root has one child. Its stem uses a 2.5 width
+multiplier; its head, health, and per-source manufacture scale stay separate.
+Navigation and debris use the visible stem scale. Roots keep the direction
+from the nucleus through the organelle center.
+
+The method uses repeated branch relations from
+[plant self-similarity research](https://algorithmicbotany.org/papers/fractals.tip2004.html)
+and split-angle control from the
+[dielectric breakdown model](https://arxiv.org/abs/cond-mat/0112218).
+These are shape references. Growth remains the existing bounded game rule.
+
+At radius 4.2 and seed 1234, each faction has ten roots: three large trees
+with seven structures each, plus seven small trees with two structures each.
+That is 35 structures per cell. Fungal source checks still enforce the
+existing mature output and nutrient-income limits.
+
+The Windows cross-build passed twelve real-application check groups through
+Proton: smoke, natural_factory, small_factories, fungal_sources, data_assets,
+growth_factions, three_factions, factory_repair, navigation, fungal_defence,
+colony_forms, and cell_animation. Checks cover radii 2.1, 2.7, and 4.2,
+three layout seeds, outward roots, taper, joints, wall clearance, navigation
+widths, damage, and regrowth. A parallel-axis case checks that forks remain
+separate and finite. Invalid widths, missing dependencies, and storage
+overflow fail at startup. The bend value 0.05 now passes its documented
+lower limit; tree decimal bounds use double precision during JSON validation.
+
+The earlier balance fixtures retain their original faction grammars.
+Current-content checks use the new defaults. Instrumented coverage, the
+complete suite, and native Windows remain unverified.
+
+### Bounded render cost
+
+RX 7800 XT, RADV Mesa 25.2.8, Windows executable through Proton 11.
+Each capture uses one frozen native 1920x1080 frame, default sampling,
+one film sample, three volume steps, and Khronos host Vulkan validation.
+Initial lighting bakes are included. Each process completed in about one
+second. These short captures measure appearance and bounded cost.
+
+| Faction | Layout | GPU trace ms | Total GPU ms | Application frame ms |
+| --- | --- | ---: | ---: | ---: |
+| fungus | Earlier | 9.802 | 11.812 | 28.749 |
+| fungus | Current | 9.657 | 11.484 | 28.866 |
+| immune | Earlier | 9.230 | 10.985 | 29.184 |
+| immune | Current | 9.497 | 11.348 | 29.687 |
+| virus | Earlier | 11.534 | 13.303 | 32.051 |
+| virus | Current | 11.314 | 13.172 | 30.807 |
+
+Final captures are screenshots 000986 (fungal), 000987 (immune), and 000988
+(virus). Earlier captures are 000980, 000982, and 000984. Inputs, application
+logs, captures, and the measurements are in `build/fractal_factory_review/`.
+
+### Dense combat cost
+
+Ryzen 9 9900X, Windows Release cross-build through Proton 11. The real
+three-faction stress match uses seed 1234, fifteen mature cells, 90 seconds
+of actual production, fungal sight radius 18, and 1,800 measured combat
+ticks. Three runs per build ran with no other test active. Setup is separate
+from the tick measurements. The table gives medians across the three runs.
+
+| Layout | Peak units | Mean tick ms | p99 tick ms |
+| --- | ---: | ---: | ---: |
+| Earlier | 3801 | 3.954 | 10.429 |
+| Current | 3721 | 4.236 | 11.403 |
+
+The current mean is about 7 percent higher. The layouts produce different
+unit positions and fight results, so these values measure content cost.
+The largest observed current tick was 12.979 ms. Phase clocks show movement
+and fog as the largest costs. Raw reports are in
+`build/fractal_factory_dense_before/` and `build/fractal_factory_dense_after/`.
+CPU tick times, GPU work, and application frame times are separate values.
+Long gameplay and sustained GPU performance remain unverified.

@@ -36,7 +36,7 @@ def established_world(source,directory):
         building.update(health=480 if immune else 240,hits=24 if immune else 12)
         building['branches'].update(health=300 if immune else 150,hits=16 if immune else 8)
         building.pop('repair',None);building.pop('haze',None)
-        for key in ('root_height','spread_all_roots','surface_clearance','all_leaf_nodes','additional_root_scale','spread_scale','chain_length','production_leaf_limits','production_reference_count'):building['branches'].pop(key,None)
+        for key in ('root_height','spread_all_roots','surface_clearance','all_leaf_nodes','additional_root_scale','additional_root_width_scale','additional_root_branch','spread_scale','chain_length','production_leaf_limits','production_reference_count'):building['branches'].pop(key,None)
         building['branches'].pop('root_interval_seconds',None)
         building['growth_plane'].pop('spread_roots',None)
         building['growth_plane']['depth_ratio']=.15
@@ -45,7 +45,9 @@ def established_world(source,directory):
         building['branches'].pop('root_limit',None);building['branches'].pop('root_minimum_radius',None)
         building['branches']['count']=max(16,building['branches']['count'])
         if building['branches']['grammar']=='tree':
-            building['branches'].update(grammar='axial',count=24,production=.05)
+            if building['faction']=='immune':building['branches'].update(grammar='fan',count=16,production=.12)
+            elif building['faction']=='fungus':building['branches'].update(grammar='hypha',count=21,production=.12)
+            else:building['branches'].update(grammar='axial',count=24,production=.05)
             building['branches'].pop('tree',None)
     return data
 

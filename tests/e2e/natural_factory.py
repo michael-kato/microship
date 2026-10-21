@@ -14,11 +14,13 @@ count=0
 with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
     out=Path(directory);data=stage_world(root/'assets/levels/virus-player-level.json',out)
     for building in data['content']['buildings']:
-        building['branches'].pop('additional_root_scale',None)
+        building['branches'].pop('additional_root_scale',None);building['branches'].pop('additional_root_width_scale',None);building['branches'].pop('additional_root_branch',None);building['branches'].pop('all_leaf_nodes',None)
         building['branches'].pop('surface_clearance',None);building['branches'].pop('root_height',None);building['branches'].pop('spread_all_roots',None)
         building.pop('repair',None);building.pop('haze',None)
         building['branches'].pop('root_interval_seconds',None)
         building.update(growth_seconds=.01,establishment_seconds=.01);building['branches']['seconds']=.01
+    # Keep the earlier sparse-tree fixture; small_factories checks current full forks.
+    data['content']['buildings'][0]['branches']['tree']['branch_probability']=.72
     data['rules']['ai']['expansion_delay']=300;data['rules']['economy'].update(enemy_attack_seconds=300,manufacture_seconds=1000)
     def check_leaf_caps(game,scene):
         instances={item['slot']:item for item in scene['instances']}
@@ -97,12 +99,12 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
     for side,faction in [('immune',2),('fungus',3)]:
         d=stage_world(root/'assets/levels'/(side+'-player-level.json'),out)
         for building in d['content']['buildings']:
-            building['branches'].pop('additional_root_scale',None);building['branches'].pop('surface_clearance',None);building['branches'].pop('root_height',None);building['branches'].pop('spread_all_roots',None)
+            building['branches'].pop('additional_root_scale',None);building['branches'].pop('additional_root_width_scale',None);building['branches'].pop('additional_root_branch',None);building['branches'].pop('all_leaf_nodes',None);building['branches'].pop('surface_clearance',None);building['branches'].pop('root_height',None);building['branches'].pop('spread_all_roots',None)
         for start in d['match'].pop('starts'):d['bodies'][start['cell']]['owner']=start['faction']
         d['spawns']=[];d['rules']['ai']['expansion_delay']=300;d['rules']['economy'].update(enemy_attack_seconds=300,manufacture_seconds=1000)
         state,_=run(side,d,ticks=120);home=1 if side=='immune' else 0;c=state['colonies'][home]
         definition=next(b for b in d['content']['buildings'] if b['faction']==side)
-        check_roots(c,definition['branches']);assert len(c['structures'])==definition['branches']['count']
+        check_roots(c,definition['branches']);assert c['root_count']<len(c['structures'])<=definition['branches']['count']
     # One expendable attacker removes one root, then leaves each faction to regrow.
     for side in ('virus','immune','fungus'):
         regrow=deepcopy(data);enemy='virus' if side=='fungus' else 'fungus'

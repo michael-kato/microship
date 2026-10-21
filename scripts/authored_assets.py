@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 FACTORY_SHARED_FIELDS=('growth_seconds', 'sprout_seconds', 'establishment_seconds', 'collection', 'height', 'width', 'repair', 'growth_plane')
-FACTORY_SHARED_BRANCH_FIELDS=('seconds', 'seed', 'regrow_seconds', 'roots', 'root_limit', 'root_minimum_radius', 'additional_root_scale', 'surface_clearance', 'all_leaf_nodes', 'root_offset_seconds')
+FACTORY_SHARED_BRANCH_FIELDS=('seconds', 'seed', 'regrow_seconds', 'roots', 'root_limit', 'root_minimum_radius', 'additional_root_scale', 'additional_root_width_scale', 'additional_root_branch', 'surface_clearance', 'all_leaf_nodes', 'root_offset_seconds')
 
 
 def stage_world(source, directory):

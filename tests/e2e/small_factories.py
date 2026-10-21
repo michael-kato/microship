@@ -51,6 +51,23 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
             assert all(colony['leaf_births'][k]>0 for k in range(large,roots)),(side,radius,colony['leaf_births'])
             assert all(colony['leaf_births'][k]>0 for k,s in enumerate(colony['structures']) if s['health']>0 and s['visible_growth']==1),(side,radius,colony['leaf_births'])
             check_directions(colony,case['bodies'][home]['position'],side,radius)
+            for k in range(large,roots):
+                children=[i for i,v in enumerate(colony['structures']) if v['parent']==k]
+                assert len(children)==1,(side,radius,k,'A small factory has no child branch')
+                child=colony['structures'][children[0]];trunk=colony['structures'][k]
+                assert child['stem'][0]==trunk['stem'][3],'A small branch joint opened'
+                assert child['scale']<trunk['scale'],'A small branch did not taper'
+                assert math.isclose(trunk['scale']/trunk['head_scale'],branch['additional_root_width_scale'],abs_tol=2e-5),(side,k,'Small trunk width was not applied')
+                assert math.dist(child['position'],trunk['position'])>.03,'A small fork is hidden by its trunk'
+            for k in range(large):
+                children=[i for i,v in enumerate(colony['structures']) if v['parent']==k]
+                assert len(children)==2,(side,radius,k,'A large trunk did not split')
+                assert any(sum(v['parent']==i for v in colony['structures'])>=1 for i in children),'A large fork did not repeat'
+            for k,limb in enumerate(colony['structures']):
+                if limb['parent']<0:continue
+                parent=colony['structures'][limb['parent']]
+                assert limb['stem'][0]==parent['stem'][3],'A fork joint opened'
+                assert limb['scale']<parent['scale'],'A fork did not taper'
             membrane=scene['meshes'][home]['deformation'];wall={i for t in membrane['indices'] if t[3]==3 for i in t[:3]}
             actual_radius=max(math.dist(membrane['vertices'][i][:3],case['bodies'][home]['position']) for i in wall)
             assert all(math.dist(v['position'],case['bodies'][home]['position'])>actual_radius for v in colony['structures'] if v['health']>0)
@@ -69,11 +86,13 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
                 tip=[stem['transform'][j+1]+stem['transform'][j+3] for j in (0,4,8)]
                 assert math.dist(tip,[head['transform'][j] for j in (3,7,11)])<.001,'A rendered factory head detached'
                 head_width=math.sqrt(sum(head['transform'][j]**2 for j in (0,4,8)))
-                assert math.isclose(head_width,profile['width']*limb['scale'],rel_tol=2e-5)
+                assert math.isclose(head_width,profile['width']*limb['head_scale'],rel_tol=2e-5)
                 obstacles=[o for o in game['flight']['obstacles'] if o['cell']==home and o['structure']==k]
                 has_head=True
                 assert len(obstacles)==4+has_head,(side,k,obstacles)
                 if has_head:assert math.isclose(obstacles[-1]['radius'],head_width*profile['navigation']['head_radius'],rel_tol=2e-5)
+                stem_width=math.sqrt(sum(stem['transform'][j]**2 for j in (0,4,8)))
+                assert math.isclose(obstacles[3]['radius'],stem_width*profile['navigation']['stem_radius'],rel_tol=2e-5),'Navigation missed the wider trunk'
             if radius==4.2:
                 # A spore removes one small root. Other roots must survive; the small root must regrow.
                 target=max(range(large,roots),key=lambda k:math.dist(colony['structures'][k]['position'],case['bodies'][home]['position']));original=colony['structures'][target];tip=original['position'];damaged=deepcopy(case)
@@ -88,6 +107,9 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
                 lost,_=run(side+'_small_lost',damaged,ticks=10);rebuilt,_=run(side+'_small_regrown',damaged,ticks=120)
                 a=lost['colonies'][home];b=rebuilt['colonies'][home]
                 assert a['active'] and a['structures'][target]['health']==0,(side,a['structures'][target])
+                child=next(k for k,v in enumerate(colony['structures']) if v['parent']==target)
+                assert a['structures'][child]['health']==0,'A small branch survived a lost support'
+                assert b['structures'][child]['health']>0 and b['structures'][child]['generation']==2,'A small branch failed to regrow'
                 assert b['structures'][target]['generation']==2 and b['structures'][target]['health']>0
                 assert b['structures'][target]['factory_scale']==original['factory_scale']
                 assert b['structures'][target]['stem'][0]==colony['attachments'][indices[target]]
@@ -100,6 +122,28 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
             assert all(math.dist(v['position'],case['bodies'][home]['position'])>surface for v in c['structures'])
             assert all(c['leaf_births'][k]>0 for k in range(len(c['structures'])))
             assert all(c['structures'][k]['stem'][0]==c['attachments'][c['root_attachments'][k]] for k in range(c['root_count']))
+        # Force a large root along the branch-plane normal. A local split must
+        # still separate its two children instead of rotating them onto one line.
+        parallel=deepcopy(case);organ=colony['root_attachments'][0]
+        aim=[a-b for a,b in zip(colony['attachment_centers'][organ],colony['factory_origin'])]
+        if math.dist(aim,[0,0,0])<.0001:aim=[a-b for a,b in zip(colony['attachments'][organ],colony['factory_origin'])]
+        aim=[v/math.dist(aim,[0,0,0]) for v in aim]
+        for building in parallel['content']['buildings']:
+            building['growth_plane']['normal']=aim
+            building['branches']['tree'].update(bend=.05,angle_jitter_degrees=0)
+        axis,_=run(side+'_parallel_fork',parallel);c=axis['colonies'][home]
+        children=[v for v in c['structures'] if v['parent']==0]
+        directions=[[b-a for a,b in zip(v['stem'][0],v['stem'][-1])] for v in children]
+        cosine=sum(a*b for a,b in zip(*directions))/(math.dist(directions[0],[0,0,0])*math.dist(directions[1],[0,0,0]))
+        assert cosine<math.cos(math.radians(20)),(side,'Parallel-axis forks collapsed',cosine)
+        assert all(math.isfinite(x) for v in c['structures'] for point in v['stem'] for x in point)
+        for value in (.99,4.01):
+            bad=deepcopy(data)
+            for b in bad['content']['buildings']:b['branches']['additional_root_width_scale']=value
+            run(side+'_invalid_width_'+str(value),bad,expected=1)
+        bad=deepcopy(data)
+        for b in bad['content']['buildings']:b['branches'].pop('additional_root_scale')
+        run(side+'_missing_small_scale',bad,expected=1)
         bad=deepcopy(data)
         for b in bad['content']['buildings']:b['branches']['additional_root_scale']=.51
         run(side+'_invalid_scale',bad,expected=1)

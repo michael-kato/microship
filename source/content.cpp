@@ -327,7 +327,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
     json_object(root,"$schema|shared|buildings");
     Json shared=json_get(root,"shared"),shared_branches=json_get(shared,"branches");
     json_object(shared,"growth_seconds|sprout_seconds|establishment_seconds|collection|height|width|repair|growth_plane|branches");
-    json_object(shared_branches,"seconds|seed|regrow_seconds|roots|root_limit|root_minimum_radius|additional_root_scale|surface_clearance|all_leaf_nodes|root_offset_seconds");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
+    json_object(shared_branches,"seconds|seed|regrow_seconds|roots|root_limit|root_minimum_radius|additional_root_scale|additional_root_width_scale|additional_root_branch|surface_clearance|all_leaf_nodes|root_offset_seconds");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
     while (json_next(&a,&j))
     {
         json_object(j,"name|faction|model|health|hits|branches|growth_meshes|navigation|haze");ProducerDefinition p={};
@@ -398,6 +398,12 @@ static bool load_buildings(Content* c,Json root,const char* path)
             p.branches.additional_root_scale=json_float(additional,.05f,.5f);
             if (!p.branches.organelle_roots) json_error(additional,"additional roots require organelle roots");
         }
+        p.branches.additional_root_width_scale=1;
+        Json small_width=json_find(shared_branches,"additional_root_width_scale"),small_branch=json_find(shared_branches,"additional_root_branch");
+        if (json_present(small_width)) p.branches.additional_root_width_scale=json_float(small_width,1,4);
+        if (json_present(small_branch)) p.branches.additional_root_branch=json_bool(small_branch);
+        if ((json_present(small_width) || json_present(small_branch)) && !json_present(additional))
+            json_error(shared_branches,"small root width and branching require additional roots");
         Json clearance=json_find(shared_branches,"surface_clearance"),all_leaves=json_find(shared_branches,"all_leaf_nodes");
         if (json_present(clearance)) p.branches.surface_clearance=json_positive(clearance,MAX_BUILDING_SPACING);
         if (json_present(all_leaves)) p.branches.all_leaf_nodes=json_bool(all_leaves);
@@ -428,14 +434,14 @@ static bool load_buildings(Content* c,Json root,const char* path)
         {
             json_object(tree,"children|levels|length_scale|width_scale|angle_degrees|bend|branch_probability|angle_jitter_degrees|length_jitter|width_jitter");
             p.branches.children=json_uint(json_get(tree,"children"),2,3);p.branches.levels=json_uint(json_get(tree,"levels"),2,5);
-            p.branches.length_scale=json_float(json_get(tree,"length_scale"),.2f,.9f);p.branches.width_scale=json_float(json_get(tree,"width_scale"),.2f,.9f);
-            p.branches.angle=json_float(json_get(tree,"angle_degrees"),10,65)*.01745329252f;p.branches.bend=json_float(json_get(tree,"bend"),.05f,.5f);
+            p.branches.length_scale=json_float(json_get(tree,"length_scale"),.2,.9);p.branches.width_scale=json_float(json_get(tree,"width_scale"),.2,.9);
+            p.branches.angle=json_float(json_get(tree,"angle_degrees"),10,65)*.01745329252f;p.branches.bend=json_float(json_get(tree,"bend"),.05,.5);
             Json probability=json_find(tree,"branch_probability"),angle=json_find(tree,"angle_jitter_degrees");
             Json length=json_find(tree,"length_jitter"),width=json_find(tree,"width_jitter");
             if (json_present(probability)) p.branches.branch_probability=json_float(probability,0,1);
             if (json_present(angle)) p.branches.angle_jitter=json_float(angle,0,30)*.01745329252f;
-            if (json_present(length)) p.branches.length_jitter=json_float(length,0,.4f);
-            if (json_present(width)) p.branches.width_jitter=json_float(width,0,.3f);
+            if (json_present(length)) p.branches.length_jitter=json_float(length,0,.4);
+            if (json_present(width)) p.branches.width_jitter=json_float(width,0,.3);
         }
         else if (json_present(tree)) json_error(tree,"tree settings require the tree grammar");
         Json branch_health=json_find(b,"health"),branch_hits=json_find(b,"hits");

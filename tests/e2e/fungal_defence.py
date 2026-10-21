@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-defence-') as directory:
     for b in base['content']['buildings']:
         b.update(growth_seconds=.01,sprout_seconds=.01,establishment_seconds=.01)
         b['branches'].update(count=1,roots='single',grammar='axial',seconds=.01)
-        for key in ('root_limit','root_minimum_radius','additional_root_scale','tree'):b['branches'].pop(key,None)
+        for key in ('root_limit','root_minimum_radius','additional_root_scale','additional_root_width_scale','additional_root_branch','tree'):b['branches'].pop(key,None)
     def run(name,data=base,ticks=120,expected=0,orders=''):
         global count
         world=out/(name+'_world.json');write_world(world,data)

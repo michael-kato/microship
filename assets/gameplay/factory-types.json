@@ -27,7 +27,9 @@
       "root_offset_seconds": 10,
       "additional_root_scale": 0.35,
       "surface_clearance": 0.5,
-      "all_leaf_nodes": true
+      "all_leaf_nodes": true,
+      "additional_root_width_scale": 2.5,
+      "additional_root_branch": true
     }
   },
   "buildings": [
@@ -51,11 +53,12 @@
           "width_scale": 0.62,
           "angle_degrees": 32,
           "bend": 0.3,
-          "branch_probability": 0.72,
+          "branch_probability": 1,
           "angle_jitter_degrees": 16,
           "length_jitter": 0.25,
           "width_jitter": 0.15
-        }
+        },
+        "root_height": 1.4
       },
       "growth_meshes": {
         "segment": "../models/virus_stem.fmesh",
@@ -73,13 +76,26 @@
       "health": 1440,
       "hits": 24,
       "branches": {
-        "count": 9,
+        "count": 21,
         "spacing": 0.4,
         "production": 0.12,
         "health": 900,
         "hits": 16,
-        "grammar": "fan",
-        "root_height": 1
+        "grammar": "tree",
+        "root_height": 1,
+        "production_reference_count": 9,
+        "tree": {
+          "children": 2,
+          "levels": 3,
+          "length_scale": 0.66,
+          "width_scale": 0.76,
+          "angle_degrees": 32,
+          "bend": 0.2,
+          "branch_probability": 1,
+          "angle_jitter_degrees": 10,
+          "length_jitter": 0.18,
+          "width_jitter": 0.1
+        }
       },
       "growth_meshes": {
         "segment": "../models/immune_stem.fmesh",
@@ -102,8 +118,7 @@
         "production": 0.12,
         "health": 50,
         "hits": 3,
-        "grammar": "hypha",
-        "spread_scale": 2.8,
+        "grammar": "tree",
         "production_leaf_limits": [
           {
             "roots": 1,
@@ -120,8 +135,19 @@
           }
         ],
         "production_reference_count": 9,
-        "chain_length": 1,
-        "root_height": 1
+        "root_height": 1.4,
+        "tree": {
+          "children": 2,
+          "levels": 3,
+          "length_scale": 0.7,
+          "width_scale": 0.72,
+          "angle_degrees": 40,
+          "bend": 0.36,
+          "branch_probability": 1,
+          "angle_jitter_degrees": 14,
+          "length_jitter": 0.22,
+          "width_jitter": 0.12
+        }
       },
       "growth_meshes": {
         "segment": "../models/fungal_stem.fmesh",
