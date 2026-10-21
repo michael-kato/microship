@@ -9,6 +9,9 @@
 #include "audio.h"
 #include "vector_math.h"
 #include "math_constants.h"
+#include "player_settings.h"
+#include "pause_menu.h"
+#include "asset_limits.h"
 
 #include <algorithm>
 #include <stdio.h>
@@ -335,7 +338,7 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     snprintf(r->hud[HUD_LINE_TITLE],HUD_LINE_CAPACITY,"NANOVA / %s     FLEET %u     SELECTED %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet,selected);
     snprintf(r->hud[HUD_LINE_GROUPS],HUD_LINE_CAPACITY,"1 %-10s %-5u 2 %-10s %-5u 3 ALL",s->world.content.groups[0].plural,groups[0],s->world.content.groups[1].plural,groups[1]);
     snprintf(r->hud[HUD_LINE_MESSAGE],HUD_LINE_CAPACITY,"%.55s",s->outcome ? (s->outcome>0 ? "YOU WON / KEEP PLAYING / R TO RESTART" : "COLONY LOST / R TO RESTART") : s->message);
-    snprintf(r->hud[HUD_LINE_HELP],HUD_LINE_CAPACITY,"F/B: ON SCREEN   RIGHT CLICK: ORDER   SPACE: PAUSE");
+    snprintf(r->hud[HUD_LINE_HELP],HUD_LINE_CAPACITY,"F/B: ON SCREEN   RIGHT CLICK: ORDER   ESC: MENU");
     snprintf(r->hud[HUD_LINE_SITE],HUD_LINE_CAPACITY,"SELECT A BODY");
     snprintf(r->hud[HUD_LINE_STRUCTURES],HUD_LINE_CAPACITY,"SCOUT TO FIND ENEMY PRODUCTION SITES");
     snprintf(r->hud[HUD_LINE_RESOURCE],HUD_LINE_CAPACITY,"CLEAR DEFENDERS / COLONIZE TO EXPAND");
@@ -344,7 +347,7 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     {
         snprintf(r->hud[HUD_LINE_TITLE],HUD_LINE_CAPACITY,"NANOVA / %s     SPORES %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet);
         snprintf(r->hud[HUD_LINE_GROUPS],HUD_LINE_CAPACITY,"AUTOMATIC EMISSION / NO UNIT ORDERS");
-        snprintf(r->hud[HUD_LINE_HELP],HUD_LINE_CAPACITY,"HOME: FOCUS   SPACE: PAUSE   R: RESTART");
+        snprintf(r->hud[HUD_LINE_HELP],HUD_LINE_CAPACITY,"HOME: FOCUS   ESC: MENU   R: RESTART");
     }
     for (int j=0;j<4;++j) r->hud_status[j]=0;
     r->hud_status[0]=-1;
@@ -421,6 +424,104 @@ static int run_matches(const GameOptions* options)
     return 0;
 }
 
+static void apply_camera_preferences(PointerInput* input,const PlayerSettings* settings)
+{
+    input->drag_x*=settings->drag_sensitivity;input->drag_y*=settings->drag_sensitivity;
+    input->wheel*=settings->zoom_sensitivity*(settings->invert_zoom ? -1.0f : 1.0f);
+}
+
+static RenderConfig settings_config(const PlayerSettings* settings)
+{
+    RenderConfig config=settings->graphics;config.borderless=settings->borderless;
+#ifdef _WIN32
+    if (settings->borderless)
+    {
+        DEVMODEA mode={};mode.dmSize=sizeof(mode);
+        bool found=EnumDisplaySettingsA(0,ENUM_CURRENT_SETTINGS,&mode)!=0;
+        config.width=found ? mode.dmPelsWidth : 0;config.height=found ? mode.dmPelsHeight : 0;
+    }
+#endif
+    return config;
+}
+
+static void renderer_preferences(Renderer* renderer,const PlayerSettings* settings,const GameOptions* options,bool debug_views)
+{
+    renderer->debug_stats=settings->show_stats;renderer->debug_views=debug_views;
+    renderer->frame_log=options->frames!=0;
+    renderer->disabled_features=player_settings_disabled_features(settings);
+}
+
+static bool replace_renderer(Game* game,Presentation* presentation,const RenderConfig* config,
+    const PlayerSettings* settings,const GameOptions* options,bool debug_views)
+{
+    if (!renderer_shutdown(&game->renderer)) return false;
+    if (!presentation_build(presentation,&game->simulation,&game->camera,config)
+        || !renderer_initialize(&game->renderer,&presentation->scene,config,options->shader_path,
+            options->builtin_shader_path,options->headless,debug_views,options->no_activate)) return false;
+    renderer_preferences(&game->renderer,settings,options,debug_views);return true;
+}
+
+static bool graphics_changed(const PlayerSettings* a,const PlayerSettings* b)
+{
+    if (a->borderless!=b->borderless) return true;
+    size_t count;const SettingField* fields=player_setting_fields(&count);
+    for (size_t i=0;i<count;++i)
+        if (fields[i].offset<sizeof(RenderConfig) && player_setting_value(a,fields[i])!=player_setting_value(b,fields[i])) return true;
+    return false;
+}
+
+// The simulation, camera and audio stay in this session while graphics resources
+// can be rebuilt at this boundary. No elapsed menu time reaches the tick clock.
+static PauseAction pause_session(Game* game,Presentation* presentation,Audio* audio,RenderConfig* config,
+    PlayerSettings* settings,const PlayerSettings* defaults,const char* settings_path,const GameOptions* options,bool rendered)
+{
+    uint32_t tick=game->simulation.tick_count;double time=game->simulation.time_seconds;
+    bool previously_paused=game->simulation.paused;game->simulation.paused=true;
+    audio_set_volume(audio,0,0);
+    if (rendered)
+    {
+        uint32_t mask=game->renderer.disabled_features;
+        settings->subsurface=!(mask&RENDER_SSS);settings->volume=!(mask&RENDER_VOLUME);
+        settings->cell_blur=!(mask&RENDER_CELL_BLUR);settings->tilt_shift=!(mask&RENDER_TILT_SHIFT);
+        settings->fog_blur=!(mask&RENDER_FOG_BLUR);settings->glow=!(mask&RENDER_GLOW);
+        settings->show_stats=game->renderer.debug_stats;
+    }
+    PlayerSettings draft=*settings;int page=-1;char status[256]={};PauseAction action=PAUSE_ERROR;
+    for (;;)
+    {
+        action=pause_menu(rendered ? renderer_window(&game->renderer) : 0,&draft,defaults,&page,status);
+        if (action!=PAUSE_APPLY) break;
+        const char* error=player_settings_error(&draft);
+        if (error) { snprintf(status,sizeof(status),"%s",error);continue; }
+        RenderConfig candidate=settings_config(&draft),previous=*config;
+        error=render_config_error(&candidate);
+        if (error) { snprintf(status,sizeof(status),"%s",error);continue; }
+        bool rebuild=graphics_changed(settings,&draft),debug_views=game->renderer.debug_views;
+        bool applied=!rendered || !rebuild || replace_renderer(game,presentation,&candidate,&draft,options,debug_views);
+        bool keep=applied;
+        if (keep) keep=player_settings_save(&draft,settings_path);
+        if (!keep)
+        {
+            if (rendered && rebuild && !replace_renderer(game,presentation,&previous,settings,options,debug_views))
+            { action=PAUSE_ERROR;break; }
+            draft=*settings;
+            snprintf(status,sizeof(status),"Settings were not saved. Previous settings restored.");
+            continue;
+        }
+        *config=candidate;*settings=draft;
+        if (rendered) renderer_preferences(&game->renderer,settings,options,debug_views);
+        snprintf(status,sizeof(status),"Settings applied and saved.");
+        printf("Player settings applied: %ux%u; %u film samples; master %.3g; effects %.3g.\n",
+            config->width,config->height,config->samples_per_pixel,settings->master_volume,settings->effects_volume);fflush(stdout);
+    }
+    bool unchanged=tick==game->simulation.tick_count && time==game->simulation.time_seconds;
+    printf("Pause session: tick %u -> %u; time %.9g -> %.9g; action %d.\n",tick,game->simulation.tick_count,time,game->simulation.time_seconds,(int)action);fflush(stdout);
+    game->simulation.paused=previously_paused;
+    audio_set_volume(audio,settings->master_volume,settings->effects_volume);
+    game->box_dragging=false;game->ratio_dragging=false;game->pointer=PointerInput();
+    return unchanged ? action : PAUSE_ERROR;
+}
+
 int game_run(const GameOptions* options)
 {
     if (options->matches) return run_matches(options);
@@ -451,16 +552,45 @@ int game_run(const GameOptions* options)
         config.samples_per_pixel = options->samples;
     if (options->seed_set)
         config.seed = options->seed;
+    PlayerSettings defaults,settings;
+    if (!player_settings_defaults(&defaults,&config,options->settings_defaults_path)) return 1;
+    settings=defaults;char user_path[ASSET_PATH_CAPACITY]={};const char* settings_path=options->settings_path;
+    bool preferences=!options->smoke && !options->headless && !options->frames && !options->capture_path;
+    if (preferences && !settings_path)
+    {
+        if (!player_settings_user_path(user_path,sizeof(user_path)))
+        { fprintf(stderr,"Cannot locate the player settings folder.\n");return 1; }
+        settings_path=user_path;
+    }
+    if (settings_path && !player_settings_load(&settings,settings_path,true)) return 1;
+    if (options->samples) settings.graphics.samples_per_pixel=options->samples;
+    if (options->vsync) settings.graphics.vsync=true;
+    if (options->stats_set) settings.show_stats=options->show_stats;
+    config=settings_config(&settings);
+    const char* config_error=render_config_error(&config);
+    if (config_error) { fprintf(stderr,"Player graphics settings: %s.\n",config_error);return 1; }
+    audio_set_volume(&audio,settings.master_volume,settings.effects_volume);
     printf("Render configuration: direct ray tracing; %u film samples; %u transmission layers; %u volume rays; %u integration steps.\n",
         config.samples_per_pixel,config.max_transmission_layers,config.volume_rays_per_pixel,config.volume_steps);
     startup_camera(&game,&config);
     if (!orders_run(&game.simulation,options->replay_path,options->ticks,&audio)) return 1;
     game.pointer=options->camera_input;
     PointerInput initial_input=options->camera_input;
+    apply_camera_preferences(&initial_input,&settings);
     ratio_pointer(&game,&initial_input,&config);selection_input(&game,&initial_input,&config);camera_apply_input(&game.camera,&initial_input,&config);
     gameplay_input(&game,&initial_input,&config);
     printf("Initial camera: %g %g %g; target: %g %g %g.\n",game.camera.position.x,game.camera.position.y,game.camera.position.z,game.camera.target.x,game.camera.target.y,game.camera.target.z);
     if (!presentation_initialize(presentation.get(),&game.simulation,&config)) return 1;
+    if (options->smoke && options->pause_on_start)
+    {
+        PauseAction action=pause_session(&game,presentation.get(),&audio,&config,&settings,&defaults,settings_path,options,false);
+        if (action==PAUSE_ERROR) return 1;
+        if (action==PAUSE_MAIN_MENU || action==PAUSE_QUIT)
+        {
+            if (options->state_path && !simulation_write_state(&game.simulation,options->state_path)) return 1;
+            return action==PAUSE_MAIN_MENU ? GAME_RETURN_TO_MENU : 0;
+        }
+    }
     if (options->smoke)
     {
         if (!options->ticks)
@@ -475,12 +605,12 @@ int game_run(const GameOptions* options)
     if (!presentation_build(presentation.get(),&game.simulation,&game.camera,&config)
         || !renderer_initialize(&game.renderer,&presentation->scene,&config,options->shader_path,
             options->builtin_shader_path,options->headless,options->debug_views,options->no_activate)) return 1;
-    game.renderer.debug_stats = options->stats_set ? options->show_stats : false;
+    renderer_preferences(&game.renderer,&settings,options,options->debug_views);
     // Console writes are synchronous; interactive play keeps them out of the frame.
     game.renderer.frame_log = options->frames!=0;
     if (!options->headless && !audio_open(&audio)) { renderer_shutdown(&game.renderer);return 1; }
     game.renderer.debug_views = options->debug_views;
-    printf("Left-drag to select; middle-drag or WASD/arrows to pan; wheel to zoom. F1 profiler; F2 render buffers; F5 SSS; F6 volume; F7 cell blur; F8 tilt shift; F9 fog blur; F10 self-glow and halo. Gameplay: F/B select fighters/bombers on screen; 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; R restart.\n");
+    printf("Left-drag to select; middle-drag or WASD/arrows to pan; wheel to zoom. F1 profiler; F2 render buffers; F5 SSS; F6 volume; F7 cell blur; F8 tilt shift; F9 fog blur; F10 self-glow and halo. Gameplay: F/B select fighters/bombers on screen; 1 fighters, 2 bombers, 3 all; right-click to move or order; drag the site slider to set production; Space pause; Esc pause menu; R restart.\n");
     const double tick_seconds = 1.0 / SIMULATION_TICKS_PER_SECOND_DOUBLE;
     // Bounded diagnostics and captures draw the exact current tick.
     bool interpolate=!options->frames && !options->headless;
@@ -489,7 +619,7 @@ int game_run(const GameOptions* options)
     double accumulator = 0.0;
     double frame_total = 0.0;
     uint32_t frames = 0;
-    bool success = true;
+    bool success = true,return_to_menu=false,pause_pending=options->pause_on_start;
     PointerInput input = {};
     while (!options->frames || frames < options->frames)
     {
@@ -504,6 +634,16 @@ int game_run(const GameOptions* options)
         double start = monotonic_seconds();
         Profiler* profile=&game.renderer.profiler;profiler_begin(profile,start*MILLISECONDS_PER_SECOND);
         if (!renderer_poll(&game.renderer,&input)) break;
+        if (input.menu || pause_pending)
+        {
+            pause_pending=false;
+            PauseAction action=pause_session(&game,presentation.get(),&audio,&config,&settings,&defaults,settings_path,options,true);
+            if (action==PAUSE_ERROR) { success=false;break; }
+            if (action==PAUSE_MAIN_MENU || action==PAUSE_QUIT)
+            { return_to_menu=action==PAUSE_MAIN_MENU;break; }
+            accumulator=0;previous=monotonic_seconds();input=PointerInput();
+            record_motion(&game.motion,&game.simulation);continue;
+        }
         double elapsed = start - previous;
         previous = start;
         game.renderer.previous_frame_ms = frames ? elapsed*MILLISECONDS_PER_SECOND : 0.0;
@@ -512,6 +652,7 @@ int game_run(const GameOptions* options)
         if (input.toggle_render_features) renderer_toggle_features(&game.renderer,input.toggle_render_features);
         if (input.restart && game.simulation.world.gameplay.enabled) { accumulator=0;elapsed=0; }
         input.pan_seconds=(float)std::fmin(elapsed,MAX_FRAME_CATCHUP_SECONDS);
+        apply_camera_preferences(&input,&settings);
         game.pointer=input;ratio_pointer(&game,&input,&config);selection_input(&game,&input,&config);
         camera_apply_input(&game.camera,&input,&config);gameplay_input(&game,&input,&config);
         double input_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_INPUT,start*MILLISECONDS_PER_SECOND,input_end);
@@ -573,5 +714,5 @@ int game_run(const GameOptions* options)
     if (frames)
         printf("Rendered %u frames: mean application %.3f ms (%.2f FPS).\n",
                frames, frame_total / frames, MILLISECONDS_PER_SECOND * frames / frame_total);
-    return success ? 0 : 1;
+    return !success ? 1 : return_to_menu ? GAME_RETURN_TO_MENU : 0;
 }

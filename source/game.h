@@ -12,6 +12,9 @@ struct GameOptions
     const char* builtin_shader_path;
     const char* capture_path;
     const char* audio_path;
+    const char* settings_defaults_path;
+    const char* settings_path; // Explicit file for preferences and menu diagnostics.
+    bool pause_on_start; // Open the production pause menu before the first tick/frame.
     const char* audio_capture_path;
     uint32_t frames;
     uint32_t frame_ticks; // Fixed simulation work per frame in bounded diagnostics.
@@ -36,6 +39,7 @@ struct GameOptions
     PointerInput camera_input;
 };
 
+enum { GAME_RETURN_TO_MENU=2 };
 int game_run(const GameOptions* options);
 
 #endif

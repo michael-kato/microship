@@ -89,6 +89,7 @@ Audio uses twelve generated PCM effects and a fixed sixteen-voice mixer. Off-scr
 | F / B | Select your fighters / bombers on screen |
 | Home | Focus the selected cell or starting cell |
 | Space / R | Pause / restart |
+| Esc | Open or close the pause menu |
 | F1 / F2 | Toggle the frame profiler / current render buffers |
 | F5 | Toggle subsurface scattering (SSS) |
 | F6 | Toggle volume scattering; keep absorption |
@@ -100,6 +101,23 @@ Audio uses twelve generated PCM effects and a fixed sixteen-voice mixer. Off-scr
 Both sides start with craft at neutral cells. Select craft and right-click your starting cell to establish the first factory. One craft is consumed. The enemy establishes its first site automatically. The fungal trial uses an automatic founder.
 
 A normal launch opens the faction menu. `--world PATH` selects a level directly. `--no-menu` starts the default level. `--menu` opens the menu for a diagnostic run. `--menu-select 1..3` uses the same faction choice without opening a menu window.
+
+Press Esc during play to open the pause menu. The match clock stops and game sound is muted. Resume continues the same match. Main Menu ends the match and returns to faction selection. Quit to Desktop closes the program. Both exit actions ask before ending the match.
+
+Settings has six pages. Display, Lighting, Volume, and Effects contain 40 graphics controls. Audio and Controls contain six sound and camera controls.
+
+| Page | Controls |
+| --- | --- |
+| Display | Borderless fullscreen, window size, VSync, film samples, spatial anti-aliasing, exposure, field of view, frame statistics |
+| Lighting | Transmission layers, subsurface scattering and samples, light wrap, transmission, optical thickness, energy compensation, lighting grid and caches |
+| Volume | Scattering, rays, integration steps and method, spatial filter and stride, optical lookup, lighting grid |
+| Effects | Cell blur, tilt shift, fog blur, glow, bloom radius and strength, bloom threshold, focus band and blur radius |
+| Audio | Master volume and sound effects volume |
+| Controls | Keyboard camera speed, mouse pan and zoom sensitivity, inverted wheel zoom, control reference |
+
+Apply changes and saves the settings. Display changes apply immediately, with no countdown. Cancel discards changes made since the last Apply. Restore Defaults prepares the authored defaults; select Apply to use them. Invalid setting combinations show an error. Higher sample counts and larger grids increase GPU work and memory use. Borderless mode uses the primary monitor's native resolution. Window width and height apply in windowed mode.
+
+Player settings are saved in `%LOCALAPPDATA%\Nanova\player_settings.json`. They remain in effect after a faction change or program restart. `--settings PATH.json` selects another player file. Bounded diagnostics use authored defaults unless this option is present.
 
 The slider moves in one-percent steps. The left end makes fighters only; the right end makes bombers only. Each cell keeps its own setting. Units already in production finish before the new mix applies. The ratio controls future production, not surviving unit counts. Restart restores startup state. Fungal emitters produce spores only and have no ratio control.
 

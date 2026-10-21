@@ -176,7 +176,7 @@ endforeach()
 add_custom_target(nanova_assets DEPENDS "${focus_output}" "${medium_blur_output}" "${shadow_grid_output}" "${fog_output}" "${effects_output}" "${backdrop_output}" "${json_license}" "${shader_output}" "${bloom_output}" "${volume_output}" "${debug_overlay}" ${debug_outputs} ${model_outputs} ${asset_outputs})
 
 if(WIN32)
-    set(platform_sources source/window.cpp source/start_menu.cpp)
+    set(platform_sources source/window.cpp source/start_menu.cpp source/pause_menu.cpp)
 else()
     set(platform_sources source/native_headless.cpp)
 endif()
@@ -195,7 +195,7 @@ add_executable(nanova
     source/flight.cpp source/fog.cpp
     source/orders.cpp
     source/renderer.cpp source/profiler.cpp
-    source/game.cpp
+    source/game.cpp source/player_settings.cpp
 )
 add_dependencies(nanova nanova_assets)
 target_link_libraries(nanova PRIVATE Vulkan::Vulkan)

@@ -11,6 +11,7 @@ struct RenderConfig;
 struct PointerInput;
 struct Camera;
 struct RendererState;
+struct Window;
 
 // One concrete Vulkan backend; the state owns resources allocated at startup.
 struct Renderer
@@ -36,6 +37,7 @@ struct Renderer
 bool renderer_initialize(Renderer* renderer, const RenderScene* scene,
                          const RenderConfig* config, const char* shader_path, const char* builtin_shader_path,
                          bool headless, bool debug_views, bool no_activate);
+Window* renderer_window(Renderer*);
 bool renderer_poll(Renderer* renderer, PointerInput* input);
 void renderer_toggle_features(Renderer* renderer, uint32_t mask);
 bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera* camera, const char* capture_path);

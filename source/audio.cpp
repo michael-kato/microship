@@ -26,7 +26,7 @@ static const int MAX_SOUND_COOLDOWN_SECONDS = 10;
 
 enum { WAV_RIFF_WORD=0, WAV_RIFF_BYTES_WORD=1, WAV_WAVE_WORD=2, WAV_FORMAT_WORD=3, WAV_FORMAT_BYTES_WORD=4, WAV_ENCODING_WORD=5, WAV_SAMPLE_RATE_WORD=6, WAV_BYTE_RATE_WORD=7, WAV_BLOCK_FORMAT_WORD=8, WAV_DATA_WORD=9, WAV_DATA_BYTES_WORD=10 };
 
-Audio::Audio():trigger_write(0),trigger_read(0),stopping(false),failed(false),device(0),capture(0),captured(0),distance(1),valid(true)
+Audio::Audio():trigger_write(0),trigger_read(0),stopping(false),failed(false),output_gain(1),device(0),capture(0),captured(0),distance(1),valid(true)
 {
     memset(voices,0,sizeof(voices));memset(cooldown,0,sizeof(cooldown));memset(triggers,0,sizeof(triggers));
 #ifdef _WIN32
@@ -147,8 +147,12 @@ void audio_events(Audio* a,Simulation* s,Vec3 listener)
     }
     s->sounds.count=0;
 }
+void audio_set_volume(Audio* a,float master,float effects)
+{ a->output_gain.store(master*effects,std::memory_order_relaxed); }
+
 static void mix(Audio* a,int16_t* output,uint32_t count)
 {
+    const float output_gain=a->output_gain.load(std::memory_order_relaxed);
     for (uint32_t i=0;i<count;++i)
     {
         float sample=0;
@@ -157,7 +161,7 @@ static void mix(Audio* a,int16_t* output,uint32_t count)
             AudioVoice& v=a->voices[j];const AudioClip& c=a->clips[v.clip];sample+=c.samples[v.cursor++]*v.gain;
             if (v.cursor>=c.samples.size()) v.active=false;
         }
-        output[i]=(int16_t)std::fmax(-MAX_MIX_SAMPLE,std::fmin(MAX_MIX_SAMPLE,sample));
+        output[i]=(int16_t)std::fmax(-MAX_MIX_SAMPLE,std::fmin(MAX_MIX_SAMPLE,sample*output_gain));
     }
     for (uint32_t j=0;j<SOUND_COUNT;++j) a->cooldown[j]=std::fmax(0.0f,a->cooldown[j]-count/AUDIO_SAMPLE_RATE_FLOAT);
 }

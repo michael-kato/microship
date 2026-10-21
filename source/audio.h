@@ -32,6 +32,7 @@ struct Audio
     AudioTrigger triggers[AUDIO_TRIGGER_CAPACITY];
     std::atomic<uint32_t> trigger_write,trigger_read;
     std::atomic<bool> stopping,failed;
+    std::atomic<float> output_gain;
 #ifdef _WIN32
     HWAVEOUT device;WAVEHDR headers[AUDIO_OUTPUT_BUFFER_COUNT];HANDLE wake,thread;
 #else
@@ -41,6 +42,7 @@ struct Audio
     FILE* capture;uint32_t captured;float distance;bool valid;
     Audio();~Audio();
 };
+void audio_set_volume(Audio*,float master,float effects);
 bool audio_load(Audio*,const char* manifest,const char* capture);
 bool audio_open(Audio*);
 void audio_events(Audio*,Simulation*,Vec3 listener);

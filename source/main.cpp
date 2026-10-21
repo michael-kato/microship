@@ -31,7 +31,7 @@ static const int MAX_CLIENT_PIXEL_COORDINATE = 65535;
 static const double MAX_CURSOR_ANCHOR_COORDINATE = 100000.0;
 static const int MAX_AUDIO_CAPTURE_TICKS = 3600;
 
-static bool asset_paths(char* world, char* config, char* shader,char* audio,char* menu,size_t capacity)
+static bool asset_paths(char* world, char* config, char* shader,char* audio,char* menu,char* settings,size_t capacity)
 {
     char executable[EXECUTABLE_PATH_CAPACITY];
 #ifdef _WIN32
@@ -54,12 +54,13 @@ static bool asset_paths(char* world, char* config, char* shader,char* audio,char
     int length=snprintf(manifest,sizeof(manifest),"%s/assets/startup.json",executable);
     if (length<=0 || (size_t)length>=sizeof(manifest)) return false;
     JsonDocument document;if (!json_load(&document,manifest)) return false;
-    Json root=json_root(&document);json_object(root,"$schema|world|render|shader|audio|menu");
+    Json root=json_root(&document);json_object(root,"$schema|world|render|shader|audio|menu|settings");
     return json_path(json_get(root,"world"),manifest,world,capacity)
         && json_path(json_get(root,"render"),manifest,config,capacity)
         && json_path(json_get(root,"shader"),manifest,shader,capacity)
         && json_path(json_get(root,"audio"),manifest,audio,capacity)
         && json_path(json_get(root,"menu"),manifest,menu,capacity)
+        && json_path(json_get(root,"settings"),manifest,settings,capacity)
         && document.valid;
 }
 
@@ -75,7 +76,8 @@ static void print_usage(FILE* output)
         "              [--matches N] (with --smoke and --ticks: N seeded matches from --world-seed, each until its outcome)\n"
         "              [--audio-capture PATH.wav] (with --smoke and --ticks, at most 3600 ticks)\n"
         "              [--camera-pan X Y SECONDS] [--world-seed N] [--audio PATH.json] [--menu|--no-menu] [--menu-select 1..3]\n"
-        "Default: faction menu, then direct ray-traced Win32 window; Escape or close to exit.\n"
+        "              [--settings PATH.json] [--pause-on-start] (production menu diagnostic)\n"
+        "Default: faction menu, then direct ray-traced Win32 window; Esc opens the pause menu; close exits.\n"
         "Headless/capture runs default to one frame. PFM saves linear HDR before bloom; PPM saves display RGB.\n"
         "--smoke runs asset loading and simulation lifecycle without a GPU.\n");
 }
@@ -111,9 +113,9 @@ int main(int argc, char** argv)
     static char diagnostic_output[64*1024];
     if (setvbuf(stdout,diagnostic_output,_IOFBF,sizeof(diagnostic_output))) return 1;
     GameOptions options = {};
-    char world_path[EXECUTABLE_PATH_CAPACITY], config_path[EXECUTABLE_PATH_CAPACITY], shader_path[EXECUTABLE_PATH_CAPACITY],audio_path[EXECUTABLE_PATH_CAPACITY],menu_path[EXECUTABLE_PATH_CAPACITY];
+    char world_path[EXECUTABLE_PATH_CAPACITY], config_path[EXECUTABLE_PATH_CAPACITY], shader_path[EXECUTABLE_PATH_CAPACITY],audio_path[EXECUTABLE_PATH_CAPACITY],menu_path[EXECUTABLE_PATH_CAPACITY],settings_defaults_path[EXECUTABLE_PATH_CAPACITY];
     bool no_menu=false,force_menu=false;uint32_t menu_selection=0;
-    if (!asset_paths(world_path, config_path, shader_path,audio_path,menu_path,sizeof(world_path)))
+    if (!asset_paths(world_path, config_path, shader_path,audio_path,menu_path,settings_defaults_path,sizeof(world_path)))
     {
         fprintf(stderr, "Cannot locate assets beside the nanova executable.\n");
         return 1;
@@ -123,6 +125,7 @@ int main(int argc, char** argv)
     options.shader_path = shader_path;
     options.builtin_shader_path = shader_path;
     options.audio_path=audio_path;
+    options.settings_defaults_path=settings_defaults_path;
     for (int i = 1; i < argc; ++i)
     {
         if (strcmp(argv[i], "--help") == 0)
@@ -130,7 +133,13 @@ int main(int argc, char** argv)
             print_usage(stdout);
             return 0;
         }
-        if (!strcmp(argv[i],"--no-menu")) no_menu=true;
+        if (!strcmp(argv[i],"--pause-on-start")) options.pause_on_start=true;
+        else if (!strcmp(argv[i],"--settings"))
+        {
+            if (++i==argc) { fprintf(stderr,"--settings requires a JSON file path.\n");return 2; }
+            options.settings_path=argv[i];
+        }
+        else if (!strcmp(argv[i],"--no-menu")) no_menu=true;
         else if (!strcmp(argv[i],"--menu")) force_menu=true;
         else if (!strcmp(argv[i],"--menu-select"))
         {
@@ -306,11 +315,25 @@ int main(int argc, char** argv)
     { fprintf(stderr,"--frame-ticks requires bounded --frames and no --time override.\n");return 2; }
     if (options.frame_delay_ms && !options.frames) { fprintf(stderr,"--frame-delay-ms requires a bounded --frames run.\n");return 2; }
     bool diagnostic=options.smoke || options.headless || options.frames || options.capture_path || options.world_path!=world_path;
-    if (force_menu || menu_selection || (!no_menu && !diagnostic))
+    if (options.pause_on_start && options.headless)
+    { fprintf(stderr,"--pause-on-start needs a window-capable build.\n");return 2; }
+    if (options.pause_on_start && diagnostic && !options.settings_path)
+    { fprintf(stderr,"A pause-menu diagnostic requires --settings PATH.json.\n");return 2; }
+#ifdef _WIN32
+    if (options.pause_on_start || options.frames)
+    { printf("Application process: %lu.\n",GetCurrentProcessId());fflush(stdout); }
+#endif
+    bool show_menu=force_menu || menu_selection || (!no_menu && !diagnostic);
+    for (;;)
     {
-        int result=start_menu(menu_path,world_path,sizeof(world_path),menu_selection);
-        if (result<=0) return result<0 ? 1 : 0;
-        options.world_path=world_path;
+        if (show_menu)
+        {
+            int result=start_menu(menu_path,world_path,sizeof(world_path),menu_selection);
+            if (result<=0) return result<0 ? 1 : 0;
+            options.world_path=world_path;
+        }
+        int result=game_run(&options);
+        if (result!=GAME_RETURN_TO_MENU) return result;
+        show_menu=true;menu_selection=0;options.pause_on_start=false;
     }
-    return game_run(&options);
 }

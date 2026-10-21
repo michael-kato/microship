@@ -33,7 +33,7 @@ static const float MAX_EXPOSURE_FLOAT = 100.0f;
 static const float MAX_VERTICAL_FOV_FLOAT = 179.0f;
 static const double CAMERA_BASIS_DEGENERACY_EPSILON = 1e-12;
 
-static const char* validate_config(const RenderConfig* config)
+const char* render_config_error(const RenderConfig* config)
 {
     if (config->volume_rays_per_pixel > MAX_RENDER_RAYS_PER_PIXEL)
         return "volume_rays_per_pixel must be in [0, 4096]";
@@ -200,6 +200,6 @@ bool render_config_load(RenderConfig* config,const char* path)
         loaded.focus_radius=json_float(json_get(focus,"max_radius"),0,64);
     }
     if (!document.valid) return false;
-    const char* error=validate_config(&loaded);if (error) return json_error(root,error);
+    const char* error=render_config_error(&loaded);if (error) return json_error(root,error);
     *config=loaded;return true;
 }

@@ -1,0 +1,291 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Nanova player settings",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "display": {
+      "type": "object",
+      "properties": {
+        "borderless": {
+          "title": "Borderless fullscreen",
+          "type": "boolean"
+        },
+        "width": {
+          "title": "Window width",
+          "type": "integer",
+          "minimum": 1.0,
+          "maximum": 4096.0
+        },
+        "height": {
+          "title": "Window height",
+          "type": "integer",
+          "minimum": 1.0,
+          "maximum": 4096.0
+        },
+        "vsync": {
+          "title": "VSync",
+          "type": "boolean"
+        },
+        "samples": {
+          "title": "Film samples per pixel",
+          "type": "integer",
+          "minimum": 1.0,
+          "maximum": 4096.0
+        },
+        "antialiasing": {
+          "title": "Spatial anti-aliasing",
+          "type": "boolean"
+        },
+        "exposure": {
+          "title": "Exposure",
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 100.0
+        },
+        "field_of_view": {
+          "title": "Vertical field of view",
+          "type": "number",
+          "minimum": 2.0,
+          "maximum": 178.0
+        },
+        "show_stats": {
+          "title": "Frame statistics",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "lighting": {
+      "type": "object",
+      "properties": {
+        "subsurface_enabled": {
+          "title": "Subsurface scattering",
+          "type": "boolean"
+        },
+        "transmission_layers": {
+          "title": "Transparent surface layers",
+          "type": "integer",
+          "minimum": 1.0,
+          "maximum": 32.0
+        },
+        "subsurface_strength": {
+          "title": "Subsurface strength",
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "subsurface_samples": {
+          "title": "Subsurface film samples",
+          "type": "integer",
+          "minimum": 0.0,
+          "maximum": 4096.0
+        },
+        "subsurface_wrap": {
+          "title": "Subsurface light wrap",
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "subsurface_transmission": {
+          "title": "Subsurface transmission",
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "membrane_thickness": {
+          "title": "Membrane optical thickness",
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "energy_compensation": {
+          "title": "Specular energy compensation",
+          "type": "integer",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "shadow_grid": {
+          "title": "Lighting grid resolution",
+          "type": "integer",
+          "minimum": 0.0,
+          "maximum": 64.0
+        },
+        "static_cache": {
+          "title": "Static lighting cache",
+          "type": "boolean"
+        },
+        "texture_grid": {
+          "title": "Texture lighting grid",
+          "type": "boolean"
+        },
+        "thickness_cache": {
+          "title": "Static thickness cache",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "volume": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "title": "Volume scattering",
+          "type": "boolean"
+        },
+        "rays": {
+          "title": "Volume rays per pixel",
+          "type": "integer",
+          "minimum": 0.0,
+          "maximum": 4096.0
+        },
+        "steps": {
+          "title": "Integration steps",
+          "type": "integer",
+          "minimum": 2.0,
+          "maximum": 64.0
+        },
+        "gauss": {
+          "title": "Gauss-Legendre integration",
+          "type": "boolean"
+        },
+        "spatial_filter": {
+          "title": "Spatial volume filter",
+          "type": "boolean"
+        },
+        "spatial_stride": {
+          "title": "Volume grid pixel stride",
+          "type": "integer",
+          "minimum": 2.0,
+          "maximum": 4.0
+        },
+        "optical_lookup": {
+          "title": "Optical depth lookup",
+          "type": "boolean"
+        },
+        "lighting_grid": {
+          "title": "Volume lighting grid",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "effects": {
+      "type": "object",
+      "properties": {
+        "cell_blur": {
+          "title": "Cell depth blur",
+          "type": "boolean"
+        },
+        "tilt_shift": {
+          "title": "Tilt shift",
+          "type": "boolean"
+        },
+        "fog_blur": {
+          "title": "Fog of war blur",
+          "type": "boolean"
+        },
+        "glow": {
+          "title": "Glow and bloom",
+          "type": "boolean"
+        },
+        "bloom_radius": {
+          "title": "Bloom radius",
+          "type": "integer",
+          "minimum": 1.0,
+          "maximum": 64.0
+        },
+        "bloom_strength": {
+          "title": "Bloom strength",
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "bloom_threshold": {
+          "title": "Bloom threshold",
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1000000.0
+        },
+        "focus_center": {
+          "title": "Focus center",
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "focus_width": {
+          "title": "Focus half width",
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 0.5
+        },
+        "focus_falloff": {
+          "title": "Focus falloff",
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "focus_radius": {
+          "title": "Maximum focus blur radius",
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 64.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "audio": {
+      "type": "object",
+      "properties": {
+        "master_volume": {
+          "title": "Master volume",
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "effects_volume": {
+          "title": "Sound effects volume",
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "controls": {
+      "type": "object",
+      "properties": {
+        "keyboard_speed": {
+          "title": "Keyboard camera speed",
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1000.0
+        },
+        "drag_sensitivity": {
+          "title": "Mouse pan sensitivity",
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 10.0
+        },
+        "zoom_sensitivity": {
+          "title": "Mouse zoom sensitivity",
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 10.0
+        },
+        "invert_zoom": {
+          "title": "Invert mouse wheel zoom",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["version"],
+  "additionalProperties": false
+}

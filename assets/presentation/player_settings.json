@@ -1,0 +1,29 @@
+{
+  "$schema": "../schemas/player_settings.schema.json",
+  "version": 1,
+  "display": {
+    "borderless": false,
+    "show_stats": false
+  },
+  "lighting": {
+    "subsurface_enabled": true
+  },
+  "volume": {
+    "enabled": true
+  },
+  "effects": {
+    "cell_blur": true,
+    "tilt_shift": true,
+    "fog_blur": true,
+    "glow": true
+  },
+  "audio": {
+    "master_volume": 1,
+    "effects_volume": 1
+  },
+  "controls": {
+    "drag_sensitivity": 1,
+    "zoom_sensitivity": 1,
+    "invert_zoom": false
+  }
+}

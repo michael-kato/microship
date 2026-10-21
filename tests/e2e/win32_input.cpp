@@ -31,8 +31,104 @@ static int menu_input(int argc,char** argv)
     printf("Queued menu click at %ld %ld.\n",x,y);return 0;
 }
 
+
+struct UiTarget { DWORD process;const char* klass;HWND window; };
+static BOOL CALLBACK find_ui(HWND window,LPARAM context)
+{
+    UiTarget* target=(UiTarget*)context;DWORD process=0;GetWindowThreadProcessId(window,&process);
+    char klass[80]={};GetClassNameA(window,klass,sizeof(klass));
+    if (process==target->process && !strcmp(klass,target->klass) && IsWindowVisible(window))
+    { target->window=window;return FALSE; }
+    return TRUE;
+}
+static HWND ui_window(DWORD process,const char* klass)
+{
+    UiTarget target={process,klass,0};
+    for (unsigned attempt=0;!target.window && attempt<400;++attempt)
+    { EnumWindows(find_ui,(LPARAM)&target);if (!target.window) Sleep(5); }
+    return target.window;
+}
+static HWND ui_control(DWORD process,const char* klass,const char* text,HWND* parent)
+{
+    for (unsigned attempt=0;attempt<400;++attempt)
+    {
+        UiTarget target={process,"nanovaPauseMenu",0};EnumWindows(find_ui,(LPARAM)&target);
+        HWND child=target.window ? FindWindowExA(target.window,0,klass,text) : 0;
+        if (child) { *parent=target.window;return child; }
+        Sleep(5);
+    }
+    fprintf(stderr,"UI control not found: %s / %s.\n",klass,text);return 0;
+}
+static int ui_input(DWORD process)
+{
+    char line[512];
+    while (fgets(line,sizeof(line),stdin))
+    {
+        char* end=strpbrk(line,"\r\n");if (end) *end=0;
+        char* command=strtok(line,"|"),*label=strtok(0,"|"),*value=strtok(0,"|");
+        if (!command) return 2;
+        const char* klass=!strcmp(command,"game_escape") || !strcmp(command,"game_dirty") ? "nanovaWindow"
+            : !strcmp(command,"faction") ? "nanovaStartMenu" : "nanovaPauseMenu";
+        HWND window=ui_window(process,klass);if (!window) { fprintf(stderr,"UI window not found: %s.\n",klass);return 1; }
+        if (!strcmp(command,"game_escape") || !strcmp(command,"escape"))
+        { if (!press(window,VK_ESCAPE)) return 1; }
+        else if (!strcmp(command,"game_dirty"))
+        {
+            if (!key(window,'W',true) || !PostMessageA(window,WM_MBUTTONDOWN,MK_MBUTTON,MAKELPARAM(900,500))
+                || !PostMessageA(window,WM_MOUSEMOVE,MK_MBUTTON,MAKELPARAM(990,550))
+                || !PostMessageA(window,WM_MBUTTONUP,0,MAKELPARAM(990,550))
+                || !PostMessageA(window,WM_RBUTTONUP,0,MAKELPARAM(1400,500)) || !key(window,'W',false)) return 1;
+        }
+        else if (!strcmp(command,"close"))
+        { if (!PostMessageA(window,WM_CLOSE,0,0)) return 1; }
+        else if (!strcmp(command,"faction"))
+        { if (!label || label[0]<'1' || label[0]>'3' || label[1] || !press(window,label[0])) return 2; }
+        else if (!strcmp(command,"click"))
+        {
+            HWND child=label ? ui_control(process,"BUTTON",label,&window) : 0;if (!child) return 1;
+            SendMessageA(window,WM_COMMAND,MAKEWPARAM(GetDlgCtrlID(child),BN_CLICKED),(LPARAM)child);
+        }
+        else if (!strcmp(command,"set") || !strcmp(command,"get"))
+        {
+            HWND child=label ? ui_control(process,"STATIC",label,&window) : 0;if (!child) return 1;
+            HWND combo=GetWindow(child,GW_HWNDNEXT);char name[32]={};GetClassNameA(combo,name,sizeof(name));
+            if (strcmp(name,"ComboBox")) return 1;
+            if (!strcmp(command,"set"))
+            {
+                if (!value) return 2;
+                int index=(int)SendMessageA(combo,CB_FINDSTRINGEXACT,(WPARAM)-1,(LPARAM)value);
+                if (index<0) { fprintf(stderr,"UI choice not found: %s = %s.\n",label,value);return 1; }
+                SendMessageA(combo,CB_SETCURSEL,index,0);
+                SendMessageA(window,WM_COMMAND,MAKEWPARAM(GetDlgCtrlID(combo),CBN_SELCHANGE),(LPARAM)combo);
+            }
+            else
+            {
+                int index=(int)SendMessageA(combo,CB_GETCURSEL,0,0);char text[128]={};
+                if (index<0 || SendMessageA(combo,CB_GETLBTEXTLEN,index,0)>=(LRESULT)sizeof(text)) return 1;
+                SendMessageA(combo,WM_GETTEXT,sizeof(text),(LPARAM)text);printf("VALUE|%s\n",text);
+            }
+        }
+        else if (!strcmp(command,"wait_text"))
+        {
+            bool found=false;
+            for (unsigned attempt=0;!found && attempt<400;++attempt)
+            {
+                UiTarget target={process,"nanovaPauseMenu",0};EnumWindows(find_ui,(LPARAM)&target);
+                found=target.window && label && FindWindowExA(target.window,0,"STATIC",label);
+                if (!found) Sleep(5);
+            }
+            if (!found) return 1;
+        }
+        else if (strcmp(command,"wait")) return 2;
+        printf("OK\n");fflush(stdout);
+    }
+    return 0;
+}
+
 int main(int argc,char** argv)
 {
+    if (argc==3 && !strcmp(argv[1],"--ui"))
+    { char* end=0;unsigned long process=strtoul(argv[2],&end,10);if (*end || !process) return 2;return ui_input((DWORD)process); }
     if (argc>=2 && (!strcmp(argv[1],"--menu-click") || !strcmp(argv[1],"--menu-close"))) return menu_input(argc,argv);
     bool render=argc>=2 && !strcmp(argv[1],"--render-keys");
     HWND window=FindWindowA("nanovaWindow","Nanova");

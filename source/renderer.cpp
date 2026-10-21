@@ -377,7 +377,7 @@ static bool create_instance(RendererState* state)
     fprintf(stderr,"Native diagnostic requires --headless.\n");return false;
 #else
     printf("Window startup: open Win32 window.\n");
-    if (!window_open(&state->window, state->config.width, state->config.height, !state->no_activate))
+    if (!window_open(&state->window, state->config.width, state->config.height, !state->no_activate,state->config.borderless))
         return false;
     VkWin32SurfaceCreateInfoKHR surface = {};
     surface.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
@@ -2288,6 +2288,9 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
         (unsigned long long)state->guides.size,(unsigned long long)state->debug_pixels.size);
     return true;
 }
+
+Window* renderer_window(Renderer* renderer)
+{ return renderer->state && !renderer->state->headless ? &renderer->state->window : 0; }
 
 bool renderer_poll(Renderer* renderer, PointerInput* input)
 {

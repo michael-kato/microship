@@ -978,3 +978,19 @@ Screenshots `000938_warm_wide_factory_emission.png` and
 `000939_warm_near_factory_emission.png` show the final color. Inputs, logs, report
 and before/after viewers are in `build/warm_factory_review/`. Its `run_review.py`
 prepares inputs by default; `--run` starts the bounded GPU batch.
+
+
+## Pause menu checks
+
+Build the input driver with `cmake --build build/windows-cross --target nanova_input_probe`. Run `python3 tests/e2e/pause_menu.py build/windows-cross/nanova.exe` for CPU application checks of the production menu, settings files, faction changes and quit. These runs load the game, open its real Win32 menu and use its controls. They start no GPU work. The input driver sends Win32 messages to the selected application process. This does not establish physical input or native Windows behavior.
+
+`--smoke --pause-on-start --settings PATH.json` opens the production pause menu after game loading and before the smoke check continues. The explicit player file keeps the diagnostic separate from normal preferences. The smoke path does not check graphics resource changes. `--pause-on-start` also works with bounded window runs.
+
+Add `--gpu` to the pause-menu check for two native 1920x1080 frames with host Vulkan validation. It opens the menu with Esc, applies graphics changes, rebuilds the renderer, checks input isolation and resumes the match. It uses one film sample, a 10-second process limit and no hardware tracing. This is a bounded graphics check, not a performance result or full graphics-setting matrix.
+
+
+Run `python3 tests/e2e/pause_menu.py build/windows-cross/nanova.exe --gpu --os-input` to check OS Esc input, mouse navigation, Esc back and Enter resume. This captures only the menu window's native client pixels. Game captures remain native 1920x1080.
+
+Checked Oct 20: 24 CPU menu and audio application runs passed. Captured PCM confirmed volume gain and mute. The smoke, camera, screen selection and polish checks passed. All three faction choices passed through the main menu. Bounded GPU runs checked graphics Apply, renderer cleanup during a faction change, recovery after a settings save failure, input isolation and resume with the host Vulkan validation layer. OS menu input also passed.
+
+The broader `world_files` check failed because its empty building fixture has no `shared` field. The existing content loader requires that field. The loader and fixture helper were not changed for this feature. The complete suite, all graphics combinations, native Windows and audible device output remain unverified.

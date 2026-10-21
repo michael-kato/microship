@@ -26,11 +26,13 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
         window = (Window*)((CREATESTRUCTA*)lparam)->lpCreateParams;
         SetWindowLongPtrA(handle, GWLP_USERDATA, (LONG_PTR)window);
     }
-    if (window && (message == WM_CLOSE || (message == WM_KEYDOWN && wparam == VK_ESCAPE)))
+    if (window && message == WM_CLOSE)
     {
         window->open = false;
         return 0;
     }
+    if (window && window->suspended && ((message>=WM_KEYFIRST && message<=WM_KEYLAST)
+        || (message>=WM_MOUSEFIRST && message<=WM_MOUSELAST))) return 0;
     if (window && message == WM_DESTROY)
     {
         window->open = false;
@@ -121,7 +123,7 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
             bool* held=wparam==VK_F1 ? &window->stats_held : &window->buffers_held;
             bool* toggle=wparam==VK_F1 ? &window->input.toggle_stats : &window->input.toggle_buffers;
             if (message==WM_KEYUP) *held=false;
-            else { if (!*held) *toggle=!*toggle;*held=true; }
+            else { if (!*held && !(lparam&(1L<<KEY_WAS_DOWN_BIT))) *toggle=!*toggle;*held=true; }
             return 0;
         }
         if (wparam>=VK_F5 && wparam<=VK_F10)
@@ -139,12 +141,15 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
         uint32_t key=camera_key(wparam);
         if (key)
         {
-            if (message==WM_KEYDOWN) window->camera_keys|=key;else window->camera_keys&=~key;
+            if (message==WM_KEYDOWN)
+            { if (!(lparam&(1L<<KEY_WAS_DOWN_BIT))) window->camera_keys|=key; }
+            else window->camera_keys&=~key;
             return 0;
         }
     }
     if (window && message == WM_KEYDOWN && !(lparam & (1L << KEY_WAS_DOWN_BIT)))
     {
+        if (wparam==VK_ESCAPE) { window->input.menu=true;return 0; }
         if (wparam>='1' && wparam<='3') { window->input.group=(uint32_t)(wparam-'0');return 0; }
         if (wparam=='F' || wparam=='B') { window->input.screen_group=wparam=='F' ? 1u : 2u;return 0; }
         if (wparam==VK_SPACE) { window->input.pause=true;return 0; }
@@ -154,7 +159,7 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
     return DefWindowProcA(handle, message, wparam, lparam);
 }
 
-bool window_open(Window* window, uint32_t width, uint32_t height, bool activate)
+bool window_open(Window* window, uint32_t width, uint32_t height, bool activate, bool borderless)
 {
     // Physical pixel coordinates: Windows display scaling must not upscale the image.
     if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)
@@ -174,13 +179,13 @@ bool window_open(Window* window, uint32_t width, uint32_t height, bool activate)
         fprintf(stderr, "Cannot register nanova window (Windows error %lu).\n", GetLastError());
         return false;
     }
-    DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+    DWORD style = borderless ? WS_POPUP : WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
     DWORD extended = activate ? 0 : WS_EX_NOACTIVATE;
     RECT extent = { 0, 0, (LONG)width, (LONG)height };
     if (!AdjustWindowRectExForDpi(&extent, style, FALSE, extended, GetDpiForSystem()))
         return false;
     window->handle = CreateWindowExA(extended, klass.lpszClassName, "Nanova", style,
-        CW_USEDEFAULT, CW_USEDEFAULT, extent.right - extent.left, extent.bottom - extent.top,
+        borderless ? 0 : CW_USEDEFAULT, borderless ? 0 : CW_USEDEFAULT, extent.right - extent.left, extent.bottom - extent.top,
         0, 0, window->instance, window);
     if (!window->handle)
     {
@@ -219,6 +224,15 @@ bool window_poll(Window* window, PointerInput* input)
     { input->pointer_x=point.x;input->pointer_y=point.y;input->pointer_valid=true; }
     window->input = PointerInput();
     return window->open;
+}
+
+void window_suspend_input(Window* window,bool suspended)
+{
+    window->suspended=suspended;
+    if (GetCapture()==window->handle) ReleaseCapture();
+    window->dragging=false;window->panning=false;window->moved=false;
+    window->camera_keys=0;window->render_keys=0;window->stats_held=false;window->buffers_held=false;
+    window->input=PointerInput();
 }
 
 void window_close(Window* window)

@@ -8,6 +8,7 @@
 struct RenderConfig
 {
     bool spatial_antialiasing;
+    bool borderless; // Runtime display mode; borderless uses native monitor pixels.
     bool vsync; // Runtime preference; false requests immediate presentation.
     uint32_t width;
     uint32_t height;
@@ -37,6 +38,7 @@ struct RenderConfig
     float subsurface_strength,subsurface_wrap,subsurface_transmission,subsurface_thickness;
 };
 
+const char* render_config_error(const RenderConfig*);
 bool render_config_load(RenderConfig* config, const char* path);
 
 #endif

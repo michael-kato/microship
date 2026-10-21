@@ -19,7 +19,7 @@ struct Window
     HINSTANCE instance;
     HWND handle;
 #endif
-    bool open;
+    bool open,suspended;
     bool dragging,panning;
     bool stats_held,buffers_held;
     int32_t pan_x,pan_y;
@@ -30,8 +30,9 @@ struct Window
     PointerInput input;
 };
 
-bool window_open(Window* window, uint32_t width, uint32_t height, bool activate);
+bool window_open(Window* window, uint32_t width, uint32_t height, bool activate, bool borderless=false);
 bool window_poll(Window* window, PointerInput* input);
+void window_suspend_input(Window*,bool suspended);
 void window_close(Window* window);
 
 #endif
