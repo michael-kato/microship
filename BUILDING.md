@@ -9,6 +9,14 @@ bash scripts/check.sh
 python3 scripts/proton_run.py build/windows-cross/nanova.exe
 ```
 
+In VS Code, open the `nanova` project folder. Press F5 and select
+**nanova: run (Proton)**. This entry builds the Windows executable, then
+starts it through Proton in a terminal. It uses the JavaScript Debugger
+that ships with VS Code. It starts the game; C++ breakpoints are not supported
+by this entry. The CMake extension's Run button is a separate command.
+Use **Terminal > Run Task > nanova: run (Proton)** to launch with the task
+system. The faction tasks select the current 15-cell JSON maps.
+
 `check.sh` defaults to an incremental build and short CPU application checks.
 It starts no GPU work. Use `--quick fungal` or `--quick repair` to check one
 changed area. Use `--quick smoke` for build, asset loading, render-input

@@ -47,7 +47,7 @@
     },
     {
       "label": "nanova: run (Proton)",
-      "detail": "Play the virus-side biological prototype with ambient lighting.",
+      "detail": "Build and start Nanova with the normal faction menu.",
       "type": "process",
       "command": "python3",
       "args": [
@@ -84,7 +84,7 @@
     },
     {
       "label": "nanova: gameplay E2E (Proton)",
-      "detail": "Incremental build and CPU-only biological gameplay checks for both sides.",
+      "detail": "Build and run CPU application checks for biological gameplay.",
       "type": "process",
       "command": "python3",
       "args": [
@@ -105,9 +105,9 @@
         "${workspaceFolder}/scripts/proton_run.py",
         "${workspaceFolder}/build/windows-cross/nanova.exe",
         "--world",
-        "${workspaceFolder}/assets/levels/biology-virus.world",
+        "${workspaceFolder}/assets/levels/virus_large_level.json",
         "--config",
-        "${workspaceFolder}/assets/rendering/biology.render"
+        "${workspaceFolder}/assets/rendering/renderer.json"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
@@ -131,9 +131,9 @@
         "${workspaceFolder}/scripts/proton_run.py",
         "${workspaceFolder}/build/windows-cross/nanova.exe",
         "--world",
-        "${workspaceFolder}/assets/levels/biology-immune.world",
+        "${workspaceFolder}/assets/levels/immune_large_level.json",
         "--config",
-        "${workspaceFolder}/assets/rendering/biology.render"
+        "${workspaceFolder}/assets/rendering/renderer.json"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
@@ -150,16 +150,16 @@
       }
     },
     {
-      "label": "nanova: planetary prototype (Proton)",
+      "label": "nanova: play as fungus (Proton)",
       "type": "process",
       "command": "python3",
       "args": [
         "${workspaceFolder}/scripts/proton_run.py",
         "${workspaceFolder}/build/windows-cross/nanova.exe",
         "--world",
-        "${workspaceFolder}/assets/levels/prototype.world",
+        "${workspaceFolder}/assets/levels/fungus_large_level.json",
         "--config",
-        "${workspaceFolder}/assets/rendering/first.render"
+        "${workspaceFolder}/assets/rendering/renderer.json"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
