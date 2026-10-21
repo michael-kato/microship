@@ -86,7 +86,7 @@ struct World
     Spawn spawns[MAX_SPAWNS];
     uint32_t spawn_count;
     Content content;
-    char content_path[ASSET_PATH_CAPACITY];
+    char content_path[ASSET_PATH_CAPACITY],appearance_path[ASSET_PATH_CAPACITY];
     GameplayRules gameplay;
     float sight_radius;
     Faction player_faction,opponent_faction;
@@ -124,5 +124,7 @@ struct World
 };
 
 bool world_load(World* world, const char* path,uint32_t seed);
+bool world_reload_appearance(World* output,const World* current,uint32_t seed);
+void world_copy_appearance(World* output,const World* source);
 
 #endif

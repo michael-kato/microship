@@ -523,7 +523,7 @@ bool world_load(World* world,const char* path,uint32_t seed)
     char file[ASSET_PATH_CAPACITY]={};
     Json rules=json_find(root,"rules");if (json_present(rules) && (!json_path(rules,path,file) || !load_rules(&loaded,file))) return false;
     Json effects=json_find(root,"effects");if (json_present(effects) && (!json_path(effects,path,file) || !load_effects(&loaded,file))) return false;
-    if (!json_path(json_get(root,"appearance"),path,file) || !load_appearance(&loaded,file,seed)) return false;
+    if (!json_path(json_get(root,"appearance"),path,loaded.appearance_path) || !load_appearance(&loaded,loaded.appearance_path,seed)) return false;
     Json match=json_get(root,"match");json_object(match,"player|opponent|starts|auto_colonize|player_ai");
     Json automatic=json_find(match,"auto_colonize");if (json_present(automatic)) loaded.auto_colonize=json_bool(automatic);
     Json player_ai=json_find(match,"player_ai");if (json_present(player_ai)) loaded.player_ai=json_bool(player_ai);
@@ -551,4 +551,46 @@ bool world_load(World* world,const char* path,uint32_t seed)
     }
     if (!validate_world(&loaded,path)) return false;
     *world=loaded;return true;
+}
+
+// Copy visual settings only. Ownership, anatomy, combat and economy keep their current state.
+void world_copy_appearance(World* output,const World* source)
+{
+    output->ambient_enabled=source->ambient_enabled;output->ambient=source->ambient;
+    output->ambient_top=source->ambient_top;output->ambient_bottom=source->ambient_bottom;
+    output->ambient_gradient=source->ambient_gradient;output->backdrop=source->backdrop;
+    output->backdrop_samples=source->backdrop_samples;output->backdrop_soft=source->backdrop_soft;
+    output->backdrop_blur=source->backdrop_blur;output->backdrop_glow=source->backdrop_glow;
+    output->backdrop_ambient=source->backdrop_ambient;output->backdrop_pulse=source->backdrop_pulse;
+    output->backdrop_period=source->backdrop_period;output->backdrop_wave=source->backdrop_wave;
+    output->backdrop_wave_set=source->backdrop_wave_set;output->atmosphere_enabled=source->atmosphere_enabled;
+    output->atmosphere_shadows=source->atmosphere_shadows;output->atmosphere_center=source->atmosphere_center;
+    output->atmosphere_radius=source->atmosphere_radius;output->atmosphere_fade=source->atmosphere_fade;
+    output->atmosphere_absorption=source->atmosphere_absorption;output->atmosphere_phase=source->atmosphere_phase;
+    output->atmosphere_scattering=source->atmosphere_scattering;output->fog_blur=source->fog_blur;
+    output->fog_feather=source->fog_feather;output->fog_plane_z=source->fog_plane_z;
+    output->fog_half_life=source->fog_half_life;output->fog_tint=source->fog_tint;
+    output->glow_interior=source->glow_interior;output->glow_organelles=source->glow_organelles;
+    output->glow_stems=source->glow_stems;output->glow_leaves=source->glow_leaves;
+    output->glow_units=source->glow_units;output->organelle_squash=source->organelle_squash;
+    output->organelle_period=source->organelle_period;output->membrane_ripple=source->membrane_ripple;
+    output->membrane_wavelength=source->membrane_wavelength;output->membrane_period=source->membrane_period;
+    output->factory_sway=source->factory_sway;output->factory_period=source->factory_period;
+    output->studio_mask=source->studio_mask;output->thin_transmission=source->thin_transmission;
+    output->thin_absorption=source->thin_absorption;output->thin_transmission_set=source->thin_transmission_set;
+    output->thin_clarity=source->thin_clarity;output->thin_edge_strength=source->thin_edge_strength;
+    output->thin_edge_power=source->thin_edge_power;output->thin_blur_radius=source->thin_blur_radius;
+    output->thin_clarity_set=source->thin_clarity_set;
+    memcpy(output->factory_emission_color,source->factory_emission_color,sizeof(output->factory_emission_color));
+    memcpy(output->factory_emission_fresnel,source->factory_emission_fresnel,sizeof(output->factory_emission_fresnel));
+    memcpy(output->organelle_style,source->organelle_style,sizeof(output->organelle_style));
+    memcpy(output->studio,source->studio,sizeof(output->studio));
+}
+
+bool world_reload_appearance(World* output,const World* current,uint32_t seed)
+{
+    World appearance={};
+    if (!load_appearance(&appearance,current->appearance_path,seed)) return false;
+    *output=*current;world_copy_appearance(output,&appearance);
+    return validate_world(output,current->appearance_path);
 }
