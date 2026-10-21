@@ -16,7 +16,7 @@
     "sphere_rings": 32
   },
   "camera": {
-    "position": [0.0, 6.0, 20.0],
+    "position": [0.0, 0.0, 20.88],
     "target": [0.0, 0.0, 0.0],
     "up": [0.0, 1.0, 0.0],
     "min_distance": 8.0,

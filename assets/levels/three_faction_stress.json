@@ -22,7 +22,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,
@@ -45,7 +45,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,
@@ -68,7 +68,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,
@@ -91,7 +91,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,
@@ -114,7 +114,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,
@@ -137,7 +137,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,
@@ -160,7 +160,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,
@@ -183,7 +183,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,
@@ -206,7 +206,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,
@@ -229,7 +229,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,
@@ -252,7 +252,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,
@@ -275,7 +275,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,
@@ -298,7 +298,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,
@@ -321,7 +321,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,
@@ -344,7 +344,7 @@
       "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
-        "normal": [0.0, 0.29, 0.957]
+        "normal": [0, 0, 1]
       },
       "medium": {
         "radius_fraction": 0.94,

@@ -13,7 +13,7 @@
       "delay_seconds": 4
     },
     "growth_plane": {
-      "normal": [0, 0.28734789, 0.95782629],
+      "normal": [0, 0, 1],
       "depth_ratio": 0.03,
       "spread_roots": true
     },
