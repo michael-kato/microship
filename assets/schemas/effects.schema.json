@@ -232,6 +232,11 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "fade_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
         }
       },
       "required": ["color", "alpha"],

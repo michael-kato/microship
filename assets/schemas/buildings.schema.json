@@ -20,32 +20,7 @@
           "model": {
             "$ref": "shared.schema.json#/$defs/path"
           },
-          "growth_seconds": {
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 10000
-          },
-          "sprout_seconds": {
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 10000
-          },
           "health": {
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 10000
-          },
-          "collection": {
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 10000
-          },
-          "height": {
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 10000
-          },
-          "width": {
             "type": "number",
             "exclusiveMinimum": 0,
             "maximum": 10000
@@ -58,11 +33,6 @@
           "branches": {
             "type": "object",
             "properties": {
-              "seconds": {
-                "type": "number",
-                "exclusiveMinimum": 0,
-                "maximum": 300
-              },
               "count": {
                 "type": "integer",
                 "minimum": 1,
@@ -78,14 +48,6 @@
                 "exclusiveMinimum": 0,
                 "maximum": 10
               },
-              "seed": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 16777215
-              },
-              "normal": {
-                "$ref": "shared.schema.json#/$defs/normal"
-              },
               "health": {
                 "type": "number",
                 "exclusiveMinimum": 0,
@@ -95,15 +57,6 @@
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 32
-              },
-              "regrow_seconds": {
-                "type": "number",
-                "exclusiveMinimum": 0,
-                "maximum": 300
-              },
-              "roots": {
-                "type": "string",
-                "enum": ["single", "organelles"]
               },
               "grammar": {
                 "type": "string",
@@ -173,28 +126,13 @@
                 ],
                 "additionalProperties": false
               },
-              "root_limit": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 128
-              },
-              "root_minimum_radius": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1.5
-              },
-              "root_offset_seconds": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 10000
-              },
               "root_interval_seconds": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 10000
               }
             },
-            "required": ["seconds", "count", "spacing", "production", "seed", "normal"],
+            "required": ["count", "spacing", "production"],
             "additionalProperties": false
           },
           "growth_meshes": {
@@ -227,48 +165,6 @@
             "required": ["stem_radius", "head_radius"],
             "additionalProperties": false
           },
-          "establishment_seconds": {
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 10000
-          },
-          "growth_plane": {
-            "type": "object",
-            "properties": {
-              "normal": {
-                "$ref": "shared.schema.json#/$defs/normal"
-              },
-              "depth_ratio": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1
-              }
-            },
-            "required": ["normal", "depth_ratio"],
-            "additionalProperties": false
-          },
-          "repair": {
-            "type": "object",
-            "properties": {
-              "health_per_second": {
-                "type": "number",
-                "exclusiveMinimum": 0,
-                "maximum": 10000
-              },
-              "nutrients_per_health": {
-                "type": "number",
-                "exclusiveMinimum": 0,
-                "maximum": 10000
-              },
-              "delay_seconds": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 10000
-              }
-            },
-            "required": ["health_per_second", "nutrients_per_health", "delay_seconds"],
-            "additionalProperties": false
-          },
           "haze": {
             "type": "object",
             "properties": {
@@ -292,23 +188,130 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "name",
-          "faction",
-          "model",
-          "growth_seconds",
-          "health",
-          "collection",
-          "height",
-          "width",
-          "hits",
-          "branches"
-        ],
+        "required": ["name", "faction", "model", "health", "hits", "branches"],
         "additionalProperties": false
       },
       "maxItems": 8
+    },
+    "shared": {
+      "type": "object",
+      "properties": {
+        "growth_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "sprout_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "establishment_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "collection": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "repair": {
+          "type": "object",
+          "properties": {
+            "health_per_second": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 10000
+            },
+            "nutrients_per_health": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 10000
+            },
+            "delay_seconds": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          },
+          "required": ["health_per_second", "nutrients_per_health", "delay_seconds"],
+          "additionalProperties": false
+        },
+        "growth_plane": {
+          "type": "object",
+          "properties": {
+            "normal": {
+              "$ref": "shared.schema.json#/$defs/normal"
+            },
+            "depth_ratio": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "spread_roots": {
+              "type": "boolean"
+            }
+          },
+          "required": ["normal", "depth_ratio"],
+          "additionalProperties": false
+        },
+        "branches": {
+          "type": "object",
+          "properties": {
+            "seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 300
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777215
+            },
+            "regrow_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 300
+            },
+            "roots": {
+              "type": "string",
+              "enum": ["single", "organelles"]
+            },
+            "root_limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 128
+            },
+            "root_minimum_radius": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1.5
+            },
+            "root_offset_seconds": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          },
+          "required": ["seconds", "seed"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["growth_seconds", "collection", "height", "width", "branches", "growth_plane"],
+      "additionalProperties": false
     }
   },
-  "required": ["buildings"],
+  "required": ["buildings", "shared"],
   "additionalProperties": false
 }

@@ -122,7 +122,7 @@ struct Colony
     Faction faction;
     float health, growth, uptake, energy, manufacturing;
     uint32_t type,priority,building_kind;
-    uint32_t fighter_percent,production_error,produced[2];
+    uint32_t fighter_percent,production_error,produced[2],established_tick;
     bool ratio_enabled;
     bool building, capacity_blocked;
     bool active;

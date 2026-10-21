@@ -155,7 +155,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-content-') as directory:
         ('broken-product',change(text,'content.factions.0.production.default_unit','absent')),
         ('cross-faction-product',change(text,'content.factions.0.production.default_unit','immune_fighter')),
         ('missing-producer',remove(text,'content.buildings.0')),
-        ('missing-plane',remove(text,'content.buildings.0.branches.normal')),
+        ('missing-plane',remove(text,'content.buildings.0.growth_plane.normal')),
         ('invalid-hits',units(text,hits=0)),
         ('fractional-hits',units(text,hits=2.5)),
         ('invalid-targets',units(text,targets=['anything'])),

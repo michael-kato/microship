@@ -384,6 +384,26 @@ static uint32_t select_factory_roots(const Body& body,const BranchRules& f,uint3
     }
     return count;
 }
+static Vec3 spread_root_direction(const Simulation* s,uint32_t p,uint32_t root,Vec3 plane)
+{
+    const Colony& c=s->colonies[p];const Body& b=s->world.bodies[p];
+    Vec3 right=normalize(cross(std::fabs(plane.y)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0},plane));
+    Vec3 up=cross(plane,right);float angles[MAX_FACTORY_STRUCTURES];uint32_t ranks[MAX_FACTORY_STRUCTURES]={};
+    for (uint32_t k=0;k<c.root_count;++k)
+    {
+        Vec3 offset=subtract(b.factory_roots[c.root_attachments[k]],b.position);
+        angles[k]=std::atan2(dot(offset,up),dot(offset,right));
+    }
+    float sine=0,cosine=0,step=FULL_TURN_RADIANS/c.root_count;
+    for (uint32_t k=0;k<c.root_count;++k)
+    {
+        for (uint32_t j=0;j<c.root_count;++j) ranks[k]+=angles[j]<angles[k] || (angles[j]==angles[k] && j<k);
+        float residual=angles[k]-ranks[k]*step;sine+=std::sin(residual);cosine+=std::cos(residual);
+    }
+    float angle=std::atan2(sine,cosine)+ranks[root]*step;
+    return add(scale(right,std::cos(angle)),scale(up,std::sin(angle)));
+}
+
 static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* seed)
 {
     Colony* c=&s->colonies[p];const BranchRules* f=&simulation_producer_definition(s,p)->branches;
@@ -395,6 +415,13 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
     Vec3 radial=normalize(subtract(start,body.position));
     Vec3 side=normalize(cross(std::fabs(radial.y)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0},radial));
     Vec3 other=cross(radial,side);float sign=k%2 ? -1.0f : 1.0f;
+    const ProducerDefinition& definition=*simulation_producer_definition(s,p);
+    if (definition.growth_plane_enabled && definition.spread_roots)
+    {
+        radial=parent<0 ? spread_root_direction(s,p,k,definition.growth_plane_normal)
+            : normalize(subtract(c->stems[parent][GROWTH_SEGMENTS],c->stems[parent][GROWTH_SEGMENTS-1]));
+        side=normalize(cross(definition.growth_plane_normal,radial));other=cross(radial,side);
+    }
     float extent=parent>=0 ? f->spacing*CHILD_LIMB_LENGTH_SCALE : simulation_producer_definition(s,p)->height;
     float spread=f->grammar==GROWTH_AXIAL ? AXIAL_SPREAD : f->grammar==GROWTH_FAN ? FAN_SPREAD : HYPHA_SPREAD;
     float bend=f->grammar==GROWTH_AXIAL ? AXIAL_BEND : f->grammar==GROWTH_FAN ? FAN_BEND : HYPHA_BEND;
@@ -424,7 +451,7 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
         Vec3 direction=normalize(add(scale(radial,LIMB_RADIAL_DIRECTION_WEIGHT),add(scale(side,(parent>=0 ? sign*spread : 0)+signed_random(seed)*bend),scale(other,signed_random(seed)*bend))));
         direction=factory_direction(direction,*simulation_producer_definition(s,p));
         c->stems[k][j]=add(c->stems[k][j-1],scale(direction,extent/GROWTH_SEGMENTS));
-        radial=f->grammar==GROWTH_TREE ? direction : normalize(subtract(c->stems[k][j],body.position));
+        radial=f->grammar==GROWTH_TREE || definition.spread_roots ? direction : normalize(subtract(c->stems[k][j],body.position));
     }
     if (k) c->branches[k-1].offset=subtract(start,c->surface);
 }
@@ -519,7 +546,7 @@ static void establish_colony(Simulation* s,uint32_t p,Faction faction)
     c->fighter_percent=s->world.content.units[c->priority].group==0 ? 100 : 0;c->production_error=50;
     if (s->world.gameplay.production_ratio_default && content_product(&s->world.content,faction,0)>=0 && content_product(&s->world.content,faction,1)>=0)
     { c->fighter_percent=s->world.gameplay.default_fighter_percent;c->ratio_enabled=true; }
-    c->active=true;c->root_generation=1;
+    c->established_tick=s->tick_count;c->active=true;c->root_generation=1;
     s->world.bodies[p].owner=faction;s->faction_established[faction]=true;++s->faction_stats[faction].colonies_gained;
     if (s->world.gameplay.enabled) prepare_factory(s,p);
     if (simulation_producer_definition(s,p)->establishment_seconds>0) c->growth=0;
@@ -1818,15 +1845,14 @@ void simulation_step(Simulation* s)
             const FactionDefinition& f=s->world.content.factions[s->world.bodies[p].owner];
             for (uint32_t faction=1;faction<MAX_FACTIONS;++faction)
             {
-                const FactionDefinition& profile=s->world.content.factions[faction];
-                if (profile.morph_seconds<=0) continue;
-                float target=s->world.bodies[p].owner==faction ? 1.0f : 0.0f,step=dt/profile.morph_seconds;
+                if (s->world.gameplay.cell_morph_seconds<=0) continue;
+                float target=s->world.bodies[p].owner==faction ? 1.0f : 0.0f,step=dt/s->world.gameplay.cell_morph_seconds;
                 float* blend=&appearance.factions[faction];*blend+=std::fmax(-step,std::fmin(step,target-*blend));
             }
             if (f.cell_strength>0)
             {
                 if (appearance.strength<=0) appearance.tint=f.cell_tint;
-                appearance.seconds=f.transform_seconds;
+                appearance.seconds=s->world.gameplay.cell_tint_seconds;
                 float t=dt/appearance.seconds;
                 appearance.tint.r+=(f.cell_tint.r-appearance.tint.r)*t;
                 appearance.tint.g+=(f.cell_tint.g-appearance.tint.g)*t;

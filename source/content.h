@@ -20,7 +20,7 @@ struct FactionDefinition
     uint32_t producer,default_unit,assault_unit;
     bool automatic;
     Color cell_tint;
-    float cell_strength,transform_seconds,morph_seconds,cell_roughness;
+    float cell_strength,cell_roughness;
     bool cell_material;
     uint32_t displacement_features,displacement_seed;
     float displacement_height,displacement_width;
@@ -80,7 +80,7 @@ struct ProducerDefinition
     float haze_reach,haze_damage,haze_heal;
     Vec3 growth_plane_normal;
     float growth_depth_ratio;
-    bool growth_plane_enabled;
+    bool growth_plane_enabled,spread_roots;
     uint32_t hits;
     BranchRules branches;
 };

@@ -31,47 +31,9 @@
             "properties": {
               "parts": {
                 "$ref": "shared.schema.json#/$defs/path"
-              },
-              "shape": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 0.12
-              },
-              "interior": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 0.15
-              },
-              "wall_noise": {
-                "type": "object",
-                "properties": {
-                  "strength": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 1
-                  },
-                  "frequency": {
-                    "type": "number",
-                    "exclusiveMinimum": 0,
-                    "maximum": 32
-                  },
-                  "warm": {
-                    "$ref": "shared.schema.json#/$defs/color"
-                  },
-                  "cool": {
-                    "$ref": "shared.schema.json#/$defs/color"
-                  }
-                },
-                "required": ["strength", "frequency", "warm", "cool"],
-                "additionalProperties": false
-              },
-              "layout_rotation_degrees": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 180
               }
             },
-            "required": ["parts", "shape", "interior"],
+            "required": ["parts"],
             "additionalProperties": false
           }
         },
@@ -98,6 +60,51 @@
         ]
       },
       "maxItems": 32
+    },
+    "shared": {
+      "type": "object",
+      "properties": {
+        "shape": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.12
+        },
+        "interior": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.15
+        },
+        "wall_noise": {
+          "type": "object",
+          "properties": {
+            "strength": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "frequency": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 32
+            },
+            "warm": {
+              "$ref": "shared.schema.json#/$defs/color"
+            },
+            "cool": {
+              "$ref": "shared.schema.json#/$defs/color"
+            }
+          },
+          "required": ["strength", "frequency", "warm", "cool"],
+          "additionalProperties": false
+        },
+        "layout_rotation_degrees": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 180
+        }
+      },
+      "required": ["shape", "interior"],
+      "additionalProperties": false
     }
   },
   "required": ["bodies"],

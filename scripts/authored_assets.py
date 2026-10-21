@@ -5,6 +5,10 @@ import os
 from pathlib import Path
 
 
+FACTORY_SHARED_FIELDS=('growth_seconds', 'sprout_seconds', 'establishment_seconds', 'collection', 'height', 'width', 'repair', 'growth_plane')
+FACTORY_SHARED_BRANCH_FIELDS=('seconds', 'seed', 'regrow_seconds', 'roots', 'root_limit', 'root_minimum_radius', 'root_offset_seconds')
+
+
 def stage_world(source, directory):
     def read(path):
         data=json.loads(path.read_text());data.pop('$schema',None)
@@ -17,7 +21,19 @@ def stage_world(source, directory):
     content={}
     for name,path in read(manifest).items():
         definition=(manifest.parent/path).resolve()
-        content[name]=read(definition)[name]
+        document=read(definition);content[name]=document[name]
+        if name=='buildings' and 'shared' in document:
+            shared=document['shared']
+            for i,item in enumerate(content[name]):
+                merged=deepcopy(shared);merged.update(item)
+                merged['branches']=dict(shared['branches'],**item['branches'])
+                content[name][i]=merged
+        if name=='units' and 'shared' in document:
+            for item in content[name]:
+                if 'secondary_attack' in item:item['secondary_attack']['interval_factor']=document['shared']['secondary_interval_factor']
+        if name=='bodies' and 'shared' in document:
+            for item in content[name]:
+                if 'variation' in item:item['variation']=dict(document['shared'],**item['variation'])
         for item in content[name]:
             model(item,'model',definition.parent)
             if 'payload' in item:model(item['payload'],'model',definition.parent)
@@ -47,7 +63,25 @@ def write_world(path, data):
             manifest={}
             for name,items in document.items():
                 target=path.stem+'-'+name+'.json';manifest[name]=target
-                (path.parent/target).write_text(json.dumps({name:items},indent=2)+'\n')
+                payload={name:items}
+                if name=='buildings' and items:
+                    first=items[0];shared={key:deepcopy(first[key]) for key in FACTORY_SHARED_FIELDS if key in first}
+                    shared['branches']={key:deepcopy(first['branches'][key]) for key in FACTORY_SHARED_BRANCH_FIELDS if key in first['branches']}
+                    for item in items:
+                        for key in FACTORY_SHARED_FIELDS:item.pop(key,None)
+                        for key in FACTORY_SHARED_BRANCH_FIELDS:item['branches'].pop(key,None)
+                    payload['shared']=shared
+                if name=='units':
+                    factor=next((item['secondary_attack'].get('interval_factor',1) for item in items if 'secondary_attack' in item),1)
+                    payload['shared']={'secondary_interval_factor':factor}
+                    for item in items:
+                        if 'secondary_attack' in item:item['secondary_attack'].pop('interval_factor',None)
+                if name=='bodies':
+                    variation=next((item['variation'] for item in items if 'variation' in item),{})
+                    payload['shared']={key:deepcopy(value) for key,value in variation.items() if key!='parts'}
+                    for item in items:
+                        if 'variation' in item:item['variation']={key:value for key,value in item['variation'].items() if key=='parts'}
+                (path.parent/target).write_text(json.dumps(payload,indent=2)+'\n')
             document=manifest
         (path.parent/filename).write_text(json.dumps(document,indent=2)+'\n')
         world[section]=filename

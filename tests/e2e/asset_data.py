@@ -18,6 +18,10 @@ def established_world(source,directory):
     for building in data['content']['buildings']:
         building.pop('repair',None);building.pop('haze',None)
         building['branches'].pop('root_interval_seconds',None)
+        building['growth_plane'].pop('spread_roots',None)
+        building['growth_plane']['depth_ratio']=.15
+        building.update(establishment_seconds=180,sprout_seconds=3)
+        building['branches']['root_offset_seconds']=2
         building['branches'].pop('root_limit',None);building['branches'].pop('root_minimum_radius',None)
         building['branches']['count']=max(16,building['branches']['count'])
         if building['branches']['grammar']=='tree':

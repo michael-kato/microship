@@ -37,5 +37,9 @@
   },
   "exploration": {
     "sight_radius": 18.0
+  },
+  "cell_infection": {
+    "morph_seconds": 18,
+    "tint_seconds": 24
   }
 }

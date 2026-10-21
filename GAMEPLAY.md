@@ -21,7 +21,7 @@ builds up as exposure until it forms a whole hit. Set these values in
 `attack.damage`, and `attack.cloud`. Omit the per-unit manufacture time to
 use the global value.
 
-Factory deployment takes 180 seconds. Virus and immune roots start near colonization, with up to two seconds of offset (`branches.root_offset_seconds`). Fungal roots start one at a time, twelve seconds apart, with the same small offset (`branches.root_interval_seconds`). During deployment each structure grows in three seconds (`sprout_seconds`). Each root's limbs then emerge one at a time, depth first, at even intervals so the last one matures as deployment ends. The first child of the first root is always a leaf, so a virus cell makes its first fighter about 20 seconds after colonization. Immune cells take about 24 seconds because a fighter costs 28 nutrients. Each completed leaf can grow one unit at a time. Base manufacture takes twelve seconds per leaf, except where a unit defines its own time. Leaves share the cell nutrient store. AI manufacture uses the full 1.0 rate. Base collection is 2.5 nutrients per second. Damage regrowth uses fourteen seconds of growth (`growth_seconds`) and thirty-two-second child emergence intervals. Destroyed limbs wait at least forty-eight seconds and require paid repair before regrowth. Mature roots share the base rate. Child limbs add to that rate. Leaves can start production while other factories are still growing. Virus production uses terminal leaves.
+Factory deployment takes about 257 seconds, at 70 percent of its former speed. Virus and immune roots start near colonization, with up to 2.86 seconds of offset (`shared.branches.root_offset_seconds`). Fungal roots start one at a time, about 17.14 seconds apart, with the same small offset (`branches.root_interval_seconds`). During deployment each structure grows in about 4.29 seconds (`shared.sprout_seconds`). Each root's limbs then emerge one at a time, depth first, at even intervals so the last one matures as deployment ends. The first child of the first root stays a leaf, so production can start before the rest of the factory completes. Each completed leaf can grow one unit at a time. Base manufacture takes twelve seconds per leaf, except where a unit defines its own time. Leaves share the cell nutrient store. AI manufacture uses the full 1.0 rate. Base collection is 2.5 nutrients per second. Damage regrowth uses fourteen seconds of growth (`growth_seconds`) and thirty-two-second child emergence intervals. Destroyed limbs wait at least forty-eight seconds and require paid repair before regrowth. Mature roots share the base rate. Child limbs add to that rate. Leaves can start production while other factories are still growing. Virus production uses terminal leaves.
 
 Each virus organelle root grows a curved trunk, two forked sub-trunks, and four smaller branches with terminal leaves. Factories root on the three largest organelles, so a virus cell has at most twenty-one structures; each fork has a 72 percent chance of a second branch. Child lengths and widths use a 0.62 scale at each level. Child production contribution is 0.05 per mature limb, so a full virus tree roughly matches an immune fan's nutrient income. Immune and fungal factories have nine structures and a 0.12 child contribution. Storage supports 128 structures per cell.
 
@@ -44,7 +44,7 @@ after growth. The separate slow sway animation still moves the tree.
 
 Virus trees grow side by side. New units grow at terminal leaves. Support damage removes descendants. The growth plane is authored to match the startup view. Moving the camera does not change geometry or gameplay.
 
-Ownership changes the existing cell wall shape over 24 seconds. Its tint changes over 180 seconds. Seeded pigment variation changes the wall brightness and shifts its hue between pink and blue-green. Virus control blends in a pointed radial displacement and a shinier blue-green material. Fungal control blends in broad rounded displacement and a rougher brown material. Immune control returns the wall to its neutral shape and moves its material toward pink and white. Vertex and triangle counts stay fixed. Normals and render bounds follow the current positions. No separate spines or lobes appear. Organelle geometry, collision rules, attachment points, and game outcomes do not change.
+Ownership changes the existing cell wall shape over 18 seconds. Tint uses a shared 24-second transition rate. These timings apply to all factions. Seeded pigment variation changes the wall brightness and shifts its hue between pink and blue-green. Virus control blends in a pointed radial displacement and a shinier blue-green material. Fungal control blends in broad rounded displacement and a rougher brown material. Immune control returns the wall to its neutral shape and moves its material toward pink and white. Vertex and triangle counts stay fixed. Normals and render bounds follow the current positions. No separate spines or lobes appear. Organelle geometry, collision rules, attachment points, and game outcomes do not change.
 
 Every intact factory branch ends in a faction leaf head. This includes trunks
 that extend past their forks. The head follows the stem during sway. Tips exposed
@@ -179,7 +179,7 @@ Virus wall mutation uses 256 pointed displacement features, each with a
 `width_degrees` for narrower, steeper peaks. The supported limits are 256
 features and a minimum width of 6 degrees for the current wall mesh. `height`
 sets the maximum height as a fraction of cell radius. This moves the existing wall vertices; it adds
-no geometry. `morph_seconds` sets the time to reach the faction shape.
+no geometry. `cell_infection.morph_seconds` in `gameplay-rules.json` sets the time to reach the faction shape for every faction.
 
 Organelle color and glow controls are in `assets/presentation/scene.json`, under
 `organelle_appearance`. Restart the application after you change the file.
@@ -211,7 +211,7 @@ silhouette or add another wall. Faction mutation still moves the wall vertices.
 All motion uses the current simulation time. Pause stops it.
 
 Cell organs use a fixed arrangement for each world seed.
-`variation.layout_rotation_degrees` in `cell-types.json` sets the range
+`shared.layout_rotation_degrees` in `cell-types.json` sets the range
 of random arrangement rotation. The default is 180 degrees. Existing
 per-organ position, size, and orientation variation still applies.
 Factory roots use the same transform as the organs. Restart keeps the seed.
@@ -226,7 +226,7 @@ Each cell repairs up to 12 health per second, at 0.08 nutrients per health,
 after a four-second damage delay. A destroyed limb must receive the full
 replacement cost before it grows again. Its support must be complete first.
 Initial construction does not require a repair payment. A fully lost colony
-does not repair itself. Set `repair.health_per_second`, `nutrients_per_health`,
+does not repair itself. Set `shared.repair.health_per_second`, `nutrients_per_health`,
 and `delay_seconds` in `factory-types.json`. Omit `repair` for the legacy
 regrowth rules.
 
@@ -238,7 +238,7 @@ does not multiply damage or healing. Losing the colony removes its haze.
 Factory repair still requires nutrients. Set the `fungal_emitter.haze` values
 in `factory-types.json`: `reach`, `damage_per_second`, and `heal_per_second`.
 Set its visible color and strength under `cell_haze` in `combat-effects.json`.
-The soft haze uses the existing cloud drawing pass and adds no volume rays.
+The haze fades in over ten seconds after colonization (`cell_haze.fade_seconds`). It uses the existing cloud drawing pass and adds no volume rays.
 Enemy haze is visible only when its cell is in current sight.
 
 Unit births use a 16 ms noise click; attack hits use a 12 ms click. Their
@@ -247,3 +247,20 @@ hit clicks have a 0.1-second cooldown. Set gain and cooldown in
 `assets/audio/audio.json`. Set duration and envelope in
 `assets/audio/sound-synthesis.json`, then run `python3 scripts/make_sfx.py`.
 Other sound clips keep their existing waveforms.
+
+Shared settings have one authoring location:
+
+| File | Shared values |
+| --- | --- |
+| `gameplay-rules.json`, `cell_infection` | Morph and tint timing for every faction. |
+| `factory-types.json`, `shared` | Deployment, repair, collection, size, growth plane, root limits, and branch timing. |
+| `cell-types.json`, `shared` | Wall noise and seeded organ variation. |
+| `unit-types.json`, `shared` | Secondary attack interval factor. |
+
+Faction entries retain their models, colors, wall displacement shape, roughness,
+health, branch grammar, and production differences. Fungal root spacing remains
+a faction trait. Factory roots keep their organ attachments, but their growth
+directions spread across the common view plane. `shared.growth_plane.normal`
+sets that plane; `depth_ratio` limits growth toward or away from the camera.
+`spread_roots` separates the initial trunk directions. Trees keep their shape
+after growth and regrowth. Moving the camera does not move their roots.

@@ -32,8 +32,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
                 for key in ('branch_probability','angle_jitter_degrees','length_jitter','width_jitter'):branch['tree'].pop(key,None)
                 branch['tree']['bend']=.2
             else:branch['count']=16
-        for profile in data['content']['factions']:
-            if 'cell_appearance' in profile:profile['cell_appearance'].update(seconds=12,morph_seconds=12)
+        data['rules']['cell_infection'].update(tint_seconds=12,morph_seconds=12)
         data['rules']['ai']['expansion_delay']=1 if side=='fungus' else 300
         data['rules']['economy']['enemy_attack_seconds']=300;data['rules']['economy']['manufacture_seconds']=1
         orders='' if side=='fungus' else f'0 select all\n0 order {home}\n'

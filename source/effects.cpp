@@ -189,7 +189,9 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
         const Colony& c=s->colonies[i];if (!c.active || !s->visible_bodies[i]) continue;
         const ProducerDefinition& d=*simulation_producer_definition(s,i);if (d.haze_reach<=0) continue;
         const Body& b=s->world.bodies[i];
-        uint32_t before=*count;segment(output,count,p,b.position,b.position,b.radius+d.haze_reach,v->haze_color,v->haze_alpha,CLOUD_EFFECT_KIND);
+        float age=(s->tick_count-c.established_tick)/(float)SIMULATION_TICKS_PER_SECOND;
+        float fade=v->haze_fade_seconds>0 ? std::fmin(1.0f,age/v->haze_fade_seconds) : 1;
+        uint32_t before=*count;segment(output,count,p,b.position,b.position,b.radius+d.haze_reach,v->haze_color,v->haze_alpha*fade,CLOUD_EFFECT_KIND);
         int r[4];if (*count==before || !tile_rectangle(output[before],width,height,r)) continue;
         cloud_references+=(uint32_t)((r[2]-r[0]+1)*(r[3]-r[1]+1));
         if (cloud_references>CLOUD_REFERENCE_BUDGET) { *count=before;break; }

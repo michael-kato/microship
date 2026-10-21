@@ -19,6 +19,7 @@ static const float MAX_BACKDROP_PULSE_AMPLITUDE = .15f;
 static const int MAX_BACKDROP_AMBIENT = 10;
 static const int MAX_BACKDROP_GLOW = 20;
 static const int MAX_SURFACE_GLOW_STRENGTH = 8;
+static const int MAX_CELL_INFECTION_SECONDS = 3600;
 static const int MAX_BACKDROP_SCALE = 10000;
 static const int MAX_BACKDROP_COORDINATE = 1000000;
 static const int MAX_MEMBRANE_ABSORPTION = 10;
@@ -86,7 +87,7 @@ static Faction read_owner(const World* world,Json j)
 static bool load_rules(World* w,const char* path)
 {
     JsonDocument d;if (!json_load(&d,path)) return false;Json root=json_root(&d);
-    json_object(root,"$schema|resource_label|economy|ai|exploration|flight|orbit|recovery|spikes");
+    json_object(root,"$schema|resource_label|economy|ai|exploration|flight|orbit|recovery|spikes|cell_infection");
     json_string(json_get(root,"resource_label"),w->content.resource_label,MAX_RULES_RESOURCE_LABEL);
     Json economy=json_find(root,"economy");
     if (json_present(economy))
@@ -100,6 +101,10 @@ static bool load_rules(World* w,const char* path)
         if (json_present(ratio)) { w->gameplay.default_fighter_percent=json_uint(ratio,0,100);w->gameplay.production_ratio_default=true; }
         w->gameplay.enabled=true;
     }
+    Json infection=json_get(root,"cell_infection");
+    json_object(infection,"morph_seconds|tint_seconds");
+    w->gameplay.cell_morph_seconds=json_positive(json_get(infection,"morph_seconds"),MAX_CELL_INFECTION_SECONDS);
+    w->gameplay.cell_tint_seconds=json_positive(json_get(infection,"tint_seconds"),MAX_CELL_INFECTION_SECONDS);
     Json ai=json_find(root,"ai");
     if (json_present(ai))
     {
@@ -171,7 +176,10 @@ static bool load_effects(World* w,const char* path)
     Json haze=json_find(root,"cell_haze");
     if (json_present(haze))
     {
-        json_object(haze,"color|alpha");w->combat.haze_color=json_color(json_get(haze,"color"));
+        json_object(haze,"color|alpha|fade_seconds");
+        Json fade=json_find(haze,"fade_seconds");
+        if (json_present(fade)) w->combat.haze_fade_seconds=json_positive(fade,MAX_RULES_MANUFACTURE_SECONDS);
+        w->combat.haze_color=json_color(json_get(haze,"color"));
         w->combat.haze_alpha=json_float(json_get(haze,"alpha"),0,1);
     }
     Json cloud=json_find(root,"spore_cloud");

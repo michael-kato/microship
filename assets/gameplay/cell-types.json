@@ -1,5 +1,16 @@
 {
   "$schema": "../schemas/bodies.schema.json",
+  "shared": {
+    "shape": 0.065,
+    "interior": 0.105,
+    "wall_noise": {
+      "strength": 0.32,
+      "frequency": 5.5,
+      "warm": [0.94, 0.54, 0.69],
+      "cool": [0.45, 0.78, 0.86]
+    },
+    "layout_rotation_degrees": 180
+  },
   "bodies": [
     {
       "name": "infected",
@@ -8,16 +19,7 @@
       "model": "../models/cell_infected.fmesh",
       "hosts_site": true,
       "variation": {
-        "parts": "../models/cell_infected.parts.json",
-        "shape": 0.065,
-        "interior": 0.105,
-        "wall_noise": {
-          "strength": 0.32,
-          "frequency": 5.5,
-          "warm": [0.94, 0.54, 0.69],
-          "cool": [0.45, 0.78, 0.86]
-        },
-        "layout_rotation_degrees": 180
+        "parts": "../models/cell_infected.parts.json"
       }
     },
     {
@@ -27,16 +29,7 @@
       "model": "../models/cell_healthy.fmesh",
       "hosts_site": true,
       "variation": {
-        "parts": "../models/cell_healthy.parts.json",
-        "shape": 0.065,
-        "interior": 0.105,
-        "wall_noise": {
-          "strength": 0.32,
-          "frequency": 5.5,
-          "warm": [0.94, 0.54, 0.69],
-          "cool": [0.45, 0.78, 0.86]
-        },
-        "layout_rotation_degrees": 180
+        "parts": "../models/cell_healthy.parts.json"
       }
     },
     {
@@ -46,16 +39,7 @@
       "model": "../models/cell_neutral.fmesh",
       "hosts_site": true,
       "variation": {
-        "parts": "../models/cell_neutral.parts.json",
-        "shape": 0.065,
-        "interior": 0.105,
-        "wall_noise": {
-          "strength": 0.32,
-          "frequency": 5.5,
-          "warm": [0.94, 0.54, 0.69],
-          "cool": [0.45, 0.78, 0.86]
-        },
-        "layout_rotation_degrees": 180
+        "parts": "../models/cell_neutral.parts.json"
       }
     }
   ]

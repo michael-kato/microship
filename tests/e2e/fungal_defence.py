@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-defence-') as directory:
     staged=stage_world(root/'assets/levels/fungus-player-level.json',out)
     staged['rules']['ai']['expansion_delay']=300
     for unit in staged['content']['units']:unit['manufacture_seconds']=10000
-    for ticks,roots in (((1500,2),) if quick else ((900,1),(1500,2),(2400,3))):
+    for ticks,roots in (((1800,2),) if quick else ((900,1),(1800,2),(3000,3))):
         growth,_=run('staged_factories_'+str(ticks),staged,ticks=ticks)
         colony=growth['colonies'][0]
         assert colony['root_count']==3 and sum(limb['health']>0 for limb in colony['structures'][:3])==roots,(ticks,colony['structures'][:3])

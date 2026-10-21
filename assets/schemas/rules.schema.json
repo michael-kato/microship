@@ -172,8 +172,25 @@
       },
       "required": ["count", "regrow_seconds"],
       "additionalProperties": false
+    },
+    "cell_infection": {
+      "type": "object",
+      "properties": {
+        "morph_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 3600
+        },
+        "tint_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 3600
+        }
+      },
+      "required": ["morph_seconds", "tint_seconds"],
+      "additionalProperties": false
     }
   },
-  "required": ["resource_label"],
+  "required": ["resource_label", "cell_infection"],
   "additionalProperties": false
 }

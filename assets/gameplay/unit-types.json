@@ -1,5 +1,8 @@
 {
   "$schema": "../schemas/units.schema.json",
+  "shared": {
+    "secondary_interval_factor": 8
+  },
   "units": [
     {
       "name": "virus_fighter",
@@ -23,8 +26,7 @@
       "cue_radius": 0.22,
       "hits": 3,
       "secondary_attack": {
-        "targets": ["structures"],
-        "interval_factor": 8
+        "targets": ["structures"]
       },
       "autonomy": {
         "unit_radius": 5.5,
@@ -58,8 +60,7 @@
       "cue_radius": 0.65,
       "hits": 3,
       "secondary_attack": {
-        "targets": ["units"],
-        "interval_factor": 8
+        "targets": ["units"]
       },
       "autonomy": {
         "unit_radius": 3.5,
@@ -124,8 +125,7 @@
         }
       },
       "secondary_attack": {
-        "targets": ["structures"],
-        "interval_factor": 8
+        "targets": ["structures"]
       },
       "autonomy": {
         "unit_radius": 5.5,
@@ -171,8 +171,7 @@
         "release_seconds": 2.5
       },
       "secondary_attack": {
-        "targets": ["units"],
-        "interval_factor": 8
+        "targets": ["units"]
       },
       "autonomy": {
         "unit_radius": 3.5,
@@ -251,8 +250,7 @@
       "cue_radius": 0.22,
       "hits": 2,
       "secondary_attack": {
-        "targets": ["structures"],
-        "interval_factor": 8
+        "targets": ["structures"]
       },
       "autonomy": {
         "unit_radius": 5.5,
@@ -286,8 +284,7 @@
       "cue_radius": 0.65,
       "hits": 2,
       "secondary_attack": {
-        "targets": ["units"],
-        "interval_factor": 8
+        "targets": ["units"]
       },
       "autonomy": {
         "unit_radius": 3.5,

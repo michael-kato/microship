@@ -46,6 +46,7 @@ struct GameplayRules
 {
     bool enabled;
     float storage,manufacture_seconds,landing_seconds,enemy_attack_seconds;
+    float cell_morph_seconds,cell_tint_seconds;
     uint32_t default_fighter_percent;bool production_ratio_default;
 };
 enum { COMBAT_FIELD_PROJECTILE=1, COMBAT_FIELD_ORBIT=2, COMBAT_FIELD_DAMAGE=4, COMBAT_FIELDS_COMPLETE=7, STUDIO_LIGHTS_COMPLETE=7 };
@@ -63,7 +64,7 @@ struct CombatVisuals
     Color flash, injured;
     float break_seconds,break_speed,break_drag,break_spin,break_shrink;
     Color cloud_color;float cloud_alpha; // Spore cloud glow; zero alpha draws none.
-    Color haze_color;float haze_alpha;
+    Color haze_color;float haze_alpha,haze_fade_seconds;
     Color aura_color;float aura_alpha; // Healing aura glow around a unit after devouring.
 };
 struct SpikeRules

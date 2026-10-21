@@ -55,11 +55,6 @@
                 "minimum": 0,
                 "maximum": 1
               },
-              "seconds": {
-                "type": "number",
-                "exclusiveMinimum": 0,
-                "maximum": 3600
-              },
               "roughness": {
                 "type": "number",
                 "minimum": 0.02,
@@ -94,14 +89,9 @@
                 },
                 "required": ["features", "height", "width_degrees", "profile", "seed"],
                 "additionalProperties": false
-              },
-              "morph_seconds": {
-                "type": "number",
-                "exclusiveMinimum": 0,
-                "maximum": 3600
               }
             },
-            "required": ["tint", "strength", "seconds"],
+            "required": ["tint", "strength"],
             "additionalProperties": false
           }
         },

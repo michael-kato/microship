@@ -1,29 +1,45 @@
 {
   "$schema": "../schemas/buildings.schema.json",
+  "shared": {
+    "growth_seconds": 14,
+    "sprout_seconds": 4.285714285714286,
+    "establishment_seconds": 257.14285714285717,
+    "collection": 2.5,
+    "height": 3.5,
+    "width": 1.35,
+    "repair": {
+      "health_per_second": 12,
+      "nutrients_per_health": 0.08,
+      "delay_seconds": 4
+    },
+    "growth_plane": {
+      "normal": [0, 0.28734789, 0.95782629],
+      "depth_ratio": 0.03,
+      "spread_roots": true
+    },
+    "branches": {
+      "seconds": 32,
+      "seed": 4721,
+      "regrow_seconds": 48,
+      "roots": "organelles",
+      "root_limit": 3,
+      "root_minimum_radius": 0.1,
+      "root_offset_seconds": 2.857142857142857
+    }
+  },
   "buildings": [
     {
       "name": "virus_factory",
       "faction": "virus",
       "model": "../models/virus_factory.fmesh",
-      "growth_seconds": 14,
-      "sprout_seconds": 3,
-      "establishment_seconds": 180,
       "health": 240,
-      "collection": 2.5,
-      "height": 3.5,
-      "width": 1.35,
       "hits": 12,
       "branches": {
-        "seconds": 32,
         "count": 21,
         "spacing": 1.4,
         "production": 0.05,
-        "seed": 4721,
-        "normal": [0.0, 0.29, 0.957],
         "health": 150,
         "hits": 8,
-        "regrow_seconds": 48,
-        "roots": "organelles",
         "grammar": "tree",
         "tree": {
           "children": 2,
@@ -36,10 +52,7 @@
           "angle_jitter_degrees": 16,
           "length_jitter": 0.25,
           "width_jitter": 0.15
-        },
-        "root_limit": 3,
-        "root_minimum_radius": 0.1,
-        "root_offset_seconds": 2
+        }
       },
       "growth_meshes": {
         "segment": "../models/virus_stem.fmesh",
@@ -48,44 +61,21 @@
       "navigation": {
         "stem_radius": 0.15,
         "head_radius": 0.85
-      },
-      "growth_plane": {
-        "normal": [0, 0.28734789, 0.95782629],
-        "depth_ratio": 0.15
-      },
-      "repair": {
-        "health_per_second": 12,
-        "nutrients_per_health": 0.08,
-        "delay_seconds": 4
       }
     },
     {
       "name": "immune_factory",
       "faction": "immune",
       "model": "../models/immune_factory.fmesh",
-      "growth_seconds": 14,
-      "sprout_seconds": 3,
-      "establishment_seconds": 180,
       "health": 480,
-      "collection": 2.5,
-      "height": 3.5,
-      "width": 1.35,
       "hits": 24,
       "branches": {
-        "seconds": 32,
         "count": 9,
         "spacing": 1.15,
         "production": 0.12,
-        "seed": 4721,
-        "normal": [0.0, 0.29, 0.957],
         "health": 300,
         "hits": 16,
-        "regrow_seconds": 48,
-        "roots": "organelles",
-        "grammar": "fan",
-        "root_limit": 3,
-        "root_minimum_radius": 0.1,
-        "root_offset_seconds": 2
+        "grammar": "fan"
       },
       "growth_meshes": {
         "segment": "../models/immune_stem.fmesh",
@@ -94,45 +84,22 @@
       "navigation": {
         "stem_radius": 0.55,
         "head_radius": 0.55
-      },
-      "growth_plane": {
-        "normal": [0, 0.28734789, 0.95782629],
-        "depth_ratio": 0.15
-      },
-      "repair": {
-        "health_per_second": 12,
-        "nutrients_per_health": 0.08,
-        "delay_seconds": 4
       }
     },
     {
       "name": "fungal_emitter",
       "faction": "fungus",
       "model": "../models/fungal_factory.fmesh",
-      "growth_seconds": 14,
-      "sprout_seconds": 3,
-      "establishment_seconds": 180,
       "health": 240,
-      "collection": 2.5,
-      "height": 3.5,
-      "width": 1.35,
       "hits": 12,
       "branches": {
-        "seconds": 32,
         "count": 9,
         "spacing": 1.15,
         "production": 0.12,
-        "seed": 4721,
-        "normal": [0.0, 0.29, 0.957],
         "health": 150,
         "hits": 8,
-        "regrow_seconds": 48,
-        "roots": "organelles",
         "grammar": "hypha",
-        "root_limit": 3,
-        "root_minimum_radius": 0.1,
-        "root_offset_seconds": 2,
-        "root_interval_seconds": 12
+        "root_interval_seconds": 17.142857142857142
       },
       "growth_meshes": {
         "segment": "../models/fungal_stem.fmesh",
@@ -141,15 +108,6 @@
       "navigation": {
         "stem_radius": 0.55,
         "head_radius": 0.55
-      },
-      "growth_plane": {
-        "normal": [0, 0.28734789, 0.95782629],
-        "depth_ratio": 0.15
-      },
-      "repair": {
-        "health_per_second": 12,
-        "nutrients_per_health": 0.08,
-        "delay_seconds": 4
       },
       "haze": {
         "reach": 4,

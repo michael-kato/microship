@@ -40,7 +40,6 @@ static const int MAX_UNIT_CLOUD_SECONDS = 120;
 static const int MAX_UNIT_CLOUD_DAMAGE = 1000;
 static const int MAX_UNIT_BROOD = 64;
 static const int MAX_UNIT_STUN_SECONDS = 60;
-static const int MAX_CELL_TINT_SECONDS = 3600;
 static const float MIN_CELL_DISPLACEMENT_WIDTH_DEGREES = 6;
 static const double MAX_CELL_INTERIOR_VARIATION = .15;
 static const double MAX_CELL_SHAPE_VARIATION = .12;
@@ -100,7 +99,7 @@ static Vec3 normal(Json j)
 }
 static bool load_bodies(Content* c,Json root,const char* path)
 {
-    json_object(root,"$schema|bodies");JsonArray a=json_array(json_get(root,"bodies"),MAX_BODY_TYPES);Json j={};
+    json_object(root,"$schema|shared|bodies");Json shared=json_find(root,"shared");JsonArray a=json_array(json_get(root,"bodies"),MAX_BODY_TYPES);Json j={};
     while (json_next(&a,&j))
     {
         json_object(j,"name|label|geometry|model|hosts_site|variation");BodyDefinition b={};char geometry[ASSET_NAME_CAPACITY]={};
@@ -111,8 +110,9 @@ static bool load_bodies(Content* c,Json root,const char* path)
         Json variation=json_find(j,"variation");
         if (json_present(variation))
         {
-            json_object(variation,"parts|shape|interior|wall_noise|layout_rotation_degrees");
-            Json noise=json_find(variation,"wall_noise");
+            json_object(variation,"parts");
+            json_object(shared,"shape|interior|wall_noise|layout_rotation_degrees");
+            Json noise=json_find(shared,"wall_noise");
             if (json_present(noise))
             {
                 json_object(noise,"strength|frequency|warm|cool");
@@ -121,9 +121,9 @@ static bool load_bodies(Content* c,Json root,const char* path)
                 b.wall_noise_warm=json_color(json_get(noise,"warm"));b.wall_noise_cool=json_color(json_get(noise,"cool"));
             }
             json_path(json_get(variation,"parts"),path,b.parts_path);
-            b.shape_variation=json_float(json_get(variation,"shape"),0,MAX_CELL_SHAPE_VARIATION);
-            b.part_variation=json_float(json_get(variation,"interior"),0,MAX_CELL_INTERIOR_VARIATION);
-            Json rotation=json_find(variation,"layout_rotation_degrees");
+            b.shape_variation=json_float(json_get(shared,"shape"),0,MAX_CELL_SHAPE_VARIATION);
+            b.part_variation=json_float(json_get(shared,"interior"),0,MAX_CELL_INTERIOR_VARIATION);
+            Json rotation=json_find(shared,"layout_rotation_degrees");
             if (json_present(rotation)) b.layout_rotation=json_float(rotation,0,180)*.01745329252f;
             if (!b.model_path[0]) json_error(variation,"variation requires a mesh");
         }
@@ -141,10 +141,8 @@ static bool load_factions(Content* c,Json root)
         Json appearance=json_find(j,"cell_appearance");
         if (json_present(appearance))
         {
-            json_object(appearance,"tint|strength|seconds|morph_seconds|roughness|displacement");f.cell_tint=json_color(json_get(appearance,"tint"));
-            f.cell_strength=json_float(json_get(appearance,"strength"),0,1);f.transform_seconds=json_positive(json_get(appearance,"seconds"),MAX_CELL_TINT_SECONDS);
-            f.morph_seconds=f.transform_seconds;
-            Json morph=json_find(appearance,"morph_seconds");if (json_present(morph)) f.morph_seconds=json_positive(morph,MAX_CELL_TINT_SECONDS);
+            json_object(appearance,"tint|strength|roughness|displacement");f.cell_tint=json_color(json_get(appearance,"tint"));
+            f.cell_strength=json_float(json_get(appearance,"strength"),0,1);
             Json roughness=json_find(appearance,"roughness");
             if (json_present(roughness)) { f.cell_roughness=json_float(roughness,.02f,1);f.cell_material=true; }
             Json displacement=json_find(appearance,"displacement");
@@ -199,7 +197,8 @@ static bool load_groups(Content* c,Json root)
 }
 static bool load_units(Content* c,Json root,const char* path)
 {
-    json_object(root,"$schema|units");JsonArray a=json_array(json_get(root,"units"),MAX_UNIT_TYPES);Json j={};
+    json_object(root,"$schema|shared|units");Json shared=json_get(root,"shared");
+    json_object(shared,"secondary_interval_factor");float secondary_interval=json_float(json_get(shared,"secondary_interval_factor"),1,MAX_UNIT_INTERVAL_FACTOR);JsonArray a=json_array(json_get(root,"units"),MAX_UNIT_TYPES);Json j={};
     while (json_next(&a,&j))
     {
         json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|trail_origin|pick_radius|cue_radius|hits|brood|manufacture_seconds|attack|secondary_attack|autonomy|payload|rear_tint");
@@ -301,10 +300,10 @@ static bool load_units(Content* c,Json root,const char* path)
             if (!bit || (u.targets&bit)) return json_error(target,"unknown or duplicate target category");
             u.targets|=bit;
         }
-        Json secondary=json_find(j,"secondary_attack");u.secondary_interval=1;
+        Json secondary=json_find(j,"secondary_attack");u.secondary_interval=secondary_interval;
         if (json_present(secondary))
         {
-            json_object(secondary,"targets|interval_factor");u.secondary_interval=json_float(json_get(secondary,"interval_factor"),1,MAX_UNIT_INTERVAL_FACTOR);
+            json_object(secondary,"targets");
             JsonArray a=json_array(json_get(secondary,"targets"),MAX_UNIT_TARGETS);
             while (json_next(&a,&target))
             {
@@ -321,11 +320,14 @@ static bool load_units(Content* c,Json root,const char* path)
 }
 static bool load_buildings(Content* c,Json root,const char* path)
 {
-    json_object(root,"$schema|buildings");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
+    json_object(root,"$schema|shared|buildings");
+    Json shared=json_get(root,"shared"),shared_branches=json_get(shared,"branches");
+    json_object(shared,"growth_seconds|sprout_seconds|establishment_seconds|collection|height|width|repair|growth_plane|branches");
+    json_object(shared_branches,"seconds|seed|regrow_seconds|roots|root_limit|root_minimum_radius|root_offset_seconds");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|model|growth_seconds|sprout_seconds|establishment_seconds|health|collection|height|width|hits|branches|growth_meshes|navigation|growth_plane|repair|haze");ProducerDefinition p={};
-        Json repair=json_find(j,"repair");
+        json_object(j,"name|faction|model|health|hits|branches|growth_meshes|navigation|haze");ProducerDefinition p={};
+        Json repair=json_find(shared,"repair");
         if (json_present(repair))
         {
             json_object(repair,"health_per_second|nutrients_per_health|delay_seconds");
@@ -341,10 +343,12 @@ static bool load_buildings(Content* c,Json root,const char* path)
             p.haze_damage=json_positive(json_get(haze,"damage_per_second"),MAX_UNIT_CLOUD_DAMAGE);
             p.haze_heal=json_positive(json_get(haze,"heal_per_second"),MAX_UNIT_CLOUD_DAMAGE);
         }
-        Json plane=json_find(j,"growth_plane");
+        Json plane=json_find(shared,"growth_plane");
         if (json_present(plane))
         {
-            json_object(plane,"normal|depth_ratio");p.growth_plane_normal=normal(json_get(plane,"normal"));
+            json_object(plane,"normal|depth_ratio|spread_roots");
+            Json spread=json_find(plane,"spread_roots");if (json_present(spread)) p.spread_roots=json_bool(spread);
+            p.growth_plane_normal=normal(json_get(plane,"normal"));
             p.growth_depth_ratio=json_float(json_get(plane,"depth_ratio"),0,1);p.growth_plane_enabled=true;
         }
         Json navigation=json_find(j,"navigation");
@@ -361,30 +365,30 @@ static bool load_buildings(Content* c,Json root,const char* path)
             json_path(json_get(growth,"tip"),path,p.tip_path);
         }
         definition_name(j,p.name);json_string(json_get(j,"faction"),p.faction_name,ASSET_NAME_CAPACITY);json_path(json_get(j,"model"),path,p.model_path);
-        p.growth_seconds=json_positive(json_get(j,"growth_seconds"),MAX_BUILDING_GROWTH_SECONDS);
-        Json sprout=json_find(j,"sprout_seconds");
+        p.growth_seconds=json_positive(json_get(shared,"growth_seconds"),MAX_BUILDING_GROWTH_SECONDS);
+        Json sprout=json_find(shared,"sprout_seconds");
         p.sprout_seconds=json_present(sprout) ? json_positive(sprout,MAX_BUILDING_GROWTH_SECONDS) : p.growth_seconds;
-        Json establishment=json_find(j,"establishment_seconds");
+        Json establishment=json_find(shared,"establishment_seconds");
         if (json_present(establishment)) p.establishment_seconds=json_positive(establishment,MAX_ESTABLISHMENT_SECONDS);
         p.health=json_positive(json_get(j,"health"),MAX_BUILDING_HEALTH);
-        p.collection=json_positive(json_get(j,"collection"),MAX_BUILDING_COLLECTION);
-        p.height=json_positive(json_get(j,"height"),MAX_BUILDING_HEIGHT);
-        p.width=json_positive(json_get(j,"width"),MAX_BUILDING_WIDTH);
+        p.collection=json_positive(json_get(shared,"collection"),MAX_BUILDING_COLLECTION);
+        p.height=json_positive(json_get(shared,"height"),MAX_BUILDING_HEIGHT);
+        p.width=json_positive(json_get(shared,"width"),MAX_BUILDING_WIDTH);
         p.hits=json_uint(json_get(j,"hits"),1,MAX_HIT_COUNT);Json b=json_get(j,"branches");
-        json_object(b,"seconds|count|spacing|production|seed|normal|health|hits|regrow_seconds|roots|root_limit|root_minimum_radius|root_offset_seconds|root_interval_seconds|grammar|tree");
+        json_object(b,"count|spacing|production|health|hits|root_interval_seconds|grammar|tree");
         char roots[ASSET_NAME_CAPACITY]={},grammar[ASSET_NAME_CAPACITY]={};
-        Json roots_json=json_find(b,"roots"),grammar_json=json_find(b,"grammar");
+        Json roots_json=json_find(shared_branches,"roots"),grammar_json=json_find(b,"grammar");
         if (json_present(roots_json))
         {
             json_string(roots_json,roots,ASSET_NAME_CAPACITY);
             p.branches.organelle_roots=!strcmp(roots,"organelles");
             if (!p.branches.organelle_roots && strcmp(roots,"single")) json_error(roots_json,"roots must be organelles or single");
         }
-        Json root_limit=json_find(b,"root_limit"),root_radius=json_find(b,"root_minimum_radius");
+        Json root_limit=json_find(shared_branches,"root_limit"),root_radius=json_find(shared_branches,"root_minimum_radius");
         if (json_present(root_limit)) p.branches.root_limit=json_uint(root_limit,1,MAX_FACTORY_STRUCTURES);
         if (json_present(root_radius)) p.branches.root_minimum_radius=json_float(root_radius,0,1.5f);
         if (!p.branches.organelle_roots && (json_present(root_limit) || json_present(root_radius))) json_error(b,"root filters require organelle roots");
-        Json root_offset=json_find(b,"root_offset_seconds");
+        Json root_offset=json_find(shared_branches,"root_offset_seconds");
         if (json_present(root_offset)) p.branches.root_offset_seconds=json_float(root_offset,0,MAX_ESTABLISHMENT_SECONDS);
         Json root_interval=json_find(b,"root_interval_seconds");
         if (json_present(root_interval)) p.branches.root_interval_seconds=json_float(root_interval,0,MAX_ESTABLISHMENT_SECONDS);
@@ -415,13 +419,13 @@ static bool load_buildings(Content* c,Json root,const char* path)
         Json branch_health=json_find(b,"health"),branch_hits=json_find(b,"hits");
         p.branches.health=json_present(branch_health) ? json_positive(branch_health,MAX_BRANCH_HEALTH) : p.health;
         p.branches.hits=json_present(branch_hits) ? json_uint(branch_hits,1,MAX_HIT_COUNT) : p.hits;
-        p.branches.seconds=json_positive(json_get(b,"seconds"),MAX_BRANCH_EMERGENCE_SECONDS);
-        Json regrow=json_find(b,"regrow_seconds");p.branches.regrow_seconds=json_present(regrow) ? json_positive(regrow,MAX_BRANCH_REGROW_SECONDS) : p.branches.seconds;
+        p.branches.seconds=json_positive(json_get(shared_branches,"seconds"),MAX_BRANCH_EMERGENCE_SECONDS);
+        Json regrow=json_find(shared_branches,"regrow_seconds");p.branches.regrow_seconds=json_present(regrow) ? json_positive(regrow,MAX_BRANCH_REGROW_SECONDS) : p.branches.seconds;
         p.branches.count=json_uint(json_get(b,"count"),1,MAX_FACTORY_STRUCTURES);
         p.branches.spacing=json_positive(json_get(b,"spacing"),MAX_BUILDING_SPACING);
         p.branches.production=json_positive(json_get(b,"production"),MAX_BUILDING_PRODUCTION);
-        p.branches.seed=json_uint(json_get(b,"seed"),0,MAX_BUILDING_SEED);
-        p.branches.normal=normal(json_get(b,"normal"));p.branches.fields=BRANCH_FIELDS_COMPLETE;
+        p.branches.seed=json_uint(json_get(shared_branches,"seed"),0,MAX_BUILDING_SEED);
+        p.branches.normal=p.growth_plane_normal;p.branches.fields=BRANCH_FIELDS_COMPLETE;
         if (content_producer(c,p.name)>=0) return json_error(j,"duplicate building definition");
         c->producers[c->producer_count++]=p;
     }

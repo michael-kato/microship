@@ -308,14 +308,9 @@
                 },
                 "maxItems": 2,
                 "uniqueItems": true
-              },
-              "interval_factor": {
-                "type": "number",
-                "minimum": 1,
-                "maximum": 100
               }
             },
-            "required": ["targets", "interval_factor"],
+            "required": ["targets"],
             "additionalProperties": false
           },
           "autonomy": {
@@ -448,8 +443,20 @@
         "additionalProperties": false
       },
       "maxItems": 32
+    },
+    "shared": {
+      "type": "object",
+      "properties": {
+        "secondary_interval_factor": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": ["secondary_interval_factor"],
+      "additionalProperties": false
     }
   },
-  "required": ["units"],
+  "required": ["units", "shared"],
   "additionalProperties": false
 }

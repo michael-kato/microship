@@ -29,5 +29,9 @@
     "heal_interval": 2.5,
     "damage_delay": 3.0,
     "orbit_clearance": 1.6
+  },
+  "cell_infection": {
+    "morph_seconds": 18,
+    "tint_seconds": 24
   }
 }
