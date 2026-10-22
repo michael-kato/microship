@@ -889,6 +889,25 @@ void simulation_order(Simulation* s, uint32_t cell)
     else snprintf(s->message,sizeof(s->message),"SELECT A GROUP FIRST");
 }
 
+static bool stationed(const Simulation* s,const Unit& u,uint32_t cell)
+{ return u.health>0 && u.faction==s->world.player_faction && !u.moving && u.target==(int32_t)cell; }
+uint32_t simulation_stationed(const Simulation* s,uint32_t cell)
+{
+    if (s->world.content.factions[s->world.player_faction].automatic) return 0;
+    uint32_t count=0;for (uint32_t i=0;i<MAX_UNITS;++i) count+=stationed(s,s->units[i],cell);
+    return count;
+}
+void simulation_send(Simulation* s,uint32_t from,uint32_t to)
+{
+    if (from==to || !simulation_stationed(s,from)) return;
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    {
+        Unit& u=s->units[i];u.selected=stationed(s,u,from);
+        if (u.selected) u.path_marker_tick=s->tick_count;
+    }
+    simulation_order(s,to);
+}
+
 void simulation_move_to(Simulation* s,Vec3 destination)
 {
     if (s->world.content.factions[s->world.player_faction].automatic) return;

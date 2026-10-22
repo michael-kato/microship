@@ -137,7 +137,9 @@ Settings has six pages. Display, Lighting, Volume, and Effects contain 40 graphi
 | Volume | Scattering, rays, integration steps and method, spatial filter and stride, optical lookup, lighting grid |
 | Effects | Cell blur, tilt shift, fog blur, glow, bloom radius and strength, bloom threshold, focus band and blur radius |
 | Audio | Master volume and sound effects volume |
-| Controls | Keyboard camera speed, mouse pan and zoom sensitivity, inverted wheel zoom, control reference |
+| Controls | Drag from a cell to another cell to send every unit stationed at the first cell (orbiting or defending it, not moving elsewhere). The drag replaces the selection with those units and orders them to the second cell. A drag that starts on a cell without stationed units, or ends on open space, box-selects as before.
+
+Keyboard camera speed, mouse pan and zoom sensitivity, inverted wheel zoom, control reference |
 
 Apply changes and saves the settings. Display changes apply immediately, with no countdown. Cancel discards changes made since the last Apply. Restore Defaults prepares the authored defaults; select Apply to use them. Invalid setting combinations show an error. Higher sample counts and larger grids increase GPU work and memory use. Borderless mode uses the primary monitor's native resolution. Window width and height apply in windowed mode.
 

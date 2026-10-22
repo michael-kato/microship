@@ -222,6 +222,10 @@ void simulation_step(Simulation* simulation,SimulationTimings* timings=0);
 void simulation_set_time(Simulation* simulation, double seconds);
 void simulation_select(Simulation* simulation, int group); // Asset group ID; a negative value selects all.
 void simulation_order(Simulation* simulation, uint32_t cell);
+// Player units stationed at a cell: alive, not moving, and orbiting or defending it.
+uint32_t simulation_stationed(const Simulation* simulation, uint32_t cell);
+// Replaces the selection with the units stationed at one cell and orders them to another.
+void simulation_send(Simulation* simulation, uint32_t from, uint32_t to);
 void simulation_move_to(Simulation* simulation, Vec3 destination);
 void simulation_priority(Simulation* simulation,int group);
 bool simulation_ratio_available(const Simulation*,uint32_t cell);

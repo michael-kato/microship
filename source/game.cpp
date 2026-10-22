@@ -65,6 +65,8 @@ struct Game
     int ratio_body;
     bool box_dragging,box_moved;
     int box[4];
+    int drag_cell; // Press cell with stationed units; a release on another cell sends them.
+
     MotionHistory motion;
     MotionRestore current_motion;
 };
@@ -154,6 +156,27 @@ static float pick_distance(Vec3 eye, Vec3 direction, Vec3 position, float radius
     return discriminant>=0 && -b+std::sqrt(discriminant)>0 ? std::fmax(0.0f,-b-std::sqrt(discriminant)) : PICK_MISS_DISTANCE;
 }
 
+// The nearest known cell under a client pixel, or -1.
+static int cell_at(const Game* game,const RenderConfig* config,int x,int y)
+{
+    const Simulation* s=&game->simulation;Vec3 ray=pointer_ray(&game->camera,config,x,y);
+    float nearest=PICK_MISS_DISTANCE;int cell=-1;
+    for (uint32_t p=0;p<s->world.body_count;++p)
+    {
+        if (!simulation_body_known(s,p)) continue;
+        float t=pick_distance(game->camera.position,ray,s->world.bodies[p].position,s->world.bodies[p].radius*CELL_PICK_RADIUS_SCALE);
+        if (t<nearest) { nearest=t;cell=(int)p; }
+    }
+    return cell;
+}
+// The cell a drag from drag_cell would send its units to, or -1 while it would box-select.
+static int send_target(const Game* game,const RenderConfig* config)
+{
+    if (!game->box_dragging || !game->box_moved || game->drag_cell<0) return -1;
+    int cell=cell_at(game,config,game->box[2],game->box[3]);
+    return cell!=game->drag_cell ? cell : -1;
+}
+
 static void startup_camera(Game* game,const RenderConfig* config)
 {
     camera_initialize(&game->camera,config);
@@ -237,6 +260,8 @@ static void selection_input(Game* game,PointerInput* input,const RenderConfig* c
     {
         game->box_dragging=true;game->box_moved=false;
         game->box[0]=input->press_x;game->box[1]=input->press_y;
+        game->drag_cell=cell_at(game,config,input->press_x,input->press_y);
+        if (game->drag_cell>=0 && !simulation_stationed(&game->simulation,(uint32_t)game->drag_cell)) game->drag_cell=-1;
     }
     if (!game->box_dragging) return;
     game->box[2]=std::max(0,std::min((int)config->width-1,input->pointer_x));
@@ -244,7 +269,10 @@ static void selection_input(Game* game,PointerInput* input,const RenderConfig* c
     game->box_moved=game->box_moved || input->pointer_moved;
     if (input->pointer_released)
     {
-        if (game->box_moved)
+        int target=send_target(game,config);
+        if (target>=0)
+        { simulation_send(&game->simulation,(uint32_t)game->drag_cell,(uint32_t)target);input->click=false; }
+        else if (game->box_moved)
         {
             select_rectangle(game,config,input->additive,-1,
                 std::min(game->box[0],game->box[2]),std::min(game->box[1],game->box[3]),
@@ -350,13 +378,8 @@ static void gameplay_input(Game* game, PointerInput* input, const RenderConfig* 
         }
     }
     int x=input->command ? input->command_x : input->click_x,y=input->command ? input->command_y : input->click_y;
-    Vec3 ray=pointer_ray(&game->camera,config,x,y);float nearest=PICK_MISS_DISTANCE;int cell=-1,unit=-1;
-    for (uint32_t p=0;p<s->world.body_count;++p)
-    {
-        if (!simulation_body_known(s,p)) continue;
-        float t=pick_distance(game->camera.position,ray,s->world.bodies[p].position,s->world.bodies[p].radius*CELL_PICK_RADIUS_SCALE);
-        if (t<nearest) { nearest=t;cell=(int)p; }
-    }
+    Vec3 ray=pointer_ray(&game->camera,config,x,y);int cell=cell_at(game,config,x,y),unit=-1;
+    float nearest=cell>=0 ? pick_distance(game->camera.position,ray,s->world.bodies[cell].position,s->world.bodies[cell].radius*CELL_PICK_RADIUS_SCALE) : PICK_MISS_DISTANCE;
     if (input->command)
     {
         if (cell>=0) simulation_order(s,(uint32_t)cell);
@@ -428,14 +451,15 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     Color accent=content_color(&s->world.content,s->world.player_faction);
     r->hud_accent[0]=accent.r;r->hud_accent[1]=accent.g;r->hud_accent[2]=accent.b;
     for (uint32_t j=0;j<4;++j) r->selection_box[j]=-1;
-    if (game->box_dragging && game->box_moved)
+    int sending=send_target(game,config);
+    if (game->box_dragging && game->box_moved && sending<0)
     {
         r->selection_box[0]=std::min(game->box[0],game->box[2]);r->selection_box[1]=std::min(game->box[1],game->box[3]);
         r->selection_box[2]=std::max(game->box[0],game->box[2]);r->selection_box[3]=std::max(game->box[1],game->box[3]);
     }
     r->hud_feedback[0]=-1;r->hud_feedback[1]=s->paused ? 2.0f : (float)s->outcome;
     r->hud_feedback[2]=(float)s->time_seconds;r->hud_feedback[3]=-1;
-    int p=s->selected_body;selection_marker(game,config,p,r->selection_marker);
+    int p=sending>=0 ? game->drag_cell : s->selected_body;selection_marker(game,config,p,r->selection_marker);
     if (p>=0 && simulation_body_known(s,(uint32_t)p) && s->visible_bodies[p])
     {
         const Colony* c=&s->colonies[p];
@@ -477,17 +501,7 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     }
     else if (p>=0 && simulation_body_known(s,(uint32_t)p))
     { r->hud_accent[3]=0;snprintf(r->hud[HUD_LINE_SITE],HUD_LINE_CAPACITY,"%s %02d / OUT OF SIGHT",s->world.content.bodies[s->world.bodies[p].type].label,p+1); }
-    int hover=-1;float nearest=PICK_MISS_DISTANCE;
-    if (game->pointer.pointer_valid)
-    {
-        Vec3 ray=pointer_ray(&game->camera,config,game->pointer.pointer_x,game->pointer.pointer_y);
-        for (uint32_t j=0;j<s->world.body_count;++j)
-        {
-            if (!simulation_body_known(s,j)) continue;
-            float d=pick_distance(game->camera.position,ray,s->world.bodies[j].position,s->world.bodies[j].radius*CELL_PICK_RADIUS_SCALE);
-            if (d<nearest) { nearest=d;hover=(int)j; }
-        }
-    }
+    int hover=sending>=0 ? sending : game->pointer.pointer_valid ? cell_at(game,config,game->pointer.pointer_x,game->pointer.pointer_y) : -1;
     selection_marker(game,config,hover==p ? -1 : hover,r->hover_marker);
 }
 
