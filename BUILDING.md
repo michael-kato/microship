@@ -1296,3 +1296,44 @@ The largest observed S-path tick was 16.572 ms. Raw records are in
 `build/s_curve_factory_dense_before/` and `build/s_curve_factory_dense_after/`.
 CPU simulation, GPU stages, and application frames are separate measures.
 The complete suite, native Windows, and long gameplay remain unverified.
+
+## Immune production and factory health (Oct 21)
+
+Immune fighters now take 4 seconds to manufacture, down from 8. Bombers
+now take 5 seconds, down from 10. Factory trunks have 2,880 health and 48
+hits, up from 1,440 and 24. Branches have 1,800 health and 32 hits, up from
+900 and 16. Raising both health and hits preserves damage per wound and
+also increases resistance to direct projectiles. Small structures retain
+area scaling and round their hit counts up. Nutrient costs and collection
+rates keep their existing values.
+
+The factory loader and building schema now allow 64 hits. The unit limit
+remains 32. A real application accepts the factory limit and rejects 65
+root or branch hits and 33 unit hits. The natural-factory destruction check
+uses four quarter-health bursts to stay within the damage asset limit.
+
+Verification used the Windows application through Proton. Eight groups
+passed: smoke, data_assets, production_ratio, natural_factory,
+small_factories, factory_curves, three_factions, and factory_repair.
+Controlled 60-second production runs used the same seed, one mature Immune
+cell, sufficient nutrients, and separate fighter and bomber priorities.
+Factory work includes completed units plus unfinished job progress. Each
+of the 35 structures performed twice the prior work within 0.5%; total
+work ratios were 1.999992 for fighters and 1.999996 for bombers. Completed
+counts were 147 to 299 fighters and 106 to 236 bombers. Batch completion
+changes count ratios at a fixed end time. All 35 structure health values
+were twice their prior values, with the same paths and scales.
+
+Three real dense combat matches per balance used seed 1234, 15 mature
+cells, 90 seconds of production, and 1,800 measured ticks. No other check
+ran during the measurements. Median CPU tick times:
+
+| Balance | Peak units | Mean ms | p99 ms |
+| --- | ---: | ---: | ---: |
+| Before buff | 3725 | 5.162 | 12.742 |
+| After buff | 3731 | 5.193 | 12.747 |
+
+The largest observed tick after the buff was 13.638 ms. This is a bounded
+CPU simulation measurement. It does not establish sustained GPU or native
+Windows performance. Inputs, scripts, logs, states, and raw timing reports
+are in `build/immune_buff_review/`.

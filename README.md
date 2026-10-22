@@ -2,7 +2,7 @@
 
 Microscopic strategy inside a body, inspired by Eufloria. Command craft, scout living cells, establish factories, and expand. All three factions start on a 15-cell map. Fighters prefer units; bombers prefer factories. A slider sets their production ratio. Destroy enemy factories to win.
 
-Virus forces use large swarms of light craft and spike projectiles. Immune forces use fewer, tougher craft that stun a target with a blob, devour it, then heal nearby allies. The fungal trial fields swarms of melee spores that burst into toxic clouds.
+Virus forces use large swarms of light craft and spike projectiles. Immune forces use fewer, tougher craft that stun a target with a blob, devour it, then heal nearby allies. The fungal trial fields swarms of melee spores that burst into toxic clouds. Immune fighters take 4 seconds to manufacture and bombers take 5 seconds before factory-size and AI modifiers. Immune factory trunks have 2,880 health and withstand 48 direct hits; branches have 1,800 health and withstand 32 direct hits. Small factories scale health and manufacture rate by area.
 
 Seeded membranes, organelles, branching factories, and wet anatomical backgrounds form the world. Units grow at factory tips. Damaged limbs break away. Fog returns gradually and strongly blurs unseen areas. Direct ray tracing provides light, shadows, and atmospheric scattering. Colors come from vertices; each frame uses current data only.
 

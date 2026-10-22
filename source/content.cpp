@@ -378,7 +378,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
         p.collection=json_positive(json_get(shared,"collection"),MAX_BUILDING_COLLECTION);
         p.height=json_positive(json_get(shared,"height"),MAX_BUILDING_HEIGHT);
         p.width=json_positive(json_get(shared,"width"),MAX_BUILDING_WIDTH);
-        p.hits=json_uint(json_get(j,"hits"),1,MAX_HIT_COUNT);Json b=json_get(j,"branches");
+        p.hits=json_uint(json_get(j,"hits"),1,MAX_STRUCTURE_HIT_COUNT);Json b=json_get(j,"branches");
         json_object(b,"count|spacing|spread_scale|chain_length|production|production_leaf_limits|production_reference_count|health|hits|root_height|root_interval_seconds|grammar|tree");
         char roots[ASSET_NAME_CAPACITY]={},grammar[ASSET_NAME_CAPACITY]={};
         Json roots_json=json_find(shared_branches,"roots"),grammar_json=json_find(b,"grammar");
@@ -454,7 +454,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
         else if (json_present(tree)) json_error(tree,"tree settings require the tree grammar");
         Json branch_health=json_find(b,"health"),branch_hits=json_find(b,"hits");
         p.branches.health=json_present(branch_health) ? json_positive(branch_health,MAX_BRANCH_HEALTH) : p.health;
-        p.branches.hits=json_present(branch_hits) ? json_uint(branch_hits,1,MAX_HIT_COUNT) : p.hits;
+        p.branches.hits=json_present(branch_hits) ? json_uint(branch_hits,1,MAX_STRUCTURE_HIT_COUNT) : p.hits;
         p.branches.seconds=json_positive(json_get(shared_branches,"seconds"),MAX_BRANCH_EMERGENCE_SECONDS);
         Json regrow=json_find(shared_branches,"regrow_seconds");p.branches.regrow_seconds=json_present(regrow) ? json_positive(regrow,MAX_BRANCH_REGROW_SECONDS) : p.branches.seconds;
         p.branches.count=json_uint(json_get(b,"count"),1,MAX_FACTORY_STRUCTURES);
