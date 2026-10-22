@@ -24,6 +24,12 @@ with tempfile.TemporaryDirectory(prefix='nanova-keyboard-') as folder:
   for i in range(6):assert math.isclose(camera[i],baseline[i]+delta[i%3],rel_tol=1e-5,abs_tol=.0002),(x,y,camera,baseline,delta)
  for seconds in (.25,.5,2):
   camera,same=run('seconds-'+str(count),(1,0,seconds));assert abs(camera[0]-baseline[0]-speed*seconds)<.0002 and same==state
+ # Zooming out past the authored view scales speed by distance; zooming in keeps the authored speed.
+ authored=math.dist(settings['camera']['position'],settings['camera']['target'])
+ for wheel in (-8,-3,3):
+  zoomed,_=run('zoom-'+str(count),extra=('--camera-zoom',str(wheel)));camera,same=run('zoom-pan-'+str(count),(1,0,1),extra=('--camera-zoom',str(wheel)))
+  expected=speed*max(1,math.dist(zoomed[:3],zoomed[3:])/authored)
+  assert math.isclose(camera[3]-zoomed[3],expected,rel_tol=1e-4,abs_tol=.0005) and same==state,(wheel,camera,zoomed,expected)
  disabled=deepcopy(settings);disabled['camera']['keyboard_pan_speed']=0
  assert run('disabled',(1,1,1),disabled)==(baseline,state)
  rotated=deepcopy(settings);rotated['camera']['up']=[1,0,0]
@@ -36,4 +42,4 @@ with tempfile.TemporaryDirectory(prefix='nanova-keyboard-') as folder:
   run('invalid-delay-'+value,extra=('--frame-delay-ms',value),expected=2)
  for value in (-1,1001):
   bad=deepcopy(settings);bad['camera']['keyboard_pan_speed']=value;run('invalid-speed-'+str(count),config=bad,expected=1)
-print(f'Keyboard camera E2E passed: {count} application runs; cardinal and diagonal movement, elapsed time, map plane, rotated view, restart, unchanged sight and orders, optional settings and rejected input.')
+print(f'Keyboard camera E2E passed: {count} application runs; cardinal and diagonal movement, elapsed time, zoom-scaled speed, map plane, rotated view, restart, unchanged sight and orders, optional settings and rejected input.')
