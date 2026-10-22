@@ -16,10 +16,16 @@ static const int RADIAL_AVOIDANCE_GAIN = 4;
 static float length(Vec3 v) { return std::sqrt(dot(v,v)); }
 static FlightObstacle capsule(Vec3 a,Vec3 b,float radius,uint32_t cell,uint32_t structure)
 { return FlightObstacle{a,b,scale(add(a,b),.5f),radius,length(subtract(b,a))*.5f+radius,cell,structure}; }
-static float box_distance(Vec3 p,Vec3 low,Vec3 high)
+static bool outside_box(Vec3 p,Vec3 low,Vec3 high,float reach)
 {
-    Vec3 d={std::fmax(0.0f,std::fmax(low.x-p.x,p.x-high.x)),std::fmax(0.0f,std::fmax(low.y-p.y,p.y-high.y)),std::fmax(0.0f,std::fmax(low.z-p.z,p.z-high.z))};
-    return length(d);
+    // Most cells are far away. Reject on an axis before testing the sphere.
+    float x=p.x<low.x ? low.x-p.x : p.x>high.x ? p.x-high.x : 0;
+    if (x>=reach) return true;
+    float y=p.y<low.y ? low.y-p.y : p.y>high.y ? p.y-high.y : 0;
+    if (y>=reach) return true;
+    float z=p.z<low.z ? low.z-p.z : p.z>high.z ? p.z-high.z : 0;
+    if (z>=reach) return true;
+    return x*x+y*y+z*z>=reach*reach;
 }
 static Vec3 nearest(Vec3 point,const FlightObstacle& o)
 {
@@ -90,7 +96,7 @@ Vec3 flight_avoid(Simulation* s,const FlightObstacles& obstacles,const Unit& u,V
     float reach=length(ahead)+d.scale*CRAFT_COLLISION_RADIUS_SCALE+f.obstacle_clearance;
     for (uint32_t c=0;c<obstacles.cell_count;++c)
     {
-        if (box_distance(u.position,obstacles.low[c],obstacles.high[c])>=reach) continue;
+        if (outside_box(u.position,obstacles.low[c],obstacles.high[c],reach)) continue;
         for (uint32_t i=obstacles.first[c];i<obstacles.first[c+1];++i)
         {
             const FlightObstacle& o=obstacles.values[i];
@@ -133,7 +139,7 @@ void flight_clip(Simulation* s,const FlightObstacles& obstacles,Unit* u,Vec3 pre
     float craft=d.scale*CRAFT_COLLISION_RADIUS_SCALE;
     for (uint32_t c=0;c<obstacles.cell_count;++c)
     {
-        if (box_distance(u->position,obstacles.low[c],obstacles.high[c])>=craft) continue;
+        if (outside_box(u->position,obstacles.low[c],obstacles.high[c],craft)) continue;
         for (uint32_t i=obstacles.first[c];i<obstacles.first[c+1];++i)
         {
             const FlightObstacle& o=obstacles.values[i];

@@ -1255,14 +1255,17 @@ static void move_units(Simulation* s, float dt)
                 float d=std::sqrt(squared);desired=add(desired,scale(apart,speed*(1-d/spacing)/d));
             }
             // Steer around a cell before the hard collision shell becomes necessary.
+            Vec3 probe=add(u->position,scale(velocities[i],CELL_AVOIDANCE_LOOKAHEAD_SECONDS));
             for (uint32_t j=0;j<s->world.body_count;++j)
             {
                 if (colonizing && j==p && distance<LANDING_APPROACH_RADIUS) continue;
                 if (contact_attack(*definition) && u->task==TASK_ATTACK_STRUCTURE && u->attention==(int32_t)j) continue;
-                Vec3 probe=add(u->position,scale(velocities[i],CELL_AVOIDANCE_LOOKAHEAD_SECONDS));
-                Vec3 away=subtract(probe,s->world.bodies[j].position);float d=length(away);
+                Vec3 away=subtract(probe,s->world.bodies[j].position);float squared=dot(away,away);
                 float safe=s->world.bodies[j].radius*CELL_COLLISION_RADIUS_SCALE+CELL_AVOIDANCE_CLEARANCE;
-                if (d<safe && d>STEERING_DIRECTION_EPSILON) desired=add(desired,scale(away,speed*FLIGHT_POSITION_GAIN*(1-d/safe)/d));
+                if (squared<safe*safe && squared>STEERING_DIRECTION_EPSILON*STEERING_DIRECTION_EPSILON)
+                {
+                    float d=std::sqrt(squared);desired=add(desired,scale(away,speed*FLIGHT_POSITION_GAIN*(1-d/safe)/d));
+                }
             }
             desired=flight_avoid(s,obstacles,*u,desired,speed);
             float desired_speed=length(desired);if (desired_speed>speed) desired=scale(desired,speed/desired_speed);
@@ -1288,12 +1291,12 @@ static void move_units(Simulation* s, float dt)
         // Conservative spherical collision keeps transit outside cell terrain.
         for (uint32_t p2=0;p2<s->world.body_count;++p2)
         {
-            Vec3 offset=subtract(u->position,s->world.bodies[p2].position);float radial=length(offset);
+            Vec3 offset=subtract(u->position,s->world.bodies[p2].position);float squared=dot(offset,offset);
             float clearance=s->world.bodies[p2].radius*CELL_COLLISION_RADIUS_SCALE+CELL_COLLISION_CLEARANCE;
             if (colonizing && p2==p && distance<LANDING_APPROACH_RADIUS) continue;
             if (contact_attack(*definition) && u->task==TASK_ATTACK_STRUCTURE && u->attention==(int32_t)p2) continue;
-            if (radial<clearance && radial>POSITION_EPSILON)
-                u->position=add(s->world.bodies[p2].position,scale(offset,clearance/radial));
+            if (squared<clearance*clearance && squared>POSITION_EPSILON*POSITION_EPSILON)
+                u->position=add(s->world.bodies[p2].position,scale(offset,clearance/std::sqrt(squared)));
         }
         if (flight->flight_enabled) flight_clip(s,obstacles,u,positions[i]);
         if (u->moving && length(subtract(u->destination,u->position))<MOVE_COMPLETION_RADIUS)
