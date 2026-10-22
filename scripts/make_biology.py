@@ -380,7 +380,7 @@ def cell(name,key):
     export(name,True)
 
 def pointed_hull(profile,color,surface):
-    # Closed diamond sections meet at single vertices. Flat normals retain each edge.
+    # Closed diamond sections meet at single vertices. Smooth normals soften the edges.
     vertices=[(0,0,profile['rear_z'])];rings=profile['sections']
     for section in rings:
         z,x,y=section['z'],section['half_width'],section['half_height']
@@ -394,7 +394,7 @@ def pointed_hull(profile,color,surface):
     for j in range(4):faces.append((tip-4+j,tip-4+(j+1)%4,tip))
     mesh=bpy.data.meshes.new('pointed_hull');mesh.from_pydata(vertices,[],faces);mesh.update()
     obj=bpy.data.objects.new('pointed_hull',mesh);bpy.context.collection.objects.link(obj)
-    finish(obj,color,surface=surface,smooth=False)
+    finish(obj,color,surface=surface)
 
 def virus(large):
     palette=profiles['virus'];p=profiles['virus_ships']['bomber' if large else 'fighter']
@@ -402,11 +402,11 @@ def virus(large):
     for fin in p['fins']:
         for side in (-1,1):
             a=(side*fin['root_x'],0,fin['root_z']);b=(side*fin['tip_x'],0,fin['tip_z'])
-            rod(a,b,fin['radius'],palette['spikes'],'virus_fibre',sides=4,smooth=False,tip_scale=0)
+            rod(a,b,fin['radius'],palette['spikes'],'virus_fibre',sides=4,tip_scale=0)
     for side in (-1,1):
         rod((0,side*p['ridge_root_y'],p['ridge_root_z']),
             (0,side*p['ridge_tip_y'],p['ridge_tip_z']),p['ridge_radius'],
-            palette['spikes'],'virus_fibre',sides=4,smooth=False,tip_scale=0)
+            palette['spikes'],'virus_fibre',sides=4,tip_scale=0)
     export('virus_'+('bomber' if large else 'virion'))
 
 def virus_bomb():
