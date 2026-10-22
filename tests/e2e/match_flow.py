@@ -37,12 +37,12 @@ with tempfile.TemporaryDirectory(prefix='nanova-match-') as directory:
     for key in ('world','render','shader','audio'):manifest[key]=os.path.relpath(binary.parent/'assets'/manifest[key],copied/'assets')
     manifest['menu']='menu.json';(copied/'assets/startup.json').write_text(json.dumps(manifest))
     menu=json.loads((root/'assets/presentation/start-menu.json').read_text())
-    for choice in menu['choices']:choice['world']=os.path.relpath((root/'assets/presentation'/choice['world']).resolve(),copied/'assets')
     invalid=[]
     empty=deepcopy(menu);empty['choices']=[];invalid.append(empty)
     extra=deepcopy(menu);extra['unknown']=True;invalid.append(extra)
     color=deepcopy(menu);color['choices'][0]['color']=[2,0,0];invalid.append(color)
-    missing=deepcopy(menu);missing['choices'][0]['world']='missing.json';invalid.append(missing)
+    unknown=deepcopy(menu);unknown['choices'][0]['faction']='nobody';invalid.append(unknown)
+    world=deepcopy(menu);world['choices'][0]['world']='../levels/large_level.json';invalid.append(world)
     for bad in invalid:
         (copied/'assets/menu.json').write_text(json.dumps(bad))
         invocation=[str(copied/'nanova.exe')] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(copied/'nanova.exe')]

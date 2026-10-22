@@ -11,7 +11,7 @@ losses, and flags suspect results.
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from itertools import combinations
-import json
+import json, math
 import os
 from pathlib import Path
 import statistics
@@ -47,18 +47,16 @@ attack_seconds = base['rules']['economy'].get('enemy_attack_seconds', 0)
 unit_faction = {u['name']: u['faction'] for u in base['content']['units']}
 
 def roster(faction):
-    """Starting craft from the faction's own player level, as offsets from its start cell."""
+    """Starting craft from the normal map's starts, as offsets on its force ring."""
     startup = json.loads((root/'assets/startup.json').read_text())
-    menu_path = (root/'assets'/startup['menu']).resolve()
-    menu = json.loads(menu_path.read_text())
-    for choice in menu['choices']:
-        level = (menu_path.parent/choice['world']).resolve()
-        data = json.loads(level.read_text())
-        if data['match']['player'] != faction: continue
-        cell = next(s['cell'] for s in data['match']['starts'] if s['faction'] == faction)
-        home = data['bodies'][cell]['position']
-        return [(s['type'], [p-h for p, h in zip(s['position'], home)]) for s in data['spawns'] if unit_faction[s['type']] == faction]
-    raise SystemExit(f'No player level defines a starting roster for {faction}.')
+    data = json.loads((root/'assets'/startup['world']).read_text())
+    ring = data['match']['force_ring']
+    for start in data['match']['starts']:
+        if start['faction'] != faction: continue
+        kinds = [f['type'] for f in start.get('forces', []) for _ in range(f['count'])]
+        return [(kind, [ring['radius']*math.cos(2*math.pi*k/len(kinds)), ring['radius']*math.sin(2*math.pi*k/len(kinds)), ring['height']])
+                for k, kind in enumerate(kinds)]
+    raise SystemExit(f'The normal map defines no starting roster for {faction}.')
 
 def world_for(player, opponent, player_cell):
     data = json.loads(json.dumps(base))
