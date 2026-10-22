@@ -20,6 +20,8 @@ with tempfile.TemporaryDirectory(prefix='nanova-polish-') as directory:
     config.write_text(json.dumps(change(json.loads((root/'assets/rendering/renderer.json').read_text()),'camera.position',[0,11,36])))
     world=root/'tests/e2e/scenes/virus-two-cell-test-level.json'
     authored=established_world(world,out);definitions={u['name']:u for u in authored['content']['units']}
+    authored['rules']['economy']['fighter_percent']=80
+    world=out/'flight_world.json';write_world(world,authored)
     acceleration=authored['rules']['flight']['acceleration']
     def speed_limit(u):
         definition=definitions[u['type']]
