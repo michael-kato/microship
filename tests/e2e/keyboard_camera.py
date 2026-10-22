@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-keyboard-') as folder:
   # The camera log has six significant digits; large coordinates round more.
   for i in range(6):assert math.isclose(camera[i],baseline[i]+delta[i%3],rel_tol=1e-5,abs_tol=.0002),(x,y,camera,baseline,delta)
  for seconds in (.25,.5,2):
-  camera,same=run('seconds-'+str(count),(1,0,seconds));assert abs(camera[0]-baseline[0]-speed*seconds)<.0002 and same==state
+  camera,same=run('seconds-'+str(count),(1,0,seconds));assert math.isclose(camera[0],baseline[0]+speed*seconds,rel_tol=1e-5,abs_tol=.0002) and same==state
  # Zooming out past the authored view scales speed by distance; zooming in keeps the authored speed.
  authored=math.dist(settings['camera']['position'],settings['camera']['target'])
  for wheel in (-8,-3,3):
@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-keyboard-') as folder:
  assert run('disabled',(1,1,1),disabled)==(baseline,state)
  rotated=deepcopy(settings);rotated['camera']['up']=[1,0,0]
  initial,_=run('rotated-initial',config=rotated);moved,_=run('rotated-right',(1,0,1),rotated)
- assert abs(moved[0]-initial[0])<.0002 and abs(moved[1]-initial[1]+speed)<.0002 and moved[2]==initial[2]
+ assert math.isclose(moved[0],initial[0],rel_tol=1e-5,abs_tol=.0002) and math.isclose(moved[1],initial[1]-speed,rel_tol=1e-5,abs_tol=.0002) and moved[2]==initial[2]
  reset,_=run('restart',(1,1,1),extra=('--restart',));assert reset==baseline
  for pan in ((2,0,1),(0,-2,1),(0,0,-1),(0,0,61),('nan',0,1)):
   run('invalid-pan-'+str(count),pan,expected=2)
