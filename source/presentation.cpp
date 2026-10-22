@@ -33,6 +33,17 @@ static const float FACTORY_AXIS_PARALLEL_LIMIT = .9f;
 static const float BUD_START_SCALE = .08f;
 static const float BUD_GROWTH_SCALE = .92f;
 
+static void factory_length_color(const ProducerDefinition& definition,float distance,float* style)
+{
+    if (definition.length_color_distance<=0) return;
+    float t=std::fmin(1.0f,distance/definition.length_color_distance);
+    float amount=t*t*(3-2*t)*definition.length_color_strength;if (amount<=0) return;
+    float retained=style[3]*(1-amount),weight=retained+amount;
+    style[0]=(style[0]*retained+definition.length_color.r*amount)/weight;
+    style[1]=(style[1]*retained+definition.length_color.g*amount)/weight;
+    style[2]=(style[2]*retained+definition.length_color.b*amount)/weight;style[3]=weight;
+}
+
 static void rounded_stem_frame(const MeshRange& mesh,Vec3 start,Vec3 delta,float width,Vec3* origin,Vec3* axis)
 {
     float radial=std::fmax(std::fmax(std::fabs(mesh.low[0]),std::fabs(mesh.high[0])),std::fmax(std::fabs(mesh.low[2]),std::fabs(mesh.high[2])));
@@ -369,9 +380,12 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
             if (definition->segment_path[0])
             {
                 Color color=content_color(&s->world.content,colony->faction);
+                float fork_distance[MAX_FACTORY_STRUCTURES]={};
                 for (uint32_t k=0;k<colony->structure_count;++k)
                 {
                     if ((k ? colony->branches[k-1].health : colony->health)<=0) continue;
+                    float distance=colony->parents[k]<0 ? 0 : fork_distance[colony->parents[k]];
+                    fork_distance[k]=distance;
                     float growth=simulation_structure_growth(s,p,k);
                     if (growth*GROWTH_PATH_SEGMENTS<=MIN_VISIBLE_STEM_EXTENSION) continue;
                     for (uint32_t j=0;j<GROWTH_PATH_SEGMENTS;++j)
@@ -379,6 +393,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                         float extension=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_PATH_SEGMENTS-j));
                         if (extension<=MIN_VISIBLE_STEM_EXTENSION) continue;
                         Vec3 start=colony->paths[k][j],delta=scale(subtract(colony->paths[k][j+1],start),extension);
+                        float span_length=definition->length_color_distance>0 ? std::sqrt(dot(delta,delta)) : 0;
                         Vec3 y=normalize(delta),x=normalize(cross(std::fabs(y.z)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
                         float width=simulation_structure_stem_width(s,p,k,j,growth);
                         uint32_t slot=state->stem_base+(p*MAX_FACTORY_STRUCTURES+k)*GROWTH_PATH_SEGMENTS+j;
@@ -392,6 +407,9 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                         Color tint=wounds ? s->world.spikes.injury[std::min(1u,wounds-1)] : color;
                         float* style=state->scene.instances[slot].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=wounds ? INJURY_TINT_STRENGTH : definition->factory_tint_strength;
                         style[4]=state->stem_glow_mask[colony->type] ? 0 : s->world.glow_stems*definition->factory_glow_scale;style[7]=INSTANCE_EMISSION_FRESNEL;
+                        if (!wounds) factory_length_color(*definition,distance+span_length*.5f,style);
+                        distance+=span_length;
+                        if (j<GROWTH_PATH_SEGMENTS-GROWTH_PATH_SUBDIVISIONS) fork_distance[k]+=span_length;
                     }
                     float size=definition->width*simulation_structure_head_scale(s,p,k)*(FACTORY_HEAD_START_WIDTH_SCALE+FACTORY_HEAD_GROWTH_WIDTH_SCALE*growth);
                     uint32_t slot=factory_instance_slot(state,p,k);
@@ -402,6 +420,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                         set_instance(state,slot,state->tip_meshes[colony->type],tip,scale(x,size),scale(y,size),scale(z,size));
                     float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=definition->factory_tint_strength;
                     style[4]=s->world.glow_leaves*definition->factory_glow_scale;style[7]=INSTANCE_EMISSION_FRESNEL;
+                    factory_length_color(*definition,distance,style);
                 }
                 for (uint32_t k=0;k<colony->structure_count;++k) if (colony->leaves[k].active)
                 {

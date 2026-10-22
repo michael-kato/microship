@@ -1482,3 +1482,62 @@ Balance and navigation changes alter the battle, so these states differ.
 This is bounded CPU simulation evidence. It does not establish sustained
 GPU performance. Raw timing and phase records are in the `cpu_before` and
 `cpu_after` folders under `build/factory_shapes_review/`.
+
+
+## Fungal pigment and tip spacing (Oct 21)
+
+Fungal factory color now becomes darker with cumulative distance along
+its growth path. Child branches inherit distance at the parent junction.
+This keeps the color continuous through forks. Visible growth controls
+which part of the path supplies the end color. Existing injury tint takes
+priority on wounded stems. The optional `growth_meshes.length_color`
+object supplies a target RGB color, a positive distance, and strength from
+0 through 1. This uses current geometry and instance tint; it stores no
+frame history and allocates no per-frame heap memory.
+
+The Fungal setting uses color [0.045, 0.012, 0.004], distance 8, and strength
+0.65. In the captured large root, linear surface-color brightness changed
+from 0.154 near the start to 0.101 near the end, about 35 percent lower.
+This is an average mesh-color and instance-tint measurement before light
+and display conversion. The previous stem had the same value at both ends.
+
+Each tip now has three tendrils spaced at 120 degrees. Their bases are
+separate, their lateral motion is smaller, and each tube stays inside its
+own angular sector. Tendril height variation is 14 percent. The Fungal
+fork angle is 44 degrees with 6 degrees of jitter. Length jitter is 0.16
+and curve jitter is 0.5. Curvature remains 1.4. These changes retain the
+wandering paths while reducing crowding. The tip mesh uses 930 triangles,
+down from 1,096. Factory production head counts retain their values.
+
+Seven real Windows application groups passed through Proton:
+factory_curves, small_factories, fungal_sources, factory_emission,
+data_assets, three_factions, and navigation. The added checks inspect the
+exported mesh after a successful game run: three separate tendrils,
+equal endpoint angles, and no tube crossing into the neighboring sector.
+Color checks cover monotonic tint, inherited distance, actual surface
+brightness, and identical simulation state when the length color is removed.
+Malformed color settings are rejected. Existing checks cover three cell
+sizes, three fixed seeds, partial growth, damage, and navigation bounds.
+
+Host Vulkan validation passed for native 1920x1080 captures, one frozen
+frame per process with default sampling. Tilt-shift blur was disabled for
+inspection. Before and after close views are screenshots 001019 and
+001020. Large and small cell views are 001021 and 001022; the latter uses
+seed 1235. The close view measured GPU renderer time 9.673 to 9.540 ms
+and application frame time 19.076 to 18.831 ms. These are single-frame
+measurements, not a sustained frame-rate claim.
+
+CPU comparison used three real matches per build, seed 1234, 15 mature
+cells, 90 seconds of production, and 1,800 measured combat ticks. No other
+check ran during these measurements. Median per-run results:
+
+| Build | Peak units | Mean tick ms | p99 tick ms | Largest observed tick ms |
+| --- | ---: | ---: | ---: | ---: |
+| before | 3740 | 5.077 | 12.951 | 17.156 |
+| after | 3750 | 5.088 | 13.143 | 17.870 |
+
+Branch geometry changes the battle, so the states differ between builds.
+Color alone leaves simulation state unchanged. Reports, worlds, state
+exports, capture commands, and timing logs are in
+`build/fungal_spacing_review/`. Native Windows and sustained GPU timing
+remain unverified.

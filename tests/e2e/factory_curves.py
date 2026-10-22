@@ -52,6 +52,13 @@ def mesh_points(path):
     stride=64 if magic==b'FLMESH02' else 48
     return [struct.unpack_from('<3f',raw,16+i*stride) for i in range(vertices)]
 
+def surface_brightness(path,style):
+    raw=Path(path).read_bytes();magic,count,_=struct.unpack_from('<8sII',raw)
+    stride=64 if magic==b'FLMESH02' else 48
+    rgb=[sum(struct.unpack_from('<3f',raw,16+i*stride+32)[k] for i in range(count))/count for k in range(3)]
+    tinted=[rgb[k]*(1-style[3])+style[k]*style[3] for k in range(3)]
+    return dot(tinted,(.2126,.7152,.0722))
+
 def check_bounds(instance,points,obstacle):
     a=obstacle['start'];direction=delta(obstacle['end'],a);squared=dot(direction,direction)
     matrix=instance['transform']
@@ -59,6 +66,31 @@ def check_bounds(instance,points,obstacle):
         point=[sum(matrix[row*4+j]*v[j] for j in range(3))+matrix[row*4+3] for row in range(3)]
         t=max(0,min(1,dot(delta(point,a),direction)/squared)) if squared else 0
         assert math.dist(point,[x+t*y for x,y in zip(a,direction)])<=obstacle['radius']+3e-5,'Navigation missed visible factory geometry'
+
+def check_tendril_sectors(path):
+    # Inspect the actual exported mesh loaded by the successful game run.
+    raw=Path(path).read_bytes();magic,count,triangles=struct.unpack_from('<8sII',raw)
+    stride=64 if magic==b'FLMESH02' else 48;points=mesh_points(path)
+    parent=list(range(count))
+    def root(i):
+        while parent[i]!=i:parent[i]=parent[parent[i]];i=parent[i]
+        return i
+    for i in range(triangles):
+        a,b,c,_=struct.unpack_from('<4I',raw,16+count*stride+i*16)
+        parent[root(b)]=root(a);parent[root(c)]=root(a)
+    groups={}
+    for i,v in enumerate(points):groups.setdefault(root(i),[]).append(v)
+    caps=[v for v in groups.values() if min(p[1] for p in v)>.3]
+    stalks=[v for v in groups.values() if min(p[1] for p in v)<.1]
+    assert len(caps)==len(stalks)==3,'Fungal ends no longer have three separate tendrils'
+    centers=[[sum(v[a] for v in group)/len(group) for a in range(3)] for group in caps]
+    angles=sorted(math.atan2(v[2],v[0]) for v in centers)
+    gaps=[(angles[(i+1)%3]-angles[i])%math.tau for i in range(3)]
+    assert all(abs(v-math.tau/3)<.01 for v in gaps),'Tendril ends are unevenly spaced'
+    for group in stalks:
+        angle=math.atan2(sum(v[2] for v in group),sum(v[0] for v in group))
+        # Each tube stays in its own 120 degree sector, including its thickness.
+        assert all(abs(math.atan2(math.sin(math.atan2(v[2],v[0])-angle),math.cos(math.atan2(v[2],v[0])-angle)))<math.pi/3 for v in group),'A tendril crossed its neighbor sector'
 
 with tempfile.TemporaryDirectory(prefix='nanova-factory-curves-') as directory:
     # The stress scene keeps authored cells; homes 0, 5 and 10 belong to the three factions.
@@ -109,6 +141,20 @@ with tempfile.TemporaryDirectory(prefix='nanova-factory-curves-') as directory:
                         assert math.dist(obstacles[j]['start'],points[j])<3e-5 and math.dist(obstacles[j]['end'],points[j+1])<3e-5,'Navigation differs from growth path'
                         width=norm([instance['transform'][n] for n in (0,4,8)])
                         assert math.isclose(obstacles[j]['radius'],width*profile['navigation']['stem_radius'],rel_tol=3e-5),'Curve collision width differs'
+                    if profile['growth_meshes'].get('length_color'):
+                        weights=[instances[stems+(cell*128+k)*spans+j]['style'][3] for j in range(spans)]
+                        assert all(a<=b+2e-6 for a,b in zip(weights,weights[1:])),'Length tint reversed along a stem'
+                        if limb['parent']>=0:
+                            parent_span=stems+(cell*128+limb['parent'])*spans+spans-spans//4-1
+                            assert weights[0]>=instances[parent_span]['style'][3]-2e-6,'A child reset the inherited length color'
+                        if k==0:
+                            assert weights[-1]>weights[0]+.1,'Long stems did not darken'
+                            mesh=out/profile['growth_meshes']['segment']
+                            near=surface_brightness(mesh,instances[stems+(cell*128+k)*spans]['style'])
+                            far=surface_brightness(mesh,instances[stems+(cell*128+k)*spans+spans-1]['style'])
+                            assert far<near,'The length tint made the surface lighter'
+                            if radius==4.2:assert far<near*.85,'The large stem gradient is too weak'
+                            if radius==4.2 and seed==1234:check_tendril_sectors(out/profile['growth_meshes']['tip'])
                     head=instances[heads+cell*128+k];direction=[head['transform'][n] for n in (1,5,9)]
                     assert dot(direction,vectors[-1])/(norm(direction)*norm(vectors[-1]))>.99999,'A head left the curve tangent'
                     if radius==4.2 and seed==1234 and k==0:check_bounds(head,mesh_points(out/profile['growth_meshes']['tip']),obstacles[-1])
@@ -148,7 +194,11 @@ with tempfile.TemporaryDirectory(prefix='nanova-factory-curves-') as directory:
         assert children,'The partial-growth case has no growing limb'
         for k in children:check_prefix(growing,scene,cell,k,True)
     # One contact burst cuts the final quarter of each faction's curved root.
-    intact,_=run('damage_probe',base);damaged=deepcopy(base)
+    intact,_=run('damage_probe',base)
+    no_color=deepcopy(base)
+    for building in no_color['content']['buildings']:building['growth_meshes'].pop('length_color',None)
+    assert run('color_does_not_change_simulation',no_color)[0]==intact,'Length coloring changed game outcomes'
+    damaged=deepcopy(base)
     for building in damaged['content']['buildings']:
         building['hits']=4;building.pop('repair',None);building.pop('haze',None)
     for side,cell in (('virus',0),('immune',5),('fungus',10)):

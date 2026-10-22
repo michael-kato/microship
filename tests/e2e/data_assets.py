@@ -159,6 +159,8 @@ with tempfile.TemporaryDirectory(prefix='nanova-content-') as directory:
         ('invalid-hits',units(text,hits=0)),
         ('invalid-rounded-stem',change(text,'content.buildings.0.growth_meshes.rounded',2)),
         ('invalid-factory-bulges',change(text,'content.buildings.0.growth_meshes.bulges',9)),
+        ('zero-length-color-distance',change(text,'content.buildings.0.growth_meshes.length_color',dict(color=[.1,.1,.1],distance=0,strength=.5))),
+        ('invalid-length-color-strength',change(text,'content.buildings.0.growth_meshes.length_color',dict(color=[.1,.1,.1],distance=8,strength=1.01))),
         ('invalid-factory-glow',change(text,'content.buildings.0.growth_meshes.glow_scale',1.01)),
         ('invalid-factory-tint',change(text,'content.buildings.0.growth_meshes.tint_strength',-.01)),
         ('fractional-hits',units(text,hits=2.5)),

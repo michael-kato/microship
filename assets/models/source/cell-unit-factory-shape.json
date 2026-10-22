@@ -149,14 +149,16 @@
     "fungal_spore": {
       "shaft_radius": 0.13,
       "sides": 9,
-      "tendrils": 4,
-      "sections": 10,
-      "spread": 0.25,
-      "wander": 0.12,
-      "tip_height": 0.7,
-      "tip_radius": 0.055,
+      "tendrils": 3,
+      "sections": 12,
+      "spread": 0.29,
+      "wander": 0.035,
+      "tip_height": 0.58,
+      "tip_radius": 0.045,
       "stem_color": [0.32, 0.15, 0.065],
-      "tip_color": [0.52, 0.29, 0.12]
+      "tip_color": [0.34, 0.17, 0.065],
+      "base_spread": 0.1,
+      "min_height_scale": 0.86
     }
   }
 }

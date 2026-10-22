@@ -367,7 +367,14 @@ static bool load_buildings(Content* c,Json root,const char* path)
         Json growth=json_find(j,"growth_meshes");
         if (json_present(growth))
         {
-            json_object(growth,"segment|tip|rounded|bulges|glow_scale|tint_strength");
+            json_object(growth,"segment|tip|rounded|bulges|glow_scale|tint_strength|length_color");
+            Json pigment=json_find(growth,"length_color");
+            if (json_present(pigment))
+            {
+                json_object(pigment,"color|distance|strength");p.length_color=json_color(json_get(pigment,"color"));
+                p.length_color_distance=json_positive(json_get(pigment,"distance"),MAX_BUILDING_HEIGHT);
+                p.length_color_strength=json_float(json_get(pigment,"strength"),0,1);
+            }
             Json glow_scale=json_find(growth,"glow_scale"),tint=json_find(growth,"tint_strength");
             if (json_present(glow_scale)) p.factory_glow_scale=json_float(glow_scale,0,1);
             if (json_present(tint)) p.factory_tint_strength=json_float(tint,0,1);

@@ -149,14 +149,14 @@
           "levels": 3,
           "length_scale": 0.7,
           "width_scale": 0.72,
-          "angle_degrees": 40,
+          "angle_degrees": 44,
           "bend": 0.36,
           "branch_probability": 1,
-          "angle_jitter_degrees": 14,
-          "length_jitter": 0.22,
+          "angle_jitter_degrees": 6,
+          "length_jitter": 0.16,
           "width_jitter": 0.12,
           "curvature": 1.4,
-          "curve_jitter": 0.65
+          "curve_jitter": 0.5
         }
       },
       "growth_meshes": {
@@ -164,7 +164,12 @@
         "tip": "../models/fungal_head.fmesh",
         "glow_scale": 0.06,
         "tint_strength": 0.04,
-        "rounded": true
+        "rounded": true,
+        "length_color": {
+          "color": [0.045, 0.012, 0.004],
+          "distance": 8,
+          "strength": 0.65
+        }
       },
       "navigation": {
         "stem_radius": 0.2,

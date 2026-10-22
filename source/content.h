@@ -79,6 +79,7 @@ struct ProducerDefinition
     Faction faction;
     float growth_seconds,sprout_seconds,establishment_seconds,health,collection,height,width;
     float stem_radius,head_radius,factory_glow_scale,factory_tint_strength;
+    Color length_color;float length_color_distance,length_color_strength;
     float repair_health_per_second,repair_nutrients_per_health,repair_delay_seconds;
     float haze_reach,haze_damage,haze_heal;
     Vec3 growth_plane_normal;

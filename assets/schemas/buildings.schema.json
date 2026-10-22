@@ -220,6 +220,26 @@
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 8
+              },
+              "length_color": {
+                "type": "object",
+                "properties": {
+                  "color": {
+                    "$ref": "shared.schema.json#/$defs/color"
+                  },
+                  "distance": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 10000
+                  },
+                  "strength": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": ["color", "distance", "strength"],
+                "additionalProperties": false
               }
             },
             "required": ["segment", "tip"],

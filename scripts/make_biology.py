@@ -533,14 +533,17 @@ def factory(side):
         # The runtime path supplies the large bends; its mesh has no lateral needles.
         sphere((0,.5,0),(f['shaft_radius'],)*3,f['stem_color'],3,surface='fungal_stalk')
         export('fungal_stem',subsurface_weight=0)
+        # Equal angular sectors keep neighboring tendrils apart. A small
+        # tangential S-bend adds motion without crossing the radial lanes.
         for i in range(f['tendrils']):
-            angle=i*GOLDEN_ANGLE_RADIANS;phase=i*1.7
-            height=f['tip_height']*(.72+.28*math.sin(phase)**2)
+            angle=i*math.tau/f['tendrils'];phase=i*GOLDEN_ANGLE_RADIANS
+            height=f['tip_height']*(f['min_height_scale']+(1-f['min_height_scale'])*math.sin(phase)**2)
             points=[];radii=[]
             for j in range(f['sections']+1):
-                t=j/f['sections'];spread=f['spread']*t
-                x=spread*math.cos(angle)+f['wander']*math.sin(t*math.tau+phase)*math.sin(math.pi*t)
-                z=spread*math.sin(angle)+f['wander']*math.sin(t*math.tau*1.5-phase)*math.sin(math.pi*t)
+                t=j/f['sections'];spread=f['base_spread']+(f['spread']-f['base_spread'])*t
+                sway=f['wander']*math.sin(t*math.tau+phase)*math.sin(math.pi*t)
+                x=spread*math.cos(angle)-sway*math.sin(angle)
+                z=spread*math.sin(angle)+sway*math.cos(angle)
                 points.append((x,height*t,z));radii.append(f['tip_radius']*(1-.3*t))
             curved_tube(points,radii,f['stem_color'],'fungal_stalk',f['sides'])
             sphere(points[-1],(radii[-1]*1.15,)*3,f['tip_color'],2,surface='fungal_cap')
