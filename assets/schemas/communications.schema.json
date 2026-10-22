@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Territory alerts and dialogue timing",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "territory_clearance": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "encounter_radius": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "dialogue_seconds": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 30
+    },
+    "dialogue_gap": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 30
+    },
+    "focus_distance": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 600
+    }
+  },
+  "required": [
+    "territory_clearance",
+    "encounter_radius",
+    "dialogue_seconds",
+    "dialogue_gap",
+    "focus_distance"
+  ],
+  "additionalProperties": false
+}

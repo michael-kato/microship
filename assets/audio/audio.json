@@ -61,6 +61,243 @@
       "file": "break.wav",
       "gain": 0.4,
       "cooldown": 0.08
+    },
+    "alert": {
+      "file": "alert.wav",
+      "gain": 0.4,
+      "cooldown": 0.5
+    },
+    "transmission": {
+      "file": "transmission.wav",
+      "gain": 0.2,
+      "cooldown": 0.5
     }
-  }
+  },
+  "banks": [
+    {
+      "name": "virus",
+      "events": {
+        "order": {
+          "file": "virus_order.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "growth": {
+          "file": "virus_growth.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "mature": {
+          "file": "virus_mature.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "birth": {
+          "file": "virus_birth.wav",
+          "gain": 0.14,
+          "cooldown": 0.18
+        },
+        "shot": {
+          "file": "virus_shot.wav",
+          "gain": 0.24,
+          "cooldown": 0.065
+        },
+        "hit": {
+          "file": "virus_hit.wav",
+          "gain": 0.13,
+          "cooldown": 0.1
+        },
+        "death": {
+          "file": "virus_death.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "colonize": {
+          "file": "virus_colonize.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "heal": {
+          "file": "virus_heal.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "win": {
+          "file": "virus_win.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "lose": {
+          "file": "virus_lose.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "break": {
+          "file": "virus_break.wav",
+          "gain": 0.4,
+          "cooldown": 0.08
+        },
+        "alert": {
+          "file": "virus_alert.wav",
+          "gain": 0.4,
+          "cooldown": 0.5
+        },
+        "transmission": {
+          "file": "virus_transmission.wav",
+          "gain": 0.2,
+          "cooldown": 0.5
+        }
+      }
+    },
+    {
+      "name": "immune",
+      "events": {
+        "order": {
+          "file": "immune_order.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "growth": {
+          "file": "immune_growth.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "mature": {
+          "file": "immune_mature.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "birth": {
+          "file": "immune_birth.wav",
+          "gain": 0.14,
+          "cooldown": 0.18
+        },
+        "shot": {
+          "file": "immune_shot.wav",
+          "gain": 0.24,
+          "cooldown": 0.065
+        },
+        "hit": {
+          "file": "immune_hit.wav",
+          "gain": 0.13,
+          "cooldown": 0.1
+        },
+        "death": {
+          "file": "immune_death.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "colonize": {
+          "file": "immune_colonize.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "heal": {
+          "file": "immune_heal.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "win": {
+          "file": "immune_win.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "lose": {
+          "file": "immune_lose.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "break": {
+          "file": "immune_break.wav",
+          "gain": 0.4,
+          "cooldown": 0.08
+        },
+        "alert": {
+          "file": "immune_alert.wav",
+          "gain": 0.4,
+          "cooldown": 0.5
+        },
+        "transmission": {
+          "file": "immune_transmission.wav",
+          "gain": 0.2,
+          "cooldown": 0.5
+        }
+      }
+    },
+    {
+      "name": "fungus",
+      "events": {
+        "order": {
+          "file": "fungus_order.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "growth": {
+          "file": "fungus_growth.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "mature": {
+          "file": "fungus_mature.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "birth": {
+          "file": "fungus_birth.wav",
+          "gain": 0.14,
+          "cooldown": 0.18
+        },
+        "shot": {
+          "file": "fungus_shot.wav",
+          "gain": 0.24,
+          "cooldown": 0.065
+        },
+        "hit": {
+          "file": "fungus_hit.wav",
+          "gain": 0.13,
+          "cooldown": 0.1
+        },
+        "death": {
+          "file": "fungus_death.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "colonize": {
+          "file": "fungus_colonize.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "heal": {
+          "file": "fungus_heal.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "win": {
+          "file": "fungus_win.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "lose": {
+          "file": "fungus_lose.wav",
+          "gain": 0.45,
+          "cooldown": 0.12
+        },
+        "break": {
+          "file": "fungus_break.wav",
+          "gain": 0.4,
+          "cooldown": 0.08
+        },
+        "alert": {
+          "file": "fungus_alert.wav",
+          "gain": 0.4,
+          "cooldown": 0.5
+        },
+        "transmission": {
+          "file": "fungus_transmission.wav",
+          "gain": 0.2,
+          "cooldown": 0.5
+        }
+      }
+    }
+  ]
 }

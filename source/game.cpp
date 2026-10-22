@@ -215,9 +215,20 @@ static void select_rectangle(Game* game,const RenderConfig* config,bool additive
     if (group>=0) snprintf(s->message,sizeof(s->message),"SELECTED %u %s ON SCREEN",count,s->world.content.groups[group].plural);
 }
 
+static int alert_row_at(const RenderConfig*,int,int);
+static bool notice_pointer_hit(const Game* game,const RenderConfig* config,int x,int y)
+{
+    int row=alert_row_at(config,x,y);
+    if (row>=0 && communications_alert(&game->simulation,(uint32_t)row)>=0) return true;
+    return communications_speaking(&game->simulation) && x>=(int)config->width-HUD_SITE_PANEL_LEFT_INSET
+        && x<(int)config->width-HUD_PANEL_MARGIN && y>=(int)config->height-HUD_DIALOGUE_BOTTOM
+        && y<(int)config->height-HUD_DIALOGUE_BOTTOM+HUD_DIALOGUE_HEIGHT;
+}
 static void selection_input(Game* game,PointerInput* input,const RenderConfig* config)
 {
     if (!game->simulation.world.gameplay.enabled) return;
+    if (input->pointer_pressed && notice_pointer_hit(game,config,input->press_x,input->press_y))
+    { game->box_dragging=false;return; }
     if (input->restart || input->pointer_cancelled) { game->box_dragging=false;return; }
     if (input->group)
     { simulation_select(&game->simulation,input->group==3 ? -1 : (int)input->group-1);input->group=0; }
@@ -244,11 +255,73 @@ static void selection_input(Game* game,PointerInput* input,const RenderConfig* c
     }
 }
 
+static int alert_row_at(const RenderConfig* config,int x,int y)
+{
+    int left=(int)config->width-HUD_PANEL_MARGIN-HUD_ALERT_WIDTH;
+    if (x<left || x>=(int)config->width-HUD_PANEL_MARGIN || y<HUD_PANEL_MARGIN) return -1;
+    int row=(y-HUD_PANEL_MARGIN)/HUD_ALERT_STRIDE;
+    return row<HUD_ALERT_ROWS && (y-HUD_PANEL_MARGIN)%HUD_ALERT_STRIDE<HUD_ALERT_HEIGHT ? row : -1;
+}
+static bool notice_input(Game* game,PointerInput* input,const RenderConfig* config)
+{
+    if (!input->click && !input->command) return false;
+    int x=input->click ? input->click_x : input->command_x,y=input->click ? input->click_y : input->command_y;
+    int row=alert_row_at(config,x,y);Simulation* s=&game->simulation;
+    int cell=row>=0 ? communications_alert(s,(uint32_t)row) : -1;
+    if (cell>=0)
+    {
+        if (input->click && communications_acknowledge(s,(uint32_t)cell)
+            && x<(int)config->width-HUD_PANEL_MARGIN-28)
+        {
+            Vec3 offset=subtract(game->camera.position,game->camera.target);float distance=std::sqrt(dot(offset,offset));
+            float focus_distance=s->world.communications.focus_distance;
+            if (distance>focus_distance) offset=scale(offset,focus_distance/distance);
+            game->camera.target=s->world.bodies[cell].position;game->camera.position=add(game->camera.target,offset);
+            s->selected_body=cell;
+        }
+        input->click=false;input->command=false;game->box_dragging=false;return true;
+    }
+    if (communications_speaking(s) && x>=(int)config->width-HUD_SITE_PANEL_LEFT_INSET && x<(int)config->width-HUD_PANEL_MARGIN
+        && y>=(int)config->height-HUD_DIALOGUE_BOTTOM && y<(int)config->height-HUD_DIALOGUE_BOTTOM+HUD_DIALOGUE_HEIGHT)
+    { input->click=false;input->command=false;game->box_dragging=false;return true; }
+    return false;
+}
+static void notice_overlay(Game* game)
+{
+    Renderer* r=&game->renderer;const Simulation* s=&game->simulation;r->notice_mask=0;
+    for (uint32_t line=HUD_NOTICE_FIRST_LINE;line<HUD_TEXT_LINES;++line) r->hud[line][0]=0;
+    const DialogueEvent* e=communications_speaking(s);
+    if (e)
+    {
+        r->notice_mask|=1;snprintf(r->hud[HUD_NOTICE_FIRST_LINE],HUD_LINE_CAPACITY,"%s / TRANSMISSION",s->world.content.factions[e->faction].label);
+        const char* cursor=communications_line(s,*e);
+        for (uint32_t row=1;row<=3 && *cursor;++row)
+        {
+            size_t length=std::min((size_t)40,strlen(cursor));
+            if (cursor[length]) { while (length && cursor[length]!=' ') --length;if (!length) length=40; }
+            snprintf(r->hud[HUD_NOTICE_FIRST_LINE+row],HUD_LINE_CAPACITY,"%.*s",(int)length,cursor);cursor+=length;while (*cursor==' ') ++cursor;
+        }
+        if (!r->hud[HUD_NOTICE_FIRST_LINE+3][0]) snprintf(r->hud[HUD_NOTICE_FIRST_LINE+3],HUD_LINE_CAPACITY,e->trigger==DIALOGUE_TERRITORY ? "CONTROLS %u CELLS" : e->trigger==DIALOGUE_SHIPS ? "FIRST SHIP CONTACT" : "FIRST CELL CONTACT",e->cells);
+    }
+    uint32_t pending=0;for (uint32_t p=0;p<s->world.body_count;++p) pending+=s->communications.alerts[p].pending;
+    for (uint32_t row=0;row<HUD_ALERT_ROWS;++row)
+    {
+        int cell=communications_alert(s,row);if (cell<0) break;
+        const TerritoryAlert& a=s->communications.alerts[cell];uint32_t faction=1;
+        while (faction+1<MAX_FACTIONS && !(a.factions&(1u<<faction))) ++faction;
+        uint32_t line=HUD_ALERT_FIRST_LINE+row*3;r->notice_mask|=2u<<row;
+        snprintf(r->hud[line],HUD_LINE_CAPACITY,"HOSTILE CONTACT / %u %s",pending,pending==1 ? "ALERT" : "ALERTS");
+        snprintf(r->hud[line+1],HUD_LINE_CAPACITY,"CELL %03d / %.16s",cell+1,s->world.content.factions[faction].label);
+        snprintf(r->hud[line+2],HUD_LINE_CAPACITY,"CLICK TO FOCUS / %uS AGO",(s->tick_count-a.tick)/SIMULATION_TICKS_PER_SECOND);
+    }
+}
+
 static void gameplay_input(Game* game, PointerInput* input, const RenderConfig* config)
 {
     Simulation* s=&game->simulation;if (!s->world.gameplay.enabled) return;
     if (input->restart) { *s=game->initial_simulation;game->ratio_dragging=false;startup_camera(game,config); }
     if (input->pause) s->paused=!s->paused;
+    if (notice_input(game,input,config)) return;
     if (input->group) simulation_select(s,input->group==3 ? -1 : (int)input->group-1);
     if (input->focus)
     {
@@ -331,6 +404,7 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
 {
     Renderer* r=&game->renderer;const Simulation* s=&game->simulation;
     r->overlay_enabled=s->world.gameplay.enabled;if (!r->overlay_enabled) return;
+    notice_overlay(game);
     uint32_t groups[MAX_GROUPS]={},fleet=0,selected=0;
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (s->units[i].health>0 && s->units[i].faction==s->world.player_faction)
@@ -574,7 +648,7 @@ int game_run(const GameOptions* options)
     if (options->matches) return run_matches(options);
     std::unique_ptr<Game> storage(new (std::nothrow) Game());if (!storage) return 1;
     Game& game=*storage;
-    Audio audio;if (!audio_load(&audio,options->audio_path,options->audio_capture_path)) return 1;
+    Audio audio;
     std::unique_ptr<Presentation> presentation(new (std::nothrow) Presentation());
     if (!presentation) return 1;
     uint32_t seed=options->world_seed;
@@ -589,6 +663,7 @@ int game_run(const GameOptions* options)
     printf("World variation seed: %u. Restart keeps this layout.\n",seed);
     if (!simulation_initialize(&game.simulation, options->world_path,seed))
         return 1;
+    if (!audio_load(&audio,options->audio_path,options->audio_capture_path,&game.simulation.world.content)) return 1;
     game.initial_simulation=game.simulation;
     print_world(&game.simulation, options->world_path);
     RenderConfig config;

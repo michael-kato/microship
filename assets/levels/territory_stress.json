@@ -1,0 +1,2963 @@
+{
+  "$schema": "../schemas/world.schema.json",
+  "content": "../gameplay/gameplay.json",
+  "rules": "../gameplay/three_faction_stress_rules.json",
+  "appearance": "../presentation/scene.json",
+  "effects": "../presentation/combat-effects.json",
+  "match": {
+    "player": "virus",
+    "opponent": "immune",
+    "player_ai": true,
+    "fully_established": true,
+    "rally_point": [0, 0, 8],
+    "production_seconds": 10,
+    "formation_spacing": 0.6
+  },
+  "bodies": [
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-103.92305, -59.999996, 0.0],
+      "radius": 4.2,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [103.923042, -60.000023, 0.0],
+      "radius": 4.2,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [1.7e-05, 120.0, 0.0],
+      "radius": 4.2,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-0.722496, 0.418914, 0.0],
+      "radius": 6.0,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [49.90593, -72.85453, 0.0],
+      "radius": 3.503252,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-32.20578, -59.572536, 0.0],
+      "radius": 3.288618,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-17.162598, -45.127495, 0.0],
+      "radius": 2.769919,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-87.708702, 54.548149, 0.0],
+      "radius": 1.625203,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [58.738659, 93.669296, 0.0],
+      "radius": 3.592683,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-87.122978, 10.735967, 0.0],
+      "radius": 3.270732,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [73.672554, 15.01698, 0.0],
+      "radius": 1.714634,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-48.468071, 14.776484, 0.0],
+      "radius": 3.038211,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [14.384379, -70.862282, 0.0],
+      "radius": 1.857724,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [69.954788, -49.931896, 0.0],
+      "radius": 2.644716,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [83.916321, 31.153368, 0.0],
+      "radius": 2.412195,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [2.336749, -43.880951, 0.0],
+      "radius": 1.947154,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-30.748026, 50.610306, 0.0],
+      "radius": 2.805691,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [28.724447, -110.735802, 0.0],
+      "radius": 1.839837,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-49.177979, 59.777069, 0.0],
+      "radius": 2.358537,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-16.579643, -111.136047, 0.0],
+      "radius": 2.036585,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-18.683996, 25.933649, 0.0],
+      "radius": 2.501626,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [73.213936, 55.238834, 0.0],
+      "radius": 3.431707,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-68.52877, -22.043352, 0.0],
+      "radius": 2.430081,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [24.317524, -83.821541, 0.0],
+      "radius": 2.465854,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-79.925186, 66.558922, 0.0],
+      "radius": 1.517886,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-10.544324, 50.124523, 0.0],
+      "radius": 3.342277,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [77.954933, -13.807709, 0.0],
+      "radius": 1.893496,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [69.183907, 36.883968, 0.0],
+      "radius": 2.537398,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [47.541428, 3.853504, 0.0],
+      "radius": 2.10813,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [3.949784, -113.158806, 0.0],
+      "radius": 1.965041,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-73.174683, -69.46489, 0.0],
+      "radius": 3.521138,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-57.281002, 85.993698, 0.0],
+      "radius": 1.589431,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [64.655815, -32.080158, 0.0],
+      "radius": 2.913008,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-21.528021, 66.713615, 0.0],
+      "radius": 3.073984,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-107.010437, -21.149895, 0.0],
+      "radius": 2.966667,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-2.867126, -17.519924, 0.0],
+      "radius": 2.322764,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [85.243408, -28.401575, 0.0],
+      "radius": 2.787805,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [75.262444, 76.630936, 0.0],
+      "radius": 3.682114,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [97.53746, 24.802599, 0.0],
+      "radius": 1.678862,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [93.086952, -7.129433, 0.0],
+      "radius": 1.821951,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [52.052975, -51.848499, 0.0],
+      "radius": 3.252846,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-60.669872, -41.639057, 0.0],
+      "radius": 3.646342,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-52.389469, -97.088882, 0.0],
+      "radius": 3.127642,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-6.717077, 88.390343, 0.0],
+      "radius": 3.46748,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-23.264626, 94.955704, 0.0],
+      "radius": 2.161789,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [49.393459, 35.837143, 0.0],
+      "radius": 3.306504,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-50.96666, 41.822891, 0.0],
+      "radius": 3.181301,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [72.425186, 0.902792, 0.0],
+      "radius": 1.786179,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-43.767372, -13.588943, 0.0],
+      "radius": 3.413821,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [94.034317, 56.654221, 0.0],
+      "radius": 3.610569,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [16.262127, 10.342175, 0.0],
+      "radius": 3.378049,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-83.252899, -30.597471, 0.0],
+      "radius": 3.145529,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [63.450764, -90.59922, 0.0],
+      "radius": 3.020325,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-1.377243, 24.32217, 0.0],
+      "radius": 3.09187,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-17.852245, 109.933945, 0.0],
+      "radius": 3.002439,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-70.433022, 87.322395, 0.0],
+      "radius": 1.64309,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-28.037191, -26.233812, 0.0],
+      "radius": 2.877236,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [0.947958, 71.268517, 0.0],
+      "radius": 3.32439,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-35.16135, -105.522575, 0.0],
+      "radius": 2.304878,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [6.167386, -99.332108, 0.0],
+      "radius": 2.018699,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [33.372932, -6.976378, 0.0],
+      "radius": 3.163415,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-84.821991, -8.111687, 0.0],
+      "radius": 3.449594,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-15.702398, 6.97589, 0.0],
+      "radius": 2.090244,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [105.273735, -34.576622, 0.0],
+      "radius": 2.179675,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-108.089058, -4.69214, 0.0],
+      "radius": 2.984553,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [47.62854, 77.513725, 0.0],
+      "radius": 3.574797,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-33.74374, 78.697632, 0.0],
+      "radius": 2.85935,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-9.929242, -29.558868, 0.0],
+      "radius": 1.911382,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-106.855675, 27.450317, 0.0],
+      "radius": 2.340651,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-59.219852, -11.189726, 0.0],
+      "radius": 2.143903,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [89.690689, -69.984734, 0.0],
+      "radius": 1.660976,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [27.703922, 77.032829, 0.0],
+      "radius": 3.395935,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [89.342598, 9.981811, 0.0],
+      "radius": 1.929268,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-64.680824, 5.808861, 0.0],
+      "radius": 3.234959,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-80.8367, 79.108459, 0.0],
+      "radius": 1.571545,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [15.57778, -14.175717, 0.0],
+      "radius": 3.056098,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-101.635048, 44.831554, 0.0],
+      "radius": 2.376423,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-32.900043, 32.854477, 0.0],
+      "radius": 2.680488,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [59.455368, -9.42567, 0.0],
+      "radius": 2.215447,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [32.66288, -27.839067, 0.0],
+      "radius": 2.25122,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-70.050507, -86.271797, 0.0],
+      "radius": 3.199187,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [14.871426, 93.661613, 0.0],
+      "radius": 3.664228,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-41.82531, -42.033833, 0.0],
+      "radius": 3.556911,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-103.048531, -36.801662, 0.0],
+      "radius": 2.286992,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [34.167648, 103.847687, 0.0],
+      "radius": 3.7,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-80.531998, -57.637112, 0.0],
+      "radius": 2.948781,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [30.614388, 60.271866, 0.0],
+      "radius": 2.197561,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-56.92382, 98.771614, 0.0],
+      "radius": 1.607317,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [2.775095, -84.000954, 0.0],
+      "radius": 1.804065,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [12.12593, 59.284145, 0.0],
+      "radius": 2.608943,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [105.963936, 36.79697, 0.0],
+      "radius": 2.662602,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [34.448612, -45.959652, 0.0],
+      "radius": 2.823577,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-86.362701, 27.96789, 0.0],
+      "radius": 2.895122,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [15.975201, -35.644997, 0.0],
+      "radius": 2.573171,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [32.305645, -65.095329, 0.0],
+      "radius": 2.698374,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [58.82724, 17.785244, 0.0],
+      "radius": 2.233333,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [49.359261, -24.631577, 0.0],
+      "radius": 2.734146,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [73.573227, -75.578056, 0.0],
+      "radius": 3.360163,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-33.659874, 10.456513, 0.0],
+      "radius": 2.591057,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [45.280426, -96.106277, 0.0],
+      "radius": 3.539024,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-64.128204, 28.047935, 0.0],
+      "radius": 3.217073,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-8.769018, -76.166626, 0.0],
+      "radius": 1.696748,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-6.07615, -61.013462, 0.0],
+      "radius": 2.447968,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-40.342991, 101.598427, 0.0],
+      "radius": 3.109756,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-15.62677, -95.211296, 0.0],
+      "radius": 2.48374,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [14.393647, -56.009415, 0.0],
+      "radius": 2.072358,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-91.016266, -47.511684, 0.0],
+      "radius": 1.87561,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [37.021229, 17.731743, 0.0],
+      "radius": 2.930894,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-94.519836, 65.713882, 0.0],
+      "radius": 1.553658,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-24.913435, -7.960679, 0.0],
+      "radius": 2.841464,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [109.53463, 14.036957, 0.0],
+      "radius": 2.126016,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [25.585241, -98.537117, 0.0],
+      "radius": 1.768293,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [27.826914, 44.371029, 0.0],
+      "radius": 2.626829,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-50.383545, -71.879539, 0.0],
+      "radius": 3.628455,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-23.030008, -75.329971, 0.0],
+      "radius": 2.000813,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [109.165207, -19.175928, 0.0],
+      "radius": 1.982927,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-34.491356, -86.887398, 0.0],
+      "radius": 2.519512,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [115.307426, -0.551177, 0.0],
+      "radius": 1.5,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [81.987045, -58.126823, 0.0],
+      "radius": 1.73252,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-50.624863, 76.545708, 0.0],
+      "radius": 1.750407,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [50.582867, 56.351383, 0.0],
+      "radius": 3.485366,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [23.00923, 28.908651, 0.0],
+      "radius": 2.555285,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [5.313679, 41.114658, 0.0],
+      "radius": 2.71626,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "fungus",
+      "position": [-66.587517, 63.410519, 0.0],
+      "radius": 2.394309,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-76.823021, 43.750885, 0.0],
+      "radius": 2.752033,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [92.492393, -44.888081, 0.0],
+      "radius": 2.054471,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "virus",
+      "position": [-109.586227, 11.379496, 0.0],
+      "radius": 2.269106,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    },
+    {
+      "type": "unclaimed",
+      "owner": "immune",
+      "position": [105.388039, -4.820705, 0.0],
+      "radius": 1.535772,
+      "tint": [1.0, 1.0, 1.0],
+      "site": {
+        "availability": 1.0,
+        "normal": [0, 0, 1]
+      },
+      "medium": {
+        "radius_fraction": 0.94,
+        "edge_fade": 0.28,
+        "scattering": [0.1, 0.075, 0.085],
+        "absorption": 0.018,
+        "anisotropy": 0.2,
+        "depth_blur": {
+          "start_fraction": 0.3333333333333333,
+          "full_fraction": 0.6666666666666666,
+          "max_radius": 18
+        }
+      }
+    }
+  ],
+  "spawns": []
+}

@@ -108,5 +108,6 @@
       "power": 0.4
     },
     "emission_color": [1.0, 0.55, 0.25]
-  }
+  },
+  "communications": "communications.json"
 }

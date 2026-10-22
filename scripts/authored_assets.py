@@ -35,6 +35,7 @@ def stage_world(source, directory):
             for item in content[name]:
                 if 'variation' in item:item['variation']=dict(document['shared'],**item['variation'])
         for item in content[name]:
+            if name=='factions':model(item,'personality',definition.parent)
             model(item,'model',definition.parent)
             if 'payload' in item:model(item['payload'],'model',definition.parent)
             if 'blob' in item.get('attack',{}):model(item['attack']['blob'],'model',definition.parent)
@@ -45,6 +46,7 @@ def stage_world(source, directory):
     for name in ('rules','appearance','effects'):
         if name not in world:continue
         path=(source.parent/world[name]).resolve();world[name]=read(path)
+        if name=='appearance':model(world[name],'communications',path.parent)
         if name=='appearance' and 'backdrop' in world[name]:
             backdrop=world[name]['backdrop'];model(backdrop,'model',path.parent)
             if 'variants' in backdrop:backdrop['variants']=[Path(os.path.relpath((path.parent/v).resolve(),directory)).as_posix() for v in backdrop['variants']]

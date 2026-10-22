@@ -15,244 +15,46 @@
       "type": "object",
       "properties": {
         "order": {
-          "type": "object",
-          "properties": {
-            "file": {
-              "$ref": "shared.schema.json#/$defs/path"
-            },
-            "gain": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "cooldown": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 10
-            }
-          },
-          "required": ["file", "gain", "cooldown"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "growth": {
-          "type": "object",
-          "properties": {
-            "file": {
-              "$ref": "shared.schema.json#/$defs/path"
-            },
-            "gain": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "cooldown": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 10
-            }
-          },
-          "required": ["file", "gain", "cooldown"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "mature": {
-          "type": "object",
-          "properties": {
-            "file": {
-              "$ref": "shared.schema.json#/$defs/path"
-            },
-            "gain": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "cooldown": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 10
-            }
-          },
-          "required": ["file", "gain", "cooldown"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "birth": {
-          "type": "object",
-          "properties": {
-            "file": {
-              "$ref": "shared.schema.json#/$defs/path"
-            },
-            "gain": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "cooldown": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 10
-            }
-          },
-          "required": ["file", "gain", "cooldown"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "shot": {
-          "type": "object",
-          "properties": {
-            "file": {
-              "$ref": "shared.schema.json#/$defs/path"
-            },
-            "gain": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "cooldown": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 10
-            }
-          },
-          "required": ["file", "gain", "cooldown"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "hit": {
-          "type": "object",
-          "properties": {
-            "file": {
-              "$ref": "shared.schema.json#/$defs/path"
-            },
-            "gain": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "cooldown": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 10
-            }
-          },
-          "required": ["file", "gain", "cooldown"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "death": {
-          "type": "object",
-          "properties": {
-            "file": {
-              "$ref": "shared.schema.json#/$defs/path"
-            },
-            "gain": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "cooldown": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 10
-            }
-          },
-          "required": ["file", "gain", "cooldown"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "colonize": {
-          "type": "object",
-          "properties": {
-            "file": {
-              "$ref": "shared.schema.json#/$defs/path"
-            },
-            "gain": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "cooldown": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 10
-            }
-          },
-          "required": ["file", "gain", "cooldown"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "heal": {
-          "type": "object",
-          "properties": {
-            "file": {
-              "$ref": "shared.schema.json#/$defs/path"
-            },
-            "gain": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "cooldown": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 10
-            }
-          },
-          "required": ["file", "gain", "cooldown"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "win": {
-          "type": "object",
-          "properties": {
-            "file": {
-              "$ref": "shared.schema.json#/$defs/path"
-            },
-            "gain": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "cooldown": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 10
-            }
-          },
-          "required": ["file", "gain", "cooldown"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "lose": {
-          "type": "object",
-          "properties": {
-            "file": {
-              "$ref": "shared.schema.json#/$defs/path"
-            },
-            "gain": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "cooldown": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 10
-            }
-          },
-          "required": ["file", "gain", "cooldown"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "break": {
-          "type": "object",
-          "properties": {
-            "file": {
-              "$ref": "shared.schema.json#/$defs/path"
-            },
-            "gain": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "cooldown": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 10
-            }
-          },
-          "required": ["file", "gain", "cooldown"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
+        },
+        "alert": {
+          "$ref": "#/$defs/clip"
+        },
+        "transmission": {
+          "$ref": "#/$defs/clip"
         }
       },
       "required": [
@@ -267,11 +69,98 @@
         "heal",
         "win",
         "lose",
-        "break"
+        "break",
+        "alert",
+        "transmission"
       ],
       "additionalProperties": false
+    },
+    "banks": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "events": {
+            "type": "object",
+            "properties": {
+              "order": {
+                "$ref": "#/$defs/clip"
+              },
+              "growth": {
+                "$ref": "#/$defs/clip"
+              },
+              "mature": {
+                "$ref": "#/$defs/clip"
+              },
+              "birth": {
+                "$ref": "#/$defs/clip"
+              },
+              "shot": {
+                "$ref": "#/$defs/clip"
+              },
+              "hit": {
+                "$ref": "#/$defs/clip"
+              },
+              "death": {
+                "$ref": "#/$defs/clip"
+              },
+              "colonize": {
+                "$ref": "#/$defs/clip"
+              },
+              "heal": {
+                "$ref": "#/$defs/clip"
+              },
+              "win": {
+                "$ref": "#/$defs/clip"
+              },
+              "lose": {
+                "$ref": "#/$defs/clip"
+              },
+              "break": {
+                "$ref": "#/$defs/clip"
+              },
+              "alert": {
+                "$ref": "#/$defs/clip"
+              },
+              "transmission": {
+                "$ref": "#/$defs/clip"
+              }
+            },
+            "minProperties": 1,
+            "additionalProperties": false
+          }
+        },
+        "required": ["name", "events"],
+        "additionalProperties": false
+      }
     }
   },
   "required": ["distance", "events"],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "clip": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "$ref": "shared.schema.json#/$defs/path"
+        },
+        "gain": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "cooldown": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        }
+      },
+      "required": ["file", "gain", "cooldown"],
+      "additionalProperties": false
+    }
+  }
 }

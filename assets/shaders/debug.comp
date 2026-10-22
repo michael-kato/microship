@@ -158,6 +158,25 @@ vec3 buffer_value(uint panel, DebugPixel data)
     return clamp(vec3(data.surface.w,data.volume.w,0.0)/(max(debug.settings.y,1.0)*QUERY_DISPLAY_SCALE),0.0,1.0);
 }
 
+vec3 notice_card(vec3 value,ivec2 pixel,ivec2 origin,ivec2 size,int first,int lines,vec3 accent,bool close)
+{
+    ivec2 local=pixel-origin;
+    if (any(lessThan(local,ivec2(0))) || any(greaterThanEqual(local,size))) return value;
+    value=mix(value,CARD_BACKGROUND_COLOR,CARD_ALPHA);
+    if (local.x<3) value=accent;
+    int row=(local.y-12)/HUD_LINE_SPACING;
+    ivec2 letter=ivec2(local.x-CARD_TEXT_MARGIN,(local.y-12)%HUD_LINE_SPACING);
+    if (local.y>=12 && row<lines && letter.x>=0 && letter.x<size.x-2*CARD_TEXT_MARGIN && letter.y<FONT_GLYPH_HEIGHT*HUD_GLYPH_SCALE)
+    {
+        uint bit=uint(STATS_TEXT_WIDTH*STATS_TEXT_HEIGHT+(TEXT_MARGIN+(first+row)*HUD_MASK_LINE_SPACING+letter.y/HUD_GLYPH_SCALE)*HUD_TEXT_WIDTH+TEXT_MARGIN+letter.x/HUD_GLYPH_SCALE);
+        uint word=bit/uint(TEXT_MASK_WORD_BITS);
+        if ((text_data.mask[word/4u][word%4u]&(1u<<(bit%uint(TEXT_MASK_WORD_BITS))))!=0u) value=row==0 ? accent : CARD_TEXT_COLOR;
+    }
+    if (close && abs(local.x-(size.x-16))<=5 && abs(local.y-17)<=5
+        && abs(abs(local.x-(size.x-16))-abs(local.y-17))<=1) value=CARD_TEXT_COLOR;
+    return value;
+}
+
 void main()
 {
     ivec2 pixel=ivec2(gl_GlobalInvocationID.xy), extent=ivec2(debug.header.xy);
@@ -238,6 +257,14 @@ void main()
     }
     if (!views && debug.settings.w>0.0)
     {
+        uint notices=uint(debug.settings.w)>>1;
+        if ((notices&1u)!=0u)
+            value=notice_card(value,pixel,ivec2(extent.x-HUD_SITE_PANEL_LEFT_INSET,extent.y-HUD_DIALOGUE_BOTTOM),
+                ivec2(HUD_DIALOGUE_WIDTH,HUD_DIALOGUE_HEIGHT),HUD_NOTICE_FIRST_LINE,4,CARD_MESSAGE_COLOR,false);
+        for (uint row=0u;row<uint(HUD_ALERT_ROWS);++row)
+            if ((notices&(2u<<row))!=0u)
+                value=notice_card(value,pixel,ivec2(extent.x-HUD_PANEL_MARGIN-HUD_ALERT_WIDTH,HUD_PANEL_MARGIN+int(row)*HUD_ALERT_STRIDE),
+                    ivec2(HUD_ALERT_WIDTH,HUD_ALERT_HEIGHT),HUD_ALERT_FIRST_LINE+int(row)*3,3,HOSTILE_SELECTION_COLOR,true);
         // Two compact tactical cards. Text is a CPU-generated bit mask, never a texture.
         bool left=pixel.x>=HUD_PANEL_MARGIN && pixel.x<HUD_FLEET_PANEL_RIGHT && pixel.y>=extent.y-HUD_PANEL_HEIGHT && pixel.y<extent.y-HUD_PANEL_MARGIN;
         bool right=pixel.x>=extent.x-HUD_SITE_PANEL_LEFT_INSET && pixel.x<extent.x-HUD_PANEL_MARGIN && pixel.y>=extent.y-HUD_BOTTOM_BAND_HEIGHT && pixel.y<extent.y-HUD_PANEL_MARGIN;
@@ -258,7 +285,7 @@ void main()
                 ivec2 letter=ivec2(local.x-CARD_TEXT_MARGIN,(local.y-CARD_TEXT_TOP)%CARD_ROW_HEIGHT);
                 if (local.y>=CARD_TEXT_TOP && row<4 && letter.x>=0 && letter.y<CARD_TEXT_MARGIN && letter.x<width-CARD_TEXT_HORIZONTAL_PADDING)
                 {
-                    uint bit=uint(STATS_TEXT_WIDTH*STATS_TEXT_HEIGHT+(TEXT_MARGIN+line*HUD_LINE_SPACING+letter.y)*HUD_TEXT_WIDTH+TEXT_MARGIN+letter.x),word=bit/uint(TEXT_MASK_WORD_BITS);
+                    uint bit=uint(STATS_TEXT_WIDTH*STATS_TEXT_HEIGHT+(TEXT_MARGIN+line*HUD_MASK_LINE_SPACING+letter.y/HUD_GLYPH_SCALE)*HUD_TEXT_WIDTH+TEXT_MARGIN+letter.x/HUD_GLYPH_SCALE),word=bit/uint(TEXT_MASK_WORD_BITS);
                     if ((text_data.mask[word/4u][word%4u] & (1u << (bit%uint(TEXT_MASK_WORD_BITS))))!=0u)
                         value=row==0 ? accent : row==2 && left ? CARD_MESSAGE_COLOR : CARD_TEXT_COLOR;
                 }

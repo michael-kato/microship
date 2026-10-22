@@ -206,6 +206,16 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
     return true;
 }
 
+static void unit_pose_axes(const Simulation* s,const Unit* u,Vec3* x,Vec3* y,Vec3* z)
+{
+    simulation_unit_axes(u,x,y,z);const FactionMotion& motion=s->world.content.factions[u->faction].motion;
+    if (!motion.enabled || motion.roll==0) return;
+    double time=s->time_seconds;
+    if (motion.cadence>0) time=std::floor(time/motion.cadence)*motion.cadence;
+    float angle=motion.roll*(float)std::sin(time/motion.period*FULL_TURN_RADIANS+u->generation);
+    Vec3 old=*x;*x=add(scale(*x,std::cos(angle)),scale(*y,std::sin(angle)));
+    *y=add(scale(*y,std::cos(angle)),scale(old,-std::sin(angle)));
+}
 static Vec3 posed_direction(Vec3 local,Vec3 x,Vec3 y,Vec3 z)
 { return add(add(scale(x,local.x),scale(y,local.y)),scale(z,local.z)); }
 static uint32_t factory_instance_slot(const Presentation* state,uint32_t cell,uint32_t structure)
@@ -226,7 +236,7 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         const Unit* u=&s->units[i];if (u->health<=0 || !s->visible_units[i]) continue;
-        float size=simulation_unit_scale(s,u);Vec3 x,y,z;simulation_unit_axes(u,&x,&y,&z);
+        float size=simulation_unit_scale(s,u);Vec3 x,y,z;unit_pose_axes(s,u,&x,&y,&z);
         Color color=u->flash>0 ? s->world.combat.flash : u->wounds ? r->injury[std::min(1u,u->wounds-1)] : content_color(&s->world.content,u->faction);
         if (simulation_unit_definition(s,u)->detaches)
             for (uint32_t j=0;j<r->count;++j)
@@ -327,8 +337,11 @@ static void animate_factories(Presentation* p,const Simulation* s)
         for (uint32_t k=0;k<colony.structure_count;++k)
         {
             uint32_t root=k;while (colony.parents[root]>=0) root=(uint32_t)colony.parents[root];
-            double phase=std::fmod(s->time_seconds/s->world.factory_period+(s->world.bodies[body].seed%997+root*71)/997.0,1.0)*FULL_TURN_RADIANS;
-            float angle=s->world.factory_sway*(float)std::sin(phase),sine=std::sin(angle),cosine=std::cos(angle);
+            const FactionMotion& motion=s->world.content.factions[colony.faction].motion;
+            double time=s->time_seconds;if (motion.cadence>0) time=std::floor(time/motion.cadence)*motion.cadence;
+            double period=s->world.factory_period*(motion.enabled ? motion.factory_period : 1);
+            double phase=std::fmod(time/period+(s->world.bodies[body].seed%997+root*71)/997.0,1.0)*FULL_TURN_RADIANS;
+            float angle=s->world.factory_sway*(motion.enabled ? motion.factory_amount : 1)*(float)std::sin(phase),sine=std::sin(angle),cosine=std::cos(angle);
             Vec3 pivot=colony.stems[root][0];
             sway_factory_instance(p,factory_instance_slot(p,body,k),pivot,sine,cosine);
             for (uint32_t j=0;j<GROWTH_PATH_SEGMENTS;++j) sway_factory_instance(p,p->stem_base+(body*MAX_FACTORY_STRUCTURES+k)*GROWTH_PATH_SEGMENTS+j,pivot,sine,cosine);
@@ -364,7 +377,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
         }
         if (s->world.combat.flight_enabled)
         {
-            float size=simulation_unit_scale(s,unit);Vec3 x,y,z;simulation_unit_axes(unit,&x,&y,&z);
+            float size=simulation_unit_scale(s,unit);Vec3 x,y,z;unit_pose_axes(s,unit,&x,&y,&z);
             set_instance(state,state->unit_base+i,state->unit_meshes[unit->type],unit->position,scale(x,size),scale(y,size),scale(z,size));
             continue;
         }
@@ -529,8 +542,11 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
     for (uint32_t i=0;i<p->organelles.size();++i)
     {
         const OrganellePose& part=p->organelles[i];
-        double phase=std::fmod(s->time_seconds/w->organelle_period+(w->bodies[part.body].seed%997+i*37)/997.0,1.0)*FULL_TURN_RADIANS;
-        float y=1+w->organelle_squash*(float)std::sin(phase),xz=1/std::sqrt(y);
+        const FactionMotion& motion=w->content.factions[s->colonies[part.body].faction].motion;
+        double time=s->time_seconds;if (motion.cadence>0) time=std::floor(time/motion.cadence)*motion.cadence;
+        double period=w->organelle_period*(motion.enabled ? motion.organelle_period : 1);
+        double phase=std::fmod(time/period+(w->bodies[part.body].seed%997+i*37)/997.0,1.0)*FULL_TURN_RADIANS;
+        float y=1+w->organelle_squash*(motion.enabled ? motion.organelle_amount : 1)*(float)std::sin(phase),xz=1/std::sqrt(y);
         Vec3 offset={part.pivot.x*(1-xz),part.pivot.y*(1-y),part.pivot.z*(1-xz)};
         set_instance(p,p->organelle_base+i,part.mesh,offset,Vec3{xz,0,0},Vec3{0,y,0},Vec3{0,0,xz});
         RenderInstance& instance=scene->instances[p->organelle_base+i];instance.style[7]=INSTANCE_ORGANELLE;

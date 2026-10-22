@@ -255,7 +255,22 @@ static bool load_effects(World* w,const char* path)
 static bool load_appearance(World* w,const char* path,uint32_t seed)
 {
     JsonDocument d;if (!json_load(&d,path)) return false;Json root=json_root(&d);
-    json_object(root,"$schema|ambient|gradient|lights|thin_surface|backdrop|atmosphere|fog|self_glow|organelle_appearance|factory_appearance|animation");
+    json_object(root,"$schema|communications|ambient|gradient|lights|thin_surface|backdrop|atmosphere|fog|self_glow|organelle_appearance|factory_appearance|animation");
+
+    Json comm=json_find(root,"communications");
+    if (json_present(comm))
+    {
+        char file[ASSET_PATH_CAPACITY]={};if (!json_path(comm,path,file)) return false;
+        JsonDocument settings;if (!json_load(&settings,file)) return false;Json j=json_root(&settings);
+        json_object(j,"$schema|territory_clearance|encounter_radius|dialogue_seconds|dialogue_gap|focus_distance");
+        w->communications.territory_clearance=json_float(json_get(j,"territory_clearance"),0,100);
+        w->communications.encounter_radius=json_float(json_get(j,"encounter_radius"),1,100);
+        w->communications.dialogue_seconds=json_float(json_get(j,"dialogue_seconds"),1,30);
+        w->communications.dialogue_gap=json_float(json_get(j,"dialogue_gap"),0,30);
+        w->communications.focus_distance=json_float(json_get(j,"focus_distance"),1,600);
+        if (!settings.valid) return false;
+        w->communications.enabled=true;
+    }
     w->ambient=json_color(json_get(root,"ambient"),MAX_AMBIENT_RADIANCE);w->ambient_enabled=true;
     Json gradient=json_find(root,"gradient");
     if (json_present(gradient))

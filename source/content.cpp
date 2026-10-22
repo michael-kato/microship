@@ -136,12 +136,45 @@ static bool load_bodies(Content* c,Json root,const char* path)
     }
     return root.document->valid;
 }
-static bool load_factions(Content* c,Json root)
+static bool load_personality(FactionDefinition* f,Json reference,const char* origin)
+{
+    char path[ASSET_PATH_CAPACITY]={};if (!json_path(reference,origin,path)) return false;
+    JsonDocument doc;if (!json_load(&doc,path)) return false;Json root=json_root(&doc);
+    json_object(root,"$schema|motion|dialogue|sound_bank");json_string(json_get(root,"sound_bank"),f->audio_bank,sizeof(f->audio_bank));Json motion=json_get(root,"motion");
+    json_object(motion,"acceleration|turn_rate|burst|wander|roll_degrees|period|cadence|organelle_amount|organelle_period|factory_amount|factory_period");
+    struct Field { const char* name;float* value;float low,high; };
+    FactionMotion& m=f->motion;
+    Field fields[]={ {"acceleration",&m.acceleration,.1f,4},{"turn_rate",&m.turn_rate,.1f,4},
+        {"burst",&m.burst,0,.8f},{"wander",&m.wander,0,5},{"roll_degrees",&m.roll,0,30},
+        {"period",&m.period,.1f,30},{"cadence",&m.cadence,0,1},
+        {"organelle_amount",&m.organelle_amount,0,3},{"organelle_period",&m.organelle_period,.1f,4},
+        {"factory_amount",&m.factory_amount,0,3},{"factory_period",&m.factory_period,.1f,4} };
+    for (uint32_t i=0;i<sizeof(fields)/sizeof(fields[0]);++i)
+        *fields[i].value=json_float(json_get(motion,fields[i].name),fields[i].low,fields[i].high);
+    m.roll*=.01745329252f;m.enabled=true;
+    Json voice=json_get(root,"dialogue");json_object(voice,"ships|cells|milestones");
+    json_string(json_get(voice,"ships"),f->dialogue.ships,FACTION_LINE_CAPACITY);
+    json_string(json_get(voice,"cells"),f->dialogue.cells,FACTION_LINE_CAPACITY);
+    JsonArray a=json_array(json_get(voice,"milestones"),FACTION_MILESTONES);Json line={};uint32_t seen=0;
+    while (json_next(&a,&line))
+    {
+        json_object(line,"cells|line");uint32_t cells=json_uint(json_get(line,"cells"),10,90);
+        if (cells%10) return json_error(line,"dialogue cell thresholds must be multiples of ten");
+        uint32_t index=cells/10-1;if (seen&(1u<<index)) return json_error(line,"duplicate dialogue threshold");
+        seen|=1u<<index;json_string(json_get(line,"line"),f->dialogue.milestones[index],FACTION_LINE_CAPACITY);
+    }
+    if (seen!=(1u<<FACTION_MILESTONES)-1) return json_error(voice,"dialogue requires thresholds 10 through 90");
+    f->dialogue.enabled=true;return doc.valid;
+}
+
+static bool load_factions(Content* c,Json root,const char* path)
 {
     json_object(root,"$schema|factions");JsonArray a=json_array(json_get(root,"factions"),MAX_FACTIONS-1);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"id|name|label|color|production|cell_appearance");FactionDefinition f={};
+        json_object(j,"id|name|label|color|production|cell_appearance|personality");FactionDefinition f={};
+        Json personality=json_find(j,"personality");
+        if (json_present(personality) && !load_personality(&f,personality,path)) return false;
         Json appearance=json_find(j,"cell_appearance");
         if (json_present(appearance))
         {
@@ -511,7 +544,7 @@ bool content_load(Content* content,const char* path)
     {
         char file[ASSET_PATH_CAPACITY]={};if (!json_path(json_get(root,keys[i]),path,file)) return false;
         JsonDocument document;if (!json_load(&document,file)) return false;Json data=json_root(&document);
-        bool valid=i==0 ? load_bodies(content,data,file) : i==1 ? load_factions(content,data) : i==2 ? load_groups(content,data)
+        bool valid=i==0 ? load_bodies(content,data,file) : i==1 ? load_factions(content,data,file) : i==2 ? load_groups(content,data)
             : i==3 ? load_units(content,data,file) : load_buildings(content,data,file);
         if (!valid) return false;
     }

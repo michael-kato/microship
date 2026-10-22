@@ -3,8 +3,9 @@
 
 #include <stdint.h>
 #include "types.h"
+#include "asset_limits.h"
 
-enum { MAX_LAYOUT_CELLS=128 };
+enum { MAX_LAYOUT_CELLS=CELL_STORAGE_CAPACITY };
 
 // A circular field: homes sit evenly on its circle and an optional center cell
 // sits near its middle. Every other cell sits at the centroid of its seeded

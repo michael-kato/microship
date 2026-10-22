@@ -22,7 +22,8 @@
           "profile": "pointed",
           "seed": 7821
         }
-      }
+      },
+      "personality": "../presentation/virus_personality.json"
     },
     {
       "id": 2,
@@ -39,7 +40,8 @@
         "strength": 0.78,
         "roughness": 0.6,
         "roundness": 0.8
-      }
+      },
+      "personality": "../presentation/immune_personality.json"
     },
     {
       "id": 3,
@@ -62,7 +64,8 @@
           "profile": "rounded",
           "seed": 1769
         }
-      }
+      },
+      "personality": "../presentation/fungus_personality.json"
     }
   ]
 }

@@ -100,6 +100,501 @@
       "noise": 0.72,
       "decay": 3.5,
       "seed": 4765
+    },
+    "alert": {
+      "seconds": 0.4,
+      "start_hz": 750,
+      "end_hz": 480,
+      "noise": 0.05,
+      "decay": 4,
+      "seed": 1001
+    },
+    "transmission": {
+      "seconds": 0.2,
+      "start_hz": 170,
+      "end_hz": 310,
+      "noise": 0.3,
+      "decay": 5,
+      "seed": 1002
     }
-  }
+  },
+  "banks": [
+    {
+      "name": "virus",
+      "sounds": {
+        "order": {
+          "seconds": 0.09,
+          "start_hz": 1200,
+          "end_hz": 280,
+          "noise": 0.62,
+          "decay": 5.5,
+          "seed": 14721,
+          "texture": "fracture",
+          "attack_seconds": 0.002,
+          "release_seconds": 0.015
+        },
+        "growth": {
+          "seconds": 0.26,
+          "start_hz": 1273,
+          "end_hz": 311,
+          "noise": 0.62,
+          "decay": 5.5,
+          "seed": 14722,
+          "texture": "fracture",
+          "attack_seconds": 0.002,
+          "release_seconds": 0.015
+        },
+        "mature": {
+          "seconds": 0.32,
+          "start_hz": 1346,
+          "end_hz": 342,
+          "noise": 0.62,
+          "decay": 5.5,
+          "seed": 14723,
+          "texture": "fracture",
+          "attack_seconds": 0.002,
+          "release_seconds": 0.015
+        },
+        "birth": {
+          "seconds": 0.045,
+          "start_hz": 1419,
+          "end_hz": 373,
+          "noise": 0.62,
+          "decay": 5.5,
+          "seed": 14724,
+          "attack_seconds": 0.002,
+          "release_seconds": 0.015,
+          "texture": "fracture"
+        },
+        "shot": {
+          "seconds": 0.07,
+          "start_hz": 1492,
+          "end_hz": 404,
+          "noise": 0.62,
+          "decay": 5.5,
+          "seed": 14725,
+          "texture": "fracture",
+          "attack_seconds": 0.002,
+          "release_seconds": 0.015
+        },
+        "hit": {
+          "seconds": 0.012,
+          "start_hz": 1565,
+          "end_hz": 435,
+          "noise": 0.62,
+          "decay": 5.5,
+          "seed": 14726,
+          "attack_seconds": 0.002,
+          "release_seconds": 0.015,
+          "texture": "fracture"
+        },
+        "death": {
+          "seconds": 0.3,
+          "start_hz": 1638,
+          "end_hz": 466,
+          "noise": 0.62,
+          "decay": 5.5,
+          "seed": 14727,
+          "texture": "fracture",
+          "attack_seconds": 0.002,
+          "release_seconds": 0.015
+        },
+        "colonize": {
+          "seconds": 0.45,
+          "start_hz": 1711,
+          "end_hz": 497,
+          "noise": 0.62,
+          "decay": 5.5,
+          "seed": 14728,
+          "texture": "fracture",
+          "attack_seconds": 0.002,
+          "release_seconds": 0.015
+        },
+        "heal": {
+          "seconds": 0.22,
+          "start_hz": 1784,
+          "end_hz": 528,
+          "noise": 0.62,
+          "decay": 5.5,
+          "seed": 14729,
+          "texture": "fracture",
+          "attack_seconds": 0.002,
+          "release_seconds": 0.015
+        },
+        "win": {
+          "seconds": 0.7,
+          "start_hz": 1857,
+          "end_hz": 559,
+          "noise": 0.62,
+          "decay": 5.5,
+          "seed": 14730,
+          "texture": "fracture",
+          "attack_seconds": 0.002,
+          "release_seconds": 0.015
+        },
+        "lose": {
+          "seconds": 0.7,
+          "start_hz": 1930,
+          "end_hz": 590,
+          "noise": 0.62,
+          "decay": 5.5,
+          "seed": 14731,
+          "texture": "fracture",
+          "attack_seconds": 0.002,
+          "release_seconds": 0.015
+        },
+        "break": {
+          "seconds": 0.24,
+          "start_hz": 2003,
+          "end_hz": 621,
+          "noise": 0.62,
+          "decay": 5.5,
+          "seed": 14765,
+          "texture": "fracture",
+          "attack_seconds": 0.002,
+          "release_seconds": 0.015
+        },
+        "alert": {
+          "seconds": 0.48,
+          "start_hz": 2076,
+          "end_hz": 652,
+          "noise": 0.62,
+          "decay": 5.5,
+          "seed": 11001,
+          "texture": "fracture",
+          "attack_seconds": 0.002,
+          "release_seconds": 0.015
+        },
+        "transmission": {
+          "seconds": 0.3,
+          "start_hz": 2149,
+          "end_hz": 683,
+          "noise": 0.62,
+          "decay": 5.5,
+          "seed": 11002,
+          "texture": "fracture",
+          "attack_seconds": 0.002,
+          "release_seconds": 0.015
+        }
+      }
+    },
+    {
+      "name": "immune",
+      "sounds": {
+        "order": {
+          "seconds": 0.09,
+          "start_hz": 130,
+          "end_hz": 100,
+          "noise": 0.06,
+          "decay": 3.5,
+          "seed": 15721,
+          "texture": "command",
+          "attack_seconds": 0.004,
+          "release_seconds": 0.025
+        },
+        "growth": {
+          "seconds": 0.26,
+          "start_hz": 148,
+          "end_hz": 115,
+          "noise": 0.06,
+          "decay": 3.5,
+          "seed": 15722,
+          "texture": "command",
+          "attack_seconds": 0.004,
+          "release_seconds": 0.025
+        },
+        "mature": {
+          "seconds": 0.32,
+          "start_hz": 166,
+          "end_hz": 130,
+          "noise": 0.06,
+          "decay": 3.5,
+          "seed": 15723,
+          "texture": "command",
+          "attack_seconds": 0.004,
+          "release_seconds": 0.025
+        },
+        "birth": {
+          "seconds": 0.09,
+          "start_hz": 184,
+          "end_hz": 145,
+          "noise": 0.06,
+          "decay": 3.5,
+          "seed": 15724,
+          "attack_seconds": 0.004,
+          "release_seconds": 0.025,
+          "texture": "command"
+        },
+        "shot": {
+          "seconds": 0.07,
+          "start_hz": 202,
+          "end_hz": 160,
+          "noise": 0.06,
+          "decay": 3.5,
+          "seed": 15725,
+          "texture": "command",
+          "attack_seconds": 0.004,
+          "release_seconds": 0.025
+        },
+        "hit": {
+          "seconds": 0.012,
+          "start_hz": 220,
+          "end_hz": 175,
+          "noise": 0.06,
+          "decay": 3.5,
+          "seed": 15726,
+          "attack_seconds": 0.004,
+          "release_seconds": 0.025,
+          "texture": "command"
+        },
+        "death": {
+          "seconds": 0.3,
+          "start_hz": 238,
+          "end_hz": 190,
+          "noise": 0.06,
+          "decay": 3.5,
+          "seed": 15727,
+          "texture": "command",
+          "attack_seconds": 0.004,
+          "release_seconds": 0.025
+        },
+        "colonize": {
+          "seconds": 0.45,
+          "start_hz": 256,
+          "end_hz": 205,
+          "noise": 0.06,
+          "decay": 3.5,
+          "seed": 15728,
+          "texture": "command",
+          "attack_seconds": 0.004,
+          "release_seconds": 0.025
+        },
+        "heal": {
+          "seconds": 0.22,
+          "start_hz": 274,
+          "end_hz": 220,
+          "noise": 0.06,
+          "decay": 3.5,
+          "seed": 15729,
+          "texture": "command",
+          "attack_seconds": 0.004,
+          "release_seconds": 0.025
+        },
+        "win": {
+          "seconds": 0.7,
+          "start_hz": 292,
+          "end_hz": 235,
+          "noise": 0.06,
+          "decay": 3.5,
+          "seed": 15730,
+          "texture": "command",
+          "attack_seconds": 0.004,
+          "release_seconds": 0.025
+        },
+        "lose": {
+          "seconds": 0.7,
+          "start_hz": 310,
+          "end_hz": 250,
+          "noise": 0.06,
+          "decay": 3.5,
+          "seed": 15731,
+          "texture": "command",
+          "attack_seconds": 0.004,
+          "release_seconds": 0.025
+        },
+        "break": {
+          "seconds": 0.24,
+          "start_hz": 328,
+          "end_hz": 265,
+          "noise": 0.06,
+          "decay": 3.5,
+          "seed": 15765,
+          "texture": "command",
+          "attack_seconds": 0.004,
+          "release_seconds": 0.025
+        },
+        "alert": {
+          "seconds": 0.48,
+          "start_hz": 620,
+          "end_hz": 620,
+          "noise": 0.06,
+          "decay": 3.5,
+          "seed": 12001,
+          "texture": "command",
+          "attack_seconds": 0.004,
+          "release_seconds": 0.025
+        },
+        "transmission": {
+          "seconds": 0.3,
+          "start_hz": 620,
+          "end_hz": 620,
+          "noise": 0.06,
+          "decay": 3.5,
+          "seed": 12002,
+          "texture": "command",
+          "attack_seconds": 0.004,
+          "release_seconds": 0.025
+        }
+      }
+    },
+    {
+      "name": "fungus",
+      "sounds": {
+        "order": {
+          "seconds": 0.09,
+          "start_hz": 95,
+          "end_hz": 65,
+          "noise": 0.72,
+          "decay": 3,
+          "seed": 16721,
+          "texture": "spores",
+          "attack_seconds": 0.012,
+          "release_seconds": 0.035
+        },
+        "growth": {
+          "seconds": 0.26,
+          "start_hz": 106,
+          "end_hz": 74,
+          "noise": 0.72,
+          "decay": 3,
+          "seed": 16722,
+          "texture": "spores",
+          "attack_seconds": 0.012,
+          "release_seconds": 0.035
+        },
+        "mature": {
+          "seconds": 0.32,
+          "start_hz": 117,
+          "end_hz": 83,
+          "noise": 0.72,
+          "decay": 3,
+          "seed": 16723,
+          "texture": "spores",
+          "attack_seconds": 0.012,
+          "release_seconds": 0.035
+        },
+        "birth": {
+          "seconds": 0.13,
+          "start_hz": 128,
+          "end_hz": 92,
+          "noise": 0.72,
+          "decay": 3,
+          "seed": 16724,
+          "attack_seconds": 0.012,
+          "release_seconds": 0.035,
+          "texture": "spores"
+        },
+        "shot": {
+          "seconds": 0.07,
+          "start_hz": 139,
+          "end_hz": 101,
+          "noise": 0.72,
+          "decay": 3,
+          "seed": 16725,
+          "texture": "spores",
+          "attack_seconds": 0.012,
+          "release_seconds": 0.035
+        },
+        "hit": {
+          "seconds": 0.012,
+          "start_hz": 150,
+          "end_hz": 110,
+          "noise": 0.72,
+          "decay": 3,
+          "seed": 16726,
+          "attack_seconds": 0.012,
+          "release_seconds": 0.035,
+          "texture": "spores"
+        },
+        "death": {
+          "seconds": 0.3,
+          "start_hz": 161,
+          "end_hz": 119,
+          "noise": 0.72,
+          "decay": 3,
+          "seed": 16727,
+          "texture": "spores",
+          "attack_seconds": 0.012,
+          "release_seconds": 0.035
+        },
+        "colonize": {
+          "seconds": 0.45,
+          "start_hz": 172,
+          "end_hz": 128,
+          "noise": 0.72,
+          "decay": 3,
+          "seed": 16728,
+          "texture": "spores",
+          "attack_seconds": 0.012,
+          "release_seconds": 0.035
+        },
+        "heal": {
+          "seconds": 0.22,
+          "start_hz": 183,
+          "end_hz": 137,
+          "noise": 0.72,
+          "decay": 3,
+          "seed": 16729,
+          "texture": "spores",
+          "attack_seconds": 0.012,
+          "release_seconds": 0.035
+        },
+        "win": {
+          "seconds": 0.7,
+          "start_hz": 194,
+          "end_hz": 146,
+          "noise": 0.72,
+          "decay": 3,
+          "seed": 16730,
+          "texture": "spores",
+          "attack_seconds": 0.012,
+          "release_seconds": 0.035
+        },
+        "lose": {
+          "seconds": 0.7,
+          "start_hz": 205,
+          "end_hz": 155,
+          "noise": 0.72,
+          "decay": 3,
+          "seed": 16731,
+          "texture": "spores",
+          "attack_seconds": 0.012,
+          "release_seconds": 0.035
+        },
+        "break": {
+          "seconds": 0.24,
+          "start_hz": 216,
+          "end_hz": 164,
+          "noise": 0.72,
+          "decay": 3,
+          "seed": 16765,
+          "texture": "spores",
+          "attack_seconds": 0.012,
+          "release_seconds": 0.035
+        },
+        "alert": {
+          "seconds": 0.48,
+          "start_hz": 227,
+          "end_hz": 173,
+          "noise": 0.72,
+          "decay": 3,
+          "seed": 13001,
+          "texture": "spores",
+          "attack_seconds": 0.012,
+          "release_seconds": 0.035
+        },
+        "transmission": {
+          "seconds": 0.3,
+          "start_hz": 238,
+          "end_hz": 182,
+          "noise": 0.72,
+          "decay": 3,
+          "seed": 13002,
+          "texture": "spores",
+          "attack_seconds": 0.012,
+          "release_seconds": 0.035
+        }
+      }
+    }
+  ]
 }

@@ -1,0 +1,8 @@
+{
+  "$schema": "../schemas/communications.schema.json",
+  "territory_clearance": 8,
+  "encounter_radius": 18,
+  "dialogue_seconds": 7,
+  "dialogue_gap": 3,
+  "focus_distance": 32
+}

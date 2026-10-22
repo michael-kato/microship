@@ -51,7 +51,7 @@ static const int DESCRIPTOR_POOL_TYPE_COUNT = 5;
 static const int BACKDROP_PUSH_BYTES = 16;
 static const int GPU_TRIANGLE_BYTES = 16;
 static const uint32_t THIN_MEMBRANE_TRIANGLE = 3; // GpuTriangle material tag.
-static const int HUD_MAX_LINE_CHARACTERS = HUD_LINE_CAPACITY-1;
+static const int HUD_MAX_LINE_CHARACTERS = (HUD_TEXT_WIDTH-2*TEXT_MARGIN)/HUD_MASK_CHARACTER_SPACING;
 static const unsigned int STATS_TEXT_WIDTH_UNSIGNED = STATS_TEXT_WIDTH;
 static const unsigned int STATS_TEXT_HEIGHT_UNSIGNED = STATS_TEXT_HEIGHT;
 static const int GPU_TIMESTAMP_COUNT = 17;
@@ -225,7 +225,7 @@ struct RendererState
     RenderUniform baked_uniform;
     bool lighting_dependencies_valid;
     uint32_t lighting_bakes,lighting_reuses,lighting_surface_bakes;
-    std::vector<uint32_t> surface_cache_meshes;
+    std::vector<uint32_t> surface_cache_meshes,surface_slots;
     uint32_t medium_count;
     PFN_vkCmdCopyBufferToImage copy_buffer_to_image;
     PFN_vkCmdFillBuffer fill_buffer;
@@ -914,8 +914,9 @@ static void update_lighting_dependencies(RendererState* state,const RenderScene*
         || memcmp(u.membrane_fade,old.membrane_fade,2*sizeof(float));
     std::vector<WorldBounds>& changes=state->lighting_changes;changes.clear();
     std::vector<WorldBounds>& slot_bake=state->baked_slot_bounds;
-    for (uint32_t i=0;i<state->instance_count;++i)
+    for (uint32_t slot=0;slot<state->surface_slots.size();++slot)
     {
+        uint32_t i=state->surface_slots[slot];
         LightingKey current={};const RenderInstance& source=scene->instances[i];
         bool stationary=source.static_lighting && (source.mask&SURFACE_RAY_MASK);
         if (stationary)
@@ -941,8 +942,11 @@ static void update_lighting_dependencies(RendererState* state,const RenderScene*
     {
         for (uint32_t i=0;i<state->medium_count;++i)
             if (global || change_reaches(changes[c],medium_bounds(scene->media[i]),u)) state->lighting_valid[i]=0;
-        for (uint32_t i=0;i<state->instance_count;++i)
+        for (uint32_t slot=0;slot<state->surface_slots.size();++slot)
+        {
+            uint32_t i=state->surface_slots[slot];
             if (global || change_reaches(changes[c],slot_bake[i],u)) state->surface_valid[i]=0;
+        }
     }
     old=u;state->lighting_dependencies_valid=true;
 }
@@ -1147,14 +1151,14 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
         state->slot_cache_first.resize(state->instance_count);state->active_slots.resize(state->instance_count);
         state->surface_valid.resize(state->instance_count);state->baked_slot_bounds.assign(state->instance_count,empty_bounds());
         state->lighting_changes.reserve(state->instance_count+scene->media.size());
-        state->surface_cache_meshes.resize(state->instance_count);
+        state->surface_cache_meshes.resize(state->instance_count);state->surface_slots.reserve(state->instance_count);
         state->lighting_valid.resize(scene->media.size());state->vertex_upload_offsets.resize(state->mesh_count);
     }
     catch (const std::bad_alloc&) { fprintf(stderr,"Cannot allocate render upload storage.\n");return false; }
     if (!upload_geometry(state,geometry)) return false;
     for (uint32_t i=0;i<state->instance_count;++i) if (scene->instances[i].static_lighting)
     {
-        state->surface_cache_meshes[i]=scene->instances[i].mesh+1;
+        state->surface_slots.push_back(i);state->surface_cache_meshes[i]=scene->instances[i].mesh+1;
         state->slot_cache_first[i]=state->surface_cache_triangles;
         state->surface_cache_triangles+=state->meshes[scene->instances[i].mesh].range.count;
     }
@@ -2143,7 +2147,7 @@ static void draw_debug(RendererState* state, const Renderer* renderer)
     parameters.settings[0] = state->config.exposure;
     parameters.settings[1] = (float)state->config.samples_per_pixel;
     parameters.settings[2] = state->config.camera_max_distance;
-    parameters.settings[3] = renderer->overlay_enabled ? 1.0f : 0.0f;
+    parameters.settings[3] = renderer->overlay_enabled ? (float)(1u+2u*renderer->notice_mask) : 0.0f;
     memcpy(parameters.marker,renderer->selection_marker,sizeof(parameters.marker));
     memcpy(parameters.status,renderer->hud_status,sizeof(parameters.status));
     memcpy(parameters.accent,renderer->hud_accent,sizeof(parameters.accent));
@@ -2161,12 +2165,10 @@ static void draw_debug(RendererState* state, const Renderer* renderer)
                 for (uint32_t y=0;y<FONT_GLYPH_HEIGHT;++y)
                     for (uint32_t x=0;x<FONT_GLYPH_WIDTH;++x)
                         if (glyph & (1u << (y*FONT_GLYPH_WIDTH+x)))
-                            for (uint32_t row=0;row<HUD_GLYPH_SCALE;++row)
-                                for (uint32_t col=0;col<HUD_GLYPH_SCALE;++col)
-                                {
-                                    uint32_t bit=STATS_TEXT_WIDTH*STATS_TEXT_HEIGHT+(TEXT_MARGIN+line*HUD_LINE_SPACING+y*HUD_GLYPH_SCALE+row)*HUD_TEXT_WIDTH+TEXT_MARGIN+column*HUD_CHARACTER_SPACING+x*HUD_GLYPH_SCALE+col;
-                                    mask[bit/TEXT_MASK_WORD_BITS] |= 1u << (bit%TEXT_MASK_WORD_BITS);
-                                }
+                            {
+                                uint32_t bit=STATS_TEXT_WIDTH*STATS_TEXT_HEIGHT+(TEXT_MARGIN+line*HUD_MASK_LINE_SPACING+y)*HUD_TEXT_WIDTH+TEXT_MARGIN+column*HUD_MASK_CHARACTER_SPACING+x;
+                                mask[bit/TEXT_MASK_WORD_BITS] |= 1u << (bit%TEXT_MASK_WORD_BITS);
+                            }
             }
     GpuBuffer& text=frame_data(state).debug_text;
     memcpy((uint32_t*)text.mapped+FONT_GLYPH_COUNT,mask,sizeof(state->text_mask));

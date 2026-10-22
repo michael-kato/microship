@@ -12,6 +12,19 @@ enum GrowthGrammar { GROWTH_AXIAL,GROWTH_FAN,GROWTH_HYPHA,GROWTH_TREE };
 enum { TARGET_UNITS=1, TARGET_STRUCTURES=2 };
 enum AttackMode { ATTACK_PROJECTILE,ATTACK_DIGEST,ATTACK_SPORE };
 struct GroupDefinition { bool declared;char key[ASSET_NAME_CAPACITY],selection[ASSET_NAME_CAPACITY],singular[ASSET_NAME_CAPACITY],plural[ASSET_NAME_CAPACITY]; };
+enum { FACTION_MILESTONES=9, FACTION_LINE_CAPACITY=96 };
+struct FactionMotion
+{
+    bool enabled;
+    float acceleration,turn_rate,burst,wander,roll,period,cadence;
+    float organelle_amount,organelle_period,factory_amount,factory_period;
+};
+struct FactionDialogue
+{
+    bool enabled;
+    char ships[FACTION_LINE_CAPACITY],cells[FACTION_LINE_CAPACITY];
+    char milestones[FACTION_MILESTONES][FACTION_LINE_CAPACITY];
+};
 struct FactionDefinition
 {
     bool declared;
@@ -25,6 +38,8 @@ struct FactionDefinition
     uint32_t displacement_features,displacement_seed;
     float displacement_height,displacement_width;
     bool displacement_pointed;
+    FactionMotion motion;FactionDialogue dialogue;
+    char audio_bank[ASSET_NAME_CAPACITY];
 };
 struct UnitDefinition
 {

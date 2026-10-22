@@ -1,0 +1,59 @@
+{
+  "$schema": "../schemas/personality.schema.json",
+  "motion": {
+    "acceleration": 0.55,
+    "turn_rate": 0.55,
+    "burst": 0,
+    "wander": 0,
+    "roll_degrees": 13,
+    "period": 4.8,
+    "cadence": 0,
+    "organelle_amount": 2,
+    "organelle_period": 1.6,
+    "factory_amount": 1.6,
+    "factory_period": 1.8
+  },
+  "dialogue": {
+    "ships": "FOREIGN UNITS CONFIRMED. BEGIN INTERCEPTION.",
+    "cells": "HOSTILE COLONY IDENTIFIED. MARK FOR CONTAINMENT.",
+    "milestones": [
+      {
+        "cells": 10,
+        "line": "TEN CELLS SECURED. ESTABLISH A DEFENSIVE LINE."
+      },
+      {
+        "cells": 20,
+        "line": "TWENTY CELLS SECURED. EXPAND THE PATROL ZONE."
+      },
+      {
+        "cells": 30,
+        "line": "THIRTY CELLS SECURED. ADVANCE IN FORMATION."
+      },
+      {
+        "cells": 40,
+        "line": "FORTY CELLS SECURED. MAINTAIN THE CORDON."
+      },
+      {
+        "cells": 50,
+        "line": "FIFTY CELLS SECURED. NO EXCEPTIONS TO PROTOCOL."
+      },
+      {
+        "cells": 60,
+        "line": "SIXTY CELLS SECURED. PREPARE THE NEXT SECTOR."
+      },
+      {
+        "cells": 70,
+        "line": "SEVENTY CELLS SECURED. CLOSE ALL GAPS."
+      },
+      {
+        "cells": 80,
+        "line": "EIGHTY CELLS SECURED. COMPLETE THE CONTAINMENT."
+      },
+      {
+        "cells": 90,
+        "line": "NINETY CELLS SECURED. RESISTANCE WILL BE REMOVED."
+      }
+    ]
+  },
+  "sound_bank": "immune"
+}

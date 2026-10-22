@@ -189,7 +189,7 @@ endif()
 add_executable(nanova
     ${platform_sources}
     source/content.cpp source/asset_json.cpp
-    source/effects.cpp source/audio.cpp
+    source/effects.cpp source/communications.cpp source/audio.cpp
     source/main.cpp
     source/microfacet.cpp
     source/camera.cpp
@@ -272,7 +272,7 @@ add_test(NAME startup COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/startup.py $<TARGET_FILE:nanova>)
 set_tests_properties(startup PROPERTIES TIMEOUT 60)
 
-foreach(group IN ITEMS virus_shapes selection colony_forms cell_animation natural_factory small_factories factory_curves three_factions factory_emission factory_repair fungal_defence fungal_sources)
+foreach(group IN ITEMS communications faction_motion virus_shapes selection colony_forms cell_animation natural_factory small_factories factory_curves three_factions factory_emission factory_repair fungal_defence fungal_sources)
     add_test(NAME ${group} COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/${group}.py $<TARGET_FILE:nanova>)
     set_tests_properties(${group} PROPERTIES TIMEOUT 60)

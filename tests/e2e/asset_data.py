@@ -10,6 +10,8 @@ def established_world(source,directory):
     """Stage the prior axial balance fixture. Current-content checks use stage_world."""
     data=stage_world(source,directory)
     data['rules']['economy'].pop('fighter_percent',None)
+    data['appearance'].pop('communications',None)
+    for faction in data['content']['factions']:faction.pop('personality',None)
     for start in data['match'].pop('starts',[]):data['bodies'][start['cell']]['owner']=start['faction']
     # Keep exact timing and damage fixtures independent of current faction tuning.
     data['rules']['spikes']['regrow_seconds']=5

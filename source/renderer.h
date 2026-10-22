@@ -27,6 +27,7 @@ struct Renderer
     double previous_frame_ms;
     double gpu_frame_ms, work_frame_ms, acquire_ms, present_ms;
     bool overlay_enabled;
+    uint32_t notice_mask; // Bit zero: dialogue; bits one through three: alert tiles.
     char hud[HUD_TEXT_LINES][HUD_LINE_CAPACITY];
     int32_t selection_box[4];
     int32_t selection_marker[4];

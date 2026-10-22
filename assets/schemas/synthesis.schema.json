@@ -10,568 +10,46 @@
       "type": "object",
       "properties": {
         "order": {
-          "type": "object",
-          "properties": {
-            "seconds": {
-              "type": "number",
-              "minimum": 0.005,
-              "maximum": 2
-            },
-            "start_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "end_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "noise": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "decay": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 12
-            },
-            "seed": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16777215
-            },
-            "attack_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            },
-            "release_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            }
-          },
-          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "growth": {
-          "type": "object",
-          "properties": {
-            "seconds": {
-              "type": "number",
-              "minimum": 0.005,
-              "maximum": 2
-            },
-            "start_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "end_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "noise": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "decay": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 12
-            },
-            "seed": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16777215
-            },
-            "attack_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            },
-            "release_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            }
-          },
-          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "mature": {
-          "type": "object",
-          "properties": {
-            "seconds": {
-              "type": "number",
-              "minimum": 0.005,
-              "maximum": 2
-            },
-            "start_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "end_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "noise": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "decay": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 12
-            },
-            "seed": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16777215
-            },
-            "attack_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            },
-            "release_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            }
-          },
-          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "birth": {
-          "type": "object",
-          "properties": {
-            "seconds": {
-              "type": "number",
-              "minimum": 0.005,
-              "maximum": 2
-            },
-            "start_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "end_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "noise": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "decay": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 12
-            },
-            "seed": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16777215
-            },
-            "attack_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            },
-            "release_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            }
-          },
-          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "shot": {
-          "type": "object",
-          "properties": {
-            "seconds": {
-              "type": "number",
-              "minimum": 0.005,
-              "maximum": 2
-            },
-            "start_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "end_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "noise": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "decay": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 12
-            },
-            "seed": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16777215
-            },
-            "attack_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            },
-            "release_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            }
-          },
-          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "hit": {
-          "type": "object",
-          "properties": {
-            "seconds": {
-              "type": "number",
-              "minimum": 0.005,
-              "maximum": 2
-            },
-            "start_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "end_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "noise": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "decay": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 12
-            },
-            "seed": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16777215
-            },
-            "attack_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            },
-            "release_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            }
-          },
-          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "death": {
-          "type": "object",
-          "properties": {
-            "seconds": {
-              "type": "number",
-              "minimum": 0.005,
-              "maximum": 2
-            },
-            "start_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "end_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "noise": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "decay": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 12
-            },
-            "seed": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16777215
-            },
-            "attack_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            },
-            "release_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            }
-          },
-          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "colonize": {
-          "type": "object",
-          "properties": {
-            "seconds": {
-              "type": "number",
-              "minimum": 0.005,
-              "maximum": 2
-            },
-            "start_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "end_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "noise": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "decay": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 12
-            },
-            "seed": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16777215
-            },
-            "attack_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            },
-            "release_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            }
-          },
-          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "heal": {
-          "type": "object",
-          "properties": {
-            "seconds": {
-              "type": "number",
-              "minimum": 0.005,
-              "maximum": 2
-            },
-            "start_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "end_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "noise": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "decay": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 12
-            },
-            "seed": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16777215
-            },
-            "attack_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            },
-            "release_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            }
-          },
-          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "win": {
-          "type": "object",
-          "properties": {
-            "seconds": {
-              "type": "number",
-              "minimum": 0.005,
-              "maximum": 2
-            },
-            "start_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "end_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "noise": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "decay": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 12
-            },
-            "seed": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16777215
-            },
-            "attack_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            },
-            "release_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            }
-          },
-          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "lose": {
-          "type": "object",
-          "properties": {
-            "seconds": {
-              "type": "number",
-              "minimum": 0.005,
-              "maximum": 2
-            },
-            "start_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "end_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "noise": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "decay": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 12
-            },
-            "seed": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16777215
-            },
-            "attack_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            },
-            "release_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            }
-          },
-          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
         },
         "break": {
-          "type": "object",
-          "properties": {
-            "seconds": {
-              "type": "number",
-              "minimum": 0.005,
-              "maximum": 2
-            },
-            "start_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "end_hz": {
-              "type": "number",
-              "minimum": 20,
-              "maximum": 20000
-            },
-            "noise": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "decay": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 12
-            },
-            "seed": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16777215
-            },
-            "attack_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            },
-            "release_seconds": {
-              "type": "number",
-              "minimum": 0.0001,
-              "maximum": 0.1
-            }
-          },
-          "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
-          "additionalProperties": false
+          "$ref": "#/$defs/clip"
+        },
+        "alert": {
+          "$ref": "#/$defs/clip"
+        },
+        "transmission": {
+          "$ref": "#/$defs/clip"
         }
       },
       "required": [
@@ -586,11 +64,143 @@
         "heal",
         "win",
         "lose",
-        "break"
+        "break",
+        "alert",
+        "transmission"
       ],
       "additionalProperties": false
+    },
+    "banks": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "shared.schema.json#/$defs/name"
+          },
+          "sounds": {
+            "type": "object",
+            "properties": {
+              "order": {
+                "$ref": "#/$defs/clip"
+              },
+              "growth": {
+                "$ref": "#/$defs/clip"
+              },
+              "mature": {
+                "$ref": "#/$defs/clip"
+              },
+              "birth": {
+                "$ref": "#/$defs/clip"
+              },
+              "shot": {
+                "$ref": "#/$defs/clip"
+              },
+              "hit": {
+                "$ref": "#/$defs/clip"
+              },
+              "death": {
+                "$ref": "#/$defs/clip"
+              },
+              "colonize": {
+                "$ref": "#/$defs/clip"
+              },
+              "heal": {
+                "$ref": "#/$defs/clip"
+              },
+              "win": {
+                "$ref": "#/$defs/clip"
+              },
+              "lose": {
+                "$ref": "#/$defs/clip"
+              },
+              "break": {
+                "$ref": "#/$defs/clip"
+              },
+              "alert": {
+                "$ref": "#/$defs/clip"
+              },
+              "transmission": {
+                "$ref": "#/$defs/clip"
+              }
+            },
+            "required": [
+              "order",
+              "growth",
+              "mature",
+              "birth",
+              "shot",
+              "hit",
+              "death",
+              "colonize",
+              "heal",
+              "win",
+              "lose",
+              "break",
+              "alert",
+              "transmission"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": ["name", "sounds"],
+        "additionalProperties": false
+      }
     }
   },
   "required": ["sounds"],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "clip": {
+      "type": "object",
+      "properties": {
+        "seconds": {
+          "type": "number",
+          "minimum": 0.005,
+          "maximum": 2
+        },
+        "start_hz": {
+          "type": "number",
+          "minimum": 20,
+          "maximum": 20000
+        },
+        "end_hz": {
+          "type": "number",
+          "minimum": 20,
+          "maximum": 20000
+        },
+        "noise": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "decay": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 12
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        "attack_seconds": {
+          "type": "number",
+          "minimum": 0.0001,
+          "maximum": 0.1
+        },
+        "release_seconds": {
+          "type": "number",
+          "minimum": 0.0001,
+          "maximum": 0.1
+        },
+        "texture": {
+          "enum": ["sine", "fracture", "command", "spores"]
+        }
+      },
+      "required": ["seconds", "start_hz", "end_hz", "noise", "decay", "seed"],
+      "additionalProperties": false
+    }
+  }
 }

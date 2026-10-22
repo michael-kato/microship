@@ -5,6 +5,7 @@
 #include "types.h"
 #include "content.h"
 #include "asset_limits.h"
+#include "communications.h"
 
 struct Body
 {
@@ -43,7 +44,7 @@ struct Background
     Color color;
     char model_path[ASSET_PATH_CAPACITY];
 };
-enum { MAX_BODIES=128,MAX_SPAWNS=64 };
+enum { MAX_BODIES=CELL_STORAGE_CAPACITY,MAX_SPAWNS=64 };
 struct GameplayRules
 {
     bool enabled;
@@ -94,6 +95,7 @@ struct World
     Content content;
     char content_path[ASSET_PATH_CAPACITY],appearance_path[ASSET_PATH_CAPACITY];
     GameplayRules gameplay;
+    CommunicationSettings communications;
     float sight_radius;
     Faction player_faction,opponent_faction;
     bool ambient_enabled;

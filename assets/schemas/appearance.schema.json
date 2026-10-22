@@ -493,6 +493,9 @@
       },
       "required": ["emission_fresnel"],
       "additionalProperties": false
+    },
+    "communications": {
+      "$ref": "shared.schema.json#/$defs/path"
     }
   },
   "required": ["ambient"],

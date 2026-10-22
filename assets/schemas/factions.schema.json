@@ -98,6 +98,9 @@
             },
             "required": ["tint", "strength"],
             "additionalProperties": false
+          },
+          "personality": {
+            "$ref": "shared.schema.json#/$defs/path"
           }
         },
         "required": ["id", "name", "label", "color"],

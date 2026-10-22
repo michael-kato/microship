@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Faction motion and dialogue",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "motion": {
+      "type": "object",
+      "properties": {
+        "acceleration": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 4
+        },
+        "turn_rate": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 4
+        },
+        "burst": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.8
+        },
+        "wander": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "roll_degrees": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 30
+        },
+        "period": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 30
+        },
+        "cadence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "organelle_amount": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "organelle_period": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 4
+        },
+        "factory_amount": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "factory_period": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 4
+        }
+      },
+      "required": [
+        "acceleration",
+        "turn_rate",
+        "burst",
+        "wander",
+        "roll_degrees",
+        "period",
+        "cadence",
+        "organelle_amount",
+        "organelle_period",
+        "factory_amount",
+        "factory_period"
+      ],
+      "additionalProperties": false
+    },
+    "dialogue": {
+      "type": "object",
+      "properties": {
+        "ships": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 95,
+          "pattern": "^[ -~]+$"
+        },
+        "cells": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 95,
+          "pattern": "^[ -~]+$"
+        },
+        "milestones": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": {
+            "type": "object",
+            "properties": {
+              "cells": {
+                "type": "integer",
+                "minimum": 10,
+                "maximum": 90,
+                "multipleOf": 10
+              },
+              "line": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 95,
+                "pattern": "^[ -~]+$"
+              }
+            },
+            "required": ["cells", "line"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["ships", "cells", "milestones"],
+      "additionalProperties": false
+    },
+    "sound_bank": {
+      "$ref": "shared.schema.json#/$defs/name"
+    }
+  },
+  "required": ["motion", "dialogue", "sound_bank"],
+  "additionalProperties": false
+}

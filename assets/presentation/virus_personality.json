@@ -1,0 +1,59 @@
+{
+  "$schema": "../schemas/personality.schema.json",
+  "motion": {
+    "acceleration": 1.8,
+    "turn_rate": 2.2,
+    "burst": 0.22,
+    "wander": 0,
+    "roll_degrees": 3,
+    "period": 0.55,
+    "cadence": 0.14,
+    "organelle_amount": 0.6,
+    "organelle_period": 0.35,
+    "factory_amount": 0.7,
+    "factory_period": 0.3
+  },
+  "dialogue": {
+    "ships": "THERE YOU ARE. I WILL LEARN HOW YOU BREAK.",
+    "cells": "YOU BUILT A HOME. NOW I KNOW WHERE TO START.",
+    "milestones": [
+      {
+        "cells": 10,
+        "line": "TEN CELLS. YOUR BORDERS ARE ALREADY TOO THIN."
+      },
+      {
+        "cells": 20,
+        "line": "TWENTY CELLS. EVERY ROUTE BRINGS ME CLOSER."
+      },
+      {
+        "cells": 30,
+        "line": "THIRTY CELLS. I HAVE MORE WAYS INSIDE YOU NOW."
+      },
+      {
+        "cells": 40,
+        "line": "FORTY CELLS. KEEP WATCHING ONE FRONT."
+      },
+      {
+        "cells": 50,
+        "line": "FIFTY CELLS. HALF THIS PLACE IS LEARNING MY SHAPE."
+      },
+      {
+        "cells": 60,
+        "line": "SIXTY CELLS. YOU CANNOT DEFEND WHAT YOU FORGOT."
+      },
+      {
+        "cells": 70,
+        "line": "SEVENTY CELLS. I AM ALREADY BEHIND YOUR LINES."
+      },
+      {
+        "cells": 80,
+        "line": "EIGHTY CELLS. YOUR SAFE PLACES ARE RUNNING OUT."
+      },
+      {
+        "cells": 90,
+        "line": "NINETY CELLS. I WILL TAKE THE REST SLOWLY."
+      }
+    ]
+  },
+  "sound_bank": "virus"
+}

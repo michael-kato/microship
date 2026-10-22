@@ -97,13 +97,16 @@ static const float HIT_EFFECT_LIFETIME_SCALE = 1.8f;
 static const float LEGACY_ORBIT_BASE_RADIUS_SCALE = .25f;
 
 static float length(Vec3 v) { return std::sqrt(dot(v,v)); }
-static void sound(Simulation* s,SoundKind kind,Vec3 position)
+static void sound(Simulation* s,SoundKind kind,Vec3 position,Faction faction=0)
 {
     ++s->sounds.totals[kind];
-    if (kind!=SOUND_ORDER && kind!=SOUND_WIN && kind!=SOUND_LOSE && !simulation_in_sight(s,position,0)) return;
+    if (kind!=SOUND_ORDER && kind!=SOUND_WIN && kind!=SOUND_LOSE && kind!=SOUND_ALERT && kind!=SOUND_TRANSMISSION && !simulation_in_sight(s,position,0)) return;
     if (s->sounds.count==MAX_SOUND_EVENTS) { ++s->sounds.dropped;return; }
-    s->sounds.pending[s->sounds.count++]=SoundEvent{position,kind};
+    s->sounds.pending[s->sounds.count++]=SoundEvent{position,kind,faction ? faction : s->world.player_faction};
 }
+
+void simulation_emit_sound(Simulation* s,SoundKind kind,Vec3 position,Faction faction)
+{ sound(s,kind,position,faction); }
 
 Vec3 simulation_spike_direction(uint32_t index,uint32_t count)
 {
@@ -220,6 +223,8 @@ static uint32_t grid_query(const UnitGrid& g,Vec3 center,float radius,uint32_t f
     }
     return count;
 }
+uint32_t simulation_query_units(const Simulation* s,Vec3 p,float radius,uint32_t factions,uint16_t* out)
+{ return grid_query(s->grid,p,radius,factions,out); }
 static uint32_t enemies_of(Faction faction) { return ~(1u<<faction); }
 static uint32_t neighbor_bucket(int32_t x,int32_t y,int32_t z)
 { return ((uint32_t)x*NEIGHBOR_HASH_X^(uint32_t)y*NEIGHBOR_HASH_Y^(uint32_t)z*NEIGHBOR_HASH_Z)&(NEIGHBOR_BUCKETS-1); }
@@ -704,7 +709,7 @@ static void establish_colony(Simulation* s,uint32_t p,Faction faction)
     if (s->world.gameplay.enabled) prepare_factory(s,p);
     if (simulation_producer_definition(s,p)->establishment_seconds>0) c->growth=0;
     else for (uint32_t k=1;k<c->root_count;++k) { c->branches[k-1].health=simulation_producer_definition(s,p)->health;c->branches[k-1].growth=INITIAL_FACTORY_GROWTH;c->branches[k-1].generation=1; }
-    sound(s,SOUND_COLONIZE,c->surface);
+    sound(s,SOUND_COLONIZE,c->surface,c->faction);
 }
 
 static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,const Vec3* heading=0)
@@ -725,7 +730,7 @@ static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,const 
             unit.orbit_phase=unit.generation*GOLDEN_ANGLE_RADIANS;unit.cooldown=(unit.generation%FIRE_COOLDOWN_PHASE_COUNT)*FIRE_COOLDOWN_PHASE_SECONDS;
             s->trails[i]=Trail();s->trails[i].points[0]=simulation_trail_origin(s,&unit);s->trails[i].count=1;
             s->units[i]=unit;++s->births;++s->faction_stats[unit.faction].built;
-            sound(s,SOUND_BIRTH,position);
+            sound(s,SOUND_BIRTH,position,definition->faction);
             return true;
         }
     return false;
@@ -1207,6 +1212,15 @@ static void move_units(Simulation* s, float dt)
             if (dot(radial,radial)>STEERING_DIRECTION_EPSILON) goal=add(u->position,scale(normalize(radial),LAUNCH_GOAL_DISTANCE));
             u->task=TASK_LAUNCH;u->attention=-1;
         }
+        const FactionMotion& motion=s->world.content.factions[u->faction].motion;
+        double phase=motion.enabled ? s->time_seconds/motion.period+u->generation*.61803398875 : 0;
+        if (motion.wander>0 && !u->moving && !colonizing && u->task!=TASK_LAUNCH
+            && length(subtract(goal,u->position))>definition->range*2)
+        {
+            float a=(float)(phase*FULL_TURN_RADIANS);
+            Vec3 offset={std::sin(a*.73f+.4f),std::cos(a*.47f+1.7f),.35f*std::sin(a*.91f)};
+            goal=add(goal,scale(offset,motion.wander));
+        }
         u->flight_goal=goal;
         Vec3 delta=subtract(goal,u->position);float distance=length(delta);
         float speed=definition->speed*((u->task==TASK_PATROL || u->task==TASK_LAUNCH) ? definition->cruise_fraction : 1);
@@ -1214,7 +1228,8 @@ static void move_units(Simulation* s, float dt)
             && (u->task==TASK_ATTACK_UNIT || u->task==TASK_ATTACK_STRUCTURE) && distance>definition->range
             && distance<definition->charge_radius && clear_shot(s,u->position,goal,u->task==TASK_ATTACK_STRUCTURE ? u->attention : NO_BODY);
         if (u->charging) speed*=definition->charge_speed;
-        float acceleration=flight->acceleration*(u->charging ? definition->charge_acceleration : 1);
+        if (motion.burst>0 && std::fmod(phase,1.0)<.6) speed*=1-motion.burst;
+        float acceleration=flight->acceleration*(u->charging ? definition->charge_acceleration : 1)*(motion.enabled ? motion.acceleration : 1);
         if (flight->flight_enabled)
         {
             Vec3 desired=distance>POSITION_EPSILON ? scale(delta,std::fmin(speed,distance*FLIGHT_POSITION_GAIN)/distance) : Vec3{};
@@ -1257,7 +1272,12 @@ static void move_units(Simulation* s, float dt)
             if (length(u->velocity)>MIN_HEADING_SPEED)
             {
                 Vec3 heading=normalize(u->velocity),side=cross(Vec3{0,1,0},u->forward);
-                float blend=1-std::exp(-flight->turn_rate*dt);
+                float blend=1-std::exp(-flight->turn_rate*(motion.enabled ? motion.turn_rate : 1)*dt);
+                if (motion.cadence>0)
+                {
+                    double now=s->time_seconds+u->generation*.037;
+                    blend=std::floor(now/motion.cadence)!=std::floor((now-dt)/motion.cadence) ? 1 : 0;
+                }
                 float bank=-dot(subtract(heading,u->forward),side)*BANK_RESPONSE_GAIN;
                 u->bank+=(std::fmax(-flight->bank,std::fmin(flight->bank,bank))-u->bank)*blend;
                 Vec3 forward=add(scale(u->forward,1-blend),scale(heading,blend));
@@ -1289,7 +1309,7 @@ static void move_units(Simulation* s, float dt)
 
 static void pop_body(Simulation* s,Vec3 position,Faction faction,bool unit_death,float blast_radius=0)
 {
-    sound(s,SOUND_DEATH,position);
+    sound(s,SOUND_DEATH,position,faction);
     uint32_t slot=0;
     while (slot<MAX_POPS && s->pops[slot].duration>0) ++slot;
     if (slot==MAX_POPS) slot=s->deaths%MAX_POPS;
@@ -1380,7 +1400,7 @@ static void recover_units(Simulation* s,float dt)
                     --u->wounds;u->haze_recovery-=per_hit;s->haze_healing+=per_hit;++s->healed;
                     if (u->wounds<MAX_EMBEDDED) u->embedded[u->wounds]=EmbeddedSpike();
                     u->health=definition->health*(definition->hits-u->wounds)/definition->hits;
-                    sound(s,SOUND_HEAL,u->position);
+                    sound(s,SOUND_HEAL,u->position,u->faction);
                 }
             }
             if (!u->wounds) u->haze_recovery=0;
@@ -1399,7 +1419,7 @@ static void recover_units(Simulation* s,float dt)
         {
             s->aura_heals+=aura;u->heal_timer=0;--u->wounds;if (u->wounds<MAX_EMBEDDED) u->embedded[u->wounds]=EmbeddedSpike();
             u->health=simulation_unit_definition(s,u)->health*(simulation_unit_definition(s,u)->hits-u->wounds)/simulation_unit_definition(s,u)->hits;++s->healed;
-            sound(s,SOUND_HEAL,u->position);
+            sound(s,SOUND_HEAL,u->position,u->faction);
         }
     }
 }
@@ -1416,7 +1436,7 @@ static void fracture_limb(Simulation* s,uint32_t p,uint32_t k,float old_growth,f
 {
     const Colony& c=s->colonies[p];const ProducerDefinition& definition=*simulation_producer_definition(s,p);
     if (!definition.segment_path[0]) return;
-    ++s->limbs_broken;++s->faction_stats[s->colonies[p].faction].limbs_lost;sound(s,SOUND_BREAK,simulation_structure_position(s,p,k));
+    ++s->limbs_broken;++s->faction_stats[s->colonies[p].faction].limbs_lost;sound(s,SOUND_BREAK,simulation_structure_position(s,p,k),s->colonies[p].faction);
     const CombatVisuals& fx=s->world.combat;if (fx.break_seconds<=0) return;
     float growth=old_growth;
     uint32_t seed=s->world.bodies[p].seed^s->tick_count^(k*SEED_INDEX_MULTIPLIER);
@@ -1527,7 +1547,7 @@ static void launch_blob(Simulation* s,Unit* u,const UnitDefinition& d,uint32_t v
     Projectile p={};p.blob=true;p.stun=d.blob_stun;p.unit_type=u->type;p.position=p.previous=u->position;p.target=(int32_t)victim;
     p.faction=u->faction;p.direction=distance>POSITION_EPSILON ? scale(aim,1/distance) : u->forward;p.launch_scale=d.blob_scale;
     p.generation=t.generation;p.active=true;s->projectiles[slot]=p;
-    u->blob_cooldown=d.blob_interval;++s->blobs;sound(s,SOUND_SHOT,u->position);
+    u->blob_cooldown=d.blob_interval;++s->blobs;sound(s,SOUND_SHOT,u->position,u->faction);
     // Without a move order, the cell goes to devour what it incapacitated.
     if (!u->moving) { u->task=TASK_ATTACK_UNIT;u->attention=(int32_t)victim;u->attention_generation=t.generation; }
 }
@@ -1611,12 +1631,12 @@ static void projectile_combat(Simulation* s,float dt)
             u->latch_generation=colony ? structure_generation(&s->colonies[target],structure) : s->units[target].generation;
             u->latch_root_generation=colony ? s->colonies[target].generation : 0;
             u->latch_offset=subtract(u->position,colony ? simulation_structure_position(s,target,structure) : s->units[target].position);
-            u->cooldown=definition->shot_interval*(secondary ? definition->secondary_interval : 1);sound(s,SOUND_HIT,u->position);continue;
+            u->cooldown=definition->shot_interval*(secondary ? definition->secondary_interval : 1);sound(s,SOUND_HIT,u->position,u->faction);continue;
         }
         if (definition->attack==ATTACK_SPORE)
         {
             // Contact bursts the spore: a small hit on what it touched, then a toxic cloud from this tick.
-            burst[i]=true;++s->spore_bursts;sound(s,SOUND_HIT,u->position);
+            burst[i]=true;++s->spore_bursts;sound(s,SOUND_HIT,u->position,u->faction);
             if (colony)
             {
                 Colony& c=s->colonies[target];
@@ -1681,7 +1701,7 @@ static void projectile_combat(Simulation* s,float dt)
         p.structure_generation=colony ? structure_generation(&s->colonies[target],structure) : 0;
         p.active=true;s->projectiles[slot]=p;
         u->cooldown=v->shot_interval*simulation_unit_definition(s,u)->shot_interval*(secondary ? definition->secondary_interval : 1);++s->shots;
-        sound(s,SOUND_SHOT,u->position);
+        sound(s,SOUND_SHOT,u->position,u->faction);
     }
     for (uint32_t i=0;i<MAX_PROJECTILES;++i)
     {
@@ -1716,7 +1736,7 @@ static void projectile_combat(Simulation* s,float dt)
             uint32_t slot=s->hits%MAX_POPS;
             Impact impact={};impact.position=target;impact.duration=v->flash_seconds*HIT_EFFECT_LIFETIME_SCALE;impact.faction=p->faction;
             s->impacts[slot]=impact;
-            p->active=false;++s->hits;sound(s,SOUND_HIT,target);
+            p->active=false;++s->hits;sound(s,SOUND_HIT,target,p->faction);
         }
     }
     spore_clouds(s,dt,hit_count,factory_heads);
@@ -1733,7 +1753,7 @@ static void projectile_combat(Simulation* s,float dt)
                 if (digest_heal[i] && u->wounds>0 && u->wounds<simulation_unit_definition(s,u)->hits)
                 {
                     --u->wounds;if (u->wounds<MAX_EMBEDDED) u->embedded[u->wounds]=EmbeddedSpike{};
-                    ++s->digest_heals;sound(s,SOUND_HEAL,u->position);
+                    ++s->digest_heals;sound(s,SOUND_HEAL,u->position,u->faction);
                 }
                 float maximum=simulation_unit_definition(s,u)->health;
                 u->health=maximum*(simulation_unit_definition(s,u)->hits-u->wounds)/simulation_unit_definition(s,u)->hits;
@@ -1906,14 +1926,14 @@ static void grow_colonies(Simulation* s, float dt)
                 if (f.grammar!=GROWTH_TREE) c->branch_timer=0;
                 if (*generation>0 && d.segment_path[0]) regrow_factory_stems(s,p,k,*generation+1);
                 c->repair_credit[k]=0;emerged=true;*health=maximum;*growth=first ? 0 : INITIAL_FACTORY_GROWTH;*wounds=0;*exposure=0;++*generation;
-                memset(embedded,0,sizeof(EmbeddedSpike)*MAX_EMBEDDED);sound(s,SOUND_GROW,simulation_structure_position(s,p,k));
+                memset(embedded,0,sizeof(EmbeddedSpike)*MAX_EMBEDDED);sound(s,SOUND_GROW,simulation_structure_position(s,p,k),s->colonies[p].faction);
             }
             if (*health<=0) continue;
             float old=*growth;
             if (establishing && *generation==1)
                 *growth=std::fmin(1.0f,*growth+std::fmin(dt,std::fmax(0.0f,c->establishment_age-c->deployment_start[k]))/c->deployment_seconds[k]);
             else *growth=std::fmin(1.0f,*growth+dt/d.growth_seconds);
-            if (old<1 && *growth>=1) sound(s,SOUND_MATURE,simulation_structure_position(s,p,k));
+            if (old<1 && *growth>=1) sound(s,SOUND_MATURE,simulation_structure_position(s,p,k),s->colonies[p].faction);
             mature=mature || *growth>=1;
         }
         if (emerged) c->branch_timer=0;
@@ -2107,7 +2127,7 @@ void simulation_step(Simulation* s,SimulationTimings* timings)
         simulation_phase_end(timings,SIM_COMBAT,&phase_start);
         colonize_cells(s,dt);grow_colonies(s,dt);outcome(s);
         simulation_phase_end(timings,SIM_GROWTH,&phase_start);
-        simulation_update_sight(s);
+        simulation_update_sight(s);communications_update(s);
         simulation_phase_end(timings,SIM_SIGHT,&phase_start);
         uint32_t alive[MAX_FACTIONS]={};
         for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) ++alive[s->units[i].faction];
@@ -2177,7 +2197,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
     fprintf(file,"{\"tick\":%u,\"time\":%.9f,\"unit_capacity\":%u,\"outcome\":%d,\"outcome_tick\":%u,\"births\":%u,\"losses\":%u,\"landings\":%u,\"blocked_landings\":%u,",
         s->tick_count,s->time_seconds,(uint32_t)MAX_UNITS,s->outcome,s->outcome_tick,s->births,s->losses,s->landings,s->blocked_landings);
     fprintf(file,"\"prepared_production_ticks\":%u,\"factory_path_segments\":%u,\"factory_growth_segments\":%u,",s->world.production_ticks,(uint32_t)GROWTH_PATH_SEGMENTS,(uint32_t)GROWTH_SEGMENTS);
-    write_faction_stats(s,file);
+    write_faction_stats(s,file);communications_write_state(s,file);
     fprintf(file,",\"haze\":{\"damage\":%.6f,\"healing\":%.6f}",s->haze_damage,s->haze_healing);
     uint32_t clouds=0;for (uint32_t i=0;i<MAX_SPORE_CLOUDS;++i) clouds+=s->clouds[i].age<s->clouds[i].seconds;
     fprintf(file,",\"faction_events\":{\"digestions\":%u,\"digest_heals\":%u,\"spore_bursts\":%u,\"spore_clouds\":%u,\"captures\":%u,\"releases\":%u,\"blobs\":%u,\"devoured\":%u,\"aura_heals\":%u},\"sound_events\":{",s->digestions,s->digest_heals,s->spore_bursts,clouds,s->captures,s->releases,s->blobs,s->devoured,s->aura_heals);

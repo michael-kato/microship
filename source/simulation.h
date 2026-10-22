@@ -190,6 +190,7 @@ struct Simulation
     CellAppearance cell_appearance[MAX_BODIES];
     LimbDebris debris[MAX_LIMB_DEBRIS];
     uint32_t limbs_broken,debris_replaced;
+    CommunicationState communications;
     Faction home_owner[MAX_BODIES];
     bool discovered[MAX_BODIES], visible_bodies[MAX_BODIES], visible_units[MAX_UNITS];
     uint32_t healed,regrown,detached;
@@ -244,6 +245,8 @@ float simulation_production(const Simulation*,uint32_t cell);
 bool simulation_in_sight(const Simulation*,Vec3 position,float radius);
 bool simulation_body_known(const Simulation*,uint32_t cell);
 void simulation_update_sight(Simulation*);
+uint32_t simulation_query_units(const Simulation*,Vec3,float,uint32_t,uint16_t*);
+void simulation_emit_sound(Simulation*,SoundKind,Vec3,Faction);
 void simulation_update_fog(Simulation*,float dt);
 
 inline const UnitDefinition* simulation_unit_definition(const Simulation* s,const Unit* u)

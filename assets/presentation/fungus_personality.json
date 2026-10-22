@@ -1,0 +1,59 @@
+{
+  "$schema": "../schemas/personality.schema.json",
+  "motion": {
+    "acceleration": 0.8,
+    "turn_rate": 0.7,
+    "burst": 0,
+    "wander": 3,
+    "roll_degrees": 7,
+    "period": 5.7,
+    "cadence": 0,
+    "organelle_amount": 1.1,
+    "organelle_period": 1.9,
+    "factory_amount": 1.3,
+    "factory_period": 1.3
+  },
+  "dialogue": {
+    "ships": "OH... YOU MOVE. I WAS FOLLOWING THE WARMTH.",
+    "cells": "SOMETHING SOFT HERE... WE CAN STAY A WHILE.",
+    "milestones": [
+      {
+        "cells": 10,
+        "line": "TEN? ... THERE IS MORE UNDER THIS ONE."
+      },
+      {
+        "cells": 20,
+        "line": "TWENTY PLACES... ALL THE SAME HUNGER."
+      },
+      {
+        "cells": 30,
+        "line": "THIRTY. I LOST THE PATH... FOUND SOMETHING SWEET."
+      },
+      {
+        "cells": 40,
+        "line": "FORTY CELLS... WERE THESE ALWAYS CONNECTED?"
+      },
+      {
+        "cells": 50,
+        "line": "FIFTY... THE EDGES KEEP OPENING."
+      },
+      {
+        "cells": 60,
+        "line": "SIXTY. STILL EMPTY INSIDE... STILL GROWING."
+      },
+      {
+        "cells": 70,
+        "line": "SEVENTY... I THINK WE HAVE BEEN HERE BEFORE."
+      },
+      {
+        "cells": 80,
+        "line": "EIGHTY CELLS... LET THE OLD PARTS SLEEP."
+      },
+      {
+        "cells": 90,
+        "line": "NINETY... SOMETHING IS STILL WARM OVER THERE."
+      }
+    ]
+  },
+  "sound_bank": "fungus"
+}

@@ -28,7 +28,7 @@ enum { WAV_RIFF_WORD=0, WAV_RIFF_BYTES_WORD=1, WAV_WAVE_WORD=2, WAV_FORMAT_WORD=
 
 Audio::Audio():trigger_write(0),trigger_read(0),stopping(false),failed(false),output_gain(1),device(0),capture(0),captured(0),distance(1),valid(true)
 {
-    memset(voices,0,sizeof(voices));memset(cooldown,0,sizeof(cooldown));memset(triggers,0,sizeof(triggers));
+    memset(faction_banks,0,sizeof(faction_banks));memset(voices,0,sizeof(voices));memset(cooldown,0,sizeof(cooldown));memset(triggers,0,sizeof(triggers));
 #ifdef _WIN32
     memset(headers,0,sizeof(headers));wake=0;thread=0;
 #endif
@@ -54,18 +54,43 @@ static bool load_clip(AudioClip* clip,const char* path)
     if (!ok) fprintf(stderr,"%s: expected a canonical mono 48 kHz 16-bit PCM WAV, at most two seconds\n",path);
     return ok;
 }
-bool audio_load(Audio* a,const char* manifest,const char* capture)
+static bool load_bank(Audio* a,Json events,const char* manifest,uint32_t faction,bool required)
 {
-    JsonDocument doc;if (!json_load(&doc,manifest)) return false;Json root=json_root(&doc);
-    json_object(root,"$schema|distance|events");a->distance=json_positive(json_get(root,"distance"),MAX_AUDIBLE_DISTANCE);
-    Json events=json_get(root,"events");json_object(events,"order|growth|mature|birth|shot|hit|death|colonize|heal|win|lose|break");
+    json_object(events,"order|growth|mature|birth|shot|hit|death|colonize|heal|win|lose|break|alert|transmission");
     for (uint32_t i=0;i<SOUND_COUNT;++i)
     {
-        Json j=json_get(events,sound_name(i));json_object(j,"file|gain|cooldown");char path[ASSET_PATH_CAPACITY]={};
-        json_path(json_get(j,"file"),manifest,path);a->clips[i].gain=json_float(json_get(j,"gain"),0,1);
-        a->clips[i].cooldown=json_float(json_get(j,"cooldown"),0,MAX_SOUND_COOLDOWN_SECONDS);
-        if (!doc.valid || !load_clip(&a->clips[i],path)) return false;
+        Json j=required ? json_get(events,sound_name(i)) : json_find(events,sound_name(i));
+        if (!json_present(j)) continue;
+        json_object(j,"file|gain|cooldown");char path[ASSET_PATH_CAPACITY]={};AudioClip& clip=a->clips[faction*SOUND_COUNT+i];
+        json_path(json_get(j,"file"),manifest,path);clip.gain=json_float(json_get(j,"gain"),0,1);
+        clip.cooldown=json_float(json_get(j,"cooldown"),0,MAX_SOUND_COOLDOWN_SECONDS);
+        if (!load_clip(&clip,path)) return false;
     }
+    return true;
+}
+bool audio_load(Audio* a,const char* manifest,const char* capture,const Content* content)
+{
+    JsonDocument doc;if (!json_load(&doc,manifest)) return false;Json root=json_root(&doc);
+    json_object(root,"$schema|distance|events|banks");a->distance=json_positive(json_get(root,"distance"),MAX_AUDIBLE_DISTANCE);
+    if (!load_bank(a,json_get(root,"events"),manifest,0,true)) return false;
+    Json banks=json_find(root,"banks");char names[MAX_FACTIONS][ASSET_NAME_CAPACITY]={};uint32_t count=0;
+    if (json_present(banks))
+    {
+        JsonArray array=json_array(banks,MAX_FACTIONS-1);Json bank={};
+        while (json_next(&array,&bank))
+        {
+            json_object(bank,"name|events");++count;json_string(json_get(bank,"name"),names[count],ASSET_NAME_CAPACITY);
+            for (uint32_t i=1;i<count;++i) if (!strcmp(names[i],names[count])) return json_error(bank,"duplicate sound bank name");
+            if (!load_bank(a,json_get(bank,"events"),manifest,count,false)) return false;
+        }
+    }
+    for (uint32_t faction=1;faction<MAX_FACTIONS;++faction)
+    {
+        const char* name=content->factions[faction].audio_bank;if (!*name) continue;
+        for (uint32_t i=1;i<=count;++i) if (!strcmp(names[i],name)) a->faction_banks[faction]=i;
+        if (!a->faction_banks[faction]) return json_error(root,"faction personality refers to a missing sound bank");
+    }
+    if (!doc.valid) return false;
     if (capture)
     {
         a->capture=fopen(capture,"wb");
@@ -135,8 +160,10 @@ void audio_events(Audio* a,Simulation* s,Vec3 listener)
     for (uint32_t i=0;i<s->sounds.count;++i)
     {
         const SoundEvent& event=s->sounds.pending[i];uint32_t k=event.kind;
+        uint32_t variant=event.faction<MAX_FACTIONS ? a->faction_banks[event.faction]*SOUND_COUNT+k : k;
+        if (!a->clips[variant].samples.empty()) k=variant;
         float d=std::sqrt(dot(subtract(event.position,listener),subtract(event.position,listener)));
-        bool global=k==SOUND_ORDER || k==SOUND_WIN || k==SOUND_LOSE;
+        bool global=event.kind==SOUND_ORDER || event.kind==SOUND_WIN || event.kind==SOUND_LOSE || event.kind==SOUND_ALERT || event.kind==SOUND_TRANSMISSION;
         float gain=a->clips[k].gain*(global ? 1 : std::fmax(0.0f,1-d/a->distance));if (gain<=0) continue;
         if (!live) { start_voice(a,k,gain);continue; }
         // A full ring drops the trigger, as a busy voice set already does.
@@ -163,7 +190,7 @@ static void mix(Audio* a,int16_t* output,uint32_t count)
         }
         output[i]=(int16_t)std::fmax(-MAX_MIX_SAMPLE,std::fmin(MAX_MIX_SAMPLE,sample*output_gain));
     }
-    for (uint32_t j=0;j<SOUND_COUNT;++j) a->cooldown[j]=std::fmax(0.0f,a->cooldown[j]-count/AUDIO_SAMPLE_RATE_FLOAT);
+    for (uint32_t j=0;j<AUDIO_CLIP_COUNT;++j) a->cooldown[j]=std::fmax(0.0f,a->cooldown[j]-count/AUDIO_SAMPLE_RATE_FLOAT);
 }
 bool audio_tick(Audio* a)
 {
