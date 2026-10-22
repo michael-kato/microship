@@ -17,6 +17,9 @@ static const float UNIT_GRID_CELL_SIZE = 4;
 static const float UNIT_GRID_MARGIN = 16;
 static const float UNIT_GRID_CELL_GROWTH = 1.25f;
 static const float UNIT_GRID_MOTION_MARGIN = 1;
+static const float BODY_GRID_CELL_SIZE = 8;
+static const float BODY_GRID_REACH = 8;
+static const float BODY_GRID_ROUNDING_SLACK = .5f;
 static const uint32_t NEIGHBOR_HASH_X = 73856093u;
 static const uint32_t NEIGHBOR_HASH_Y = 19349663u;
 static const uint32_t NEIGHBOR_HASH_Z = 83492791u;
@@ -191,6 +194,59 @@ static void grid_bounds(Simulation* s)
     }
     float spacing=w.combat.separation*w.content.max_unit_separation;
     s->neighbors.inverse_cell=spacing>0 ? 1/spacing : 0;
+}
+static float body_grid_radius(const Body& b,float reach)
+{ return b.radius*CELL_COLLISION_RADIUS_SCALE+reach+BODY_GRID_ROUNDING_SLACK; }
+static int32_t body_grid_axis(const BodyGrid& g,float value,float low,uint32_t axis)
+{
+    float cell=std::floor((value-low)*g.inverse_cell);
+    return cell<0 ? 0 : cell>=g.size[axis] ? g.size[axis]-1 : (int32_t)cell;
+}
+static bool body_grid_touches(const BodyGrid& g,const Body& b,int32_t x,int32_t y)
+{
+    float cell=1/g.inverse_cell,x0=g.low_x+x*cell,y0=g.low_y+y*cell;
+    float dx=std::fmax(0.0f,std::fmax(x0-b.position.x,b.position.x-(x0+cell)));
+    float dy=std::fmax(0.0f,std::fmax(y0-b.position.y,b.position.y-(y0+cell)));
+    float r=body_grid_radius(b,g.reach);return dx*dx+dy*dy<=r*r;
+}
+// Cells are static; build their 2D candidate buckets once. Cells grow until both capacities fit.
+static void body_grid_build(Simulation* s)
+{
+    const World& w=s->world;BodyGrid& g=s->body_grid;g.reach=BODY_GRID_REACH;
+    float low_x=w.bodies[0].position.x,low_y=w.bodies[0].position.y,high_x=low_x,high_y=low_y;
+    for (uint32_t p=0;p<w.body_count;++p)
+    {
+        const Body& b=w.bodies[p];float r=body_grid_radius(b,g.reach);
+        low_x=std::fmin(low_x,b.position.x-r);high_x=std::fmax(high_x,b.position.x+r);
+        low_y=std::fmin(low_y,b.position.y-r);high_y=std::fmax(high_y,b.position.y+r);
+    }
+    g.low_x=low_x;g.low_y=low_y;
+    for (float cell=BODY_GRID_CELL_SIZE;;cell*=UNIT_GRID_CELL_GROWTH)
+    {
+        g.inverse_cell=1/cell;
+        g.size[0]=std::max(1,(int32_t)std::ceil((high_x-low_x)/cell));g.size[1]=std::max(1,(int32_t)std::ceil((high_y-low_y)/cell));
+        uint32_t keys=(uint32_t)g.size[0]*g.size[1],entries=0;
+        if (keys>MAX_BODY_GRID_KEYS) continue;
+        for (int32_t y=0;y<g.size[1];++y) for (int32_t x=0;x<g.size[0];++x)
+            for (uint32_t p=0;p<w.body_count;++p) entries+=body_grid_touches(g,w.bodies[p],x,y);
+        if (entries>MAX_BODY_GRID_ENTRIES) continue;
+        entries=0;
+        for (int32_t y=0;y<g.size[1];++y) for (int32_t x=0;x<g.size[0];++x)
+        {
+            g.start[y*g.size[0]+x]=(uint16_t)entries;
+            for (uint32_t p=0;p<w.body_count;++p) if (body_grid_touches(g,w.bodies[p],x,y)) g.cells[entries++]=(uint8_t)p;
+        }
+        g.start[keys]=(uint16_t)entries;
+        return;
+    }
+}
+// Cells, in index order, that can lie within radius*CELL_COLLISION_RADIUS_SCALE+reach
+// of the point. A superset: callers keep their exact tests.
+static uint32_t body_candidates(const Simulation* s,Vec3 point,const uint8_t** cells)
+{
+    const BodyGrid& g=s->body_grid;
+    uint32_t key=(uint32_t)body_grid_axis(g,point.y,g.low_y,1)*g.size[0]+body_grid_axis(g,point.x,g.low_x,0);
+    *cells=g.cells+g.start[key];return g.start[key+1]-g.start[key];
 }
 static void grid_build(Simulation* s)
 {
@@ -744,7 +800,7 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed,c
     // Construct in place: a temporary of this size would not fit the 2 MB stack.
     s->~Simulation();new (s) Simulation();s->selected_body=s->order_body=NO_BODY;
     if (!world_load(&s->world,world_path,seed,player)) return false;
-    grid_bounds(s);
+    grid_bounds(s);body_grid_build(s);
     if (seed) for (uint32_t i=0;i<s->world.body_count;++i) s->world.bodies[i].seed^=seed;
     for (uint32_t i=0;i<s->world.body_count;++i) s->home_owner[i]=s->world.start_owner[i];
     if (!s->world.gameplay.enabled) return true;
@@ -988,8 +1044,12 @@ static bool clear_shot(const Simulation* s, Vec3 from, Vec3 to,int32_t structure
     Vec3 delta=subtract(to,from);float distance=length(delta);
     if (distance<POSITION_EPSILON) return true;
     Vec3 direction=scale(delta,1.0f/distance);
-    for (uint32_t p=0;p<s->world.body_count;++p)
+    // A sphere the segment crosses lies within its radius plus the segment length of the start.
+    const uint8_t* cells;uint32_t near_count=body_candidates(s,from,&cells);
+    bool near=distance<=s->body_grid.reach;uint32_t count=near ? near_count : s->world.body_count;
+    for (uint32_t n=0;n<count;++n)
     {
+        uint32_t p=near ? cells[n] : n;
         if ((int32_t)p==structure_cell) continue;
         Vec3 offset=subtract(from,s->world.bodies[p].position);float along=dot(offset,direction);
         float radius=s->world.bodies[p].radius,disc=along*along-dot(offset,offset)+radius*radius;
@@ -1313,8 +1373,10 @@ static void move_units(Simulation* s, float dt)
             }
             // Steer around a cell before the hard collision shell becomes necessary.
             Vec3 probe=add(u->position,scale(velocities[i],CELL_AVOIDANCE_LOOKAHEAD_SECONDS));
-            for (uint32_t j=0;j<s->world.body_count;++j)
+            const uint8_t* cells;uint32_t cell_count=body_candidates(s,probe,&cells);
+            for (uint32_t n=0;n<cell_count;++n)
             {
+                uint32_t j=cells[n];
                 if (colonizing && j==p && distance<LANDING_APPROACH_RADIUS) continue;
                 if (contact_attack(*definition) && u->task==TASK_ATTACK_STRUCTURE && u->attention==(int32_t)j) continue;
                 Vec3 away=subtract(probe,s->world.bodies[j].position);float squared=dot(away,away);
@@ -1346,14 +1408,21 @@ static void move_units(Simulation* s, float dt)
         }
         else if (distance>POSITION_EPSILON) u->position=add(u->position,scale(delta,std::fmin(1.0f,speed*dt/distance)));
         // Conservative spherical collision keeps transit outside cell terrain.
-        for (uint32_t p2=0;p2<s->world.body_count;++p2)
+        const uint8_t* cells;uint32_t cell_count=body_candidates(s,u->position,&cells),n=0;
+        while (n<cell_count)
         {
+            uint32_t p2=cells[n++];
             Vec3 offset=subtract(u->position,s->world.bodies[p2].position);float squared=dot(offset,offset);
             float clearance=s->world.bodies[p2].radius*CELL_COLLISION_RADIUS_SCALE+CELL_COLLISION_CLEARANCE;
             if (colonizing && p2==p && distance<LANDING_APPROACH_RADIUS) continue;
             if (contact_attack(*definition) && u->task==TASK_ATTACK_STRUCTURE && u->attention==(int32_t)p2) continue;
             if (squared<clearance*clearance && squared>POSITION_EPSILON*POSITION_EPSILON)
+            {
                 u->position=add(s->world.bodies[p2].position,scale(offset,clearance/std::sqrt(squared)));
+                // The push moves the craft: continue with the later cells near its new position.
+                cell_count=body_candidates(s,u->position,&cells);n=0;
+                while (n<cell_count && cells[n]<=p2) ++n;
+            }
         }
         if (flight->flight_enabled) flight_clip(s,obstacles,u,positions[i]);
         if (u->moving && length(subtract(u->destination,u->position))<MOVE_COMPLETION_RADIUS)

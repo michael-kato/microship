@@ -38,6 +38,18 @@ struct UnitGrid
     uint32_t start[MAX_UNIT_GRID_KEYS+1],cursor[MAX_UNIT_GRID_KEYS];
     uint16_t units[MAX_UNITS];
 };
+// Cells are static. Each 2D bucket lists, in index order, every cell whose
+// collision sphere (radius*CELL_COLLISION_RADIUS_SCALE) widened by reach can
+// reach a point in the bucket. Built once at initialization.
+enum { MAX_BODY_GRID_KEYS=4096,MAX_BODY_GRID_ENTRIES=16384 };
+struct BodyGrid
+{
+    float low_x,low_y,inverse_cell,reach;
+    int32_t size[2];
+    uint16_t start[MAX_BODY_GRID_KEYS+1];
+    uint8_t cells[MAX_BODY_GRID_ENTRIES];
+};
+static_assert(MAX_BODIES<=256 && MAX_BODY_GRID_ENTRIES<=65535,"body grid entry widths");
 // Short-range neighbors for separation: hashed cells as wide as the largest spacing.
 enum { NEIGHBOR_BUCKETS=4096 };
 struct NeighborGrid
@@ -180,6 +192,7 @@ struct Simulation
     FlightObstacles flight_scratch; // Rebuilt by the movement phase.
     UnitGrid grid; // Scratch spatial index; positions may move up to UNIT_GRID_MOTION_MARGIN after a build.
     NeighborGrid neighbors; // Scratch; built from the positions at the start of movement.
+    BodyGrid body_grid;
     SightField fog_memory;
     Projectile projectiles[MAX_PROJECTILES];
     Pop pops[MAX_POPS];
