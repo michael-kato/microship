@@ -66,6 +66,7 @@ def write_world(path, data):
             for name,items in document.items():
                 target=path.stem+'-'+name+'.json';manifest[name]=target
                 payload={name:items}
+                if name=='buildings' and not items:payload['shared']={'branches':{}}
                 if name=='buildings' and items:
                     first=items[0];shared={key:deepcopy(first[key]) for key in FACTORY_SHARED_FIELDS if key in first}
                     shared['branches']={key:deepcopy(first['branches'][key]) for key in FACTORY_SHARED_BRANCH_FIELDS if key in first['branches']}

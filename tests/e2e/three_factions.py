@@ -93,6 +93,10 @@ with tempfile.TemporaryDirectory(prefix='nanova-three-factions-') as directory:
  assert all(f['colonies']==5 for f in c['faction_stats']) and c['outcome']==0
  reset=run('stress_restart',stress,300,extra=('--restart',))
  assert reset['tick']==0 and len(reset['units'])==len(a['units']) and all(c['growth']==1 for c in reset['colonies'])
+ # The current 128-cell battle must stop production at the unit storage capacity.
+ full=run('territory_capacity',root/'assets/levels/territory_stress.json',300)
+ assert len(full['colonies'])==128 and all(c['active'] for c in full['colonies'])
+ assert len(full['units'])==full['unit_capacity'] and any(c['capacity_blocked'] for c in full['colonies'])
  bad=deepcopy(pending);bad['spawns']=[s for s in bad['spawns'] if s['type']!='fungal_spore'];run('missing_third_founder',bad,expected=1)
  bad=deepcopy(pending);bad['match']['starts'][2]['cell']=0;run('duplicate_start',bad,expected=1)
  bad=deepcopy(pending);bad['layout']['minimum_gap']=40;run('impossible_gap',bad,expected=1)
@@ -101,4 +105,4 @@ with tempfile.TemporaryDirectory(prefix='nanova-three-factions-') as directory:
  bad=json.loads(stress.read_text());bad['match']['production_seconds']=0;run('zero_production',bad,expected=1)
  bad=json.loads(stress.read_text());bad['match']['production_seconds']=120;run('production_overflow',bad,expected=1)
  bad=json.loads(stress.read_text());bad['spawns']=[dict(type='virus_fighter',position=[0,0,0])];run('mixed_starting_units',bad,expected=1)
-print(f'Three factions E2E passed: {count} application runs; seeded Voronoi 15-cell maps, homes on the field circle, a center cell, area-sized neutral cells and gaps, seed variation, three settlements, pending third faction, one minute of actual factory production, full development, shared battle point, combat losses on every side, restart and invalid setup rejection.')
+print(f'Three factions E2E passed: {count} application runs; seeded Voronoi 128-cell maps, homes on the field circle, a center cell, area-sized neutral cells and gaps, seed variation, three settlements, pending third faction, one minute of actual factory production, full development, shared battle point, combat losses on every side, 128-cell capacity handling, restart and invalid setup rejection.')

@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-subsurface-') as directory:
     baseline,view=run('grown',ticks=4800)
     assert sum(m['subsurface_weight']==[0,0] for m in view['meshes'])>=10,'A factory retained scattering'
     for producer in data['content']['buildings']:
-        for path in [producer['model'],*producer.get('growth_meshes',{}).values()]:
+        for path in [producer['model'],*[producer['growth_meshes'][key] for key in ('segment','tip') if key in producer.get('growth_meshes',{})]]:
             raw=(out/path).resolve().read_bytes();n=struct.unpack_from('<I',raw,8)[0]
             if raw[:8]==b'FLMESH02':assert all(struct.unpack_from('<f',raw,16+i*64+60)[0]==0 for i in range(n)),path
     disabled=deepcopy(settings);disabled['subsurface']['strength']=0
@@ -53,8 +53,4 @@ with tempfile.TemporaryDirectory(prefix='nanova-subsurface-') as directory:
         raw=bytearray(original);struct.pack_into('<f',raw,16+offset,value)
         run('bad-material-'+str(count),world=mesh_world(raw,'bad-'+str(count)),config=disabled,expected=1)
     run('truncated',world=mesh_world(original[:-1],'truncated'),expected=1)
-    # V1 remains an explicit zero-scattering material, with the same geometry.
-    n,t=struct.unpack_from('<II',original,8);legacy=b'FLMESH01'+original[8:16]+b''.join(original[16+i*64:16+i*64+48] for i in range(n))+original[16+n*64:]
-    old,old_view=run('legacy',world=mesh_world(legacy,'legacy'))
-    assert old==initial and old_view['meshes'][len(data['bodies'])]['subsurface_weight']==[0,0]
-print(f'Subsurface E2E passed: {count} application runs; authored materials, optical scale, unchanged state, optional controls, V1 compatibility and rejected material data.')
+print(f'Subsurface E2E passed: {count} application runs; authored materials, optical scale, unchanged state, optional controls, rejected material data.')

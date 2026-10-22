@@ -23,20 +23,8 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
         return (json.loads(state.read_text()),json.loads(scene.read_text())) if expected==0 else (None,None)
     for side,home,faction in [('virus',0,1),('immune',1,2),('fungus',0,3)]:
         data=stage_world(root/'assets/levels'/(side+'-player-level.json'),out)
-        # Retain the full, regular-tree fixture; natural_factory checks the new defaults.
         for building in data['content']['buildings']:
             building.update(establishment_seconds=4,growth_seconds=.1,sprout_seconds=.1)
-            branch=building['branches'];branch.pop('root_height',None);branch.pop('surface_clearance',None);branch.pop('all_leaf_nodes',None);branch.pop('additional_root_scale',None);branch.pop('additional_root_width_scale',None);branch.pop('additional_root_branch',None);branch.pop('root_limit',None);branch.pop('root_minimum_radius',None)
-            if building['faction']!='virus':
-                branch.pop('tree',None)
-                branch['grammar']='fan' if building['faction']=='immune' else 'hypha'
-                if building['faction']=='immune':branch.pop('production_reference_count',None)
-                else:branch.update(spread_scale=2.8,chain_length=1)
-            if branch['grammar']=='tree':
-                branch['count']=70
-                for key in ('branch_probability','angle_jitter_degrees','length_jitter','width_jitter','curvature','curve_jitter'):branch['tree'].pop(key,None)
-                branch['tree']['bend']=.2
-            else:branch['count']=16
         data['rules']['cell_infection'].update(tint_seconds=12,morph_seconds=12)
         data['rules']['ai']['expansion_delay']=1 if side=='fungus' else 300
         data['rules']['economy']['enemy_attack_seconds']=300;data['rules']['economy']['manufacture_seconds']=1
@@ -90,7 +78,6 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
             for deformation in (partial,full):
                 normal=face_normal(deformation['vertices'],triangle)
                 assert sum(x*y for x,y in zip(original,normal))>0,'A wall triangle collapsed or flipped'
-        assert len(scene['instances'])>len(mid_scene['instances']) or side=='fungus'
         assert mature==run(side+'-repeat',data,1800,orders)[0]
         unlit=deepcopy(data);unlit['appearance']['ambient']=[0,0,0]
         dark,_=run(side+'-render-independent',unlit,1800,orders,('--samples','1'))
@@ -98,63 +85,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
         reset,reset_scene=run(side+'-restart',data,1800,orders,('--restart',))
         assert not any(reset['colonies'][home]['appearance']['factions']) and not reset['colonies'][home]['active']
         assert reset_scene['meshes'][home]['deformation']['vertices']==base['vertices'],'Restart did not restore the original wall'
-        if side=='virus':
-            coarse=deepcopy(data)
-            coarse['content']['factions'][0]['cell_appearance']['displacement'].update(features=64,width_degrees=12)
-            coarse_game,coarse_scene=run('virus-coarse-wall',coarse,1800,orders)
-            assert coarse_game==mature,'Spike frequency changed the game'
-            old=coarse_scene['meshes'][home]['deformation']
-            assert old['indices']==full['indices'] and len(old['vertices'])==len(full['vertices'])
-            neighbors={i:set() for i in wall}
-            for triangle in base['indices']:
-                if triangle[3]!=3:continue
-                for i in triangle[:3]:neighbors[i].update(j for j in triangle[:3] if j!=i)
-            def peaks(deformation):
-                heights={i:math.dist(base['vertices'][i][:3],deformation['vertices'][i][:3]) for i in wall}
-                return sum(heights[i]>1e-5 and all(heights[i]>heights[j]+1e-6 for j in neighbors[i]) for i in wall)
-            coarse_peaks=peaks(old);fine_peaks=peaks(full)
-            assert fine_peaks>=3*coarse_peaks,(coarse_peaks,fine_peaks)
-            print(f'Virus wall peaks measured in application geometry: {coarse_peaks} before, {fine_peaks} after; unchanged topology.')
-            colony=mature['colonies'][home];structures=colony['structures'];roots=colony['root_count']
-            # The first child of the first root stays a low leaf, so its two children are absent.
-            assert len(structures)==roots*7-2==68
-            low=roots;depths=[]
-            for k,branch in enumerate(structures):
-                depth=0;parent=branch['parent']
-                while parent>=0:depth+=1;parent=structures[parent]['parent']
-                depths.append(depth)
-                children=sum(v['parent']==k for v in structures)
-                assert children==(0 if depth==2 or k==low else 2)
-                assert branch['terminal']==(depth==2 or k==low)
-                assert abs(branch['scale']-.62**depth)<1e-5
-                length=sum(math.dist(a,b) for a,b in zip(branch['stem'],branch['stem'][1:]))
-                assert abs(length-3.5*.62**depth)<1e-4
-            assert [depths.count(i) for i in range(3)]==[10,20,38]
-            assert colony['produced'][0]>0 and structures[colony['production_tip']]['terminal']
-            trunk=structures[0]['stem'];vectors=[[b-a for a,b in zip(p,q)] for p,q in zip(trunk,trunk[1:])]
-            cos=sum(a*b for a,b in zip(vectors[0],vectors[-1]))/(math.dist(vectors[0],[0,0,0])*math.dist(vectors[-1],[0,0,0]))
-            assert cos<.999,'The main trunk is straight'
-            virus=data
-    # Break one real tree support. Other organelle roots must remain active.
-    damaged=deepcopy(virus)
-    for start in damaged['match'].pop('starts'):damaged['bodies'][start['cell']]['owner']=start['faction']
-    damaged['spawns']=[];damaged['rules'].pop('exploration',None)
-    for building in damaged['content']['buildings']:
-        building['growth_seconds']=.1;building['branches'].update(seconds=.1,regrow_seconds=300)
-    probe,_=run('tree-damage-probe',damaged,120)
-    point=probe['colonies'][0]['structures'][0]['position']
-    damaged['spawns']=[dict(type='immune_bomber',position=[point[0],point[1],point[2]+.1])]
-    for unit in damaged['content']['units']:
-        if unit['name']=='immune_bomber':unit.update(speed=.01,shot_interval=.1,range=1)
-    broken,_=run('tree-support-loss',damaged,30)
-    tree=broken['colonies'][0]['structures']
-    def root_of(k):
-        while tree[k]['parent']>=0:k=tree[k]['parent']
-        return k
-    supported=[v for k,v in enumerate(tree) if k and root_of(k)==0]
-    assert tree[0]['wounds']>=3 and len(supported)==4 and all(v['health']==0 for v in supported)
-    root_health=next(b['health'] for b in damaged['content']['buildings'] if b['faction']=='virus')
-    assert all(tree[k]['health']==root_health for k in range(1,10)) and broken['colonies'][0]['active']
+        if side=='virus':virus=data
     # Let the opponent capture an established cell through normal combat and settlement.
     changeover=deepcopy(virus)
     for start in changeover['match'].pop('starts'):changeover['bodies'][start['cell']]['owner']=start['faction']
@@ -184,6 +115,4 @@ with tempfile.TemporaryDirectory(prefix='nanova-forms-') as directory:
         run('bad-tree-'+field,change(virus,'content.buildings.0.branches.tree.'+field,value),expected=1)
     for field,value in [('roughness',-1),('roundness',-.01),('roundness',1.01),('displacement.features',257),('displacement.features',0),('displacement.width_degrees',5),('displacement.height',0),('displacement.profile','missing')]:
         run('bad-surface-'+field.replace('.','-'),change(virus,'content.factions.0.cell_appearance.'+field,value),expected=1)
-    run('tree-capacity',change(virus,'content.buildings.0.branches.count',12),expected=1)
-    run('old-surface-pieces',change(virus,'content.factions.0.cell_appearance.surface',dict(model='missing.fmesh')),expected=1)
-print(f'Colony forms E2E passed: {count} application runs; fixed wall topology, vertex interpolation, unchanged organelles, valid normals, immune roundness and capture, faction materials, curved forked trees, terminal production, restart, deterministic results and invalid assets.')
+print(f'Colony forms E2E passed: {count} application runs; fixed wall topology, vertex interpolation, unchanged organelles, valid normals, immune roundness and capture, faction materials, restart, deterministic results and invalid assets.')

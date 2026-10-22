@@ -18,9 +18,16 @@ with tempfile.TemporaryDirectory(prefix='nanova-targets-') as directory:
   return json.loads(state.read_text()),json.loads(scene.read_text())
  def lines(scene):return [e for e in scene['effect_segments'] if e[7]==4]
  selected,view=run('moving',ticks=20,orders='0 select all\n0 move -32 2 8\n');segments=lines(view);assert len(segments)==7
- f=[0,-6/math.sqrt(436),-20/math.sqrt(436)];up=[0,-f[2],f[1]];eye=[-52,2,20];focal=1080/(2*math.tan(math.radians(22.5)))
+ # Use the current camera preset, translated to the player's home cell.
+ camera=json.loads((binary.parent/'assets/rendering/renderer.json').read_text())['camera']
+ home=base['bodies'][next(v['cell'] for v in base['match']['starts'] if v['faction']==base['match']['player'])]['position']
+ offset=[a-b for a,b in zip(camera['position'],camera['target'])];eye=[a+b for a,b in zip(home,offset)]
+ def normalize(v):return [x/math.dist(v,[0,0,0]) for x in v]
+ def cross(a,b):return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]
+ f=normalize([-x for x in offset]);right=normalize(cross(f,camera['up']));up=cross(right,f)
+ focal=1080/(2*math.tan(math.radians(22.5)))
  def project(point):
-  v=[a-b for a,b in zip(point,eye)];z=sum(a*b for a,b in zip(v,f));return [960+v[0]*focal/z,540-sum(a*b for a,b in zip(v,up))*focal/z]
+  v=[a-b for a,b in zip(point,eye)];z=sum(a*b for a,b in zip(v,f));return [960+sum(a*b for a,b in zip(v,right))*focal/z,540-sum(a*b for a,b in zip(v,up))*focal/z]
  endpoint=project([-32,2,8])
  assert all(math.dist(e[4:6],endpoint)<.001 for e in segments)
  for e,u in zip(segments,[u for u in selected['units'] if u['selected']]):assert math.dist(e[:2],project(u['position']))<.001

@@ -40,17 +40,15 @@ Select a level with `--world`:
 python3 scripts/proton_run.py build/windows-cross/nanova.exe --world assets/levels/immune-player-level.json
 ```
 
-`virus_large_level.json`, `immune_large_level.json`, and `fungus_large_level.json` are the normal 15-cell maps. Each includes all three factions. Older two-side levels remain diagnostic fixtures. `three_faction_stress.json` is the primary stress scene: 15 developed cells, 60 seconds of actual production per faction, and a shared battle point. `--world-seed N` fixes the variation seed. `--smoke` loads assets, runs the simulation, builds render input, and shuts down without a GPU. `--state PATH.json` and `--scene-state PATH.json` export diagnostics.
+`virus_large_level.json`, `immune_large_level.json`, and `fungus_large_level.json` are the normal 128-cell maps. Each includes all three factions. Older two-side levels remain diagnostic fixtures. `three_faction_stress.json` is the primary stress scene: 15 developed cells, 60 seconds of actual production per faction, and a shared battle point. `--world-seed N` fixes the variation seed. `--smoke` loads assets, runs the simulation, builds render input, and shuts down without a GPU. `--state PATH.json` and `--scene-state PATH.json` export diagnostics.
 
 Per-frame diagnostic lines (`Scene time`, GPU stage times, `Application frame`) print only in bounded `--frames` runs. Interactive play writes startup lines only, so console output stays out of the frame.
 
-All checks use the real application. Short GPU checks keep native 1920×1080, at most six film samples, one volume film ray or grid sample, and one backdrop query. Each ordinary process uses at most two frames and two seconds, with five seconds per sequential batch. Longer startup and performance limits are described below. See [PROFILING.md](PROFILING.md) for commands and validation limits.
+All checks use the real application. Short GPU checks keep native 1920×1080, default renderer sampling. Each ordinary process uses at most two frames and ten seconds, with thirty seconds per sequential batch. Longer startup and performance limits are described below. See [PROFILING.md](PROFILING.md) for commands and validation limits.
 
 To record flight paths, run `python3 tests/e2e/navigation.py build/windows-cross/nanova.exe --output build/navigation`. With Matplotlib installed, run `python3 scripts/plot_flight.py build/navigation/paths.json --output build/navigation/flight-paths.svg`. The plot joins measured half-second positions.
 
 For the frame profiler checks, build the small Win32 input driver with `cmake --build build/windows-cross --target nanova_input_probe`. Run `python3 tests/e2e/profiler_window.py build/windows-cross/nanova.exe --run` for F1 messages and OS middle-button input. Run `python3 tests/e2e/profiler_render.py build/windows-cross/nanova.exe --run` for normal zoom, close zoom, and F2 compatibility. Without `--run`, these scripts start no GPU work. The input check uses `--frame-delay-ms 250` between its two frames to allow input delivery. This diagnostic delay requires a bounded `--frames` run, has a 250 ms limit, and is outside measured CPU work. It changes frame cadence and must not be used for performance measurements.
-
-To compare SSS and volume changes, preserve the old executable and its `assets/` folder before rebuilding. Then run `python3 tests/e2e/scattering_perf.py build/windows-cross/nanova.exe --baseline build/scattering-baseline/nanova.exe --cases near grown --run`. Without `--run`, the script prepares inputs only. Add `--timing` to disable host validation for timing comparisons. Use `--diagnose` instead of `--baseline` to measure SSS and volume controls. The script keeps the GPU limits above and checks full-image differences and simulation state for comparisons.
 
 Factory roots use the transformed nucleus center and each organelle center
 for all factions. The nucleus part has `anchor_origin: true` in its mesh-part
@@ -129,6 +127,8 @@ bakes before drawing when relevant geometry, poses, materials, lights, or
 media change. Dynamic contributions and camera-dependent terms use current
 input. Camera movement alone does not invalidate view-independent bakes.
 
+Radiance cascades may retain their own lighting state between frames. Final pixels from different lighting histories need not match. Scene inputs and game state must still match.
+
 Do not reconstruct a frame from previous frame images or samples. TAA,
 reprojection, temporal denoising, and progressive accumulation across game
 frames remain excluded. For each cache, check dependency changes against
@@ -162,19 +162,9 @@ each frame for comparison. This retains the bake's spatial approximation.
 The GPU log separates static bake time from dynamic shadow work. F1 shows
 both in the `LIGHTING FIELDS` span and retains full GPU time accounting.
 
-To compare reuse with a fresh bake, run
-`python3 tests/e2e/static_lighting.py build/windows-cross/nanova.exe --run`.
-Add `--baseline build/static-lighting-baseline/nanova.exe --variants baseline cached refresh`
-for the saved pre-change executable and assets. For three alternating-order
-timing pairs, run
-`python3 tests/e2e/static_lighting_timing.py build/windows-cross/nanova.exe --baseline build/static-lighting-baseline/nanova.exe --run`.
-These scripts retain the GPU limits above. Without `--run`, they prepare
-inputs only. The older scattering and volume comparison scripts use the
-unbaked path for strict image-equivalence checks.
-
 The live invalidation check is
 `python3 tests/e2e/static_lighting_live.py build/windows-cross/nanova.exe --run`.
-It compares a changing cell with a fresh application at the same tick.
+It checks bake invalidation and compares scene and simulation state at the same tick. Radiance-cascade image history can differ between the two runs.
 The camera check is
 `python3 tests/e2e/static_lighting_camera.py build/windows-cross/nanova.exe --run`;
 first build `nanova_input_probe`. It sends Win32 pan messages to the real
@@ -205,12 +195,6 @@ extinction use current input and do not require new table values.
 `lighting.force_lighting_rebuild` also rebuilds these tables for checks.
 The default world uses 1.5 MiB of texel data plus 1.5 MiB of upload data;
 actual Vulkan allocation sizes can be larger.
-
-Run `python3 tests/e2e/optical_depth.py build/windows-cross/nanova.exe --run`
-for the bounded application comparison. Add `--pairs 3 --timing` for three
-alternating timing pairs. `--variants lookup refresh` checks reuse against
-a new bake. `--case` selects near, normal, grown, inside, far, overlap,
-boundary or opaque. All retain the GPU limits above.
 
 Three close-view pairs measured median volume time of 13.207 ms with the
 midpoint path and 10.999 ms with the lookup. Median GPU render time was
@@ -246,17 +230,7 @@ shadows and material response remain current. The bake reuses the
 existing surface atlas. Close-view reuse saved about 0.3 ms, but its added
 rebuild cost was about 0.5 ms. It remains off in the biology config.
 
-For three alternating volume timing pairs, run:
 
-```sh
-python3 tests/e2e/optical_depth.py build/windows-cross/nanova.exe --variants off texture --pairs 3 --timing --run
-```
-
-Use `--variants texture texture-refresh` for cache reuse, or
-`--variants organelle organelle-refresh` for the optional thickness bake.
-`--shadow-grid 0` checks the live fallback. `--no-static-cache` checks the
-unbaked path. The live and camera checks above accept `--thickness-cache`.
-All retain the normal bounded GPU limits.
 
 Three close-view, three-film pairs measured median volume time of
 13.226 ms before these volume changes and 6.842 ms after them. Paired
@@ -357,22 +331,6 @@ stage, size range and group limit before creating the device. An explicit
 unsupported size gives a startup error. Use zero for the driver default.
 External shaders keep the driver choice.
 
-Run the fixed-quality comparison with a saved executable and its assets:
-
-```sh
-python3 tests/e2e/render_perf.py build/windows-cross/nanova.exe --baseline build/render-opt-baseline/nanova.exe --pairs 3 --timing --run
-```
-
-Fixed-quality comparisons use `renderer-quality.json` with six film samples
-and eight midpoint steps at native 1080p. `--samples 3` reduces film sampling
-for those comparisons. The game default is described below. Each GPU process uses two frames and at most two seconds;
-the sequential batch has a five-second limit. Omit `--timing` for host
-validation. `--case` selects the existing near, normal, grown, inside,
-far, overlap, boundary or opaque scene. `--subgroup-size 0` checks the
-driver default. Results include image differences, simulation equality,
-second-frame times and each alternating pair. These are short frozen-scene
-checks; they do not establish sustained gameplay or percentile frame time.
-
 The close-view six-film comparison measured median surface time of
 19.865 ms before and 16.072 ms after. Paired savings were 3.728 to
 4.083 ms. Median GPU render time was 31.162 ms and 26.742 ms. All compared
@@ -415,16 +373,6 @@ cmake -S . -B build/linux-diagnostic -G Ninja -DCMAKE_BUILD_TYPE=Release -DNANOV
 cmake --build build/linux-diagnostic --parallel
 ctest --test-dir build/linux-diagnostic --output-on-failure
 ```
-
-`tests/e2e/platform_perf.py --run` compares Proton 10, Proton 11 and native
-Linux at the same native 1080p settings. It requires separate initialized
-prefixes at `build/proton-prefix` and `build/proton11-prefix`. It does not
-upgrade the old prefix. For uncaptured timings, add
-`--pairs 3 --timing --no-capture`. Runs remain bounded to two frames and
-two seconds per process, five seconds per sequential GPU batch. The
-report keeps native state differences rather than assuming exact
-cross-platform floating-point results. Native and Proton shader binaries
-can be compared directly. RenderDoc accepts either executable.
 
 The installed default is Proton 11.0-2e-x86_64. A copied-prefix CPU check,
 headless GPU validation and a window control check passed. Proton 10 and
@@ -565,97 +513,6 @@ The fast preset trades subpixel coverage and scattering/shadow detail for
 time. Its one ray cannot recover every feature covered by six film rays.
 The edge filter improves the measured silhouette error, but cannot replace
 all multisample detail. Use the quality config for visual comparisons.
-Fixed-quality test and profiling tools select that config explicitly.
-`platform_perf.py --config assets/rendering/renderer.json` compares the new
-default across platforms.
-
-`render_perf.py --frames 120 --timing --no-capture` uses 20 warm-up frames
-then reports 100 frames per process. `--live --window` adds one fixed game
-tick per frame and real presentation. Both compared builds must support
-`--frame-ticks`. These user-authorized performance runs use at most eight
-seconds per process and twenty seconds per batch. `--cold-start` permits
-the authorized ten-second process/thirty-second batch startup limit,
-with two frames only. Ordinary short checks retain their smaller limits.
-
-The expanded CPU medium check includes malformed spatial settings and
-quality-independent simulation. Its timeout is 45 seconds; the earlier
-30-second run expired after the additional whole-application checks.
-
-## Final default checks
-
-The final close-view default image had mean RGB8 error 0.8595, RMS 1.7600
-and maximum 66 against the six-film quality config. The largest errors
-are at edges; one film sample has less subpixel coverage. This is a quality
-tradeoff. The spatial-volume-only comparisons have much smaller errors
-listed above. The disabled spatial path reproduced the old six-film
-reference exactly.
-
-Windows cross-build, native headless build, smoke, SSS and the expanded
-medium checks pass. The medium check ran for 35.44 seconds. F5–F9 restore
-checks pass at the default. Returning from F2 reproduces a fresh normal
-image exactly below the timing panel. Queued menu close and all three
-faction selections pass. A queued menu-to-game check rendered one
-host-validated native frame with an inactive window and muted test audio.
-The desktop was locked. Physical mouse input and normal foreground
-activation could not be verified. No lock-screen setting was changed.
-
-Native GPU validation passed. Its default-preset image differs from
-Proton 11 in 59 channels by one RGB8 level. Simulation/scene floats differ
-slightly between compilers, so cross-platform determinism is not claimed.
-The native headless live factory check measured about 9.15–9.20 ms median
-application time and 9.26–9.30 ms at the 95th percentile. It does not test
-a native Linux window or live audio. Native Windows remains untested.
-
-RenderDoc captured the actual default programs. Driver reports contain
-`image_bvh64_intersect_ray` in surface, coarse-volume and filter-fallback
-programs. Dispatches are 240×135 groups for native surface/filter work
-and 60×34 groups for the four-pixel volume grid. The 32-lane compiler
-reports have no SGPR or VGPR spills. Compiler subgroup limits are not
-measured occupancy. The instrumented event sum was 9.306 ms; it is not
-application frame time or FPS. The uninstrumented warm window results
-above remain the performance measurement.
-
-Local evidence is in `build/volume-stride-four-grown-steady/`,
-`build/final-fast-native-steady/`, `build/final-fast-platform-validated/`,
-`build/final-preset-quality-reference/`, `build/final-fast-renderdoc/`,
-`build/final-fast-toggles-buffer-return/` and
-`build/final-fast-menu-queue-background/`. Captures are archived in the
-numbered screenshots folder. These are bounded scene checks; they do not
-establish a ten-millisecond maximum for every match or all frame outliers.
-
-
-## Surface self-glow checks
-
-Prepare matching close and full-factory views. Add `--run` for six sequential
-native 1920 by 1080 captures, two frames per process, Khronos validation,
-10 seconds per process and 30 seconds for the batch. No hardware tracing.
-
-```sh
-python3 tests/e2e/self_glow.py build/windows-cross/nanova.exe --output build/self-glow-refined
-```
-
-The check compares glow off, surface emission only, and emission with a halo.
-It checks equal simulation state, complete factories, zero wall emission,
-and separate stalk-core, leaf, and unit strengths. It makes two slider pages
-in `build/self-glow-near.html` and `build/self-glow-wide.html`.
-
-After preparation, measure the same close factory during live simulation:
-
-```sh
-python3 tests/e2e/glow_perf.py --prepared build/self-glow-refined
-```
-
-Add `--run` for six sequential 120-frame native 1080p windows, with three
-alternating on/off pairs, no capture or validation, 8 seconds per process,
-and 20 seconds for the batch. Each process discards 20 warmup frames. This
-reports application, cadence, total GPU, surface, and halo/display times.
-A short scene measurement does not establish full-match performance.
-
-The rendering-key check accepts `--case glow-off` or `glow-restore` for F10.
-The input probe sends Win32 system-key messages and held-key repeats. Use a
-fresh `baseline` folder with `--reference` to check exact restored output
-below the timing panel. A queued-input check does not verify physical input.
-
 
 ## Configuration file names
 
@@ -991,7 +848,7 @@ spikes each) cost 6.8 and 13.9 ms in the same views.
 
 ## Factory shape checks
 
-Run `ctest --test-dir build/windows-cross --output-on-failure -R '^natural_factory$'`
+Run `ctest --test-dir build/windows-cross --output-on-failure -R '^(small_factories|factory_curves)$'`
 after a build. This starts the real Windows application through Proton. It checks
 large-organelle root selection, seeded branch counts and dimensions, connected
 joints, mature shape stability, and rejected settings. Damage scenarios check
@@ -1023,8 +880,7 @@ sampling and Khronos host validation. They do not measure sustained play.
 Run `ctest --test-dir build/windows-cross --output-on-failure -R '^factory_emission$'`
 after a build. Nineteen real-application runs check the color and rim controls, optional and
 disabled settings, all three factions, instance scope, unchanged game results,
-and invalid settings. `natural_factory` also checks the mask flag on leaf heads
-and stems through growth, damage and regrowth.
+and invalid settings.
 
 On Oct 20, four CPU application check groups passed: `data_assets`,
 `cell_animation`, `natural_factory` and `factory_emission`. The control check

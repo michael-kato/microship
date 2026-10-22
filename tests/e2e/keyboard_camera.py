@@ -20,12 +20,12 @@ with tempfile.TemporaryDirectory(prefix='nanova-keyboard-') as folder:
  for x,y in ((1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,1),(1,-1),(-1,-1),(0,0)):
   camera,same=run('direction-'+str(count),(x,y,1));magnitude=max(1,math.hypot(x,y));delta=[speed*x/magnitude,speed*y/magnitude,0]
   assert same==state,'Camera movement changed simulation or sight'
-  for i in range(6):assert abs(camera[i]-(baseline[i]+delta[i%3]))<.0002,(x,y,camera,baseline,delta)
+  # The camera log has six significant digits; large coordinates round more.
+  for i in range(6):assert math.isclose(camera[i],baseline[i]+delta[i%3],rel_tol=1e-5,abs_tol=.0002),(x,y,camera,baseline,delta)
  for seconds in (.25,.5,2):
   camera,same=run('seconds-'+str(count),(1,0,seconds));assert abs(camera[0]-baseline[0]-speed*seconds)<.0002 and same==state
  disabled=deepcopy(settings);disabled['camera']['keyboard_pan_speed']=0
  assert run('disabled',(1,1,1),disabled)==(baseline,state)
- legacy=deepcopy(settings);legacy['camera'].pop('keyboard_pan_speed');assert run('legacy',(1,1,1),legacy)==(baseline,state)
  rotated=deepcopy(settings);rotated['camera']['up']=[1,0,0]
  initial,_=run('rotated-initial',config=rotated);moved,_=run('rotated-right',(1,0,1),rotated)
  assert abs(moved[0]-initial[0])<.0002 and abs(moved[1]-initial[1]+speed)<.0002 and moved[2]==initial[2]

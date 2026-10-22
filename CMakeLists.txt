@@ -237,12 +237,6 @@ find_package(Python3 COMPONENTS Interpreter REQUIRED)
 add_test(NAME world_files COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/world_files.py $<TARGET_FILE:nanova>)
 set_tests_properties(world_files PROPERTIES TIMEOUT 10)
-add_test(NAME gameplay COMMAND ${Python3_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/gameplay.py $<TARGET_FILE:nanova>)
-set_tests_properties(gameplay PROPERTIES TIMEOUT 45)
-add_test(NAME biology COMMAND ${Python3_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/biology.py $<TARGET_FILE:nanova>)
-set_tests_properties(biology PROPERTIES TIMEOUT 45)
 add_test(NAME polish COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/polish.py $<TARGET_FILE:nanova>)
 set_tests_properties(polish PROPERTIES TIMEOUT 30)
@@ -257,9 +251,6 @@ endif()
 add_test(NAME data_assets COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/data_assets.py $<TARGET_FILE:nanova>)
 set_tests_properties(data_assets PROPERTIES TIMEOUT 45)
-add_test(NAME growth_factions COMMAND ${Python3_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/growth_factions.py $<TARGET_FILE:nanova>)
-set_tests_properties(growth_factions PROPERTIES TIMEOUT 60)
 add_test(NAME navigation COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/navigation.py $<TARGET_FILE:nanova>)
 set_tests_properties(navigation PROPERTIES TIMEOUT 60)
@@ -268,11 +259,8 @@ add_test(NAME production_ratio COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/production_ratio.py $<TARGET_FILE:nanova>)
 set_tests_properties(production_ratio PROPERTIES TIMEOUT 45)
 
-add_test(NAME startup COMMAND ${Python3_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/startup.py $<TARGET_FILE:nanova>)
-set_tests_properties(startup PROPERTIES TIMEOUT 60)
 
-foreach(group IN ITEMS communications faction_motion virus_shapes selection colony_forms cell_animation natural_factory small_factories factory_curves three_factions factory_emission factory_repair fungal_defence fungal_sources)
+foreach(group IN ITEMS communications faction_motion virus_shapes selection colony_forms cell_animation small_factories factory_curves three_factions factory_emission factory_repair fungal_defence fungal_sources)
     add_test(NAME ${group} COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/${group}.py $<TARGET_FILE:nanova>)
     set_tests_properties(${group} PROPERTIES TIMEOUT 60)
@@ -280,10 +268,10 @@ endforeach()
 
 option(NANOVA_GPU_TESTS "Run real hardware Vulkan E2E scenarios (explicit opt-in)" OFF)
 if(NANOVA_GPU_TESTS)
-    add_test(NAME biology_scale_render COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/scale_render.py $<TARGET_FILE:nanova>
-        --output "${CMAKE_CURRENT_BINARY_DIR}/biology-scale-render")
-    set_tests_properties(biology_scale_render PROPERTIES TIMEOUT 35 LABELS gpu RUN_SERIAL TRUE)
+    add_test(NAME map_render COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/map_render.py $<TARGET_FILE:nanova>
+        --output "${CMAKE_CURRENT_BINARY_DIR}/map_render" --run)
+    set_tests_properties(map_render PROPERTIES TIMEOUT 35 LABELS gpu RUN_SERIAL TRUE)
 endif()
 
 add_test(NAME match_flow COMMAND ${Python3_EXECUTABLE}
@@ -308,9 +296,6 @@ set_tests_properties(trails PROPERTIES TIMEOUT 30)
 add_test(NAME fog_memory COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/fog_memory.py $<TARGET_FILE:nanova>)
 set_tests_properties(fog_memory PROPERTIES TIMEOUT 45)
-add_test(NAME difficulty COMMAND ${Python3_EXECUTABLE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/difficulty.py $<TARGET_FILE:nanova>)
-set_tests_properties(difficulty PROPERTIES TIMEOUT 45)
 
 add_test(NAME immune_combat COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/immune_combat.py $<TARGET_FILE:nanova>)

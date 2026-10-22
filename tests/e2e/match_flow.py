@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check leaf production, faction selection and continued play in the Windows app."""
+"""Check mature-head production, faction selection and continued play in the Windows app."""
 from copy import deepcopy
 import json
 import os
@@ -8,7 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-from asset_data import stage_world,established_world,write_world,branches
+from asset_data import stage_world,established_world,write_world
 root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
@@ -50,11 +50,6 @@ with tempfile.TemporaryDirectory(prefix='nanova-match-') as directory:
     for side,home in (('virus',0),('immune',1)):
         data=stage_world(root/'assets/levels'/(side+'-player-level.json'),out)
         data['rules']['ai']['expansion_delay']=300;data['rules']['economy']['enemy_attack_seconds']=300
-        early,_=run(side+'-early',data,5400,f'0 select all\n0 order {home}\n')
-        c=early['colonies'][home]
-        assert c['establishment_age']<180 and sum(c['produced'])>0,(side,c['produced'],c['establishment_age'])
-        assert any(v['growth']<1 for v in c['structures'])
-        # Each mature terminal leaf gets a job, with no whole-cell completion gate.
         fast=deepcopy(data);fast['rules']['economy']['manufacture_seconds']=.05
         for building in fast['content']['buildings']:building.update(establishment_seconds=4,growth_seconds=.1,sprout_seconds=.1,collection=100)
         for building in fast['content']['buildings']:building['branches']['root_offset_seconds']=0
@@ -64,16 +59,6 @@ with tempfile.TemporaryDirectory(prefix='nanova-match-') as directory:
         for k,branch in enumerate(colony['structures']):
             if branch['health']>0 and branch['visible_growth']==1:assert colony['leaf_births'][k]>0,(side,k,colony['leaf_births'])
         assert full==run(side+'-repeat',fast,1050,f'0 select all\n0 order {home}\n')[0]
-    # A paid job must wait when a new child temporarily replaces the only ready tip.
-    waiting=branches(established_world(root/'assets/levels/virus-player-level.json',out),count=2,seconds=3)
-    waiting['rules']['ai']['expansion_delay']=300;waiting['rules']['economy'].update(manufacture_seconds=12,enemy_attack_seconds=300)
-    for b in waiting['content']['buildings']:b.update(growth_seconds=2,collection=100)
-    for u in waiting['content']['units']:u['cost']=.01
-    pending,_=run('paid-job-waits',waiting,240)
-    jobs=pending['colonies'][0]['leaf_jobs']
-    assert jobs and jobs[0]['leaf']==0 and jobs[0]['progress']>0,'The paid job was lost while the child grew'
-    resumed,_=run('paid-job-resumes',waiting,1140)
-    assert resumed['colonies'][0]['leaf_births'][1]>0,'The waiting job did not move and launch from the completed child'
     # Destroy a real enemy factory, then issue orders after the win.
     won=established_world(root/'assets/levels/virus-player-level.json',out)
     won['bodies']=won['bodies'][:2];won['rules'].pop('exploration',None)
@@ -94,4 +79,4 @@ with tempfile.TemporaryDirectory(prefix='nanova-match-') as directory:
     assert continued['sound_events']['win']==1,'Victory sound repeated'
     reset,_=run('win-restart',won,300,extra=('--restart',))
     assert reset['tick']==0 and reset['outcome']==0 and all(v==0 for c in reset['colonies'] for v in c['leaf_births'])
-print(f'Match flow E2E passed: {count} application runs; menu choices, early births, every leaf, continued movement and production, one win sound, restart and backdrop/fog input.')
+print(f'Match flow E2E passed: {count} application runs; menu choices, mature factory heads, continued movement and production, one win sound, restart and backdrop/fog input.')

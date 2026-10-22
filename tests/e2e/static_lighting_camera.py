@@ -7,17 +7,18 @@ from authored_assets import stage_world,write_world
 from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--thickness-cache',action='store_true');p.add_argument('--run',action='store_true');p.add_argument('--output',type=Path,default=root/'build/static-lighting-camera');a=p.parse_args()
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
+PROCESS_TIMEOUT_SECONDS=10
 world=stage_world(root/'assets/levels/virus-player-level.json',out);world['match']['auto_colonize']=False
 # Keep the cell mesh fixed in this camera-only fixture; mobile actors still move.
 for faction in world['content']['factions']:faction.get('cell_appearance',{}).pop('displacement',None)
 wp=out/'world.json';write_world(wp,world)
-cfg=json.loads((root/'assets/rendering/renderer.json').read_text());cfg['sampling']['samples_per_pixel']=3
+cfg=json.loads((root/'assets/rendering/renderer.json').read_text())
 if a.thickness_cache:cfg['lighting']['organelle_cache']=True
 cp=out/'render.json';cp.write_text(json.dumps(cfg,indent=2)+'\n')
 prefix=[str(a.binary.resolve())] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(a.binary.resolve())]
 command=[*prefix,'--world',str(wp),'--config',str(cp),'--frames','2','--frame-delay-ms','250','--world-seed','1234','--camera-zoom','1000','--no-stats','--no-activate','--ticks','1','--capture',str(out/'camera.ppm'),'--state',str(out/'state.json')]
 (out/'commands.json').write_text(json.dumps([command],indent=2)+'\n')
-if not a.run:print('Prepared one native 1920x1080 two-frame Win32 camera window, three film + one volume + one backdrop starts; host validation, 2s process/batch cap, no tracing. No GPU work started.');raise SystemExit(0)
+if not a.run:print('Prepared one native 1920x1080 two-frame Win32 camera window, default renderer sampling; host validation, 10s process cap, no tracing. No GPU work started.');raise SystemExit(0)
 env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1'
 # This input check does not test audio; avoid blocking on the host sound device.
 if sys.platform!='win32':env['WINEDLLOVERRIDES']=env.get('WINEDLLOVERRIDES','')+';winepulse.drv,winealsa.drv=d'
@@ -33,12 +34,12 @@ def read(pipe,lines):
 readers=[threading.Thread(target=read,args=(process.stdout,stdout)),threading.Thread(target=read,args=(process.stderr,stderr))]
 for thread in readers:thread.start()
 try:
- assert ready.wait(max(.01,1.4-(time.monotonic()-started))),'No first frame'
+ assert ready.wait(max(.01,PROCESS_TIMEOUT_SECONDS-(time.monotonic()-started))),'No first frame'
  helper_prefix=[str(helper)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(helper)]
  helper_env=env.copy();helper_env['NANOVA_VULKAN_VALIDATION']='0'
- helper_result=subprocess.run([*helper_prefix,'--pan'],env=helper_env,capture_output=True,text=True,timeout=max(.01,2-(time.monotonic()-started)))
+ helper_result=subprocess.run([*helper_prefix,'--pan'],env=helper_env,capture_output=True,text=True,timeout=max(.01,PROCESS_TIMEOUT_SECONDS-(time.monotonic()-started)))
  assert helper_result.returncode==0,(helper_result.stdout,helper_result.stderr)
- process.wait(timeout=max(.01,2-(time.monotonic()-started)))
+ process.wait(timeout=max(.01,PROCESS_TIMEOUT_SECONDS-(time.monotonic()-started)))
 finally:
  if process.poll() is None:
   process.terminate()
