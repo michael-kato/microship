@@ -24,7 +24,7 @@ for faction in ('virus','immune'):
  config=out/(name+'_render.json');config.write_text(json.dumps(settings,indent=2)+'\n')
  cases.append((name,['--world',str(wp),'--config',str(config),'--ticks','90','--replay',str(rp)]))
 opening=deepcopy(settings);opening['camera'].update(position=[-103.92305,-60,20.88],target=[-103.92305,-60,0]);config=out/'owned_start_render.json';config.write_text(json.dumps(opening,indent=2)+'\n')
-cases.append(('owned_start',['--world',str(binary.parent/'assets/levels/virus_large_level.json'),'--config',str(config),'--ticks','900']))
+cases.append(('owned_start',['--world',str(binary.parent/'assets/levels/large_level.json'),'--config',str(config),'--ticks','900']))
 (out/'cases.json').write_text(json.dumps(cases,indent=2)+'\n')
 if not a.run:print('Prepared three two-frame captures. No GPU work started.');raise SystemExit(0)
 env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1';env['NANOVA_GPU_TIMEOUT_SECONDS']='10'

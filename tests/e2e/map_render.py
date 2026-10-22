@@ -23,7 +23,7 @@ args = parser.parse_args()
 binary = args.binary.resolve()
 out = args.output.resolve()
 out.mkdir(parents=True, exist_ok=True)
-world = stage_world(binary.parent / 'assets/levels/virus_large_level.json', out)
+world = stage_world(binary.parent / 'assets/levels/large_level.json', out)
 assert world['layout']['cells'] == 128
 # Expose the complete map to exercise every cell's render and lighting storage.
 world['rules'].pop('exploration', None)

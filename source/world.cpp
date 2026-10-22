@@ -7,6 +7,7 @@
 #include "asset_limits.h"
 #include "geometry.h"
 #include "map_layout.h"
+#include "math_constants.h"
 
 static const int MAX_PLACEMENT_COORDINATE = 1000000;
 static const int MAX_MEDIUM_ABSORPTION = 1000;
@@ -87,6 +88,12 @@ static Faction read_owner(const World* world,Json j)
     char name[ASSET_NAME_CAPACITY]={};json_string(j,name,ASSET_NAME_CAPACITY);int owner=content_faction(&world->content,name);
     if (owner<0) { json_error(j,"unknown faction reference");return 0; }
     return (Faction)owner;
+}
+// Independent seeded values for map choices; salt separates their streams.
+static uint32_t seed_mix(uint32_t seed,uint32_t salt)
+{
+    uint32_t x=seed*0x9e3779b9u^salt*0x85ebca6bu;
+    x^=x>>16;x*=0x7feb352du;x^=x>>15;x*=0x846ca68bu;x^=x>>16;return x;
 }
 static bool load_rules(World* w,const char* path)
 {
@@ -487,14 +494,16 @@ static bool read_body(World* w,Json j,bool placed,bool sized,Body* out)
 }
 // Homes come first, evenly on the field circle, then an optional center cell
 // near the middle; neutral cells follow at the centroids of their seeded Voronoi
-// regions, sized by region area. The world seed selects the layout.
+// regions, sized by region area. The world seed selects the layout and, when
+// first_home_degrees is absent, the rotation of the home circle.
 static bool load_layout(World* w,Json j,uint32_t seed)
 {
     json_object(j,"field_radius|cells|first_home_degrees|minimum_gap|centroid_steps|home|center|neutral");
     VoronoiLayout layout={};
     layout.field_radius=json_positive(json_get(j,"field_radius"),MAX_FIELD_RADIUS);
     layout.cells=json_uint(json_get(j,"cells"),1,MAX_LAYOUT_CELLS);
-    layout.first_home_degrees=json_float(json_get(j,"first_home_degrees"),-360,360);
+    Json rotation=json_find(j,"first_home_degrees");
+    layout.first_home_degrees=json_present(rotation) ? json_float(rotation,-360,360) : 360.0f*(seed_mix(seed,1)>>8)*(1.0f/16777216.0f);
     layout.minimum_gap=json_float(json_get(j,"minimum_gap"),0,MAX_FIELD_RADIUS);
     layout.centroid_steps=json_uint(json_get(j,"centroid_steps"),1,MAX_CENTROID_STEPS);
     Body home,center={},neutral;
@@ -525,6 +534,7 @@ static bool load_layout(World* w,Json j,uint32_t seed)
         b.position=cells[i].position;b.radius=cells[i].radius;b.seed=(i+1)*DEFAULT_BODY_SEED_MULTIPLIER;
         w->bodies[w->body_count++]=b;
     }
+    w->layout_homes=layout.homes;
     return true;
 }
 static bool load_placements(World* w,Json root,uint32_t seed)
@@ -540,8 +550,8 @@ static bool load_placements(World* w,Json root,uint32_t seed)
         w->bodies[w->body_count++]=b;
     }
     // A spawn names a position, or a cell and an offset from its center.
-    JsonArray spawns=json_array(json_get(root,"spawns"),MAX_SPAWNS);
-    while (json_next(&spawns,&j))
+    Json listed=json_find(root,"spawns");JsonArray spawns=json_present(listed) ? json_array(listed,MAX_SPAWNS) : JsonArray{};
+    while (json_present(listed) && json_next(&spawns,&j))
     {
         json_object(j,"type|position|cell|offset");Spawn s={};Json name=json_get(j,"type");json_string(name,s.type_name,ASSET_NAME_CAPACITY);
         int index=content_unit(&w->content,s.type_name);if (index<0) return json_error(name,"unknown unit type reference");
@@ -600,7 +610,7 @@ static bool validate_world(const World* world,const char* path)
     return true;
 }
 
-bool world_load(World* world,const char* path,uint32_t seed)
+bool world_load(World* world,const char* path,uint32_t seed,const char* player)
 {
     JsonDocument d;if (!json_load(&d,path)) return false;Json root=json_root(&d);
     json_object(root,"$schema|content|rules|appearance|effects|match|bodies|layout|spawns");
@@ -610,15 +620,24 @@ bool world_load(World* world,const char* path,uint32_t seed)
     Json rules=json_find(root,"rules");if (json_present(rules) && (!json_path(rules,path,file) || !load_rules(&loaded,file))) return false;
     Json effects=json_find(root,"effects");if (json_present(effects) && (!json_path(effects,path,file) || !load_effects(&loaded,file))) return false;
     if (!json_path(json_get(root,"appearance"),path,loaded.appearance_path) || !load_appearance(&loaded,loaded.appearance_path,seed)) return false;
-    Json match=json_get(root,"match");json_object(match,"player|opponent|starts|auto_colonize|colonized_starts|player_ai|fully_established|rally_point|production_seconds|formation_spacing");
+    Json match=json_get(root,"match");json_object(match,"player|opponent|starts|force_ring|auto_colonize|colonized_starts|player_ai|fully_established|rally_point|production_seconds|formation_spacing");
     Json automatic=json_find(match,"auto_colonize");if (json_present(automatic)) loaded.auto_colonize=json_bool(automatic);
     Json player_ai=json_find(match,"player_ai");if (json_present(player_ai)) loaded.player_ai=json_bool(player_ai);
-    loaded.player_faction=read_owner(&loaded,json_get(match,"player"));loaded.opponent_faction=read_owner(&loaded,json_get(match,"opponent"));
-    if (!loaded.player_faction || !loaded.opponent_faction || loaded.player_faction==loaded.opponent_faction)
+    loaded.player_faction=read_owner(&loaded,json_get(match,"player"));
+    if (player)
+    {
+        int chosen=content_faction(&loaded.content,player);
+        if (chosen<=0) { fprintf(stderr,"%s: unknown player faction %s\n",path,player);return false; }
+        loaded.player_faction=(Faction)chosen;
+    }
+    Json opponent=json_find(match,"opponent");
+    if (json_present(opponent)) loaded.opponent_faction=read_owner(&loaded,opponent);
+    else if (!json_present(json_find(match,"starts"))) return json_error(match,"match requires an opponent or starts");
+    if (!loaded.player_faction || (json_present(opponent) && (!loaded.opponent_faction || loaded.player_faction==loaded.opponent_faction)))
         return json_error(match,"match requires two distinct non-neutral factions");
     if (!load_placements(&loaded,root,seed)) return false;
     for (uint32_t p=0;p<loaded.body_count;++p) loaded.start_owner[p]=loaded.bodies[p].owner;
-    loaded.active_factions=(1u<<loaded.player_faction)|(1u<<loaded.opponent_faction);
+    loaded.active_factions=(1u<<loaded.player_faction)|(loaded.opponent_faction ? 1u<<loaded.opponent_faction : 0u);
     for (uint32_t p=0;p<loaded.body_count;++p) if (loaded.start_owner[p]) loaded.active_factions|=1u<<loaded.start_owner[p];
     Json established=json_find(match,"fully_established"),rally=json_find(match,"rally_point");
     if (json_present(established)) loaded.fully_established=json_bool(established);
@@ -644,17 +663,51 @@ bool world_load(World* world,const char* path,uint32_t seed)
     if (json_present(starts))
     {
         loaded.neutral_start=true;bool seen[MAX_FACTIONS]={};bool cells[MAX_BODIES]={};
-        JsonArray entries=json_array(starts,MAX_FACTIONS-1);Json entry={};uint32_t count=0;
+        // Starts without a cell take seeded home cells of the generated layout.
+        uint32_t homes[MAX_BODIES],home_count=loaded.layout_homes,next_home=0;
+        for (uint32_t k=0;k<home_count;++k) homes[k]=k;
+        for (uint32_t k=home_count;k>1;--k) { uint32_t r=seed_mix(seed,2+k)%k,t=homes[k-1];homes[k-1]=homes[r];homes[r]=t; }
+        Json ring=json_find(match,"force_ring");float ring_radius=0,ring_height=0;
+        if (json_present(ring))
+        {
+            json_object(ring,"radius|height");ring_radius=json_positive(json_get(ring,"radius"),MAX_BODY_RADIUS);
+            ring_height=json_float(json_get(ring,"height"),-MAX_PLACEMENT_COORDINATE,MAX_PLACEMENT_COORDINATE);
+        }
+        JsonArray entries=json_array(starts,MAX_FACTIONS-1);Json entry={};uint32_t count=0,explicit_cells=0;
         while (json_next(&entries,&entry))
         {
-            json_object(entry,"faction|cell");Faction faction=read_owner(&loaded,json_get(entry,"faction"));
-            uint32_t cell=json_uint(json_get(entry,"cell"),0,loaded.body_count ? loaded.body_count-1 : 0);
+            json_object(entry,"faction|cell|forces");Faction faction=read_owner(&loaded,json_get(entry,"faction"));
+            Json fixed=json_find(entry,"cell");uint32_t cell=0;
+            if (json_present(fixed)) { cell=json_uint(fixed,0,loaded.body_count ? loaded.body_count-1 : 0);++explicit_cells; }
+            else if (next_home<home_count) cell=homes[next_home++];
+            else return json_error(entry,"a start without a cell requires a free layout home");
             if (!loaded.body_count || !faction
                 || seen[faction] || cells[cell] || loaded.bodies[cell].owner!=FACTION_NEUTRAL
                 || !loaded.content.bodies[loaded.bodies[cell].type].hosts_site) return json_error(entry,"starts require distinct match factions and neutral production cells");
             seen[faction]=true;cells[cell]=true;loaded.start_owner[cell]=faction;loaded.active_factions|=1u<<faction;++count;
+            // Starting forces stand evenly on one ring above their home cell.
+            Json forces=json_find(entry,"forces");if (!json_present(forces)) continue;
+            if (!json_present(ring)) return json_error(forces,"forces require match.force_ring");
+            uint32_t types[MAX_UNIT_TYPES],amounts[MAX_UNIT_TYPES],kinds=0,total=0;
+            JsonArray list=json_array(forces,MAX_UNIT_TYPES);Json force={};
+            while (json_next(&list,&force))
+            {
+                json_object(force,"type|count");Json name=json_get(force,"type");char type_name[ASSET_NAME_CAPACITY]={};
+                json_string(name,type_name,ASSET_NAME_CAPACITY);int index=content_unit(&loaded.content,type_name);
+                if (index<0 || loaded.content.units[index].faction!=faction) return json_error(name,"forces require unit types of the start faction");
+                types[kinds]=(uint32_t)index;amounts[kinds]=json_uint(json_get(force,"count"),1,MAX_SPAWNS);total+=amounts[kinds++];
+            }
+            if (loaded.spawn_count+total>MAX_SPAWNS) return json_error(forces,"starting forces exceed spawn storage");
+            for (uint32_t k=0,slot=0;k<kinds;++k) for (uint32_t u=0;u<amounts[k];++u,++slot)
+            {
+                Spawn* placed=&loaded.spawns[loaded.spawn_count++];placed->type=types[k];
+                strcpy(placed->type_name,loaded.content.units[types[k]].name);
+                float angle=360.0f*DEGREES_TO_RADIANS*slot/total;
+                placed->position=add(loaded.bodies[cell].position,Vec3{ring_radius*std::cos(angle),ring_radius*std::sin(angle),ring_height});
+            }
         }
-        if (count<2 || !seen[loaded.player_faction] || !seen[loaded.opponent_faction]) return json_error(starts,"starts require both selected factions");
+        if (explicit_cells && explicit_cells!=count) return json_error(starts,"starts name a cell for every side or for none");
+        if (count<2 || !seen[loaded.player_faction] || (loaded.opponent_faction && !seen[loaded.opponent_faction])) return json_error(starts,"starts require both selected factions");
         if (loaded.fully_established) return json_error(starts,"fully_established requires owned cells");
         for (uint32_t p=0;p<loaded.body_count;++p) if (loaded.bodies[p].owner!=FACTION_NEUTRAL) return json_error(starts,"neutral starts cannot contain established factories");
     }

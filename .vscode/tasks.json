@@ -105,7 +105,9 @@
         "${workspaceFolder}/scripts/proton_run.py",
         "${workspaceFolder}/build/windows-cross/nanova.exe",
         "--world",
-        "${workspaceFolder}/assets/levels/virus_large_level.json",
+        "${workspaceFolder}/assets/levels/large_level.json",
+        "--faction",
+        "virus",
         "--config",
         "${workspaceFolder}/assets/rendering/renderer.json"
       ],
@@ -131,7 +133,9 @@
         "${workspaceFolder}/scripts/proton_run.py",
         "${workspaceFolder}/build/windows-cross/nanova.exe",
         "--world",
-        "${workspaceFolder}/assets/levels/immune_large_level.json",
+        "${workspaceFolder}/assets/levels/large_level.json",
+        "--faction",
+        "immune",
         "--config",
         "${workspaceFolder}/assets/rendering/renderer.json"
       ],
@@ -157,7 +161,9 @@
         "${workspaceFolder}/scripts/proton_run.py",
         "${workspaceFolder}/build/windows-cross/nanova.exe",
         "--world",
-        "${workspaceFolder}/assets/levels/fungus_large_level.json",
+        "${workspaceFolder}/assets/levels/large_level.json",
+        "--faction",
+        "fungus",
         "--config",
         "${workspaceFolder}/assets/rendering/renderer.json"
       ],

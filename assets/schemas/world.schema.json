@@ -41,11 +41,48 @@
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 127
+              },
+              "forces": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "$ref": "shared.schema.json#/$defs/name"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 64
+                    }
+                  },
+                  "required": ["type", "count"],
+                  "additionalProperties": false
+                }
               }
             },
-            "required": ["faction", "cell"],
+            "required": ["faction"],
             "additionalProperties": false
           }
+        },
+        "force_ring": {
+          "type": "object",
+          "properties": {
+            "radius": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1000000
+            },
+            "height": {
+              "type": "number",
+              "minimum": -1000000,
+              "maximum": 1000000
+            }
+          },
+          "required": ["radius", "height"],
+          "additionalProperties": false
         },
         "auto_colonize": {
           "type": "boolean"
@@ -73,8 +110,9 @@
           "type": "boolean"
         }
       },
-      "required": ["player", "opponent"],
-      "additionalProperties": false
+      "required": ["player"],
+      "additionalProperties": false,
+      "anyOf": [{"required": ["opponent"]}, {"required": ["starts"]}]
     },
     "bodies": {
       "type": "array",
@@ -286,15 +324,7 @@
           "additionalProperties": false
         }
       },
-      "required": [
-        "field_radius",
-        "cells",
-        "first_home_degrees",
-        "minimum_gap",
-        "centroid_steps",
-        "home",
-        "neutral"
-      ],
+      "required": ["field_radius", "cells", "minimum_gap", "centroid_steps", "home", "neutral"],
       "additionalProperties": false
     },
     "spawns": {
@@ -337,7 +367,7 @@
       "maxItems": 64
     }
   },
-  "required": ["content", "appearance", "match", "spawns"],
+  "required": ["content", "appearance", "match"],
   "additionalProperties": false,
   "anyOf": [
     {

@@ -505,7 +505,7 @@ static int run_matches(const GameOptions* options)
     {
         uint32_t seed=options->world_seed+i;
         double setup_start=options->cpu_benchmark ? profiler_clock_ms() : 0;
-        if (!simulation_initialize(simulation.get(),options->world_path,seed)) return 1;
+        if (!simulation_initialize(simulation.get(),options->world_path,seed,options->player_faction)) return 1;
         double setup_ms=options->cpu_benchmark ? profiler_clock_ms()-setup_start : 0;
         uint32_t count=0,peak_units=0,worst_tick=0;double total_ms=0,maximum_ms=0;
         SimulationTimings phase_total={},worst_phases={};
@@ -668,7 +668,7 @@ int game_run(const GameOptions* options)
 #endif
     }
     printf("World variation seed: %u. Restart keeps this layout.\n",seed);
-    if (!simulation_initialize(&game.simulation, options->world_path,seed))
+    if (!simulation_initialize(&game.simulation,options->world_path,seed,options->player_faction))
         return 1;
     if (!audio_load(&audio,options->audio_path,options->audio_capture_path,&game.simulation.world.content)) return 1;
     game.initial_simulation=game.simulation;

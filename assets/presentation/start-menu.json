@@ -10,19 +10,19 @@
     {
       "label": "VIRUS",
       "description": "Grow branching factories. Command fighters and bombers.",
-      "world": "../levels/virus_large_level.json",
+      "faction": "virus",
       "color": [0.24, 0.86, 0.32]
     },
     {
       "label": "IMMUNE",
       "description": "Build durable units. Attach, digest, and recover.",
-      "world": "../levels/immune_large_level.json",
+      "faction": "immune",
       "color": [0.94, 0.97, 1]
     },
     {
       "label": "FUNGAL",
       "description": "Grow spore factories. Spores seek targets on their own.",
-      "world": "../levels/fungus_large_level.json",
+      "faction": "fungus",
       "color": [0.65, 0.43, 0.22]
     }
   ]

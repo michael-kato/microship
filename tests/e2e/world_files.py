@@ -39,7 +39,7 @@ def failure(result,path):
 
 with tempfile.TemporaryDirectory(prefix='nanova-json-e2e-') as directory:
     out=Path(directory);scene=out/'editable.json'
-    base=stage_world(root/'assets/levels/virus_large_level.json',out)
+    base=stage_world(root/'assets/levels/large_level.json',out)
     minimal=dict(content=dict(bodies=[dict(name='fixture',label='BODY',geometry='sphere',hosts_site=False)],
                 factions=[dict(id=1,name='virus',label='VIRUS',color=[.45,.9,.75]),dict(id=2,name='immune',label='IMMUNE',color=[1,.55,.65])],
                 groups=[],units=[],buildings=[]),appearance=dict(ambient=[.07,.055,.065]),
@@ -54,8 +54,8 @@ with tempfile.TemporaryDirectory(prefix='nanova-json-e2e-') as directory:
     assert 'biology.json' not in names,'Generic configuration filename remains in the bundle'
     success(run(relocated,out),128)
     manifest=bundle/'assets/startup.json';startup=json.loads(manifest.read_text())
-    manifest.write_text(json.dumps(change(startup,'world','levels/immune_large_level.json')))
-    state=out/'manifest-state.json';success(run(relocated,out,['--state',str(state)]),128)
+    manifest.write_text(json.dumps(change(startup,'world','levels/immune-player-level.json')))
+    state=out/'manifest-state.json';success(run(relocated,out,['--state',str(state)]),5)
     assert json.loads(state.read_text())['player_faction']==2
     for bad in [change(startup,'unknown','anything'),change(startup,'world','/tmp/absent.json'),
                 remove(startup,'shader'),change(startup,'world',12),

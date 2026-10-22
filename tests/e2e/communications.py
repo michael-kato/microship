@@ -75,7 +75,7 @@ with tempfile.TemporaryDirectory(prefix='nanova_communications_') as temporary:
  consumed,log=run('consume_oldest_alert',crowded,extra=('--click','1650','50'))
  assert {a['cell'] for a in consumed['communications']['alerts'] if a['pending']}=={3,4,5}
  # Build the milestone cases from the game's actual seeded 128-cell layout.
- layout=stage_world(binary.parent/'assets/levels/virus_large_level.json',out);seeded,_=run('layout_128',layout)
+ layout=stage_world(binary.parent/'assets/levels/large_level.json',out);seeded,_=run('layout_128',layout)
  assert len(seeded['colonies'])==128
  for faction,fid,controlled in [('virus',1,90),('immune',2,9),('immune',2,10),('immune',2,90),('fungus',3,90)]:
   d=deepcopy(base);player='immune' if faction=='virus' else 'virus';d['match'].update(player=player,opponent=faction);d['spawns']=[];d['bodies']=[]

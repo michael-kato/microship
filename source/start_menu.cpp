@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
-struct MenuChoice { char label[64],description[160],world[ASSET_PATH_CAPACITY];Color color;RECT bounds; };
+struct MenuChoice { char label[64],description[160],faction[ASSET_NAME_CAPACITY];Color color;RECT bounds; };
 struct StartMenu
 {
     char title[80],prompt[160];
@@ -73,15 +73,14 @@ static bool menu_load(StartMenu* menu,const char* path)
     JsonArray array=json_array(json_get(root,"choices"),8);Json item;
     while (json_next(&array,&item))
     {
-        MenuChoice* choice=&menu->choices[menu->count++];json_object(item,"label|description|world|color");
+        MenuChoice* choice=&menu->choices[menu->count++];json_object(item,"label|description|faction|color");
         json_string(json_get(item,"label"),choice->label,sizeof(choice->label));json_string(json_get(item,"description"),choice->description,sizeof(choice->description));
-        json_path(json_get(item,"world"),path,choice->world,sizeof(choice->world));choice->color=json_color(json_get(item,"color"));
-        FILE* file=fopen(choice->world,"rb");if (!file) json_error(item,"menu world does not exist");else fclose(file);
+        json_string(json_get(item,"faction"),choice->faction,sizeof(choice->faction));choice->color=json_color(json_get(item,"color"));
     }
     if (!menu->count) json_error(root,"menu needs at least one choice");
     return document.valid;
 }
-int start_menu(const char* path,char* world,size_t capacity,uint32_t selection)
+int start_menu(const char* path,char* faction,size_t capacity,uint32_t selection)
 {
     StartMenu menu={};if (!menu_load(&menu,path)) return -1;
     if (selection)
@@ -113,7 +112,7 @@ int start_menu(const char* path,char* world,size_t capacity,uint32_t selection)
         DestroyWindow(handle);
     }
     if (!menu.selected) return 0;
-    const char* selected=menu.choices[menu.selected-1].world;
+    const char* selected=menu.choices[menu.selected-1].faction;
     if (strlen(selected)>=capacity) return -1;
-    strcpy(world,selected);return 1;
+    strcpy(faction,selected);return 1;
 }

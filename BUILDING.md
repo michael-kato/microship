@@ -15,7 +15,7 @@ starts it through Proton in a terminal. It uses the JavaScript Debugger
 that ships with VS Code. It starts the game; C++ breakpoints are not supported
 by this entry. The CMake extension's Run button is a separate command.
 Use **Terminal > Run Task > nanova: run (Proton)** to launch with the task
-system. The faction tasks select the current 15-cell JSON maps.
+system. The faction tasks start the generated 128-cell map with `--faction`.
 
 `check.sh` defaults to an incremental build and short CPU application checks.
 It starts no GPU work. Use `--quick fungal` or `--quick repair` to check one
@@ -40,7 +40,7 @@ Select a level with `--world`:
 python3 scripts/proton_run.py build/windows-cross/nanova.exe --world assets/levels/immune-player-level.json
 ```
 
-`virus_large_level.json`, `immune_large_level.json`, and `fungus_large_level.json` are the normal 128-cell maps. Each includes all three factions. Older two-side levels remain diagnostic fixtures. `three_faction_stress.json` is the primary stress scene: 15 developed cells, 60 seconds of actual production per faction, and a shared battle point. `--world-seed N` fixes the variation seed. `--smoke` loads assets, runs the simulation, builds render input, and shuts down without a GPU. `--state PATH.json` and `--scene-state PATH.json` export diagnostics.
+`large_level.json` is the normal 128-cell map with all three factions; `--faction NAME` picks the player's side. The world seed generates the layout and home assignment. Older two-side levels remain diagnostic fixtures. `three_faction_stress.json` is the primary stress scene: 15 developed cells, 60 seconds of actual production per faction, and a shared battle point. `--world-seed N` fixes the variation seed. `--smoke` loads assets, runs the simulation, builds render input, and shuts down without a GPU. `--state PATH.json` and `--scene-state PATH.json` export diagnostics.
 
 Per-frame diagnostic lines (`Scene time`, GPU stage times, `Application frame`) print only in bounded `--frames` runs. Interactive play writes startup lines only, so console output stays out of the frame.
 

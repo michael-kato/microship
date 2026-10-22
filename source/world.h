@@ -97,7 +97,8 @@ struct World
     GameplayRules gameplay;
     CommunicationSettings communications;
     float sight_radius;
-    Faction player_faction,opponent_faction;
+    Faction player_faction,opponent_faction; // Opponent is zero when starts list the sides.
+    uint32_t layout_homes; // Leading home cells of a generated layout.
     bool ambient_enabled;
     Color ambient;
     Color ambient_top, ambient_bottom;
@@ -131,7 +132,8 @@ struct World
     uint32_t combat_fields;
 };
 
-bool world_load(World* world, const char* path,uint32_t seed);
+// A non-null player names the controlled faction instead of match.player.
+bool world_load(World* world, const char* path,uint32_t seed,const char* player=0);
 bool world_reload_appearance(World* output,const World* current,uint32_t seed);
 void world_copy_appearance(World* output,const World* source);
 

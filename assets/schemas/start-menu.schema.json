@@ -48,14 +48,14 @@
             "minLength": 1,
             "maxLength": 159
           },
-          "world": {
-            "$ref": "shared.schema.json#/$defs/path"
+          "faction": {
+            "$ref": "shared.schema.json#/$defs/name"
           },
           "color": {
             "$ref": "shared.schema.json#/$defs/color"
           }
         },
-        "required": ["label", "description", "world", "color"],
+        "required": ["label", "description", "faction", "color"],
         "additionalProperties": false
       }
     }

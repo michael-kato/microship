@@ -7,6 +7,7 @@
 struct GameOptions
 {
     const char* world_path;
+    const char* player_faction; // Overrides match.player when set.
     const char* config_path;
     const char* shader_path;
     const char* builtin_shader_path;

@@ -14,8 +14,10 @@ def check_layout(layout,colonies):
  points=[c['position'] for c in colonies];radii=[c['radius'] for c in colonies]
  homes=layout['home']['count'];R=layout['field_radius'];low,high=layout['neutral']['radius_range']
  assert len(colonies)==layout['cells'] and all(abs(p[2])<1e-6 for p in points)
+ # The seed rotates the home circle; homes stay evenly spaced on it.
+ first=math.atan2(points[0][1],points[0][0])
  for k in range(homes):
-  angle=math.radians(layout['first_home_degrees']+360*k/homes)
+  angle=first+2*math.pi*k/homes
   assert math.dist(points[k][:2],[R*math.cos(angle),R*math.sin(angle)])<1e-3 and radii[k]==layout['home']['cell']['radius']
  assert math.hypot(*points[homes][:2])<=layout['center']['jitter']+1e-3 and abs(radii[homes]-layout['center']['cell']['radius'])<1e-6
  neutral=radii[homes+1:]
@@ -35,30 +37,36 @@ with tempfile.TemporaryDirectory(prefix='nanova-three-factions-') as directory:
   result=subprocess.run([*command,'--smoke','--world',str(p),'--world-seed','1234','--ticks',str(ticks),'--state',str(state),*extra],capture_output=True,text=True,timeout=25);count+=1
   assert result.returncode==expected,(name,result.stdout,result.stderr)
   return json.loads(state.read_text()) if not expected else None
- layouts=[]
- for side in ('virus','immune','fungus'):
-  path=root/'assets/levels'/(side+'_large_level.json');d=json.loads(path.read_text())
-  assert d['layout']['cells']==128 and {v['faction'] for v in d['match']['starts']}=={'virus','immune','fungus'}
-  assert [v['cell'] for v in d['match']['starts']]==[0,1,2] and [sum(s['cell']==i for s in d['spawns']) for i in (0,1,2)]==[10,5,25]
-  initial=run(side+'_initial',path,extra=('--restart',));assert [sum(u['faction']==f for u in initial['units']) for f in (1,2,3)]==[10,5,25]
-  assert sum(c['active'] for c in initial['colonies'])==3
+ layouts=[];path=root/'assets/levels/large_level.json';d=json.loads(path.read_text())
+ assert d['layout']['cells']==128 and {v['faction'] for v in d['match']['starts']}=={'virus','immune','fungus'}
+ assert all('cell' not in v for v in d['match']['starts']) and 'spawns' not in d
+ for side,fid in (('virus',1),('immune',2),('fungus',3)):
+  initial=run(side+'_initial',path,extra=('--restart','--faction',side));assert [sum(u['faction']==f for u in initial['units']) for f in (1,2,3)]==[10,5,25]
+  assert initial['player_faction']==fid and sum(c['active'] for c in initial['colonies'])==3
   assert all(c['growth']==0 and c['establishment_age']==0 for c in initial['colonies'][:3])
+  # Starting forces stand on the authored ring above their own home.
+  ring=d['match']['force_ring']
+  for u in initial['units']:
+   home=next(c for c in initial['colonies'][:3] if c['faction']==u['faction'])
+   assert abs(math.dist(u['position'][:2],home['position'][:2])-ring['radius'])<.05,(u,home)
   layout=check_layout(d['layout'],initial['colonies'])
-  layouts.append(layout)
-  game=run(side+'_settled',path,2400)
-  homes={v['faction']:v['cell'] for v in d['match']['starts']}
-  assert all(game['colonies'][i]['active'] for i in homes.values()),(side,homes,[(c['faction'],c['active']) for c in game['colonies']])
-  assert {game['colonies'][i]['faction'] for i in homes.values()}=={1,2,3} and game['outcome']==0
+  layouts.append((layout,[c['faction'] for c in initial['colonies'][:3]]))
+  game=run(side+'_settled',path,2400,extra=('--faction',side))
+  homes=[i for i in range(3)]
+  assert all(game['colonies'][i]['active'] for i in homes),(side,[(c['faction'],c['active']) for c in game['colonies']])
+  assert {game['colonies'][i]['faction'] for i in homes}=={1,2,3} and game['outcome']==0
   assert all(c['production']>0 for c in game['colonies'] if c['active'])
- # The world seed selects the layout; the same seed repeats it.
+ # The world seed selects the layout and home assignment; the same seed repeats them.
  assert layouts[0]==layouts[1]==layouts[2]
- large=root/'assets/levels/virus_large_level.json';large_data=json.loads(large.read_text())
- others=[check_layout(large_data['layout'],run('seed_'+str(seed),large,extra=('--world-seed',str(seed)))['colonies']) for seed in (7,99,4242)]
- assert all(o!=layouts[0] for o in others) and len({tuple(map(tuple,o)) for o in others})==3
+ seeded=[run('seed_'+str(seed),path,extra=('--world-seed',str(seed))) for seed in (7,99,4242,5,6,8)]
+ others=[check_layout(d['layout'],s['colonies']) for s in seeded[:3]]
+ assert all(o!=layouts[0][0] for o in others) and len({tuple(map(tuple,o)) for o in others})==3
+ assert len({tuple(c['faction'] for c in s['colonies'][:3]) for s in seeded})>1,'Seeds never changed the home assignment'
+ run('unknown_faction',path,expected=1,extra=('--faction','nobody'))
  # One opponent expires before settling. The third faction's founder must prevent victory.
- pending=stage_world(root/'assets/levels/virus_large_level.json',out)
+ pending=stage_world(path,out)
  pending['match'].update(colonized_starts=False,auto_colonize=True)
- pending['spawns']=[next(s for s in pending['spawns'] if s['cell']==i) for i in (0,1,2)]
+ for i,start in enumerate(pending['match']['starts']):start['cell']=i;start['forces'][0]['count']=1
  for u in pending['content']['units']:u.pop('colonization',None);u.pop('carrier',None)
  spore=next(u for u in pending['content']['units'] if u['name']=='fungal_spore')
  for u in pending['content']['units']:
@@ -102,10 +110,13 @@ with tempfile.TemporaryDirectory(prefix='nanova-three-factions-') as directory:
  full=run('territory_capacity',root/'assets/levels/territory_stress.json',300)
  assert len(full['colonies'])==128 and all(c['active'] for c in full['colonies'])
  assert len(full['units'])==full['unit_capacity'] and any(c['capacity_blocked'] for c in full['colonies'])
- bad=deepcopy(pending);bad['spawns']=[s for s in bad['spawns'] if s['type']!='fungal_spore'];run('missing_third_founder',bad,expected=1)
+ bad=deepcopy(pending);bad['match']['starts'][2].pop('forces');run('missing_third_founder',bad,expected=1)
+ bad=deepcopy(pending);bad['match']['starts'][2]['forces'][0]['type']='virus_fighter';run('foreign_force',bad,expected=1)
+ bad=deepcopy(pending);bad['match'].pop('force_ring');run('forces_without_ring',bad,expected=1)
+ bad=deepcopy(pending);bad['match']['starts'][1].pop('cell');run('partial_start_cells',bad,expected=1)
  bad=deepcopy(pending);bad['match']['starts'][2]['cell']=0;run('duplicate_start',bad,expected=1)
  bad=deepcopy(pending);bad['layout']['minimum_gap']=40;run('impossible_gap',bad,expected=1)
- bad=deepcopy(pending);bad['spawns'][0]['position']=[0,0,7];run('spawn_position_and_cell',bad,expected=1)
+ bad=deepcopy(pending);bad['spawns']=[dict(type='virus_fighter',cell=0,offset=[0,0,7],position=[0,0,7])];run('spawn_position_and_cell',bad,expected=1)
  bad=deepcopy(pending);bad['bodies']=[];run('bodies_and_layout',bad,expected=1)
  bad=json.loads(stress.read_text());bad['match']['production_seconds']=0;run('zero_production',bad,expected=1)
  bad=json.loads(stress.read_text());bad['match']['production_seconds']=120;run('production_overflow',bad,expected=1)

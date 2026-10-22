@@ -75,7 +75,7 @@ static void print_usage(FILE* output)
         "              [--replay PATH.orders] [--ticks N] [--state PATH.json] [--scene-state PATH.json]\n"
         "              [--matches N] [--cpu-benchmark] (with --smoke and --ticks: seeded matches, optional tick timings)\n"
         "              [--audio-capture PATH.wav] (with --smoke and --ticks, at most 3600 ticks)\n"
-        "              [--camera-pan X Y SECONDS] [--world-seed N] [--audio PATH.json] [--menu|--no-menu] [--menu-select 1..3]\n"
+        "              [--camera-pan X Y SECONDS] [--world-seed N] [--audio PATH.json] [--menu|--no-menu] [--menu-select 1..3] [--faction NAME]\n"
         "              [--settings PATH.json] [--pause-on-start] (production menu diagnostic)\n"
         "Default: faction menu, then direct ray-traced Win32 window; Esc opens the pause menu; close exits.\n"
         "Headless/capture runs default to one frame. PFM saves linear HDR before bloom; PPM saves display RGB.\n"
@@ -114,7 +114,7 @@ int main(int argc, char** argv)
     if (setvbuf(stdout,diagnostic_output,_IOFBF,sizeof(diagnostic_output))) return 1;
     GameOptions options = {};
     char world_path[EXECUTABLE_PATH_CAPACITY], config_path[EXECUTABLE_PATH_CAPACITY], shader_path[EXECUTABLE_PATH_CAPACITY],audio_path[EXECUTABLE_PATH_CAPACITY],menu_path[EXECUTABLE_PATH_CAPACITY],settings_defaults_path[EXECUTABLE_PATH_CAPACITY];
-    bool no_menu=false,force_menu=false;uint32_t menu_selection=0;
+    bool no_menu=false,force_menu=false;uint32_t menu_selection=0;char menu_faction[ASSET_NAME_CAPACITY]={};
     if (!asset_paths(world_path, config_path, shader_path,audio_path,menu_path,settings_defaults_path,sizeof(world_path)))
     {
         fprintf(stderr, "Cannot locate assets beside the nanova executable.\n");
@@ -138,6 +138,11 @@ int main(int argc, char** argv)
         {
             if (++i==argc) { fprintf(stderr,"--settings requires a JSON file path.\n");return 2; }
             options.settings_path=argv[i];
+        }
+        else if (!strcmp(argv[i],"--faction"))
+        {
+            if (++i==argc) { fprintf(stderr,"--faction requires a faction name.\n");return 2; }
+            options.player_faction=argv[i];
         }
         else if (!strcmp(argv[i],"--no-menu")) no_menu=true;
         else if (!strcmp(argv[i],"--menu")) force_menu=true;
@@ -332,9 +337,9 @@ int main(int argc, char** argv)
     {
         if (show_menu)
         {
-            int result=start_menu(menu_path,world_path,sizeof(world_path),menu_selection);
+            int result=start_menu(menu_path,menu_faction,sizeof(menu_faction),menu_selection);
             if (result<=0) return result<0 ? 1 : 0;
-            options.world_path=world_path;
+            options.player_faction=menu_faction;
         }
         int result=game_run(&options);
         if (result!=GAME_RETURN_TO_MENU) return result;
