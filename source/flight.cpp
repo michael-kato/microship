@@ -30,7 +30,7 @@ static bool outside_box(Vec3 p,Vec3 low,Vec3 high,float reach)
 static Vec3 nearest(Vec3 point,const FlightObstacle& o)
 {
     Vec3 delta=subtract(o.end,o.start);float squared=dot(delta,delta);
-    float t=squared>MIN_OBSTACLE_SEGMENT_SQUARED_LENGTH ? std::fmax(0.0f,std::fmin(1.0f,dot(subtract(point,o.start),delta)/squared)) : 0;
+    float t=squared>MIN_OBSTACLE_SEGMENT_SQUARED_LENGTH ? max_of(0.0f,min_of(1.0f,dot(subtract(point,o.start),delta)/squared)) : 0;
     return add(o.start,scale(delta,t));
 }
 // Craft meet factories only while orbiting a cell, and only that cell's factories.
@@ -65,7 +65,7 @@ void flight_obstacles(const Simulation* s,FlightObstacles* out)
             float growth=simulation_structure_growth(s,p,k);
             for (uint32_t j=0;j<GROWTH_PATH_SEGMENTS;++j)
             {
-                float extension=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_PATH_SEGMENTS-j));
+                float extension=max_of(0.0f,min_of(1.0f,growth*GROWTH_PATH_SEGMENTS-j));
                 if (extension<=OBSTACLE_DIRECTION_EPSILON) continue;
                 float width=simulation_structure_stem_width(s,p,k,j,growth);
                 Vec3 a=c.paths[k][j],b=add(a,scale(subtract(c.paths[k][j+1],a),extension));
@@ -83,8 +83,8 @@ void flight_obstacles(const Simulation* s,FlightObstacles* out)
         for (uint32_t i=first;i<out->count;++i)
         {
             const FlightObstacle& o=out->values[i];
-            low=Vec3{std::fmin(low.x,o.center.x-o.bound),std::fmin(low.y,o.center.y-o.bound),std::fmin(low.z,o.center.z-o.bound)};
-            high=Vec3{std::fmax(high.x,o.center.x+o.bound),std::fmax(high.y,o.center.y+o.bound),std::fmax(high.z,o.center.z+o.bound)};
+            low=Vec3{min_of(low.x,o.center.x-o.bound),min_of(low.y,o.center.y-o.bound),min_of(low.z,o.center.z-o.bound)};
+            high=Vec3{max_of(high.x,o.center.x+o.bound),max_of(high.y,o.center.y+o.bound),max_of(high.z,o.center.z+o.bound)};
         }
         out->slot[p]=(int32_t)out->cell_count;
         out->low[out->cell_count]=low;out->high[out->cell_count]=high;out->first[++out->cell_count]=out->count;
@@ -167,7 +167,7 @@ void flight_clip(Simulation* s,const FlightObstacles& obstacles,Unit* u,Vec3 pre
             else if (distance>OBSTACLE_DIRECTION_EPSILON)
             {
                 // Growth can enclose a craft between ticks. Move it outward at its current speed limit.
-                float step=std::fmin(radius-distance,d.speed/SIMULATION_TICKS_PER_SECOND);
+                float step=min_of(radius-distance,d.speed/SIMULATION_TICKS_PER_SECOND);
                 u->position=add(previous,scale(away,step/distance));
             }
         }

@@ -113,7 +113,7 @@ void simulation_emit_sound(Simulation* s,SoundKind kind,Vec3 position,Faction fa
 
 Vec3 simulation_spike_direction(uint32_t index,uint32_t count)
 {
-    float y=1-2*(index+.5f)/count,angle=index*GOLDEN_ANGLE_RADIANS,r=std::sqrt(std::fmax(0.0f,1-y*y));
+    float y=1-2*(index+.5f)/count,angle=index*GOLDEN_ANGLE_RADIANS,r=std::sqrt(max_of(0.0f,1-y*y));
     return Vec3{r*std::cos(angle),y,r*std::sin(angle)};
 }
 void simulation_unit_axes(const Unit* u,Vec3* right,Vec3* up,Vec3* forward)
@@ -139,8 +139,8 @@ float simulation_unit_scale(const Simulation* s,const Unit* unit)
 {
     float size=simulation_unit_definition(s,unit)->scale;
     if (!s->world.combat.flight_enabled) return size;
-    float t=unit->hatched ? 1 : std::fmin(1.0f,unit->age/SPAWN_SCALE_SECONDS);t=t*t*(3-2*t);size*=SPAWN_START_SCALE+SPAWN_GROWTH_SCALE*t;
-    if (unit->landing>0 && simulation_unit_definition(s,unit)->consume_colonists) size*=1-LANDING_SHRINK_SCALE*std::fmin(1.0f,unit->landing/s->world.gameplay.landing_seconds);
+    float t=unit->hatched ? 1 : min_of(1.0f,unit->age/SPAWN_SCALE_SECONDS);t=t*t*(3-2*t);size*=SPAWN_START_SCALE+SPAWN_GROWTH_SCALE*t;
+    if (unit->landing>0 && simulation_unit_definition(s,unit)->consume_colonists) size*=1-LANDING_SHRINK_SCALE*min_of(1.0f,unit->landing/s->world.gameplay.landing_seconds);
     return size;
 }
 
@@ -181,8 +181,8 @@ static void grid_bounds(Simulation* s)
     for (uint32_t p=0;p<w.body_count;++p)
     {
         Vec3 c=w.bodies[p].position;float r=w.bodies[p].radius;
-        low=Vec3{std::fmin(low.x,c.x-r),std::fmin(low.y,c.y-r),std::fmin(low.z,c.z-r)};
-        high=Vec3{std::fmax(high.x,c.x+r),std::fmax(high.y,c.y+r),std::fmax(high.z,c.z+r)};
+        low=Vec3{min_of(low.x,c.x-r),min_of(low.y,c.y-r),min_of(low.z,c.z-r)};
+        high=Vec3{max_of(high.x,c.x+r),max_of(high.y,c.y+r),max_of(high.z,c.z+r)};
     }
     UnitGrid& g=s->grid;g.low=subtract(low,Vec3{UNIT_GRID_MARGIN,UNIT_GRID_MARGIN,UNIT_GRID_MARGIN});g.slots=0;
     for (uint32_t f=1;f<MAX_FACTIONS;++f) if (w.content.factions[f].name[0]) { g.slot[f]=g.slots;g.slot_faction[g.slots++]=f; }
@@ -195,8 +195,8 @@ static void grid_bounds(Simulation* s)
     float spacing=w.combat.separation*w.content.max_unit_separation;
     s->neighbors.inverse_cell=spacing>0 ? 1/spacing : 0;
     // Wide enough for sight and encounter reach around the largest cell.
-    float largest=0;for (uint32_t p=0;p<w.body_count;++p) largest=std::fmax(largest,w.bodies[p].radius);
-    s->player_grid.inverse_cell=1/(std::fmax(w.sight_radius,w.communications.encounter_radius)+largest+UNIT_GRID_MOTION_MARGIN);
+    float largest=0;for (uint32_t p=0;p<w.body_count;++p) largest=max_of(largest,w.bodies[p].radius);
+    s->player_grid.inverse_cell=1/(max_of(w.sight_radius,w.communications.encounter_radius)+largest+UNIT_GRID_MOTION_MARGIN);
 }
 static float body_grid_radius(const Body& b,float reach)
 { return b.radius*CELL_COLLISION_RADIUS_SCALE+reach+BODY_GRID_ROUNDING_SLACK; }
@@ -208,8 +208,8 @@ static int32_t body_grid_axis(const BodyGrid& g,float value,float low,uint32_t a
 static bool body_grid_touches(const BodyGrid& g,const Body& b,int32_t x,int32_t y)
 {
     float cell=1/g.inverse_cell,x0=g.low_x+x*cell,y0=g.low_y+y*cell;
-    float dx=std::fmax(0.0f,std::fmax(x0-b.position.x,b.position.x-(x0+cell)));
-    float dy=std::fmax(0.0f,std::fmax(y0-b.position.y,b.position.y-(y0+cell)));
+    float dx=max_of(0.0f,max_of(x0-b.position.x,b.position.x-(x0+cell)));
+    float dy=max_of(0.0f,max_of(y0-b.position.y,b.position.y-(y0+cell)));
     float r=body_grid_radius(b,g.reach);return dx*dx+dy*dy<=r*r;
 }
 // Cells are static; build their 2D candidate buckets once. Cells grow until both capacities fit.
@@ -220,8 +220,8 @@ static void body_grid_build(Simulation* s)
     for (uint32_t p=0;p<w.body_count;++p)
     {
         const Body& b=w.bodies[p];float r=body_grid_radius(b,g.reach);
-        low_x=std::fmin(low_x,b.position.x-r);high_x=std::fmax(high_x,b.position.x+r);
-        low_y=std::fmin(low_y,b.position.y-r);high_y=std::fmax(high_y,b.position.y+r);
+        low_x=min_of(low_x,b.position.x-r);high_x=max_of(high_x,b.position.x+r);
+        low_y=min_of(low_y,b.position.y-r);high_y=max_of(high_y,b.position.y+r);
     }
     g.low_x=low_x;g.low_y=low_y;
     for (float cell=BODY_GRID_CELL_SIZE;;cell*=UNIT_GRID_CELL_GROWTH)
@@ -390,21 +390,21 @@ Vec3 simulation_structure_position(const Simulation* s,uint32_t p,uint32_t struc
         Vec3 right,normal;simulation_producer_axes(simulation_producer_definition(s,p),&right,&up,&normal);
         if (structure) { base=add(base,c->branches[structure-1].offset);growth=c->branches[structure-1].growth; }
     }
-    return add(base,scale(up,simulation_producer_definition(s,p)->height*std::fmax(INITIAL_FACTORY_GROWTH,growth)));
+    return add(base,scale(up,simulation_producer_definition(s,p)->height*max_of(INITIAL_FACTORY_GROWTH,growth)));
 }
 
 static uint32_t branch_random(uint32_t* seed)
 { *seed=*seed*BRANCH_RANDOM_MULTIPLIER+BRANCH_RANDOM_INCREMENT;return *seed; }
 Vec3 simulation_growth_point(const Simulation* s,uint32_t p,uint32_t k,float growth)
 {
-    float t=std::fmax(0.0f,std::fmin(1.0f,growth))*GROWTH_PATH_SEGMENTS;
+    float t=max_of(0.0f,min_of(1.0f,growth))*GROWTH_PATH_SEGMENTS;
     uint32_t j=std::min((uint32_t)t,(uint32_t)GROWTH_PATH_SEGMENTS-1);
     const Vec3* points=s->colonies[p].paths[k];
     return add(points[j],scale(subtract(points[j+1],points[j]),t-j));
 }
 Vec3 simulation_growth_tangent(const Simulation* s,uint32_t p,uint32_t k,float growth)
 {
-    uint32_t j=std::min((uint32_t)(std::fmax(0.0f,std::fmin(1.0f,growth))*GROWTH_PATH_SEGMENTS),(uint32_t)GROWTH_PATH_SEGMENTS-1);
+    uint32_t j=std::min((uint32_t)(max_of(0.0f,min_of(1.0f,growth))*GROWTH_PATH_SEGMENTS),(uint32_t)GROWTH_PATH_SEGMENTS-1);
     const Vec3* points=s->colonies[p].paths[k];
     return normalize(subtract(points[j+1],points[j]));
 }
@@ -426,7 +426,7 @@ float simulation_structure_growth(const Simulation* s,uint32_t p,uint32_t k)
     uint32_t wounds=k ? c.branches[k-1].wounds : c.wounds;
     uint32_t hits=structure_hits(s,p,k);
     uint32_t lost=std::min((uint32_t)GROWTH_SEGMENTS,wounds*GROWTH_SEGMENTS/hits);
-    return std::fmin(growth,(GROWTH_SEGMENTS-lost)/(float)GROWTH_SEGMENTS);
+    return min_of(growth,(GROWTH_SEGMENTS-lost)/(float)GROWTH_SEGMENTS);
 }
 float simulation_production(const Simulation* s,uint32_t p)
 {
@@ -434,7 +434,7 @@ float simulation_production(const Simulation* s,uint32_t p)
     float production=0,root_weight=0,limb_production=d.branches.production;
     for (uint32_t k=0;k<c.root_count;++k) root_weight+=c.factory_scale[k]*c.factory_scale[k];
     if (d.branches.production_reference_count && c.structure_count>c.root_count)
-        limb_production*=std::fmax(0.0f,(float)d.branches.production_reference_count-c.large_root_count)/(c.structure_count-c.root_count);
+        limb_production*=max_of(0.0f,(float)d.branches.production_reference_count-c.large_root_count)/(c.structure_count-c.root_count);
     for (uint32_t k=0;k<c.structure_count;++k)
     {
         if ((k ? c.branches[k-1].health : c.health)<=0) continue;
@@ -667,7 +667,7 @@ static void build_factory_stem(Simulation* s,uint32_t p,uint32_t k,uint32_t* see
             Vec3 outward=definition.spread_roots ? (parent<0 ? outward_root_direction(s,p,k)
                 : normalize(subtract(tip,start))) : normalize(offset);
             float along=dot(offset,outward);
-            float distance=-along+std::sqrt(std::fmax(0.0f,along*along+radius*radius-dot(offset,offset)));
+            float distance=-along+std::sqrt(max_of(0.0f,along*along+radius*radius-dot(offset,offset)));
             Vec3 extension=scale(outward,distance);
             for (uint32_t j=1;j<=GROWTH_SEGMENTS;++j)
                 c->stems[k][j]=add(c->stems[k][j],scale(extension,j/(float)GROWTH_SEGMENTS));
@@ -699,7 +699,7 @@ static void prepare_factory(Simulation* s,uint32_t p)
     c->structure_count=factory_count(*f,c->large_root_count)+c->root_count-c->large_root_count;
     // Keep the selected large roots. Each remaining organelle receives one small factory.
     float minimum_radius=body.factory_root_radii[c->root_attachments[0]];
-    for (uint32_t k=1;k<c->large_root_count;++k) minimum_radius=std::fmin(minimum_radius,body.factory_root_radii[c->root_attachments[k]]);
+    for (uint32_t k=1;k<c->large_root_count;++k) minimum_radius=min_of(minimum_radius,body.factory_root_radii[c->root_attachments[k]]);
     for (uint32_t k=0;k<c->structure_count;++k)
     {
         if (k<c->root_count) c->parents[k]=-1;
@@ -711,7 +711,7 @@ static void prepare_factory(Simulation* s,uint32_t p)
             : f->grammar==GROWTH_HYPHA ? ((k-c->root_count)/f->chain_length)%c->large_root_count
             : (k-c->root_count)%c->large_root_count;
         c->factory_scale[k]=c->parents[k]>=0 ? c->factory_scale[c->parents[k]]
-            : k<c->large_root_count ? 1 : f->additional_root_scale*std::fmin(1.0f,body.factory_root_radii[c->root_attachments[k]]/minimum_radius);
+            : k<c->large_root_count ? 1 : f->additional_root_scale*min_of(1.0f,body.factory_root_radii[c->root_attachments[k]]/minimum_radius);
         c->limb_scale[k]=c->parents[k]<0 ? 1 : c->limb_scale[c->parents[k]]*f->width_scale;
     }
     if (f->grammar==GROWTH_TREE)
@@ -746,13 +746,13 @@ static void prepare_factory(Simulation* s,uint32_t p)
     // Each structure grows for sprout_seconds. A root's limbs emerge depth first at even intervals,
     // so its first child follows the mature trunk and its last limb matures when establishment ends.
     float seconds=simulation_producer_definition(s,p)->establishment_seconds;
-    float grow=std::fmin(simulation_producer_definition(s,p)->sprout_seconds,seconds);
+    float grow=min_of(simulation_producer_definition(s,p)->sprout_seconds,seconds);
     uint32_t timing_seed=seed^body.seed^(c->generation*TARGET_SEED_MULTIPLIER);
     for (uint32_t r=0;r<c->root_count;++r)
     {
         uint32_t order[MAX_FACTORY_STRUCTURES],count=0;depth_first(c,r,order,&count);
         float start=r*f->root_interval_seconds+(r ? (signed_random(&timing_seed)+1)*.5f*f->root_offset_seconds : 0);
-        float first=start+grow,interval=count>2 ? std::fmax(0.0f,seconds-grow-first)/(count-2) : 0;
+        float first=start+grow,interval=count>2 ? max_of(0.0f,seconds-grow-first)/(count-2) : 0;
         for (uint32_t i=0;i<count;++i)
         { c->deployment_start[order[i]]=i ? first+(i-1)*interval : start;c->deployment_seconds[order[i]]=grow; }
     }
@@ -848,7 +848,7 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed,c
             if (!geometry_outer_radius(source,&b.factory_surface_radius)) return false;
             float displacement=0;
             for (uint32_t f=1;f<MAX_FACTIONS;++f)
-                displacement=std::fmax(displacement,s->world.content.factions[f].displacement_height);
+                displacement=max_of(displacement,s->world.content.factions[f].displacement_height);
             b.factory_surface_radius+=b.radius*displacement;
         }
         for (uint32_t t=0;d.hosts_site && t<s->world.content.producer_count;++t)
@@ -1107,8 +1107,8 @@ static void factory_targets(const Simulation* s,FactoryTargets* targets)
             else
             {
                 Vec3& low=targets->low[p];Vec3& high=targets->high[p];
-                low=Vec3{std::fmin(low.x,point.x),std::fmin(low.y,point.y),std::fmin(low.z,point.z)};
-                high=Vec3{std::fmax(high.x,point.x),std::fmax(high.y,point.y),std::fmax(high.z,point.z)};
+                low=Vec3{min_of(low.x,point.x),min_of(low.y,point.y),min_of(low.z,point.z)};
+                high=Vec3{max_of(high.x,point.x),max_of(high.y,point.y),max_of(high.z,point.z)};
             }
         }
     }
@@ -1117,9 +1117,9 @@ static bool factory_in_range(const FactoryTargets& targets,uint32_t p,Vec3 point
 {
     if (!targets.active[p]) return false;
     const Vec3& low=targets.low[p];const Vec3& high=targets.high[p];
-    Vec3 distance={std::fmax(0.0f,std::fmax(low.x-point.x,point.x-high.x)),
-        std::fmax(0.0f,std::fmax(low.y-point.y,point.y-high.y)),
-        std::fmax(0.0f,std::fmax(low.z-point.z,point.z-high.z))};
+    Vec3 distance={max_of(0.0f,max_of(low.x-point.x,point.x-high.x)),
+        max_of(0.0f,max_of(low.y-point.y,point.y-high.y)),
+        max_of(0.0f,max_of(low.z-point.z,point.z-high.z))};
     // Keep a small outward margin. Exact range and tie checks stay in each query.
     return length(distance)<=radius+POSITION_EPSILON;
 }
@@ -1373,7 +1373,7 @@ static void move_units(Simulation* s, float dt)
         float acceleration=flight->acceleration*(u->charging ? definition->charge_acceleration : 1)*(motion.enabled ? motion.acceleration : 1);
         if (flight->flight_enabled)
         {
-            Vec3 desired=distance>POSITION_EPSILON ? scale(delta,std::fmin(speed,distance*FLIGHT_POSITION_GAIN)/distance) : Vec3{};
+            Vec3 desired=distance>POSITION_EPSILON ? scale(delta,min_of(speed,distance*FLIGHT_POSITION_GAIN)/distance) : Vec3{};
             if (strafe)
             {
                 Vec3 away=subtract(u->position,combat_target);float d=length(away);
@@ -1391,7 +1391,7 @@ static void move_units(Simulation* s, float dt)
                 uint32_t j=near[n];const Unit& other=s->units[j];
                 if (j==i || other.health<=0 || (colonizing && other.faction==u->faction && other.target==u->target)) continue;
                 Vec3 apart=subtract(positions[i],positions[j]);float squared=dot(apart,apart);
-                float spacing=flight->separation*std::fmax(own,simulation_unit_definition(s,&other)->separation);
+                float spacing=flight->separation*max_of(own,simulation_unit_definition(s,&other)->separation);
                 if (squared>=spacing*spacing || squared<=POSITION_EPSILON*POSITION_EPSILON) continue;
                 float d=std::sqrt(squared);desired=add(desired,scale(apart,speed*(1-d/spacing)/d));
             }
@@ -1425,12 +1425,12 @@ static void move_units(Simulation* s, float dt)
                     blend=std::floor(now/motion.cadence)!=std::floor((now-dt)/motion.cadence) ? 1 : 0;
                 }
                 float bank=-dot(subtract(heading,u->forward),side)*BANK_RESPONSE_GAIN;
-                u->bank+=(std::fmax(-flight->bank,std::fmin(flight->bank,bank))-u->bank)*blend;
+                u->bank+=(max_of(-flight->bank,min_of(flight->bank,bank))-u->bank)*blend;
                 Vec3 forward=add(scale(u->forward,1-blend),scale(heading,blend));
                 if (length(forward)>STEERING_DIRECTION_EPSILON) u->forward=normalize(forward);
             }
         }
-        else if (distance>POSITION_EPSILON) u->position=add(u->position,scale(delta,std::fmin(1.0f,speed*dt/distance)));
+        else if (distance>POSITION_EPSILON) u->position=add(u->position,scale(delta,min_of(1.0f,speed*dt/distance)));
         // Conservative spherical collision keeps transit outside cell terrain.
         const uint8_t* cells;uint32_t cell_count=body_candidates(s,u->position,&cells),n=0;
         while (n<cell_count)
@@ -1490,8 +1490,8 @@ static void advance_visuals(Simulation* s,float dt)
         if (s->pops[i].duration>0 && (s->pops[i].age+=dt)>=s->pops[i].duration) s->pops[i].duration=0;
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
-        Unit* u=&s->units[i];if (u->health>0) u->age+=dt;u->flash=std::fmax(0.0f,u->flash-dt);u->cooldown=std::fmax(0.0f,u->cooldown-dt);u->latch_recovery=std::fmax(0.0f,u->latch_recovery-dt);
-        u->blob_cooldown=std::fmax(0.0f,u->blob_cooldown-dt);u->stun=std::fmax(0.0f,u->stun-dt);u->aura=std::fmax(0.0f,u->aura-dt);
+        Unit* u=&s->units[i];if (u->health>0) u->age+=dt;u->flash=max_of(0.0f,u->flash-dt);u->cooldown=max_of(0.0f,u->cooldown-dt);u->latch_recovery=max_of(0.0f,u->latch_recovery-dt);
+        u->blob_cooldown=max_of(0.0f,u->blob_cooldown-dt);u->stun=max_of(0.0f,u->stun-dt);u->aura=max_of(0.0f,u->aura-dt);
         Trail* t=&s->trails[i];if (u->health<=0 || !simulation_unit_definition(s,u)->trails) { t->count=0;continue; }
         t->timer+=dt;if (t->timer<v->trail_lifetime/(TRAIL_POINTS-1)) continue;
         t->timer=0;uint32_t count=t->count<TRAIL_POINTS ? t->count : TRAIL_POINTS-1;
@@ -1516,7 +1516,7 @@ static void recover_units(Simulation* s,float dt)
         {
             uint32_t i=near[n];const Unit& u=s->units[i];
             if (u.health>0 && length(subtract(u.position,body.position))<radius && clear_shot(s,body.position,u.position,p))
-                haze_rate[i]=std::fmax(haze_rate[i],d.haze_heal);
+                haze_rate[i]=max_of(haze_rate[i],d.haze_heal);
         }
     }
     for (uint32_t i=0;i<MAX_UNITS;++i)
@@ -1536,13 +1536,13 @@ static void recover_units(Simulation* s,float dt)
         u->damage_age+=dt;
         for (uint32_t j=0;j<r->count;++j)
             if (u->spikes[j]<1)
-            { float before=u->spikes[j];u->spikes[j]=std::fmin(1.0f,before+dt/r->regrow);if (u->spikes[j]==1) ++s->regrown; }
+            { float before=u->spikes[j];u->spikes[j]=min_of(1.0f,before+dt/r->regrow);if (u->spikes[j]==1) ++s->regrown; }
         const UnitDefinition* definition=simulation_unit_definition(s,u);
         for (uint32_t j=0;j<definition->payload_count;++j)
-            u->payloads[j]=std::fmin(1.0f,u->payloads[j]+dt/definition->payload_reload);
+            u->payloads[j]=min_of(1.0f,u->payloads[j]+dt/definition->payload_reload);
         if (haze_rate[i]>0)
         {
-            float budget=haze_rate[i]*dt,removed=std::fmin(u->exposure,budget);
+            float budget=haze_rate[i]*dt,removed=min_of(u->exposure,budget);
             u->exposure-=removed;budget-=removed;s->haze_healing+=removed;
             if (u->wounds)
             {
@@ -1596,7 +1596,7 @@ static void fracture_limb(Simulation* s,uint32_t p,uint32_t k,float old_growth,f
     for (uint32_t j=0;j<=GROWTH_PATH_SEGMENTS;++j)
     {
         bool tip=j==GROWTH_PATH_SEGMENTS;
-        float amount=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_PATH_SEGMENTS-j));
+        float amount=max_of(0.0f,min_of(1.0f,growth*GROWTH_PATH_SEGMENTS-j));
         if (tip)
         { if (growth<=0 || growth<(k ? c.branches[k-1].growth : c.growth)) continue; }
         else if (j<retained*GROWTH_PATH_SEGMENTS || amount<=MIN_FRACTURE_SEGMENT_FRACTION) continue;
@@ -1873,7 +1873,7 @@ static void projectile_combat(Simulation* s,float dt)
         if (d>POSITION_EPSILON) p->direction=scale(delta,1/d);
         if (d<=step)
         {
-            if (p->blob) { Unit& t=s->units[p->target];t.stun=std::fmax(t.stun,p->stun);t.velocity=Vec3{}; }
+            if (p->blob) { Unit& t=s->units[p->target];t.stun=max_of(t.stun,p->stun);t.velocity=Vec3{}; }
             else if (s->world.spikes.enabled)
             {
                 uint32_t index=p->colony ? structure_slot(p->target,p->structure) : (uint32_t)p->target;
@@ -2013,7 +2013,7 @@ static void colonize_cells(Simulation* s, float dt)
         if (s->colonies[cell].active || s->colonies[cell].generation!=p.generation || defended(s,cell,p.faction))
         { p.active=false;++s->blocked_landings;continue; }
         p.previous=p.position;p.age+=dt;
-        float t=std::fmin(1.0f,p.age/s->world.gameplay.landing_seconds);
+        float t=min_of(1.0f,p.age/s->world.gameplay.landing_seconds);
         p.position=add(scale(p.anchor,1-t),scale(s->world.bodies[cell].factory_origin,t));
         if (t>=1) { establish_colony(s,cell,p.faction);++s->landings;p.active=false; }
     }
@@ -2032,7 +2032,7 @@ static void colonize_cells(Simulation* s, float dt)
         {
             const Unit& u=s->units[g.units[k]];
             if (u.task!=TASK_COLONIZE || length(subtract(u.position,goal))>LANDING_COMPLETION_RADIUS) ready=false;
-            progress=std::fmin(progress,std::fmax(0.0f,u.landing));
+            progress=min_of(progress,max_of(0.0f,u.landing));
         }
         if (!ready) continue;
         if (!d.consume_colonists)
@@ -2062,10 +2062,10 @@ static void grow_carriers(Simulation* s,float dt)
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         Unit& u=s->units[i];if (u.health<=0) continue;
-        u.seed_cooldown=std::fmax(0.0f,u.seed_cooldown-dt);
+        u.seed_cooldown=max_of(0.0f,u.seed_cooldown-dt);
         const UnitDefinition& d=*simulation_unit_definition(s,&u);
         if (d.carrier_seconds<=0 || held[i] || u.stun>0 || simulation_attachment_valid(s,&u)) continue;
-        u.carrier_timer=std::fmin(d.carrier_seconds,u.carrier_timer+dt);
+        u.carrier_timer=min_of(d.carrier_seconds,u.carrier_timer+dt);
         if (u.carrier_timer<d.carrier_seconds) continue;
         Vec3 offset=scale(world_direction(&u,d.carrier_offset),d.scale);uint32_t child=0;
         u.carrier_blocked=!spawn(s,d.carrier_unit,add(u.position,offset),u.target,&u.forward,&child);
@@ -2082,7 +2082,7 @@ static bool repair_colony(Simulation* s,uint32_t p,float dt)
     float budget=d.repair_health_per_second*dt;bool damaged=false;
     for (uint32_t k=0;k<c.structure_count;++k)
     {
-        c.repair_delay[k]=std::fmax(0.0f,c.repair_delay[k]-dt);
+        c.repair_delay[k]=max_of(0.0f,c.repair_delay[k]-dt);
         uint32_t generation=k ? c.branches[k-1].generation : c.root_generation;
         uint32_t* wounds=k ? &c.branches[k-1].wounds : &c.wounds;
         float* health=k ? &c.branches[k-1].health : &c.health;
@@ -2093,15 +2093,15 @@ static bool repair_colony(Simulation* s,uint32_t p,float dt)
         float maximum=structure_max_health(s,p,k);
         uint32_t hits=structure_hits(s,p,k);
         float missing=*health<=0 ? maximum : maximum*(*wounds)/(float)hits;
-        float work=std::fmin(budget,std::fmin(std::fmax(0.0f,missing-c.repair_credit[k]),c.energy/d.repair_nutrients_per_health));
+        float work=min_of(budget,min_of(max_of(0.0f,missing-c.repair_credit[k]),c.energy/d.repair_nutrients_per_health));
         c.repair_credit[k]+=work;budget-=work;
-        float cost=work*d.repair_nutrients_per_health;c.energy=std::fmax(0.0f,c.energy-cost);c.repair_nutrients+=cost;
+        float cost=work*d.repair_nutrients_per_health;c.energy=max_of(0.0f,c.energy-cost);c.repair_nutrients+=cost;
         float per_hit=maximum/hits;
         while (*health>0 && *wounds && c.repair_credit[k]>=per_hit)
         {
             float old=simulation_structure_growth(s,p,k);--*wounds;c.repair_credit[k]-=per_hit;
             *health=maximum*(hits-*wounds)/hits;
-            float* growth=k ? &c.branches[k-1].growth : &c.growth;*growth=std::fmin(*growth,old);
+            float* growth=k ? &c.branches[k-1].growth : &c.growth;*growth=min_of(*growth,old);
             EmbeddedSpike* embedded=k ? c.branches[k-1].embedded : c.embedded;
             if (*wounds<MAX_EMBEDDED) embedded[*wounds]=EmbeddedSpike();
         }
@@ -2119,7 +2119,7 @@ static void grow_colonies(Simulation* s, float dt)
         const BranchRules& f=d.branches;
         // Initial construction has one time slot per structure. Damage keeps its regrowth delay.
         bool establishing=c->establishment_age<d.establishment_seconds;
-        c->establishment_age=std::fmin(d.establishment_seconds,c->establishment_age+dt);
+        c->establishment_age=min_of(d.establishment_seconds,c->establishment_age+dt);
         c->branch_timer+=dt;
         bool mature=false,emerged=false;
         for (uint32_t k=0;k<c->structure_count;++k)
@@ -2133,7 +2133,7 @@ static void grow_colonies(Simulation* s, float dt)
             float* exposure=k ? &b->exposure : &c->exposure;
             EmbeddedSpike* embedded=k ? b->embedded : c->embedded;
             int32_t parent=c->parents[k];
-            *timer=std::fmax(0.0f,*timer-dt);
+            *timer=max_of(0.0f,*timer-dt);
             bool ready=parent<0 || ((parent ? c->branches[parent-1].health : c->health)>0 && simulation_structure_growth(s,p,parent)>=1);
             bool first=establishing && *generation==0;
             bool due=first ? c->establishment_age>c->deployment_start[k] : c->branch_timer>=f.seconds;
@@ -2149,15 +2149,15 @@ static void grow_colonies(Simulation* s, float dt)
             if (*health<=0) continue;
             float old=*growth;
             if (establishing && *generation==1)
-                *growth=std::fmin(1.0f,*growth+std::fmin(dt,std::fmax(0.0f,c->establishment_age-c->deployment_start[k]))/c->deployment_seconds[k]);
-            else *growth=std::fmin(1.0f,*growth+dt/d.growth_seconds);
+                *growth=min_of(1.0f,*growth+min_of(dt,max_of(0.0f,c->establishment_age-c->deployment_start[k]))/c->deployment_seconds[k]);
+            else *growth=min_of(1.0f,*growth+dt/d.growth_seconds);
             if (old<1 && *growth>=1) sound(s,SOUND_MATURE,simulation_structure_position(s,p,k),s->colonies[p].faction);
             mature=mature || *growth>=1;
         }
         if (emerged) c->branch_timer=0;
         float production=simulation_production(s,p);
         c->uptake=s->world.bodies[p].availability;
-        c->energy=std::fmin(rules->storage,c->energy+dt*d.collection*c->uptake*production);
+        c->energy=min_of(rules->storage,c->energy+dt*d.collection*c->uptake*production);
         c->repairing=repair_colony(s,p,dt);
         if (c->repairing) { c->building=false;c->manufacturing=0;c->capacity_blocked=false;continue; }
         if (!mature)
@@ -2216,7 +2216,7 @@ static void grow_colonies(Simulation* s, float dt)
             LeafProduction* job=&c->leaves[k];if (!job->active || !ready[k]) continue;
             const UnitDefinition& product=s->world.content.units[job->type];
             float seconds=product.manufacture_seconds>0 ? product.manufacture_seconds : rules->manufacture_seconds;
-            job->progress=std::fmin(1.0f,job->progress+dt*rate*c->factory_scale[k]*c->factory_scale[k]/seconds);
+            job->progress=min_of(1.0f,job->progress+dt*rate*c->factory_scale[k]*c->factory_scale[k]/seconds);
             if (job->progress>=1-MANUFACTURE_COMPLETION_EPSILON)
             {
                 const UnitDefinition* definition=&s->world.content.units[job->type];
@@ -2365,7 +2365,7 @@ void simulation_step(Simulation* s,SimulationTimings* timings)
             {
                 if (s->world.gameplay.cell_morph_seconds<=0) continue;
                 float target=s->world.bodies[p].owner==faction ? 1.0f : 0.0f,step=dt/s->world.gameplay.cell_morph_seconds;
-                float* blend=&appearance.factions[faction];*blend+=std::fmax(-step,std::fmin(step,target-*blend));
+                float* blend=&appearance.factions[faction];*blend+=max_of(-step,min_of(step,target-*blend));
             }
             if (f.cell_strength>0)
             {
@@ -2379,7 +2379,7 @@ void simulation_step(Simulation* s,SimulationTimings* timings)
             if (appearance.seconds>0)
             {
                 float change=dt/appearance.seconds;
-                appearance.strength+=std::fmax(-change,std::fmin(change,f.cell_strength-appearance.strength));
+                appearance.strength+=max_of(-change,min_of(change,f.cell_strength-appearance.strength));
             }
         }
     }
