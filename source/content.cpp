@@ -240,7 +240,7 @@ static bool load_units(Content* c,Json root,const char* path)
     json_object(shared,"secondary_interval_factor");float secondary_interval=json_float(json_get(shared,"secondary_interval_factor"),1,MAX_UNIT_INTERVAL_FACTOR);JsonArray a=json_array(json_get(root,"units"),MAX_UNIT_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|trail_origin|pick_radius|cue_radius|hits|brood|manufacture_seconds|attack|secondary_attack|autonomy|payload|rear_tint|colonization|carrier");
+        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|subsurface|trail_origin|pick_radius|cue_radius|hits|brood|manufacture_seconds|attack|secondary_attack|autonomy|payload|rear_tint|colonization|carrier");
         UnitDefinition u={};definition_name(j,u.name);u.charge_speed=u.charge_acceleration=1;
         Json manufacture=json_find(j,"manufacture_seconds");
         if (json_present(manufacture)) u.manufacture_seconds=json_positive(manufacture,MAX_BUILDING_GROWTH_SECONDS);
@@ -321,6 +321,7 @@ static bool load_units(Content* c,Json root,const char* path)
         Json trail_origin=json_find(j,"trail_origin");
         if (json_present(trail_origin)) u.trail_origin=json_vector(trail_origin,-10,10);
         u.colonizes=json_bool(json_get(j,"colonizes"));u.detaches=json_bool(json_get(j,"detaches"));u.trails=json_bool(json_get(j,"trails"));
+        { Json sss=json_find(j,"subsurface");u.subsurface=!json_present(sss) || json_bool(sss); }
         u.colonization_units=1;u.consume_colonists=true;
         Json colonization=json_find(j,"colonization");
         if (json_present(colonization))

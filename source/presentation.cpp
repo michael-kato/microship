@@ -225,12 +225,15 @@ static Vec3 posed_direction(Vec3 local,Vec3 x,Vec3 y,Vec3 z)
 { return add(add(scale(x,local.x),scale(y,local.y)),scale(z,local.z)); }
 static uint32_t factory_instance_slot(const Presentation* state,uint32_t cell,uint32_t structure)
 { return state->factory_base+cell*MAX_FACTORY_STRUCTURES+structure; }
+static float craft_flags(const UnitDefinition& definition)
+{ return (float)(INSTANCE_DETAIL_AMBIENT | (definition.subsurface ? 0 : INSTANCE_NO_SUBSURFACE)); }
 static void spike_instance(Presentation* state,uint32_t slot,Vec3 root,Vec3 direction,float length,float width,Color color)
 {
     Vec3 axis=std::fabs(direction.y)<SPIKE_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0};
     Vec3 x=normalize(cross(axis,direction)),y=cross(direction,x);
     set_instance(state,slot,state->spike_mesh,root,scale(x,width),scale(y,width),scale(direction,length));
     float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=1;
+    style[7]=INSTANCE_DETAIL_AMBIENT;
 }
 static void update_spike_instances(Presentation* state,const Simulation* simulation)
 {
@@ -369,6 +372,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
             yaw=std::atan2(delta.x,delta.z);
         }
         state->scene.instances[state->unit_base+i].style[4]=s->world.glow_units;
+        state->scene.instances[state->unit_base+i].style[7]=craft_flags(*definition);
         if (s->world.combat.enabled)
         {
             Vec3 velocity=subtract(unit->position,s->trails[i].points[0]);
@@ -450,6 +454,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                     Vec3 z=normalize(subtract(tip,s->world.bodies[p].position));
                     Vec3 x=normalize(cross(std::fabs(z.y)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0},z)),y=cross(z,x);
                     state->scene.instances[state->bud_base+p*MAX_FACTORY_STRUCTURES+k].style[4]=s->world.glow_units;
+                    state->scene.instances[state->bud_base+p*MAX_FACTORY_STRUCTURES+k].style[7]=craft_flags(u);
                     set_instance(state,state->bud_base+p*MAX_FACTORY_STRUCTURES+k,state->unit_meshes[job.type],tip,scale(x,size),scale(y,size),scale(z,size));
                 }
                 continue;

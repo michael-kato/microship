@@ -14,6 +14,7 @@
 #include "vector_math.h"
 #include "math_constants.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <float.h>
@@ -28,7 +29,10 @@
 
 static_assert(SIGHT_FIELD_SIDE==FOG_FIELD_SIZE,"Fog CPU/GPU grid layout");
 static const int GPU_VERTEX_BYTES = 64;
-static const int GPU_MEDIUM_BYTES = 80;
+static const int GPU_MEDIUM_BYTES = 96;
+// Scene style floats, then the renderer's screen-space detail and fog reveal.
+static const int INSTANCE_STYLE_GPU_FLOATS = INSTANCE_STYLE_FLOATS+4;
+static const float MAX_PROJECTED_PIXELS = 1e6f;
 static const int GPU_RENDER_UNIFORM_BYTES = 656;
 static const int GPU_DEBUG_PUSH_BYTES = 128;
 static const double MILLISECONDS_PER_SECOND = 1000.0;
@@ -223,6 +227,7 @@ struct RendererState
     std::vector<RenderMedium> baked_media;
     std::vector<RenderGridBounds> baked_bounds;
     std::vector<uint8_t> lighting_valid;
+    std::vector<uint8_t> current_static; // The current grid holds exactly the valid static field.
     RenderUniform baked_uniform;
     bool lighting_dependencies_valid;
     uint32_t lighting_bakes,lighting_reuses,lighting_surface_bakes;
@@ -235,7 +240,8 @@ struct RendererState
     VkDeviceMemory lighting_memory;
     VkImageView lighting_view;
     VkExtent3D lighting_extent;
-    std::vector<VkBufferImageCopy> lighting_copies;
+    std::vector<VkBufferImageCopy> lighting_copies,changed_copies; // Every block; blocks written this frame.
+    std::vector<uint8_t> grid_written; // The current pass rewrote this medium's grid this frame.
     bool lighting_image_initialized;
     VkImage optical_depth_image;
     VkDeviceMemory optical_depth_memory;
@@ -971,6 +977,80 @@ static void update_grid_activity(RendererState* state)
     }
 }
 
+// Screen-space level of detail. Smooth ramps of the projected radius keep shading
+// continuous while zooming; the fog reveal is the current fog pass visibility.
+static float detail_ramp(float pixels,float minimum,float full)
+{
+    if (full<=0) return 1;
+    float t=std::fmin(1.0f,std::fmax(0.0f,(pixels-minimum)/(full-minimum)));return t*t*(3-2*t);
+}
+static float projected_radius(const RenderUniform& u,const float center[3],float radius)
+{
+    float z=0;for (uint32_t j=0;j<3;++j) z+=(center[j]-u.camera_position[j])*u.camera_forward[j];
+    if (z<=radius) return MAX_PROJECTED_PIXELS;
+    return std::fmin(MAX_PROJECTED_PIXELS,radius/(z*u.display[1])*.5f*u.settings[1]);
+}
+static float fog_visibility(const RenderScene* scene,float x,float y)
+{
+    const SightField& f=scene->fog_field;float visibility=0;
+    float cx=(x-f.low_x)/f.spacing,cy=(y-f.low_y)/f.spacing;
+    if (cx>=0 && cy>=0 && cx<=SIGHT_FIELD_SIDE-1 && cy<=SIGHT_FIELD_SIDE-1)
+    {
+        int32_t lx=std::min((int32_t)cx,(int32_t)SIGHT_FIELD_SIDE-2),ly=std::min((int32_t)cy,(int32_t)SIGHT_FIELD_SIDE-2);
+        float fx=cx-lx,fy=cy-ly;const float* r=f.reveal+ly*SIGHT_FIELD_SIDE+lx;
+        visibility=(r[0]*(1-fx)+r[1]*fx)*(1-fy)+(r[SIGHT_FIELD_SIDE]*(1-fx)+r[SIGHT_FIELD_SIDE+1]*fx)*fy;
+    }
+    // Coarse fields also keep current sight analytically, as the fog pass does.
+    float feather=scene->fog_feather;
+    if (f.spacing>feather*.25f) for (uint32_t i=0;i<scene->sight_count;++i)
+    {
+        const float* s=scene->sight[i].center_radius;
+        float dx=x-s[0],dy=y-s[1],dz=scene->fog_plane_z-s[2];
+        float t=std::fmin(1.0f,std::fmax(0.0f,(std::sqrt(dx*dx+dy*dy+dz*dz)-s[3]+feather)/(2*feather)));
+        visibility=std::fmax(visibility,1-t*t*(3-2*t));
+    }
+    return visibility;
+}
+// The most revealed of the center and four points at the bounding radius.
+static float fog_reveal(const RenderScene* scene,const float center[3],float radius)
+{
+    if (scene->fog_blur<=0) return 1;
+    float x=center[0],y=center[1],v=fog_visibility(scene,x,y);
+    v=std::fmax(v,std::fmax(fog_visibility(scene,x+radius,y),fog_visibility(scene,x-radius,y)));
+    v=std::fmax(v,std::fmax(fog_visibility(scene,x,y+radius),fog_visibility(scene,x,y-radius)));
+    return std::fmin(1.0f,v);
+}
+// Instances: surface detail (size ramp times fog reveal) and fog reveal. Cells:
+// projected radius, fog reveal, then moving-shadow and cascade weights.
+static void update_level_of_detail(RendererState* state,const RenderScene* scene)
+{
+    const RenderUniform& u=state->uniform_data;const RenderConfig& c=state->config;
+    for (uint32_t j=0;j<state->active_count;++j)
+    {
+        const RenderInstance& source=scene->instances[state->active_slots[j]];
+        const MeshRange& mesh=scene->geometry.meshes[source.mesh];
+        float local[3],center[3],extent=0,scale=0;
+        for (uint32_t k=0;k<3;++k) { local[k]=.5f*(mesh.low[k]+mesh.high[k]);extent+=(mesh.high[k]-mesh.low[k])*(mesh.high[k]-mesh.low[k]); }
+        for (uint32_t row=0;row<3;++row)
+            center[row]=source.transform[row][0]*local[0]+source.transform[row][1]*local[1]+source.transform[row][2]*local[2]+source.transform[row][3];
+        for (uint32_t column=0;column<3;++column)
+            scale=std::fmax(scale,std::sqrt(source.transform[0][column]*source.transform[0][column]
+                +source.transform[1][column]*source.transform[1][column]+source.transform[2][column]*source.transform[2][column]));
+        float radius=.5f*std::sqrt(extent)*scale,reveal=fog_reveal(scene,center,radius);
+        float size=radius>0 ? detail_ramp(projected_radius(u,center,radius),c.detail_surface_minimum,c.detail_surface_full) : 1;
+        float* detail=&state->style_data[j*INSTANCE_STYLE_GPU_FLOATS+INSTANCE_STYLE_FLOATS];
+        detail[0]=size*reveal;detail[1]=reveal;detail[2]=detail[3]=0;
+    }
+    RenderMedium* media=(RenderMedium*)frame_data(state).media.mapped;
+    for (uint32_t i=0;i<state->medium_count;++i)
+    {
+        RenderMedium& m=media[i];
+        m.detail[0]=projected_radius(u,m.center_radius,m.center_radius[3]);
+        m.detail[1]=fog_reveal(scene,m.center_radius,m.center_radius[3]);
+        m.detail[2]=m.detail[3]=detail_ramp(m.detail[0],c.detail_cell_minimum,c.detail_cell_full)*m.detail[1];
+    }
+}
+
 // Masked-out slots stay out of the TLAS. Instance IDs index the compacted
 // style and lighting arrays, which use the same order.
 static void scene_instances(RendererState* state,const RenderScene* scene)
@@ -986,7 +1066,7 @@ static void scene_instances(RendererState* state,const RenderScene* scene)
         out->flags=VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
         const MeshAllocation* mesh=&state->meshes[source->mesh];
         out->instanceCustomIndex=source->mesh;out->accelerationStructureReference=mesh->address;
-        memcpy(&state->style_data[j*INSTANCE_STYLE_FLOATS],source->style,INSTANCE_STYLE_FLOATS*sizeof(float));
+        memcpy(&state->style_data[j*INSTANCE_STYLE_GPU_FLOATS],source->style,INSTANCE_STYLE_FLOATS*sizeof(float));
         LightingInstance& light=state->lighting_input[j];
         memcpy(light.transform,source->transform,sizeof(light.transform));
         light.first=mesh->range.first;light.count=mesh->range.count;light.cache_first=state->slot_cache_first[i];
@@ -1146,14 +1226,14 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
     state->mesh_count=(uint32_t)geometry.meshes.size();state->instance_count=(uint32_t)scene->instances.size();
     try
     {
-        state->meshes.resize(state->mesh_count);state->instance_data.resize(state->instance_count);state->style_data.resize(state->instance_count*INSTANCE_STYLE_FLOATS);
+        state->meshes.resize(state->mesh_count);state->instance_data.resize(state->instance_count);state->style_data.resize(state->instance_count*INSTANCE_STYLE_GPU_FLOATS);
         state->baked_instances.resize(state->instance_count);state->baked_mesh_revisions.resize(state->mesh_count);
         state->baked_media.resize(scene->media.size());state->baked_bounds.resize(scene->media.size());state->lighting_input.resize(state->instance_count);
         state->slot_cache_first.resize(state->instance_count);state->active_slots.resize(state->instance_count);
         state->surface_valid.resize(state->instance_count);state->baked_slot_bounds.assign(state->instance_count,empty_bounds());
         state->lighting_changes.reserve(state->instance_count+scene->media.size());
         state->surface_cache_meshes.resize(state->instance_count);state->surface_slots.reserve(state->instance_count);
-        state->lighting_valid.resize(scene->media.size());state->vertex_upload_offsets.resize(state->mesh_count);
+        state->lighting_valid.resize(scene->media.size());state->current_static.assign(scene->media.size(),0);state->vertex_upload_offsets.resize(state->mesh_count);
     }
     catch (const std::bad_alloc&) { fprintf(stderr,"Cannot allocate render upload storage.\n");return false; }
     if (!upload_geometry(state,geometry)) return false;
@@ -1379,7 +1459,7 @@ static bool create_lighting_texture(RendererState* state)
     view.image=state->lighting_image;view.viewType=VK_IMAGE_VIEW_TYPE_3D;view.format=image.format;
     view.subresourceRange=VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
     if (!vk_ok(vkCreateImageView(state->device,&view,0,&state->lighting_view),"Create lighting texture view")) return false;
-    state->lighting_copies.resize(count*3);
+    state->lighting_copies.resize(count*3);state->changed_copies.reserve(count*3);state->grid_written.assign(count,0);
     for (uint32_t medium=0;medium<count;++medium) for (uint32_t light=0;light<3;++light)
     {
         VkBufferImageCopy& copy=state->lighting_copies[medium*3+light];
@@ -1897,6 +1977,7 @@ static void shader_buffer_barrier(VkCommandBuffer command)
 static void record_lighting_fields(RendererState* state)
 {
     state->lighting_bakes=state->lighting_reuses=state->lighting_surface_bakes=0;
+    std::fill(state->grid_written.begin(),state->grid_written.end(),0);
     uint32_t n=state->config.shadow_grid_resolution;
     const RenderMedium* media=(const RenderMedium*)frame_data(state).media.mapped;
     if (n)
@@ -1919,7 +2000,7 @@ static void record_lighting_fields(RendererState* state)
                 uint32_t parameters[4]={i,LIGHTING_PASS_STATIC,0,0};
                 vkCmdPushConstants(state->command,state->pipeline_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,BACKDROP_PUSH_BYTES,parameters);
                 vkCmdDispatch(state->command,(n+7)/8,(n*n+7)/8,1);
-                state->lighting_valid[i]=1;++state->lighting_bakes;
+                state->lighting_valid[i]=1;state->current_static[i]=0;++state->lighting_bakes;
             }
             shader_buffer_barrier(state->command);
         }
@@ -1929,12 +2010,17 @@ static void record_lighting_fields(RendererState* state)
     {
         for (uint32_t i=0;i<state->medium_count;++i) if (media[i].lighting[2]>0)
         {
-            if (state->uniform_data.scene[3] && media[i].lighting[0]>0)
+            bool moving=media[i].lighting[0]>0 && media[i].detail[2]>0;
+            if (state->uniform_data.scene[3] && moving)
             {
                 uint32_t parameters[4]={i,LIGHTING_PASS_DYNAMIC,0,0};
                 vkCmdPushConstants(state->command,state->pipeline_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,BACKDROP_PUSH_BYTES,parameters);
                 vkCmdDispatch(state->command,(n+7)/8,(n*n+7)/8,1);
             }
+            // Without moving shadows the current grid is a copy of the static field.
+            bool static_only=state->uniform_data.scene[3] && !moving;
+            if (static_only && state->current_static[i]) continue;
+            state->current_static[i]=static_only;state->grid_written[i]=1;
             uint32_t parameters[4]={i,LIGHTING_PASS_CURRENT,0,0};
             vkCmdPushConstants(state->command,state->pipeline_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,BACKDROP_PUSH_BYTES,parameters);
             vkCmdDispatch(state->command,(n+7)/8,(n*n+7)/8,1);
@@ -1962,20 +2048,25 @@ static void record_radiance_cascades(RendererState* state)
     if (state->cascade_age.size()!=state->medium_count)
         state->cascade_age.assign(state->medium_count,UINT32_MAX);
     uint32_t selected[8]={},count=0,limit=state->config.cascade_cells_per_frame;
+    // Cells without cascade weight drop their projection; regaining weight makes them stalest.
     for (uint32_t i=0;i<state->medium_count;++i)
-        if (state->cascade_age[i]<UINT32_MAX) ++state->cascade_age[i];
+        if (media[i].detail[3]<=0) state->cascade_age[i]=UINT32_MAX;
+        else if (state->cascade_age[i]<UINT32_MAX) ++state->cascade_age[i];
     for (;;)
     {
         uint32_t best=UINT32_MAX;
         for (uint32_t i=0;i<state->medium_count;++i)
         {
             const RenderMedium& m=media[i];
-            if (m.lighting[2]<=0 || m.lighting[0]<=0 || m.center_radius[3]<=0 || state->cascade_age[i]==0) continue;
+            if (m.lighting[2]<=0 || m.lighting[0]<=0 || m.center_radius[3]<=0 || m.detail[3]<=0 || state->cascade_age[i]==0) continue;
             if (best==UINT32_MAX || state->cascade_age[i]>state->cascade_age[best]) best=i;
         }
         if (best==UINT32_MAX || (limit && count==limit)) break;
         selected[best/32]|=1u<<(best%32);++count;state->cascade_age[best]=0;
     }
+    // A projection older than this weight's eligibility is not shown.
+    for (uint32_t i=0;i<state->medium_count;++i)
+        if (state->cascade_age[i]==UINT32_MAX) ((RenderMedium*)media)[i].detail[3]=0;
     state->cascade_updates=count;
     if (!count) return;
     // Earlier submissions read the projection; this frame overwrites it.
@@ -2007,7 +2098,11 @@ static void record_radiance_cascades(RendererState* state)
 static void record_lighting_texture(RendererState* state)
 {
     if (!state->config.texture_lighting_grid || !state->config.shadow_grid_resolution || state->custom_shader) return;
-    uint32_t n=state->config.shadow_grid_resolution;
+    // Blocks not rewritten this frame already hold their current field.
+    state->changed_copies.clear();
+    for (uint32_t i=0;i<state->lighting_copies.size();++i)
+        if (!state->lighting_image_initialized || state->grid_written[i/3]) state->changed_copies.push_back(state->lighting_copies[i]);
+    if (state->changed_copies.empty()) return;
     VkImageMemoryBarrier barrier={};barrier.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout=state->lighting_image_initialized ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
     barrier.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -2019,9 +2114,8 @@ static void record_lighting_texture(RendererState* state)
     fields.srcAccessMask=VK_ACCESS_SHADER_WRITE_BIT;fields.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT;
     vkCmdPipelineBarrier(state->command,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,1,&fields,0,0,1,&barrier);
     // Inactive blocks may contain unspecified data. They are never sampled.
-    for (uint32_t i=0;i<state->lighting_copies.size();++i) state->lighting_copies[i].imageOffset.x=(int32_t)((i%3)*n);
     state->copy_buffer_to_image(state->command,state->shadow_grid.handle,state->lighting_image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        (uint32_t)state->lighting_copies.size(),state->lighting_copies.data());
+        (uint32_t)state->changed_copies.size(),state->changed_copies.data());
     barrier.oldLayout=barrier.newLayout;barrier.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     barrier.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;barrier.dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
     vkCmdPipelineBarrier(state->command,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,0,0,0,0,0,1,&barrier);
@@ -2685,12 +2779,13 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     record_optical_depth(state);
     update_lighting_dependencies(state,scene);
     update_grid_activity(state);
+    update_level_of_detail(state,scene);
     if (scene->fog_blur>0) memcpy(frame.sight.mapped,scene->fog_field.reveal,sizeof(scene->fog_field.reveal));
     memcpy((char*)frame.sight.mapped+sizeof(scene->fog_field.reveal),scene->sight,sizeof(scene->sight));
     memcpy(frame.instances.mapped,state->instance_data.data(),state->active_count*sizeof(state->instance_data[0]));
     record_tlas_build(state,frame.instances.address);
     memcpy(frame.uniform.mapped,uniform,sizeof(*uniform));
-    memcpy(frame.instance_styles.mapped,state->style_data.data(),state->active_count*INSTANCE_STYLE_FLOATS*sizeof(float));
+    memcpy(frame.instance_styles.mapped,state->style_data.data(),state->active_count*INSTANCE_STYLE_GPU_FLOATS*sizeof(float));
     state->effect_count=scene->effect_count;
     memcpy(frame.effects.mapped,scene->effects.data(),state->effect_count*sizeof(EffectSegment));
     // Tile offsets, CPU cursors, then only the references this frame uses.

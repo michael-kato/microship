@@ -368,6 +368,39 @@
       },
       "required": ["line", "fill", "line_pixels"],
       "additionalProperties": false
+    },
+    "level_of_detail": {
+      "type": "object",
+      "description": "Screen-space level of detail: projected radius in pixels where a feature starts to fade in and where it is complete.",
+      "properties": {
+        "surface_minimum_pixels": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "surface_full_pixels": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 4096
+        },
+        "cell_minimum_pixels": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "cell_full_pixels": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 4096
+        }
+      },
+      "required": [
+        "surface_minimum_pixels",
+        "surface_full_pixels",
+        "cell_minimum_pixels",
+        "cell_full_pixels"
+      ],
+      "additionalProperties": false
     }
   },
   "required": ["output", "sampling", "geometry", "camera", "lighting", "bloom", "volume"],

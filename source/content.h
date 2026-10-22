@@ -48,6 +48,7 @@ struct UnitDefinition
     uint32_t group,targets,secondary_targets,hits;
     float secondary_interval;
     bool colonizes,detaches,trails;
+    bool subsurface; // False removes subsurface scattering from the craft surface.
     uint32_t colonization_units,carrier_unit;
     bool consume_colonists;
     char seed_model[ASSET_PATH_CAPACITY],carrier_name[ASSET_NAME_CAPACITY];

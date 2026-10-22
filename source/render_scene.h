@@ -8,6 +8,8 @@
 
 // CPU render input. No game rules or graphics API resources are stored here.
 enum { INSTANCE_STYLE_FLOATS=8, INSTANCE_UNSHADOWED=1, INSTANCE_TINT_THIN_ONLY=2, INSTANCE_ORGANELLE=4, INSTANCE_EMISSION_FRESNEL=8 };
+// Craft: ambient light fades with screen-space detail. No subsurface: the surface never scatters.
+enum { INSTANCE_DETAIL_AMBIENT=16, INSTANCE_NO_SUBSURFACE=32 };
 struct RenderInstance
 {
     float transform[3][4];
@@ -18,6 +20,7 @@ struct RenderInstance
 struct RenderMedium
 {
     float center_radius[4], scattering[4], absorption_phase[4],lighting[4],blur[4]; // Lighting: shadow enabled, grid eligible, grid active, full cell radius.
+    float detail[4]; // Written by the renderer each frame: screen size in pixels, fog reveal, moving-shadow weight, cascade weight.
 };
 enum { MAX_RENDER_SIGHT=272 };
 struct RenderSight { float center_radius[4]; };

@@ -71,5 +71,11 @@
     "line": [0.45, 1.0, 0.75],
     "fill": [0.004, 0.006, 0.008],
     "line_pixels": 0.5
+  },
+  "level_of_detail": {
+    "surface_minimum_pixels": 2,
+    "surface_full_pixels": 8,
+    "cell_minimum_pixels": 40,
+    "cell_full_pixels": 90
   }
 }

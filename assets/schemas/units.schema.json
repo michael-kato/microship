@@ -83,6 +83,9 @@
           "trails": {
             "type": "boolean"
           },
+          "subsurface": {
+            "type": "boolean"
+          },
           "pick_radius": {
             "type": "number",
             "exclusiveMinimum": 0,

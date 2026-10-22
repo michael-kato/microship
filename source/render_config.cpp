@@ -5,6 +5,7 @@
 #include <string.h>
 
 static const double MAX_WIREFRAME_RADIANCE=16;
+static const double MAX_DETAIL_PIXELS=4096;
 static const int MAX_CAMERA_KEYBOARD_SPEED = 1000;
 static const int MAX_BLOOM_THRESHOLD = 1000000;
 static const int MAX_BLOOM_RADIUS = 64;
@@ -98,7 +99,7 @@ const char* render_config_error(const RenderConfig* config)
 bool render_config_load(RenderConfig* config,const char* path)
 {
     JsonDocument document;if (!json_load(&document,path)) return false;
-    Json root=json_root(&document);json_object(root,"$schema|output|sampling|volume|geometry|camera|lighting|radiance_cascades|bloom|tilt_shift|subsurface|wireframe");RenderConfig loaded={};
+    Json root=json_root(&document);json_object(root,"$schema|output|sampling|volume|geometry|camera|lighting|radiance_cascades|bloom|tilt_shift|subsurface|wireframe|level_of_detail");RenderConfig loaded={};
     {
         Json j=json_get(root,"output");json_object(j,"width|height|exposure");
         loaded.width=json_uint(json_get(j,"width"),1,MAX_RENDER_WIDTH);
@@ -206,6 +207,17 @@ bool render_config_load(RenderConfig* config,const char* path)
         loaded.subsurface_wrap=json_float(json_get(subsurface,"wrap"),0,1);
         loaded.subsurface_transmission=json_float(json_get(subsurface,"transmission"),0,1);
         loaded.subsurface_thickness=json_positive(json_get(subsurface,"membrane_thickness"),1);
+    }
+    Json detail=json_find(root,"level_of_detail");
+    if (json_present(detail))
+    {
+        json_object(detail,"surface_minimum_pixels|surface_full_pixels|cell_minimum_pixels|cell_full_pixels");
+        loaded.detail_surface_minimum=json_float(json_get(detail,"surface_minimum_pixels"),0,MAX_DETAIL_PIXELS);
+        loaded.detail_surface_full=json_positive(json_get(detail,"surface_full_pixels"),MAX_DETAIL_PIXELS);
+        loaded.detail_cell_minimum=json_float(json_get(detail,"cell_minimum_pixels"),0,MAX_DETAIL_PIXELS);
+        loaded.detail_cell_full=json_positive(json_get(detail,"cell_full_pixels"),MAX_DETAIL_PIXELS);
+        if (loaded.detail_surface_minimum>=loaded.detail_surface_full || loaded.detail_cell_minimum>=loaded.detail_cell_full)
+            json_error(detail,"each minimum radius must be below its full radius");
     }
     Json wireframe=json_find(root,"wireframe");
     if (json_present(wireframe))

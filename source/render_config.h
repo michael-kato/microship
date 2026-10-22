@@ -40,6 +40,9 @@ struct RenderConfig
     uint32_t cascade_probes,cascade_directions,cascade_count,cascade_cells_per_frame; // Zero cells: all active cells each frame.
     float cascade_interval,cascade_growth;
     bool cascade_feedback;
+    // Screen-space level of detail: projected radius in pixels where a feature starts
+    // to fade in and where it is complete. Zero full radius: always full detail.
+    float detail_surface_minimum,detail_surface_full,detail_cell_minimum,detail_cell_full;
     // Development wireframe view (F3). Zero line width: no wireframe section.
     Color wireframe_line,wireframe_fill;float wireframe_pixels;
 };
