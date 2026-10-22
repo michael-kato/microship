@@ -1337,3 +1337,51 @@ The largest observed tick after the buff was 13.638 ms. This is a bounded
 CPU simulation measurement. It does not establish sustained GPU or native
 Windows performance. Inputs, scripts, logs, states, and raw timing reports
 are in `build/immune_buff_review/`.
+
+
+## Faction factory setup rates (Oct 21)
+
+Factory definitions can set `setup_speed` from 0.25 to 4. The default is
+1. At asset loading, the loader divides growth, sprout, establishment,
+branch emergence, root interval, and root offset durations by this value.
+This adds no simulation field or per-tick rate calculation. Repair work
+and regrowth wait durations retain their authored values; replacement
+structures grow at the faction growth rate.
+
+Immune uses speed 2: the first sprout takes 4.286 seconds and complete
+establishment takes 257.143 seconds after settlement. Fungus uses speed
+0.9: the first sprout takes 9.524 seconds and establishment takes 571.429
+seconds. Virus uses speed 1: 8.571 and 514.286 seconds. These durations
+exclude travel and landing. Unit manufacture has a separate rate.
+
+The setup comparison ran 28 real Windows application scenarios through
+Proton. Founders used normal flight and landing. Each faction was compared
+with a speed-1 control at matching fractions of setup time. Early, middle,
+and mature states retained the same 35 structure paths and parent links;
+visible growth differed by less than 0.02, including tick rounding. Every
+structure was complete in the final comparison. The game accepted both
+rate limits and rejected zero, negative, out-of-range, and text rates.
+Exact older timing fixtures remove `setup_speed` to retain their explicit
+reference timings. Current-content checks use the shipping rates.
+
+The controlled production checks count unfinished work as well as completed
+units, as in manufacturing. Matched seeds and growth fractions provide
+experimental controls. Area scaling checks cover small structures, as in
+material testing. Invalid data and damage scenarios try to disprove the
+result. The checks use the game executable, its state export, replayable
+inputs, and CPU profiler. No separate component model supplies results.
+
+Inputs, the comparison script, state exports, and logs are in
+`build/factory_setup_review/`.
+
+
+Nine affected E2E groups passed: smoke, data_assets, growth_factions,
+factory_curves, three_factions, fungal_sources, small_factories,
+factory_repair, and natural_factory. Two checks had Proton launch failures
+during parallel execution; both passed when repeated sequentially.
+The final balance also completed three dense combat matches with seed
+1234, 15 mature cells, 90 seconds of production, and 1,800 measured ticks
+per match. Peak population was 3731. The median mean CPU tick was
+5.260 ms; median p99 was 12.882 ms; the largest observed tick was
+13.440 ms. No other check ran during these measurements. This is
+bounded CPU evidence, not a sustained GPU or native Windows result.

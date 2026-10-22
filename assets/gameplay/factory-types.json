@@ -108,7 +108,8 @@
       "navigation": {
         "stem_radius": 1,
         "head_radius": 1
-      }
+      },
+      "setup_speed": 2
     },
     {
       "name": "fungal_emitter",
@@ -167,7 +168,8 @@
         "reach": 4,
         "damage_per_second": 3,
         "heal_per_second": 3
-      }
+      },
+      "setup_speed": 0.9
     }
   ]
 }

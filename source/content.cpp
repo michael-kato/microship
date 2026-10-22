@@ -330,7 +330,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
     json_object(shared_branches,"seconds|seed|regrow_seconds|roots|root_limit|root_minimum_radius|additional_root_scale|additional_root_width_scale|additional_root_branch|surface_clearance|all_leaf_nodes|root_offset_seconds");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|model|health|hits|branches|growth_meshes|navigation|haze");ProducerDefinition p={};
+        json_object(j,"name|faction|model|health|hits|setup_speed|branches|growth_meshes|navigation|haze");ProducerDefinition p={};
         Json repair=json_find(shared,"repair");
         if (json_present(repair))
         {
@@ -478,6 +478,10 @@ static bool load_buildings(Content* c,Json root,const char* path)
         if (json_present(reference)) p.branches.production_reference_count=json_uint(reference,1,MAX_FACTORY_STRUCTURES);
         p.branches.seed=json_uint(json_get(shared_branches,"seed"),0,MAX_BUILDING_SEED);
         p.branches.normal=p.growth_plane_normal;p.branches.fields=BRANCH_FIELDS_COMPLETE;
+        Json setup=json_find(j,"setup_speed");
+        float setup_speed=json_present(setup) ? json_float(setup,.25f,4.0f) : 1;
+        p.growth_seconds/=setup_speed;p.sprout_seconds/=setup_speed;p.establishment_seconds/=setup_speed;
+        p.branches.seconds/=setup_speed;p.branches.root_offset_seconds/=setup_speed;p.branches.root_interval_seconds/=setup_speed;
         if (content_producer(c,p.name)>=0) return json_error(j,"duplicate building definition");
         c->producers[c->producer_count++]=p;
     }

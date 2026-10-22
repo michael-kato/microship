@@ -245,6 +245,11 @@
             },
             "required": ["reach", "damage_per_second", "heal_per_second"],
             "additionalProperties": false
+          },
+          "setup_speed": {
+            "type": "number",
+            "minimum": 0.25,
+            "maximum": 4
           }
         },
         "required": ["name", "faction", "model", "health", "hits", "branches"],
