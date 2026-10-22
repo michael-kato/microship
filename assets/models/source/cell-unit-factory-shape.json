@@ -160,5 +160,130 @@
       "base_spread": 0.1,
       "min_height_scale": 0.86
     }
+  },
+  "virus_ships": {
+    "fighter": {
+      "rear_z": -0.66,
+      "nose_z": 1.38,
+      "sections": [
+        {
+          "z": -0.48,
+          "half_width": 0.13,
+          "half_height": 0.07
+        },
+        {
+          "z": -0.12,
+          "half_width": 0.29,
+          "half_height": 0.15
+        },
+        {
+          "z": 0.48,
+          "half_width": 0.13,
+          "half_height": 0.065
+        }
+      ],
+      "fins": [
+        {
+          "root_x": 0.14,
+          "root_z": 0.4,
+          "tip_x": 0.49,
+          "tip_z": -0.1,
+          "radius": 0.065
+        },
+        {
+          "root_x": 0.23,
+          "root_z": -0.06,
+          "tip_x": 0.59,
+          "tip_z": -0.58,
+          "radius": 0.075
+        },
+        {
+          "root_x": 0.13,
+          "root_z": -0.43,
+          "tip_x": 0.37,
+          "tip_z": -0.86,
+          "radius": 0.045
+        }
+      ],
+      "ridge_root_y": 0.09,
+      "ridge_root_z": 0.2,
+      "ridge_tip_y": 0.34,
+      "ridge_tip_z": -0.46,
+      "ridge_radius": 0.07
+    },
+    "bomber": {
+      "rear_z": -0.93,
+      "nose_z": 1.43,
+      "sections": [
+        {
+          "z": -0.62,
+          "half_width": 0.18,
+          "half_height": 0.09
+        },
+        {
+          "z": -0.16,
+          "half_width": 0.35,
+          "half_height": 0.21
+        },
+        {
+          "z": 0.52,
+          "half_width": 0.22,
+          "half_height": 0.12
+        }
+      ],
+      "fins": [
+        {
+          "root_x": 0.2,
+          "root_z": 0.48,
+          "tip_x": 0.56,
+          "tip_z": -0.08,
+          "radius": 0.1
+        },
+        {
+          "root_x": 0.3,
+          "root_z": 0.08,
+          "tip_x": 0.72,
+          "tip_z": -0.57,
+          "radius": 0.13
+        },
+        {
+          "root_x": 0.23,
+          "root_z": -0.34,
+          "tip_x": 0.53,
+          "tip_z": -1.02,
+          "radius": 0.095
+        }
+      ],
+      "ridge_root_y": 0.13,
+      "ridge_root_z": 0.22,
+      "ridge_tip_y": 0.41,
+      "ridge_tip_z": -0.55,
+      "ridge_radius": 0.1
+    },
+    "payload": {
+      "rear_z": -0.2,
+      "rear_ring_z": -0.1,
+      "front_ring_z": 0.035,
+      "nose_z": 0.29,
+      "half_width": 0.105,
+      "half_height": 0.085
+    },
+    "spike": {
+      "length": 1,
+      "rings": [
+        {
+          "z": 0.08,
+          "radius": 0.075
+        },
+        {
+          "z": 0.47,
+          "radius": 0.047
+        },
+        {
+          "z": 0.76,
+          "radius": 0.025
+        }
+      ]
+    }
   }
 }

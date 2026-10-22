@@ -232,9 +232,11 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
             for (uint32_t j=0;j<r->count;++j)
             {
                 float growth=u->spikes[j];if (growth<=MIN_VISIBLE_SPIKE_GROWTH || attached==attached_end) continue;
-                Vec3 dir=posed_direction(simulation_spike_direction(j,r->count),x,y,z);
-                spike_instance(state,attached++,add(u->position,scale(dir,r->root*size)),dir,
-                    size*r->length*growth,size*.5f*growth,color);++state->attached_spikes;
+                Vec3 local=simulation_spike_direction(j,r->count);
+                local=Vec3{local.x*r->attached_scale.x,local.y*r->attached_scale.y,local.z*r->attached_scale.z};
+                Vec3 dir=posed_direction(local,x,y,z);float stretch=std::sqrt(dot(dir,dir));
+                spike_instance(state,attached++,add(u->position,scale(dir,r->root*size)),scale(dir,1/stretch),
+                    size*r->length*growth*stretch,size*.5f*growth,color);++state->attached_spikes;
             }
         const UnitDefinition* definition=simulation_unit_definition(s,u);
         for (uint32_t j=0;j<definition->payload_count;++j)

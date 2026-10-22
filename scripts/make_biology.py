@@ -66,22 +66,6 @@ CELL_FINE_NOISE_X_FREQUENCY = 17
 CELL_PIGMENT_Y_FREQUENCY = 3
 CELL_PIGMENT_Y_FINE_COUPLING = 2
 RETICULUM_Z_WAVE_FREQUENCY = 3
-BOMBER_CAPSID_SIZE = (.42,.3,.78)
-BOMBER_PAYLOAD_SIZE = (.19,.18,.2)
-VIRION_RADIUS = .58
-VIRUS_FIBRE_COUNT = 6
-VIRION_FIBRE_UP_COMPONENT = .2
-VIRION_FIBRE_ROOT_RADIUS = .45
-VIRION_FIBRE_LENGTH = .10
-VIRION_FIBRE_RADIUS = .012
-BOMBER_PAYLOAD_SPACING = .4
-BOMBER_PAYLOAD_X_OFFSET = .34
-BOMBER_PAYLOAD_Y_OFFSET = .1
-BOMBER_RIB_ROOT_X_OFFSET = .25
-BOMBER_RIB_ROOT_Y_OFFSET = .05
-BOMBER_RIB_Z_DIRECTION = .12
-BOMBER_RIB_LENGTH = .22
-BOMBER_RIB_RADIUS = .035
 IMMUNE_NUCLEUS_SIZE = (.19,.22,.12)
 IMMUNE_LOBE_SIZE = (.20,.17,.22)
 IMMUNE_GRANULE_SIZE = (.04,.04,.04)
@@ -182,13 +166,9 @@ BACKGROUND_VESICLE_NEAR_Z = .02
 BACKGROUND_VESICLE_FAR_Z = .28
 BACKGROUND_FIBRE_Y_FREQUENCY = 8
 BACKGROUND_FIBRE_Z_FREQUENCY = 7
-SPIKE_HEAD_SIZE = (.14,.14,.09)
 GROWTH_SEGMENT_RADIUS = .065
 GROWTH_TIP_RADIUS = .12
 GROWTH_TIP_ROUGHNESS = .55
-SPIKE_SHAFT_LENGTH = .87
-SPIKE_SHAFT_RADIUS = .075
-SPIKE_HEAD_Z = .91
 CELL_FINE_NOISE_Z_FREQUENCY = 5
 CELL_PIGMENT_XZ_FREQUENCY = 5
 IMMUNE_BOMBER_LOBE_COUNT = 7
@@ -399,22 +379,64 @@ def cell(name,key):
         branches(direction*SUBSTRATE_START_RADIUS,direction,substrate['length'],substrate['radius'],substrate['depth'],substrate['color'],surface='substrate')
     export(name,True)
 
+def pointed_hull(profile,color,surface):
+    # Closed diamond sections meet at single vertices. Flat normals retain each edge.
+    vertices=[(0,0,profile['rear_z'])];rings=profile['sections']
+    for section in rings:
+        z,x,y=section['z'],section['half_width'],section['half_height']
+        vertices.extend(((x,0,z),(0,y,z),(-x,0,z),(0,-y,z)))
+    tip=len(vertices);vertices.append((0,0,profile['nose_z']));faces=[]
+    for j in range(4):faces.append((0,1+(j+1)%4,1+j))
+    for i in range(len(rings)-1):
+        for j in range(4):
+            a=1+4*i+j;b=1+4*i+(j+1)%4
+            faces.append((a,b,b+4,a+4))
+    for j in range(4):faces.append((tip-4+j,tip-4+(j+1)%4,tip))
+    mesh=bpy.data.meshes.new('pointed_hull');mesh.from_pydata(vertices,[],faces);mesh.update()
+    obj=bpy.data.objects.new('pointed_hull',mesh);bpy.context.collection.objects.link(obj)
+    finish(obj,color,surface=surface,smooth=False)
+
 def virus(large):
-    p=profiles['virus']
-    if not large:
-        sphere((0,0,0),(VIRION_RADIUS,VIRION_RADIUS,VIRION_RADIUS),p['body'],2,surface='virus_capsid')
-        for i in range(VIRUS_FIBRE_COUNT):
-            a=i*math.tau/VIRUS_FIBRE_COUNT;d=Vector((math.cos(a),math.sin(a),VIRION_FIBRE_UP_COMPONENT))
-            branches(d*VIRION_FIBRE_ROOT_RADIUS,d,VIRION_FIBRE_LENGTH,VIRION_FIBRE_RADIUS,2,p['spikes'],surface='virus_fibre')
-        # Detachable spikes are instances of virus_spike.fmesh at runtime.
-    else:
-        # A broad capsid with paired payload sacs and repeated forked ribs.
-        sphere((0,0,0),BOMBER_CAPSID_SIZE,p['body'],2,surface='virus_capsid')
+    palette=profiles['virus'];p=profiles['virus_ships']['bomber' if large else 'fighter']
+    pointed_hull(p,palette['body'],'virus_capsid')
+    for fin in p['fins']:
         for side in (-1,1):
-            for j in range(3):
-                z=(j-1)*BOMBER_PAYLOAD_SPACING
-                branches((side*BOMBER_RIB_ROOT_X_OFFSET,BOMBER_RIB_ROOT_Y_OFFSET,z),(side,BOMBER_RIB_Y_DIRECTION,BOMBER_RIB_Z_DIRECTION),BOMBER_RIB_LENGTH,BOMBER_RIB_RADIUS,3,p['spikes'],buds=p['body'],surface='virus_fibre',bud_surface='virus_capsid')
+            a=(side*fin['root_x'],0,fin['root_z']);b=(side*fin['tip_x'],0,fin['tip_z'])
+            rod(a,b,fin['radius'],palette['spikes'],'virus_fibre',sides=4,smooth=False,tip_scale=0)
+    for side in (-1,1):
+        rod((0,side*p['ridge_root_y'],p['ridge_root_z']),
+            (0,side*p['ridge_tip_y'],p['ridge_tip_z']),p['ridge_radius'],
+            palette['spikes'],'virus_fibre',sides=4,smooth=False,tip_scale=0)
     export('virus_'+('bomber' if large else 'virion'))
+
+def virus_bomb():
+    # Two pentagonal sections and pointed ends: twenty closed, flat triangles.
+    p=profiles['virus_ships']['payload'];vertices=[(0,0,p['rear_z'])]
+    for z in (p['rear_ring_z'],p['front_ring_z']):
+        for j in range(5):
+            a=j*math.tau/5;vertices.append((p['half_width']*math.cos(a),p['half_height']*math.sin(a),z))
+    vertices.append((0,0,p['nose_z']));faces=[]
+    for j in range(5):
+        k=(j+1)%5;faces.extend(((0,1+k,1+j),(1+j,1+k,6+k,6+j),(6+j,6+k,11)))
+    mesh=bpy.data.meshes.new('payload_dart');mesh.from_pydata(vertices,[],faces);mesh.update()
+    obj=bpy.data.objects.new('payload_dart',mesh);bpy.context.collection.objects.link(obj)
+    finish(obj,profiles['virus']['core'],surface='virus_capsid',smooth=False);export('virus_bomb')
+
+def virus_spike():
+    # Three octagonal rings and two points retain the fixed 48-triangle budget.
+    p=profiles['virus_ships']['spike'];vertices=[(0,0,0)];faces=[]
+    for ring in p['rings']:
+        for j in range(8):
+            a=j*math.tau/8;vertices.append((ring['radius']*math.cos(a),ring['radius']*math.sin(a),ring['z']))
+    tip=len(vertices);vertices.append((0,0,p['length']))
+    for j in range(8):faces.append((0,1+(j+1)%8,1+j))
+    for i in range(2):
+        for j in range(8):
+            a=1+8*i+j;b=1+8*i+(j+1)%8;faces.append((a,b,b+8,a+8))
+    for j in range(8):faces.append((tip-8+j,tip-8+(j+1)%8,tip))
+    mesh=bpy.data.meshes.new('spike_needle');mesh.from_pydata(vertices,[],faces);mesh.update()
+    obj=bpy.data.objects.new('spike_needle',mesh);bpy.context.collection.objects.link(obj)
+    finish(obj,(1,1,1),surface='spike',smooth=False);export('virus_spike')
 
 def immune(large):
     p=profiles['immune'];radius=IMMUNE_BOMBER_RADIUS if large else IMMUNE_FIGHTER_RADIUS
@@ -593,6 +615,12 @@ def background(name,key):
         sphere((x,y,z),(BACKGROUND_VESICLE_RADIUS,BACKGROUND_VESICLE_RADIUS,BACKGROUND_VESICLE_RADIUS),p['ridge'],1,1,1)
     export(name)
 
+if '--virus-only' in sys.argv:
+    virus(False);virus(True);virus_bomb();virus_spike()
+    bpy.context.preferences.filepaths.save_version=0
+    bpy.ops.wm.save_as_mainfile(filepath=str(out/'source/virus_shapes.blend'),compress=True)
+    os._exit(0)
+
 if '--factories-only' in sys.argv:
     factory('virus');factory('immune');factory('fungal_spore')
     bpy.context.preferences.filepaths.save_version=0
@@ -601,15 +629,14 @@ if '--factories-only' in sys.argv:
 
 cell('cell_infected','infected_cell');cell('cell_healthy','healthy_cell');cell('cell_neutral','neutral_cell')
 virus(False);virus(True)
-sphere((0,0,0),BOMBER_PAYLOAD_SIZE,profiles['virus']['core'],1,surface='vesicle');export('virus_bomb')
+virus_bomb()
 immune(False);immune(True);node();factory('virus');factory('immune');factory('fungal_spore')
 spore()
 # A single tapered local +Y segment. Runtime poses extend segments in sequence.
 rod((0,0,0),(0,1,0),GROWTH_SEGMENT_RADIUS,(1,1,1),subsurface='substrate');export('growth_segment')
 sphere((0,0,0),(GROWTH_TIP_RADIUS,GROWTH_TIP_RADIUS,GROWTH_TIP_RADIUS),(1,1,1),2,GROWTH_TIP_ROUGHNESS,subsurface='vesicle');export('growth_tip')
-# One reusable shaft and head, local +Z; attached, flying and embedded use this mesh.
-rod((0,0,0),(0,0,SPIKE_SHAFT_LENGTH),SPIKE_SHAFT_RADIUS,(1,1,1),'spike');sphere((0,0,SPIKE_HEAD_Z),SPIKE_HEAD_SIZE,(1,1,1),1,surface='spike')
-export('virus_spike')
+# One reusable needle, local +Z; attached, flying and embedded use this mesh.
+virus_spike()
 # One low-poly mote per swarm unit: thousands can be drawn at once.
 sphere((0,0,0),(SWARM_SPORE_RADIUS,)*3,profiles['fungal_spore']['core'],1,surface='fungal_spore');export('fungal_swarm_spore')
 # A white blood cell's sticky projectile.

@@ -75,6 +75,7 @@ struct SpikeRules
     char model[ASSET_PATH_CAPACITY];
     uint32_t count;
     float root,length,regrow,scale,heal_interval,heal_delay,heal_clearance;
+    Vec3 attached_scale; // Render-only stretch of the attached spike envelope.
     Color injury[2];
 };
 

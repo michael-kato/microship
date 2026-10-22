@@ -241,7 +241,10 @@ static bool load_effects(World* w,const char* path)
     Json spikes=json_find(root,"spikes");
     if (json_present(spikes))
     {
-        json_object(spikes,"model|root_radius|length|projectile_scale");
+        json_object(spikes,"model|root_radius|length|projectile_scale|attached_scale");
+        w->spikes.attached_scale=Vec3{1,1,1};
+        if (json_present(json_find(spikes,"attached_scale")))
+            w->spikes.attached_scale=json_vector(json_get(spikes,"attached_scale"),.05f,2);
         json_path(json_get(spikes,"model"),path,w->spikes.model);
         w->spikes.root=json_positive(json_get(spikes,"root_radius"),1);
         w->spikes.length=json_positive(json_get(spikes,"length"),MAX_SPIKE_LENGTH);

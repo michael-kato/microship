@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-payloads-') as directory:
     initial,view=run('attached',data,1)
     bomber=lambda s:next(u for u in s['units'] if u['type']=='virus_bomber')
     assert bomber(initial)['ready_payloads']==6 and not initial['projectile_state']
-    # Each attached sac is the same small, closed mesh used by the flying bomb.
+    # Each attached dart is the same small, closed mesh used by the flying bomb.
     pods=[i for i in view['instances'] if view['meshes'][i['mesh']]['triangles']==20]
     assert len(pods)==6,'The body does not show six separate bombs'
     assert len({tuple(round(v,4) for v in i['transform'][3::4]) for i in pods})==6
