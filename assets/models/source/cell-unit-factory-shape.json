@@ -99,28 +99,64 @@
   "factories": {
     "virus": {
       "shaft_radius": 0.07,
-      "head_radius": 0.44,
-      "fibre_spread": 0.39,
-      "head_height_scale": 1.3,
-      "fibre_radius": 0.045,
       "shaft_sides": 6,
       "stem_sections": 5,
-      "surface_jitter": 0.18
+      "surface_jitter": 0.18,
+      "tip_radius": 0.115,
+      "tip_length": 0.66,
+      "tip_center_y": 0.22,
+      "spines": 45,
+      "spine_length": 0.24,
+      "spine_radius": 0.009,
+      "spine_up": 0.42,
+      "apex_y": 0.82
     },
     "immune": {
-      "shaft_radius": 0.12,
-      "lobes": 3,
-      "spread": 0.22,
-      "crown_lobes": 5,
-      "width_scale": 1.8
+      "voxel_size": 0.045,
+      "stem_blobs": [
+        {
+          "center": [0, 0.48, 0],
+          "size": [0.32, 0.34, 0.31]
+        },
+        {
+          "center": [0.16, 0.58, 0.07],
+          "size": [0.24, 0.23, 0.26]
+        },
+        {
+          "center": [-0.15, 0.38, -0.09],
+          "size": [0.24, 0.25, 0.23]
+        }
+      ],
+      "head_blobs": [
+        {
+          "center": [0, 0.12, 0],
+          "size": [0.35, 0.34, 0.32]
+        },
+        {
+          "center": [0.2, 0.24, 0.06],
+          "size": [0.25, 0.29, 0.24]
+        },
+        {
+          "center": [-0.19, 0.2, -0.1],
+          "size": [0.27, 0.25, 0.26]
+        },
+        {
+          "center": [0.03, 0.34, -0.16],
+          "size": [0.25, 0.25, 0.24]
+        }
+      ]
     },
     "fungal_spore": {
-      "shaft_radius": 0.07,
-      "forks": 3,
-      "spread": 0.23,
-      "cap_radius": 0.43,
-      "spores": 9,
-      "head_scale": 0.55
+      "shaft_radius": 0.13,
+      "sides": 9,
+      "tendrils": 4,
+      "sections": 10,
+      "spread": 0.25,
+      "wander": 0.12,
+      "tip_height": 0.7,
+      "tip_radius": 0.055,
+      "stem_color": [0.32, 0.15, 0.065],
+      "tip_color": [0.52, 0.29, 0.12]
     }
   }
 }

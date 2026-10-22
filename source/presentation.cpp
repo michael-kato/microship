@@ -30,9 +30,16 @@ static const float HIT_FLASH_TINT_STRENGTH = .9f;
 static const float HIT_FLASH_EMISSION_STRENGTH = .6f;
 static const float MIN_VISIBLE_STEM_EXTENSION = .0001f;
 static const float FACTORY_AXIS_PARALLEL_LIMIT = .9f;
-static const float FACTORY_FACTION_TINT_STRENGTH = .25f;
 static const float BUD_START_SCALE = .08f;
 static const float BUD_GROWTH_SCALE = .92f;
+
+static void rounded_stem_frame(const MeshRange& mesh,Vec3 start,Vec3 delta,float width,Vec3* origin,Vec3* axis)
+{
+    float radial=std::fmax(std::fmax(std::fabs(mesh.low[0]),std::fabs(mesh.high[0])),std::fmax(std::fabs(mesh.low[2]),std::fabs(mesh.high[2])));
+    float extent=mesh.high[1]-mesh.low[1],center=(mesh.high[1]+mesh.low[1])*.5f;
+    *axis=scale(normalize(delta),(std::sqrt(dot(delta,delta))+2*radial*width)/extent);
+    *origin=subtract(add(start,scale(delta,.5f)),scale(*axis,center));
+}
 
 static void set_instance(Presentation* p,uint32_t slot,uint32_t mesh,Vec3 position,Vec3 x,Vec3 y,Vec3 z)
 {
@@ -131,9 +138,15 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
                 w->content.bodies[w->bodies[i].type].parts_path,w->glow_interior,w->glow_organelles)) return false;
         for (uint32_t i=0;i<w->content.producer_count;++i)
         {
-            scale_authored_glow(&scene->geometry,p->factory_meshes[i],w->glow_stems);
+            if (w->content.producers[i].rounded_stem)
+            {
+                const MeshRange& mesh=scene->geometry.meshes[p->segment_meshes[i]];
+                if (mesh.high[1]-mesh.low[1]<=MIN_VISIBLE_STEM_EXTENSION)
+                { fprintf(stderr,"Rounded factory stems need a nonzero axial extent.\n");return false; }
+            }
+            scale_authored_glow(&scene->geometry,p->factory_meshes[i],w->glow_stems*w->content.producers[i].factory_glow_scale);
             p->stem_glow_mask[i]=w->content.producers[i].segment_path[0]
-                && scale_authored_glow(&scene->geometry,p->segment_meshes[i],w->glow_stems);
+                && scale_authored_glow(&scene->geometry,p->segment_meshes[i],w->glow_stems*w->content.producers[i].factory_glow_scale);
         }
         scene->self_glow=w->glow_interior>0 || w->glow_organelles>0 || w->glow_stems>0 || w->glow_leaves>0 || w->glow_units>0;
         p->unit_base=0;p->body_base=w->gameplay.enabled ? (uint32_t)MAX_UNITS : w->spawn_count;
@@ -367,13 +380,18 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                         if (extension<=MIN_VISIBLE_STEM_EXTENSION) continue;
                         Vec3 start=colony->paths[k][j],delta=scale(subtract(colony->paths[k][j+1],start),extension);
                         Vec3 y=normalize(delta),x=normalize(cross(std::fabs(y.z)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
-                        float width=definition->width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j/GROWTH_PATH_SUBDIVISIONS)*simulation_structure_scale(s,p,k)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
+                        float width=simulation_structure_stem_width(s,p,k,j,growth);
                         uint32_t slot=state->stem_base+(p*MAX_FACTORY_STRUCTURES+k)*GROWTH_PATH_SEGMENTS+j;
-                        set_instance(state,slot,state->segment_meshes[colony->type],start,scale(x,width),delta,scale(z,width));
+                        Vec3 axis=delta,origin=start;
+                        if (definition->rounded_stem)
+                        {
+                            rounded_stem_frame(state->scene.geometry.meshes[state->segment_meshes[colony->type]],start,delta,width,&origin,&axis);
+                        }
+                        set_instance(state,slot,state->segment_meshes[colony->type],origin,scale(x,width),axis,scale(z,width));
                         uint32_t wounds=k ? colony->branches[k-1].wounds : colony->wounds;
                         Color tint=wounds ? s->world.spikes.injury[std::min(1u,wounds-1)] : color;
-                        float* style=state->scene.instances[slot].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=wounds ? INJURY_TINT_STRENGTH : FACTORY_FACTION_TINT_STRENGTH;
-                        style[4]=state->stem_glow_mask[colony->type] ? 0 : s->world.glow_stems;style[7]=INSTANCE_EMISSION_FRESNEL;
+                        float* style=state->scene.instances[slot].style;style[0]=tint.r;style[1]=tint.g;style[2]=tint.b;style[3]=wounds ? INJURY_TINT_STRENGTH : definition->factory_tint_strength;
+                        style[4]=state->stem_glow_mask[colony->type] ? 0 : s->world.glow_stems*definition->factory_glow_scale;style[7]=INSTANCE_EMISSION_FRESNEL;
                     }
                     float size=definition->width*simulation_structure_head_scale(s,p,k)*(FACTORY_HEAD_START_WIDTH_SCALE+FACTORY_HEAD_GROWTH_WIDTH_SCALE*growth);
                     uint32_t slot=factory_instance_slot(state,p,k);
@@ -382,8 +400,8 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                     // Children join before the stem end; an intact end keeps its leaf past the fork.
                     if (growth>=(k ? colony->branches[k-1].growth : colony->growth))
                         set_instance(state,slot,state->tip_meshes[colony->type],tip,scale(x,size),scale(y,size),scale(z,size));
-                    float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=FACTORY_FACTION_TINT_STRENGTH;
-                    style[4]=s->world.glow_leaves;style[7]=INSTANCE_EMISSION_FRESNEL;
+                    float* style=state->scene.instances[slot].style;style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=definition->factory_tint_strength;
+                    style[4]=s->world.glow_leaves*definition->factory_glow_scale;style[7]=INSTANCE_EMISSION_FRESNEL;
                 }
                 for (uint32_t k=0;k<colony->structure_count;++k) if (colony->leaves[k].active)
                 {
@@ -417,10 +435,15 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
         float shrink=std::fmin(1.0f,(d.seconds-d.age)/s->world.combat.break_shrink);
         Vec3 delta=subtract(d.end,d.start),y=normalize(delta),x=normalize(cross(std::fabs(y.z)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
         uint32_t slot=state->debris_base+i;
-        set_instance(state,slot,d.tip ? state->tip_meshes[d.producer] : state->segment_meshes[d.producer],d.start,
-            scale(x,d.radius*shrink),d.tip ? scale(y,d.radius*shrink) : scale(delta,shrink),scale(z,d.radius*shrink));
+        Vec3 axis=d.tip ? scale(y,d.radius*shrink) : scale(delta,shrink),origin=d.start;
+        if (!d.tip && s->world.content.producers[d.producer].rounded_stem)
+        {
+            rounded_stem_frame(state->scene.geometry.meshes[state->segment_meshes[d.producer]],d.start,scale(delta,shrink),d.radius*shrink,&origin,&axis);
+        }
+        set_instance(state,slot,d.tip ? state->tip_meshes[d.producer] : state->segment_meshes[d.producer],origin,
+            scale(x,d.radius*shrink),axis,scale(z,d.radius*shrink));
         Color color=content_color(&s->world.content,d.faction);float* style=state->scene.instances[slot].style;
-        style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=FACTORY_FACTION_TINT_STRENGTH;style[7]=INSTANCE_EMISSION_FRESNEL;
+        style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=s->world.content.producers[d.producer].factory_tint_strength;style[7]=INSTANCE_EMISSION_FRESNEL;
     }
     update_spike_instances(state,simulation);
 }

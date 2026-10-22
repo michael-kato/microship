@@ -33,6 +33,7 @@ def established_world(source,directory):
             unit['attack']['damage']=6;unit['attack']['cloud']['damage']=2
     for building in data['content']['buildings']:
         building.pop('setup_speed',None)
+        building.get('growth_meshes',{}).pop('rounded',None)
         immune=building['faction']=='immune'
         building.update(health=480 if immune else 240,hits=24 if immune else 12)
         building['branches'].update(health=300 if immune else 150,hits=16 if immune else 8)

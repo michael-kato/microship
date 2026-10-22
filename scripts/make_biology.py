@@ -14,6 +14,7 @@ import struct
 import sys
 
 MAX_LOCAL_COORDINATE = 1.49
+FACTORY_COMPLETE_MODEL_SCALE = .8
 GOLDEN_ANGLE_RADIANS = 2.39996323
 DEFAULT_ROUGHNESS = .82
 DEFAULT_IOR = 1.35
@@ -452,6 +453,40 @@ def spore():
         branches(d*SPORE_RAY_ROOT_RADIUS,d,SPORE_RAY_LENGTH,SPORE_RAY_RADIUS,2,p['rays'],buds=p['core'],surface='fungal_stalk',bud_surface='fungal_spore')
     export('fungal_spore')
 
+def fused_blobs(blobs,color,surface,voxel):
+    objects=[]
+    for center,size in blobs:
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2,radius=1,location=center)
+        obj=bpy.context.object;obj.scale=size
+        obj.data.transform(Matrix.LocRotScale(obj.location,obj.rotation_euler.to_quaternion(),obj.scale))
+        obj.matrix_world=Matrix.Identity(4);objects.append(obj)
+    bpy.ops.object.select_all(action='DESELECT')
+    for obj in objects:obj.select_set(True)
+    bpy.context.view_layer.objects.active=objects[0];bpy.ops.object.join();obj=bpy.context.object
+    remesh=obj.modifiers.new('joined_lobes','REMESH');remesh.mode='VOXEL';remesh.voxel_size=voxel
+    bpy.ops.object.modifier_apply(modifier=remesh.name)
+    smooth=obj.modifiers.new('soft_joints','SMOOTH');smooth.factor=.7;smooth.iterations=3
+    bpy.ops.object.modifier_apply(modifier=smooth.name)
+    reduce=obj.modifiers.new('surface_budget','DECIMATE');reduce.ratio=.35
+    bpy.ops.object.modifier_apply(modifier=reduce.name)
+    finish(obj,color,surface=surface)
+
+def curved_tube(points,radii,color,surface,sides=8):
+    vertices=[];faces=[]
+    for j,point in enumerate(points):
+        direction=Vector(points[min(j+1,len(points)-1)])-Vector(points[max(0,j-1)])
+        direction.normalize();axis=Vector((0,0,1)) if abs(direction.z)<.9 else Vector((1,0,0))
+        x=direction.cross(axis).normalized();z=direction.cross(x).normalized()
+        for k in range(sides):
+            angle=math.tau*k/sides
+            vertices.append(Vector(point)+radii[j]*(math.cos(angle)*x+math.sin(angle)*z))
+    for j in range(len(points)-1):
+        for k in range(sides):
+            a=j*sides+k;b=j*sides+(k+1)%sides;faces.append((a,b,b+sides,a+sides))
+    faces.extend([tuple(reversed(range(sides))),tuple((len(points)-1)*sides+k for k in range(sides))])
+    mesh=bpy.data.meshes.new('tendril');mesh.from_pydata(vertices,[],faces);mesh.update()
+    obj=bpy.data.objects.new('tendril',mesh);bpy.context.collection.objects.link(obj);finish(obj,color,surface=surface)
+
 def factory(side):
     global parts
     saved=rng.getstate()
@@ -477,46 +512,44 @@ def factory(side):
         obj=bpy.data.objects.new('shaft',mesh);bpy.context.collection.objects.link(obj)
         finish(obj,p['body'],smooth=True,surface='virus_sheath',emission=1)
         export('virus_stem',subsurface_weight=0)
-        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1,radius=1)
-        obj=bpy.context.object;obj.scale=(f['head_radius'],f['head_radius']*f['head_height_scale'],f['head_radius'])
-        finish(obj,p['body'],smooth=False,surface='virus_capsid')
-        for i in range(VIRUS_FACTORY_FIBRE_COUNT):
-            a=i*math.tau/VIRUS_FACTORY_FIBRE_COUNT;d=Vector((math.cos(a),0,math.sin(a)))
-            bend=d*f['fibre_spread']+Vector((0,-VIRUS_FIBRE_BEND_Y,0));end=d*f['fibre_spread']*VIRUS_FIBRE_END_SPREAD_SCALE+Vector((0,-VIRUS_FIBRE_END_Y,0))
-            rod((0,-VIRUS_FIBRE_ROOT_Y,0),bend,f['fibre_radius'],p['spikes'],'virus_fibre',sides=3,smooth=False)
-            rod(bend,end,f['fibre_radius'],p['core'],'virus_fibre',sides=3,smooth=False,tip_scale=0)
+        # A slender living tip with many tapered radial spines.
+        sphere((0,f['tip_center_y'],0),(f['tip_radius'],f['tip_length']/2,f['tip_radius']),p['body'],2,surface='virus_sheath')
+        for i in range(f['spines']):
+            t=(i+.5)/f['spines'];angle=i*GOLDEN_ANGLE_RADIANS
+            y=f['tip_center_y']+(t-.5)*f['tip_length']
+            radius=f['tip_radius']*math.sqrt(max(0,1-(2*t-1)**2))
+            direction=Vector((math.cos(angle),f['spine_up'],math.sin(angle))).normalized()
+            start=Vector((radius*math.cos(angle),y,radius*math.sin(angle)))
+            length=f['spine_length']*(.7+.3*math.sin(i*GOLDEN_ANGLE_RADIANS)**2)
+            rod(start,start+direction*length,f['spine_radius'],p['spikes'],'virus_fibre',sides=3,smooth=False,tip_scale=0)
+        rod((0,f['tip_center_y']+f['tip_length']/2,0),(0,f['apex_y'],0),f['spine_radius']*2,p['spikes'],'virus_fibre',sides=5,tip_scale=0)
         export('virus_head',subsurface_weight=0)
     elif side=='immune':
-        rod((0,0,0),(0,1,0),f['shaft_radius'],p['body'],'virus_sheath' if side=='virus' else 'immune_surface')
-        for i in range(f['lobes']):
-            y=(i+.5)/f['lobes'];sign=-1 if i%2 else 1
-            sphere((sign*IMMUNE_STEM_LOBE_X,y,0),IMMUNE_STEM_LOBE_SIZE,p['body'],2,surface='immune_surface')
-            branches((0,y,0),(sign,IMMUNE_FACTORY_BRANCH_UP_COMPONENT,IMMUNE_FACTORY_BRANCH_DEPTH_COMPONENT),f['spread'],FACTORY_BRANCH_RADIUS,2,p['body'],buds=p['granules'],surface='immune_surface',bud_surface='immune_granule')
-        for obj in parts:obj.data.transform(Matrix.Diagonal((f['width_scale'],1,f['width_scale'],1)))
+        fused_blobs([(v['center'],v['size']) for v in f['stem_blobs']],p['body'],'immune_surface',f['voxel_size'])
         export('immune_stem',subsurface_weight=0)
-        for i in range(f['crown_lobes']):
-            a=i*math.tau/f['crown_lobes']
-            sphere((IMMUNE_CROWN_RADIUS*math.cos(a),IMMUNE_CROWN_Y,IMMUNE_CROWN_RADIUS*math.sin(a)),IMMUNE_CROWN_SIZE,p['body'],2,surface='immune_surface')
-        sphere((0,FACTORY_GRANULE_Y,IMMUNE_FACTORY_GRANULE_Z),IMMUNE_FACTORY_GRANULE_SIZE,p['granules'],2,surface='immune_granule')
-        for obj in parts:obj.data.transform(Matrix.Diagonal((f['width_scale'],1,f['width_scale'],1)))
+        fused_blobs([(v['center'],v['size']) for v in f['head_blobs']],p['body'],'immune_surface',f['voxel_size'])
         export('immune_head',subsurface_weight=0)
     else:
-        rod((0,0,0),(0,1,0),f['shaft_radius'],p['rays'],'fungal_stalk')
-        for i in range(f['forks']):
-            a=i*GOLDEN_ANGLE_RADIANS;y=(i+.5)/f['forks']
-            branches((0,y,0),(math.cos(a),FUNGAL_BRANCH_UP_COMPONENT,math.sin(a)),f['spread'],FACTORY_BRANCH_RADIUS,2,p['body'],buds=p['core'],surface='fungal_stalk',bud_surface='fungal_spore')
+        # The runtime path supplies the large bends; its mesh has no lateral needles.
+        sphere((0,.5,0),(f['shaft_radius'],)*3,f['stem_color'],3,surface='fungal_stalk')
         export('fungal_stem',subsurface_weight=0)
-        sphere((0,-FUNGAL_STALK_ROOT_Y,0),FUNGAL_CAP_STALK_SIZE,p['rays'],2,surface='fungal_stalk')
-        sphere((0,FUNGAL_CAP_Y,0),(f['cap_radius'],FUNGAL_CAP_HALF_HEIGHT,f['cap_radius']),p['body'],2,surface='fungal_cap')
-        for i in range(f['spores']):
-            a=i*GOLDEN_ANGLE_RADIANS
-            sphere((FUNGAL_SPORE_RING_RADIUS*math.cos(a),FUNGAL_SPORE_RING_Y,FUNGAL_SPORE_RING_RADIUS*math.sin(a)),(FUNGAL_FACTORY_SPORE_RADIUS,)*3,p['core'],1,surface='fungal_spore')
-        for obj in parts:obj.data.transform(Matrix.Diagonal((f['head_scale'],f['head_scale'],f['head_scale'],1)))
+        for i in range(f['tendrils']):
+            angle=i*GOLDEN_ANGLE_RADIANS;phase=i*1.7
+            height=f['tip_height']*(.72+.28*math.sin(phase)**2)
+            points=[];radii=[]
+            for j in range(f['sections']+1):
+                t=j/f['sections'];spread=f['spread']*t
+                x=spread*math.cos(angle)+f['wander']*math.sin(t*math.tau+phase)*math.sin(math.pi*t)
+                z=spread*math.sin(angle)+f['wander']*math.sin(t*math.tau*1.5-phase)*math.sin(math.pi*t)
+                points.append((x,height*t,z));radii.append(f['tip_radius']*(1-.3*t))
+            curved_tube(points,radii,f['stem_color'],'fungal_stalk',f['sides'])
+            sphere(points[-1],(radii[-1]*1.15,)*3,f['tip_color'],2,surface='fungal_cap')
         export('fungal_head',subsurface_weight=0)
     # The complete model is used by the non-staged presentation path.
     for i,source in enumerate(models[-2:]):
         obj=bpy.data.objects.new('complete',source.data.copy());bpy.context.collection.objects.link(obj)
         if i:obj.data.transform(Matrix.Translation((0,1,0)))
+        obj.data.transform(Matrix.Diagonal((FACTORY_COMPLETE_MODEL_SCALE,)*3+(1,)))
         parts.append(obj)
     export(('fungal' if side=='fungal_spore' else side)+'_factory',subsurface_weight=0)
     rng.setstate(saved)
@@ -556,6 +589,12 @@ def background(name,key):
         x=rng.uniform(-BACKGROUND_PARTICLE_HALF_WIDTH,BACKGROUND_PARTICLE_HALF_WIDTH);y=rng.uniform(-BACKGROUND_VESICLE_HALF_HEIGHT,BACKGROUND_VESICLE_HALF_HEIGHT);z=rng.uniform(BACKGROUND_VESICLE_NEAR_Z,BACKGROUND_VESICLE_FAR_Z)
         sphere((x,y,z),(BACKGROUND_VESICLE_RADIUS,BACKGROUND_VESICLE_RADIUS,BACKGROUND_VESICLE_RADIUS),p['ridge'],1,1,1)
     export(name)
+
+if '--factories-only' in sys.argv:
+    factory('virus');factory('immune');factory('fungal_spore')
+    bpy.context.preferences.filepaths.save_version=0
+    bpy.ops.wm.save_as_mainfile(filepath=str(out/'source/factory_shapes.blend'),compress=True)
+    os._exit(0)
 
 cell('cell_infected','infected_cell');cell('cell_healthy','healthy_cell');cell('cell_neutral','neutral_cell')
 virus(False);virus(True)

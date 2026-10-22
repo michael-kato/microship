@@ -372,6 +372,18 @@ float simulation_structure_scale(const Simulation* s,uint32_t p,uint32_t k)
     float width=c.factory_scale[k]<1 ? f.additional_root_width_scale : 1;
     return width*c.factory_scale[k]*(f.grammar==GROWTH_TREE ? c.limb_scale[k] : c.parents[k]>=0 ? FACTORY_CHILD_STEM_WIDTH_SCALE : 1);
 }
+float simulation_structure_stem_width(const Simulation* s,uint32_t p,uint32_t k,uint32_t span,float growth)
+{
+    const ProducerDefinition& d=*simulation_producer_definition(s,p);
+    float width=d.width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*span/GROWTH_PATH_SUBDIVISIONS)*simulation_structure_scale(s,p,k)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
+    if (d.rounded_stem && d.stem_bulges)
+    {
+        float phase=(span+.5f)*d.stem_bulges/GROWTH_PATH_SEGMENTS;phase-=std::floor(phase);
+        float lobe=4*phase*(1-phase);
+        width*=FACTORY_ROUNDED_MIN_WIDTH+(1-FACTORY_ROUNDED_MIN_WIDTH)*lobe*lobe;
+    }
+    return width;
+}
 float simulation_structure_head_scale(const Simulation* s,uint32_t p,uint32_t k)
 {
     const Colony& c=s->colonies[p];const BranchRules& f=simulation_producer_definition(s,p)->branches;
@@ -1434,7 +1446,7 @@ static void fracture_limb(Simulation* s,uint32_t p,uint32_t k,float old_growth,f
         // This axis always has a nonzero radial component.
         d.axis=normalize(add(radial,scale(jitter,DEBRIS_AXIS_JITTER)));d.spin=signed_random(&seed)*fx.break_spin;
         d.radius=tip ? definition.width*simulation_structure_head_scale(s,p,k)*(FACTORY_HEAD_START_WIDTH_SCALE+DEBRIS_VELOCITY_JITTER*growth)
-            : definition.width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j/GROWTH_PATH_SUBDIVISIONS)*simulation_structure_scale(s,p,k)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
+            : simulation_structure_stem_width(s,p,k,j,growth);
         d.seconds=fx.break_seconds;d.producer=c.type;d.faction=c.faction;s->debris[slot]=d;
     }
 }

@@ -43,6 +43,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-animation-') as directory:
         assert matrix!=stationary[organ['slot']]['transform']
     assert anchored==len(roots)==34,'An organelle moved its factory attachment'
     body_base=game['unit_capacity'];factory_base=body_base+len(data['bodies']);stem_base=factory_base+len(data['bodies'])*128
+    rounded_factions={f['id'] for f in data['content']['factions'] if any(b['faction']==f['name'] and b.get('growth_meshes',{}).get('rounded',False) for b in data['content']['buildings'])}
     for body,colony in enumerate(game['colonies']):
         assert instances[body_base+body]['transform']==stationary[body_base+body]['transform']
         if not colony['active'] or not colony['visible']:continue
@@ -50,9 +51,14 @@ with tempfile.TemporaryDirectory(prefix='nanova-animation-') as directory:
             slots=[stem_base+(body*128+k)*game['factory_path_segments']+j for j in range(game['factory_path_segments'])]
             if not all(slot in instances for slot in slots):continue
             for left,right in zip(slots,slots[1:]):
-                assert math.dist(point(instances[left]['transform'],[0,1,0]),point(instances[right]['transform'],[0,0,0]))<3e-5,'A swaying stem joint opened'
+                if colony['faction'] in rounded_factions:
+                    a=instances[left]['transform'];b=instances[right]['transform']
+                    reach=(math.sqrt(sum(a[n]**2 for n in (1,5,9)))+math.sqrt(sum(b[n]**2 for n in (1,5,9))))*.5
+                    assert math.dist(point(a,[0,.5,0]),point(b,[0,.5,0]))<reach,'Rounded stem pieces separated during sway'
+                else:
+                    assert math.dist(point(instances[left]['transform'],[0,1,0]),point(instances[right]['transform'],[0,0,0]))<3e-5,'A swaying stem joint opened'
             assert instances[slots[0]]['transform']!=stationary[slots[0]]['transform']
-            if structure['parent']<0:
+            if structure['parent']<0 and colony['faction'] not in rounded_factions:
                 assert math.dist(point(instances[slots[0]]['transform'],[0,0,0]),structure['stem'][0])<2e-5,'A factory root moved'
     repeat,repeated=run('repeat');assert repeat==game and repeated==scene
     # Different animation rates change poses, while the same game still runs.

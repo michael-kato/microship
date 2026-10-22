@@ -103,7 +103,10 @@
       },
       "growth_meshes": {
         "segment": "../models/immune_stem.fmesh",
-        "tip": "../models/immune_head.fmesh"
+        "tip": "../models/immune_head.fmesh",
+        "rounded": true,
+        "glow_scale": 0.25,
+        "bulges": 3
       },
       "navigation": {
         "stem_radius": 1,
@@ -158,11 +161,14 @@
       },
       "growth_meshes": {
         "segment": "../models/fungal_stem.fmesh",
-        "tip": "../models/fungal_head.fmesh"
+        "tip": "../models/fungal_head.fmesh",
+        "glow_scale": 0.06,
+        "tint_strength": 0.04,
+        "rounded": true
       },
       "navigation": {
-        "stem_radius": 0.55,
-        "head_radius": 0.31
+        "stem_radius": 0.2,
+        "head_radius": 0.85
       },
       "haze": {
         "reach": 4,

@@ -1401,3 +1401,84 @@ factory_curves, and three_factions. Controlled production work ratios
 were 1.999953 for fighters and 1.999975 for bombers. Every structure in
 the 35-structure cell had twice its prior health. Inputs, states, and
 logs are in `build/immune_second_buff_review/`.
+
+
+## Faction factory shapes (Oct 21)
+
+Immune stems and heads use overlapping rounded masses joined by voxel
+remeshing in Blender. The runtime width profile adds three broad bulges
+per limb. Virus factory tips use a slender body, 45 fine tapered spines,
+and one axial spike. The phage cap and six tail fibres are removed from
+factory tips. Fungal factories use brown stems and four curved tendrils
+per tip, with rounded ends. Their stem mesh has no lateral needle branches.
+The user supplied the Cordyceps photo used for the tendril reference.
+
+The source profiles remain in `cell-unit-factory-shape.json`. The
+`--factories-only` generator option updates only factory exports and saves
+`assets/models/source/factory_shapes.blend`. Other mesh exports and their
+source scenes are retained. Shape colors use vertex attributes.
+
+Each rounded stem piece fits its actual mesh bounds. Its axial length
+covers the path span plus rounded end margins. Its center stays on the
+path. This prevents flattened disks and gaps between short pieces. The
+same fitting applies to debris. Broad Immune widths are shared by
+presentation, navigation, and breakage. Fungal navigation uses radius
+0.2 for stems and 0.85 for the new tip clusters.
+
+`growth_meshes` has optional named controls: `rounded` (boolean), `bulges`
+(integer 0 through 8), `glow_scale`, and `tint_strength` (both 0 through 1).
+The defaults retain the earlier straight-axis posing, no broad bulges,
+full glow, and 0.25 faction tint. Immune uses rounded pieces, three bulges,
+and glow 0.25. Fungus uses rounded pieces, zero bulges, glow 0.06, and tint
+0.04 so the brown surface remains visible.
+
+Per-mesh triangle counts:
+
+| Faction | Stem before | Stem after | Tip before | Tip after |
+| --- | ---: | ---: | ---: | ---: |
+| Virus | 68 | 68 | 92 | 268 |
+| Immune | 1096 | 756 | 480 | 960 |
+| Fungus | 856 | 320 | 340 | 1096 |
+
+Real Windows application checks through Proton passed for smoke,
+factory_curves, small_factories, natural_factory, navigation, cell_animation,
+data_assets, factory_repair, three_factions, fungal_sources, and
+factory_emission. The curve check compares actual mesh vertices with
+navigation capsules, checks axial coverage to prevent gaps, and checks
+round piece centers, partial growth, cuts, and connected factory paths.
+Older endpoint fixtures keep their explicit earlier posing mode. Invalid
+rounding, bulge count, glow, and tint settings are rejected.
+
+Native 1920x1080 captures used default sampling, one frozen frame per
+process, and the Khronos host Vulkan validation layer. The close-view
+comparison disables tilt-shift blur for shape inspection. It does not
+change the shipping renderer. Final close views are screenshots 001017
+(Immune), 001013 (Virus), and 001018 (Fungus). Before views are 001009,
+001010, and 001011. These are bounded measurements:
+
+| Faction | Before GPU ms | After GPU ms | Before app ms | After app ms |
+| --- | ---: | ---: | ---: | ---: |
+| Immune | 10.099 | 9.363 | 18.637 | 17.930 |
+| Virus | 9.019 | 8.965 | 18.091 | 17.161 |
+| Fungus | 11.501 | 9.750 | 20.144 | 18.178 |
+
+GPU values are the total renderer query. App values are application frame
+times. These single-frame results do not establish sustained frame rate
+or native Windows behavior. Inputs, capture commands, states, and logs
+are in `build/factory_shapes_review/`.
+
+
+CPU comparison used the preserved build from commit 0b26e8e and the final
+build. Each ran three real matches with seed 1234, 15 mature cells, 90
+seconds of production, and 1,800 measured combat ticks. No other check ran
+during these measurements. Median per-run results:
+
+| Build | Peak units | Mean tick ms | p99 tick ms | Largest observed tick ms |
+| --- | ---: | ---: | ---: | ---: |
+| before | 3731 | 5.234 | 12.719 | 15.088 |
+| after | 3740 | 5.069 | 12.861 | 14.418 |
+
+Balance and navigation changes alter the battle, so these states differ.
+This is bounded CPU simulation evidence. It does not establish sustained
+GPU performance. Raw timing and phase records are in the `cpu_before` and
+`cpu_after` folders under `build/factory_shapes_review/`.

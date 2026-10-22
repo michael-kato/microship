@@ -54,7 +54,7 @@ void flight_obstacles(const Simulation* s,FlightObstacles* out)
             {
                 float extension=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_PATH_SEGMENTS-j));
                 if (extension<=OBSTACLE_DIRECTION_EPSILON) continue;
-                float width=d.width*(1-FACTORY_STEM_TAPER_PER_SEGMENT*j/GROWTH_PATH_SUBDIVISIONS)*simulation_structure_scale(s,p,k)*(FACTORY_STEM_START_WIDTH_SCALE+FACTORY_STEM_GROWTH_WIDTH_SCALE*growth);
+                float width=simulation_structure_stem_width(s,p,k,j,growth);
                 Vec3 a=c.paths[k][j],b=add(a,scale(subtract(c.paths[k][j+1],a),extension));
                 out->values[out->count++]=capsule(a,b,width*d.stem_radius,p,k);
             }

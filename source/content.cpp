@@ -7,6 +7,8 @@
 #include "asset_limits.h"
 
 static const uint32_t DEFAULT_HYPHA_CHAIN_LENGTH = 3;
+static const float DEFAULT_FACTORY_TINT_STRENGTH = .25f;
+static const uint32_t MAX_FACTORY_STEM_BULGES = 8;
 static const int MAX_BUILDING_SEED = 16777215;
 static const int MAX_BUILDING_PRODUCTION = 10;
 static const int MAX_BUILDING_SPACING = 10;
@@ -330,7 +332,7 @@ static bool load_buildings(Content* c,Json root,const char* path)
     json_object(shared_branches,"seconds|seed|regrow_seconds|roots|root_limit|root_minimum_radius|additional_root_scale|additional_root_width_scale|additional_root_branch|surface_clearance|all_leaf_nodes|root_offset_seconds");JsonArray a=json_array(json_get(root,"buildings"),MAX_PRODUCER_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|model|health|hits|setup_speed|branches|growth_meshes|navigation|haze");ProducerDefinition p={};
+        json_object(j,"name|faction|model|health|hits|setup_speed|branches|growth_meshes|navigation|haze");ProducerDefinition p={};p.factory_glow_scale=1;p.factory_tint_strength=DEFAULT_FACTORY_TINT_STRENGTH;
         Json repair=json_find(shared,"repair");
         if (json_present(repair))
         {
@@ -365,7 +367,13 @@ static bool load_buildings(Content* c,Json root,const char* path)
         Json growth=json_find(j,"growth_meshes");
         if (json_present(growth))
         {
-            json_object(growth,"segment|tip");json_path(json_get(growth,"segment"),path,p.segment_path);
+            json_object(growth,"segment|tip|rounded|bulges|glow_scale|tint_strength");
+            Json glow_scale=json_find(growth,"glow_scale"),tint=json_find(growth,"tint_strength");
+            if (json_present(glow_scale)) p.factory_glow_scale=json_float(glow_scale,0,1);
+            if (json_present(tint)) p.factory_tint_strength=json_float(tint,0,1);
+            Json bulges=json_find(growth,"bulges");if (json_present(bulges)) p.stem_bulges=json_uint(bulges,0,MAX_FACTORY_STEM_BULGES);
+            Json rounded=json_find(growth,"rounded");if (json_present(rounded)) p.rounded_stem=json_bool(rounded);
+            json_path(json_get(growth,"segment"),path,p.segment_path);
             json_path(json_get(growth,"tip"),path,p.tip_path);
         }
         definition_name(j,p.name);json_string(json_get(j,"faction"),p.faction_name,ASSET_NAME_CAPACITY);json_path(json_get(j,"model"),path,p.model_path);

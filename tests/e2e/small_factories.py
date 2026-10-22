@@ -35,6 +35,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
         data=stage_world(root/'assets/levels'/(side+'-player-level.json'),out)
         for start in data['match'].pop('starts'):data['bodies'][start['cell']]['owner']=start['faction']
         data['spawns']=[];data['rules'].pop('exploration',None)
+        data['appearance']['animation']['factories']['sway_degrees']=0
         data['rules']['cell_infection'].update(morph_seconds=.01,tint_seconds=.01)
         data['rules']['ai']['expansion_delay']=300;data['rules']['economy']['enemy_attack_seconds']=300
         for building in data['content']['buildings']:
@@ -83,11 +84,12 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
                 assert math.dist(limb['position'],case['bodies'][home]['position'])>=colony['surface_radius']+branch['surface_clearance']-1e-4
                 assert math.isclose(limb['health'],profile['health']*scale*scale,rel_tol=2e-5)
                 head=instances[head_base+home*128+k];stem=instances[stem_base+(home*128+k)*spans+spans-1]
-                tip=[stem['transform'][j+1]+stem['transform'][j+3] for j in (0,4,8)]
+                tip=limb['position'] if profile['growth_meshes'].get('rounded',False) else [stem['transform'][j+1]+stem['transform'][j+3] for j in (0,4,8)]
                 assert math.dist(tip,[head['transform'][j] for j in (3,7,11)])<.001,'A rendered factory head detached'
                 head_width=math.sqrt(sum(head['transform'][j]**2 for j in (0,4,8)))
                 assert math.isclose(head_width,profile['width']*limb['head_scale'],rel_tol=2e-5)
                 obstacles=[o for o in game['flight']['obstacles'] if o['cell']==home and o['structure']==k]
+                assert math.dist(obstacles[spans-1]['end'],tip)<.001,'The factory path missed its head'
                 has_head=True
                 assert len(obstacles)==spans+has_head,(side,k,obstacles)
                 if has_head:assert math.isclose(obstacles[-1]['radius'],head_width*profile['navigation']['head_radius'],rel_tol=2e-5)

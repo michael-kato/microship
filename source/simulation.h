@@ -236,6 +236,7 @@ Vec3 simulation_structure_position(const Simulation*,uint32_t cell,uint32_t stru
 Vec3 simulation_growth_point(const Simulation*,uint32_t cell,uint32_t structure,float growth);
 Vec3 simulation_growth_tangent(const Simulation*,uint32_t cell,uint32_t structure,float growth);
 float simulation_structure_scale(const Simulation*,uint32_t cell,uint32_t structure);
+float simulation_structure_stem_width(const Simulation* s,uint32_t cell,uint32_t structure,uint32_t span,float growth);
 float simulation_structure_head_scale(const Simulation*,uint32_t cell,uint32_t structure);
 bool simulation_structure_terminal(const Simulation*,uint32_t cell,uint32_t structure);
 float simulation_structure_growth(const Simulation*,uint32_t cell,uint32_t structure);

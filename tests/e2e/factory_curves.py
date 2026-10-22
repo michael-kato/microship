@@ -7,6 +7,7 @@ from pathlib import Path
 import statistics
 import subprocess
 import sys
+import struct
 import tempfile
 from asset_data import stage_world, write_world
 
@@ -33,6 +34,31 @@ def lobes(points):
 
 def start(instance):return [instance['transform'][j] for j in (3,7,11)]
 def end(instance):return [instance['transform'][j]+instance['transform'][j-2] for j in (3,7,11)]
+
+def check_pose(instance,a,b,rounded,vertices):
+    if rounded:
+        low=min(v[1] for v in vertices);high=max(v[1] for v in vertices);middle=(low+high)/2
+        center=[x+(y-x)*middle for x,y in zip(start(instance),end(instance))]
+        assert math.dist(center,[(x+y)/2 for x,y in zip(a,b)])<3e-5,'A rounded piece left its path center'
+        axis=delta(end(instance),start(instance));direction=delta(b,a)
+        assert dot(axis,direction)/(norm(axis)*norm(direction))>.99999
+        width=norm([instance['transform'][n] for n in (0,4,8)])
+        assert norm(axis)*(high-low)>=norm(direction)+.1*width-2e-5,'Rounded pieces leave gaps along the path'
+    else:
+        assert math.dist(start(instance),a)<3e-5 and math.dist(end(instance),b)<3e-5,'Render path differs from growth path'
+
+def mesh_points(path):
+    raw=Path(path).read_bytes();magic,vertices,triangles=struct.unpack_from('<8sII',raw)
+    stride=64 if magic==b'FLMESH02' else 48
+    return [struct.unpack_from('<3f',raw,16+i*stride) for i in range(vertices)]
+
+def check_bounds(instance,points,obstacle):
+    a=obstacle['start'];direction=delta(obstacle['end'],a);squared=dot(direction,direction)
+    matrix=instance['transform']
+    for v in points:
+        point=[sum(matrix[row*4+j]*v[j] for j in range(3))+matrix[row*4+3] for row in range(3)]
+        t=max(0,min(1,dot(delta(point,a),direction)/squared)) if squared else 0
+        assert math.dist(point,[x+t*y for x,y in zip(a,direction)])<=obstacle['radius']+3e-5,'Navigation missed visible factory geometry'
 
 with tempfile.TemporaryDirectory(prefix='nanova-factory-curves-') as directory:
     # The stress scene keeps authored cells; homes 0, 5 and 10 belong to the three factions.
@@ -78,12 +104,14 @@ with tempfile.TemporaryDirectory(prefix='nanova-factory-curves-') as directory:
                     profile=next(v for v in data['content']['buildings'] if v['faction']==side)
                     for j in range(spans):
                         instance=instances[stems+(cell*128+k)*spans+j]
-                        assert math.dist(start(instance),points[j])<3e-5 and math.dist(end(instance),points[j+1])<3e-5,'Render path differs from growth path'
+                        check_pose(instance,points[j],points[j+1],profile['growth_meshes'].get('rounded',False),mesh_points(out/profile['growth_meshes']['segment']))
+                        if radius==4.2 and seed==1234 and k==0:check_bounds(instance,mesh_points(out/profile['growth_meshes']['segment']),obstacles[j])
                         assert math.dist(obstacles[j]['start'],points[j])<3e-5 and math.dist(obstacles[j]['end'],points[j+1])<3e-5,'Navigation differs from growth path'
                         width=norm([instance['transform'][n] for n in (0,4,8)])
                         assert math.isclose(obstacles[j]['radius'],width*profile['navigation']['stem_radius'],rel_tol=3e-5),'Curve collision width differs'
                     head=instances[heads+cell*128+k];direction=[head['transform'][n] for n in (1,5,9)]
                     assert dot(direction,vectors[-1])/(norm(direction)*norm(vectors[-1]))>.99999,'A head left the curve tangent'
+                    if radius==4.2 and seed==1234 and k==0:check_bounds(head,mesh_points(out/profile['growth_meshes']['tip']),obstacles[-1])
             if radius==4.2 and seed==1234:
                 assert run('repeat',data)==(game,scene),'Curves changed with the same seed'
     bands={'virus':(.006,.045),'immune':(.035,.23),'fungus':(.07,.45)}
@@ -105,12 +133,13 @@ with tempfile.TemporaryDirectory(prefix='nanova-factory-curves-') as directory:
         instances={v['slot']:v for v in scene['instances']}
         shown=[instances[stems+(cell*128+k)*spans+j] for j in range(spans) if stems+(cell*128+k)*spans+j in instances]
         assert len(shown)==math.ceil(limb['visible_growth']*spans-1e-4),'Curve growth used the wrong number of spans'
-        assert math.dist(end(shown[-1]),limb['position'])<3e-5,'A partial curve left its growth point'
         assert (heads+cell*128+k in instances)==head_present,'A cut curve kept its head'
         obstacles=[v for v in game['flight']['obstacles'] if v['cell']==cell and v['structure']==k]
         assert len(obstacles)==len(shown)+int(head_present),'Navigation retained an invisible curve span'
+        assert math.dist(obstacles[len(shown)-1]['end'],limb['position'])<3e-5,'A partial curve left its growth point'
+        rounded=base['content']['buildings'][cell//5]['growth_meshes'].get('rounded',False)
         for instance,obstacle in zip(shown,obstacles):
-            assert math.dist(start(instance),obstacle['start'])<3e-5 and math.dist(end(instance),obstacle['end'])<3e-5
+            check_pose(instance,obstacle['start'],obstacle['end'],rounded,mesh_points(out/base['content']['buildings'][cell//5]['growth_meshes']['segment']))
     partial=deepcopy(base);partial['match']['fully_established']=False
     for building in partial['content']['buildings']:building['branches']['seconds']=.1
     growing,scene=run('partial_growth',partial,ticks=120)

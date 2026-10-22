@@ -202,6 +202,24 @@
               },
               "tip": {
                 "$ref": "shared.schema.json#/$defs/path"
+              },
+              "rounded": {
+                "type": "boolean"
+              },
+              "glow_scale": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "tint_strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "bulges": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 8
               }
             },
             "required": ["segment", "tip"],
