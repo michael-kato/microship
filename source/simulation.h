@@ -188,6 +188,7 @@ struct Simulation
     uint32_t tick_count;
     double time_seconds;
     Unit units[MAX_UNITS];
+    uint32_t free_hint; // Within a spawning step, no free unit slot lies below this index.
     Trail trails[MAX_UNITS];
     CombatScratch combat_scratch;
     FlightObstacles flight_scratch; // Rebuilt by the movement phase.

@@ -792,11 +792,16 @@ static void establish_colony(Simulation* s,uint32_t p,Faction faction)
     sound(s,SOUND_COLONIZE,c->surface,c->faction);
 }
 
+// Spawning steps refresh the hint first; no unit dies until the step ends.
+static void refresh_free_hint(Simulation* s)
+{ uint32_t i=0;while (i<MAX_UNITS && s->units[i].health>0) ++i;s->free_hint=i; }
+// Takes the lowest free slot. A full store stays full for the rest of the step.
 static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,const Vec3* heading=0,uint32_t* spawned=0)
 {
-    for (uint32_t i=0;i<MAX_UNITS;++i)
+    for (uint32_t i=s->free_hint;i<MAX_UNITS;++i)
         if (s->units[i].health<=0)
         {
+            s->free_hint=i+1;
             const UnitDefinition* definition=&s->world.content.units[type];
             Unit unit={};
             unit.latch=-1;
@@ -814,7 +819,7 @@ static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,const 
             if (spawned) *spawned=i;
             return true;
         }
-    return false;
+    s->free_hint=MAX_UNITS;return false;
 }
 
 static void grow_colonies(Simulation*,float dt);
@@ -830,6 +835,7 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed,c
     if (!s->world.gameplay.enabled) return true;
     for (uint32_t f=1;f<MAX_FACTIONS;++f) if ((s->world.active_factions&(1u<<f)) && home_body(s,(Faction)f)<0)
     { fprintf(stderr,"Every active faction requires a home body.\n");return false; }
+    refresh_free_hint(s);
     for (uint32_t i=0;i<s->world.spawn_count;++i)
     {
         const Spawn* placement=&s->world.spawns[i];Faction faction=s->world.content.units[placement->type].faction;
@@ -2053,6 +2059,7 @@ static void colonize_cells(Simulation* s, float dt)
 }
 static void grow_carriers(Simulation* s,float dt)
 {
+    refresh_free_hint(s);
     bool held[MAX_UNITS]={};
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
@@ -2111,6 +2118,7 @@ static bool repair_colony(Simulation* s,uint32_t p,float dt)
 
 static void grow_colonies(Simulation* s, float dt)
 {
+    refresh_free_hint(s);
     const GameplayRules* rules=&s->world.gameplay;
     for (uint32_t p=0;p<s->world.body_count;++p)
     {
