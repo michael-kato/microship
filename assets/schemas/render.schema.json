@@ -336,6 +336,38 @@
       },
       "required": ["strength", "wrap", "transmission", "membrane_thickness", "samples_per_pixel"],
       "additionalProperties": false
+    },
+    "wireframe": {
+      "type": "object",
+      "properties": {
+        "line": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "fill": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "line_pixels": {
+          "type": "number",
+          "minimum": 0.25,
+          "maximum": 8
+        }
+      },
+      "required": ["line", "fill", "line_pixels"],
+      "additionalProperties": false
     }
   },
   "required": ["output", "sampling", "geometry", "camera", "lighting", "bloom", "volume"],

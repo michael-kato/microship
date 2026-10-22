@@ -11,6 +11,12 @@ if(NOT GLSLC)
     message(FATAL_ERROR "glslc is required; install the Vulkan SDK shader compiler")
 endif()
 
+# Shipping builds set this OFF: no wireframe, buffer views or debug hotkeys.
+option(DEVELOPMENT "Wireframe view, F2 buffer views and F1/F3/F5-F10 debug hotkeys" ON)
+set(dev_shader_flags)
+if(DEVELOPMENT)
+    set(dev_shader_flags -DDEVELOPMENT=1)
+endif()
 set(shader_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/ray_trace.comp.spv")
 set(bloom_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/bloom.comp.spv")
 set(volume_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/volume.comp.spv")
@@ -27,9 +33,13 @@ add_custom_command(OUTPUT "${cascade_output}"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/ray_trace.comp" -o "${cascade_output}"
     DEPENDS assets/shaders/render_bindings.glsl assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl VERBATIM)
 set(debug_outputs)
-foreach(debug_variant IN ITEMS surface volume guide_surface)
+set(debug_variants guide_surface)
+if(DEVELOPMENT)
+    list(APPEND debug_variants surface volume)
+endif()
+foreach(debug_variant IN LISTS debug_variants)
     set(debug_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/debug_${debug_variant}.comp.spv")
-    set(debug_flags -DNANOVA_DEBUG_BUFFERS=1)
+    set(debug_flags -DNANOVA_DEBUG_BUFFERS=1 ${dev_shader_flags})
     if(debug_variant MATCHES "^guide_")
         list(APPEND debug_flags -DNANOVA_NO_QUERY_COUNTERS=1)
     endif()
@@ -98,7 +108,7 @@ add_custom_command(OUTPUT "${bloom_output}"
     DEPENDS assets/shaders/render_bindings.glsl assets/shaders/bloom.comp assets/shaders/debug_buffers.glsl assets/shaders/display_transform.glsl VERBATIM)
 add_custom_command(OUTPUT "${shader_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O
+    COMMAND ${GLSLC} --target-env=vulkan1.2 -O ${dev_shader_flags}
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/ray_trace.comp" -o "${shader_output}"
     DEPENDS assets/shaders/render_bindings.glsl assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl
     VERBATIM)
@@ -205,6 +215,9 @@ add_executable(nanova
 )
 add_dependencies(nanova nanova_assets)
 target_link_libraries(nanova PRIVATE Vulkan::Vulkan)
+if(DEVELOPMENT)
+    target_compile_definitions(nanova PRIVATE DEVELOPMENT=1)
+endif()
 if(WIN32)
     target_link_libraries(nanova PRIVATE user32 gdi32 winmm)
     target_compile_definitions(nanova PRIVATE _WIN32_WINNT=0x0A00 _CRT_SECURE_NO_WARNINGS)

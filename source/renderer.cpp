@@ -29,7 +29,7 @@
 static_assert(SIGHT_FIELD_SIDE==FOG_FIELD_SIZE,"Fog CPU/GPU grid layout");
 static const int GPU_VERTEX_BYTES = 64;
 static const int GPU_MEDIUM_BYTES = 80;
-static const int GPU_RENDER_UNIFORM_BYTES = 624;
+static const int GPU_RENDER_UNIFORM_BYTES = 656;
 static const int GPU_DEBUG_PUSH_BYTES = 128;
 static const double MILLISECONDS_PER_SECOND = 1000.0;
 static const double BINARY_UNIT_SCALE = 1024.0;
@@ -104,6 +104,7 @@ struct RenderUniform
     float organelle_style[4],membrane_ripple[4],emission_fresnel[4],emission_color[4];
     uint32_t cascades[4];
     float cascade_interval[4];
+    float wireframe_line[4],wireframe_fill[4];
 };
 
 static_assert(sizeof(GpuVertex) == GPU_VERTEX_BYTES, "Vertex shader layout");
@@ -1866,18 +1867,21 @@ static bool create_debug(RendererState* state, const char* builtin_shader_path)
         || !load_companion(state,builtin_shader_path,"debug.comp.spv",state->debug_overlay_layout,&state->debug_overlay_pipeline))
         return false;
     if (!state->debug_available) return true;
-    return load_companion(state,builtin_shader_path,"debug_surface.comp.spv",
-        state->pipeline_layout,&state->debug_surface_pipeline)
-        && load_companion(state,builtin_shader_path,"debug_volume.comp.spv",state->pipeline_layout,&state->debug_volume_pipeline)
-        && load_companion(state,builtin_shader_path,"debug_guide_surface.comp.spv",state->pipeline_layout,&state->guide_surface_pipeline);
+#ifdef DEVELOPMENT
+    if (!load_companion(state,builtin_shader_path,"debug_surface.comp.spv",state->pipeline_layout,&state->debug_surface_pipeline)
+        || !load_companion(state,builtin_shader_path,"debug_volume.comp.spv",state->pipeline_layout,&state->debug_volume_pipeline)) return false;
+#endif
+    return load_companion(state,builtin_shader_path,"debug_guide_surface.comp.spv",state->pipeline_layout,&state->guide_surface_pipeline);
 }
 
 static bool create_surface_toggles(RendererState* state,const char* shader_path)
 {
     if (state->headless || state->custom_shader || state->config.subsurface_strength<=0) return true;
     return load_compute_pipeline(state,shader_path,state->pipeline_layout,&state->no_sss_pipeline,true)
-        && load_companion(state,shader_path,"debug_guide_surface.comp.spv",state->pipeline_layout,&state->no_sss_guide_pipeline,true)
-        && load_companion(state,shader_path,"debug_surface.comp.spv",state->pipeline_layout,&state->no_sss_debug_pipeline,true);
+#ifdef DEVELOPMENT
+        && load_companion(state,shader_path,"debug_surface.comp.spv",state->pipeline_layout,&state->no_sss_debug_pipeline,true)
+#endif
+        && load_companion(state,shader_path,"debug_guide_surface.comp.spv",state->pipeline_layout,&state->no_sss_guide_pipeline,true);
 }
 
 static void shader_buffer_barrier(VkCommandBuffer command)
@@ -2653,6 +2657,19 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     uniform->membrane_fade[3]=renderer->disabled_features&RENDER_GLOW ? 0.0f : 1.0f;
     if (state->custom_shader || (renderer->disabled_features&RENDER_CELL_BLUR))
     { uniform->quality[3]=0;uniform->membrane_fade[2]=0; }
+#ifdef DEVELOPMENT
+    uniform->wireframe_line[3]=0;
+    if (renderer->wireframe && !state->custom_shader && state->config.wireframe_pixels>0)
+    {
+        const RenderConfig& c=state->config;
+        uniform->wireframe_line[0]=c.wireframe_line.r;uniform->wireframe_line[1]=c.wireframe_line.g;uniform->wireframe_line[2]=c.wireframe_line.b;
+        uniform->wireframe_line[3]=c.wireframe_pixels;
+        uniform->wireframe_fill[0]=c.wireframe_fill.r;uniform->wireframe_fill[1]=c.wireframe_fill.g;uniform->wireframe_fill[2]=c.wireframe_fill.b;
+        // Edges only: no medium, blur, focus or glow over the lines.
+        uniform->quality[0]=0;uniform->subsurface[0]=0;uniform->focus_band[3]=0;uniform->fog[0]=0;
+        uniform->membrane_fade[3]=0;uniform->quality[3]=0;uniform->membrane_fade[2]=0;
+    }
+#endif
     if (scene->instances.size()!=state->instance_count || scene->media.size()!=state->medium_count
         || scene->geometry.meshes.size()!=state->mesh_count || scene->effect_tiles.size()!=state->effect_tile_size
         || scene->lighting_bounds.size()!=state->medium_count)

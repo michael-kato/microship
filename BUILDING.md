@@ -32,6 +32,8 @@ haze range and healing. It excludes capacity, broad combat, other controls
 and renderer regressions covered by the full suite. These are different
 coverage levels. Timing records are in `build/iteration_review/`.
 
+Shipping builds configure with `-DDEVELOPMENT=OFF`. That removes the F3 wireframe view, F2 buffer views, the F1/F5–F10 hotkeys and the `--wireframe`/`--debug-views` flags. Pause-menu settings still control frame statistics and render features. The default `DEVELOPMENT=ON` build keeps them; `--wireframe` starts in wireframe.
+
 Build assets are copied beside the executable. Keep `build/` ignored. Remove `build/windows-cross/` for a clean game build; keep local tools in `build/toolchains/`.
 
 Select a level with `--world`:

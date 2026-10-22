@@ -66,5 +66,10 @@
     "transmission": 0.35,
     "membrane_thickness": 0.16,
     "samples_per_pixel": 1
+  },
+  "wireframe": {
+    "line": [0.45, 1.0, 0.75],
+    "fill": [0.004, 0.006, 0.008],
+    "line_pixels": 1.25
   }
 }

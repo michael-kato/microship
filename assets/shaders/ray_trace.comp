@@ -1119,6 +1119,39 @@ vec3 film_direction(uvec2 pixel, vec2 jitter)
         render.camera_up.xyz*(ndc.y*render.display.y));
 }
 
+#ifdef DEVELOPMENT
+// Development view: triangle edges by world distance to the nearest edge, in
+// pixels at the hit. Clear walls show the edges behind them, up to an opaque hit.
+vec3 trace_wireframe(uvec2 pixel)
+{
+    vec3 origin=render.camera_position.xyz,direction=film_direction(pixel,film_sample(0u,1u));
+    vec3 color=render.wireframe_fill.rgb;float weight=1.0,path=0.0;
+    float pixel_angle=2.0*render.display.y/float(render.settings.y),half_width=.5*render.wireframe_line.w;
+    for (uint layer=0u;layer<=render.settings.w;++layer)
+    {
+        uint triangle;vec2 barycentric;float distance;
+        if (!closest_hit(origin,direction,triangle,barycentric,distance)) break;
+        Surface s;if (!surface_at(triangle,barycentric,direction,s)) break;
+        path+=distance;film_terminal_distance=path;
+#ifdef NANOVA_DEBUG_BUFFERS
+        if (layer==0u) { debug_vertex_hit=vec4(s.color,s.translucent ? THIN_MEMBRANE_GUIDE_CODE : 1.0);debug_normal_depth=vec4(s.normal,distance); }
+#endif
+        uvec4 t=triangles[triangle];
+        vec3 a=hit_to_world*vec4(vertices[t.x].position.xyz,1.0);
+        vec3 b=hit_to_world*vec4(vertices[t.y].position.xyz,1.0);
+        vec3 c=hit_to_world*vec4(vertices[t.z].position.xyz,1.0);
+        vec3 heights=length(cross(b-a,c-a))/vec3(length(c-b),length(a-c),length(b-a));
+        vec3 edges=s.barycentric*heights;
+        float pixels=min(edges.x,min(edges.y,edges.z))/(path*pixel_angle);
+        float line=1.0-smoothstep(half_width,half_width+1.0,pixels);
+        color+=weight*line*render.wireframe_line.rgb*(.35+.65*s.color);
+        if (!s.translucent) break;
+        weight*=.5;origin=s.point-s.geometric_normal*point_epsilon(s.point);
+    }
+    return color;
+}
+#endif
+
 bool pixel_may_intersect_medium(uvec2 pixel)
 {
     vec3 axis = film_direction(pixel,vec2(0.5));
@@ -1469,7 +1502,7 @@ void main()
 #ifndef NANOVA_DISABLE_VACUUM_SKIP
     // All samples here have exactly the same uniform-environment radiance.
     // No path traversal, random draws or repeated per-sample normalization.
-    if (render.backdrop_style.x>0.0 && pixel_is_vacuum(pixel))
+    if (render.backdrop_style.x>0.0 && render.wireframe_line.w<=0.0 && pixel_is_vacuum(pixel))
     {
         if (render.background_quality.w>0u) sharp_pixels[pixel.y*render.settings.x+pixel.x].a=0.0;
         vec3 background=texelFetch(soft_backdrop,ivec2(pixel),0).rgb;
@@ -1488,6 +1521,10 @@ void main()
     if (render.background_quality.x>0u && render.background_quality.y>0u && pixel_only_background(pixel))
         sample_count=min(sample_count,render.background_quality.x);
     vec3 sum = vec3(0.0);
+#ifdef DEVELOPMENT
+    if (render.wireframe_line.w>0.0) { sample_count=1u;sum=trace_wireframe(pixel); }
+    else
+#endif
     for (uint sample_index = 0u; sample_index < sample_count; ++sample_index)
     {
         vec3 direction=film_direction(pixel,film_sample(sample_index,sample_count));

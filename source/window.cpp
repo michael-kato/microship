@@ -118,6 +118,9 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
         message=message==WM_SYSKEYDOWN ? WM_KEYDOWN : WM_KEYUP;
     if (window && (message==WM_KEYDOWN || message==WM_KEYUP))
     {
+#ifdef DEVELOPMENT
+        if (wparam==VK_F3)
+        { if (message==WM_KEYDOWN && !(lparam&(1L<<KEY_WAS_DOWN_BIT))) window->input.toggle_wireframe=true;return 0; }
         if (wparam==VK_F1 || wparam==VK_F2)
         {
             bool* held=wparam==VK_F1 ? &window->stats_held : &window->buffers_held;
@@ -138,6 +141,7 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
             }
             return 0;
         }
+#endif
         uint32_t key=camera_key(wparam);
         if (key)
         {

@@ -31,4 +31,6 @@ layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
     vec4 emission_color; // RGB override for those instances; W enables it.
     uvec4 cascades; // Probe resolution, octahedral side, cascade count, bounce feedback.
     vec4 cascade_interval; // First interval in probe spacings, interval growth per cascade.
+    vec4 wireframe_line; // RGB edge color, W line width in pixels; zero W: normal shading.
+    vec4 wireframe_fill; // RGB face and empty-space color.
 } render;

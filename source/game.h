@@ -28,7 +28,7 @@ struct GameOptions
     bool vsync;
     bool smoke;
     bool headless;
-    bool stats_set, show_stats, debug_views, no_activate;
+    bool stats_set, show_stats, debug_views, wireframe, no_activate; // Debug views and wireframe: DEVELOPMENT builds.
     double time_seconds;
     double step_seconds;
     bool time_set;

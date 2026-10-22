@@ -23,6 +23,9 @@ struct Renderer
     bool debug_stats;
     bool frame_log; // Per-frame diagnostic lines, only for bounded --frames runs.
     bool debug_views;
+#ifdef DEVELOPMENT
+    bool wireframe; // F3: triangle edges instead of lighting.
+#endif
     uint32_t disabled_features,available_features;
     double previous_frame_ms;
     double gpu_frame_ms, work_frame_ms, acquire_ms, present_ms;

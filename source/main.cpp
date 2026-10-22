@@ -71,7 +71,7 @@ static void print_usage(FILE* output)
         "              [--vsync] [--time SECONDS] [--step-seconds N] [--camera-drag X Y] [--camera-zoom N]\n"
         "              [--camera-pointer X Y] [--click X Y] [--command X Y] [--select-group 1..3] [--select-screen-group 1..2] [--focus] [--additive] [--restart]\n"
         "              [--pointer-drag X1 Y1 X2 Y2] (client pixels)\n"
-        "              [--smoke] [--stats|--no-stats] [--debug-views] [--no-activate]\n"
+        "              [--smoke] [--stats|--no-stats] [--debug-views] [--wireframe] [--no-activate]\n"
         "              [--replay PATH.orders] [--ticks N] [--state PATH.json] [--scene-state PATH.json]\n"
         "              [--matches N] [--cpu-benchmark] (with --smoke and --ticks: seeded matches, optional tick timings)\n"
         "              [--audio-capture PATH.wav] (with --smoke and --ticks, at most 3600 ticks)\n"
@@ -174,8 +174,11 @@ int main(int argc, char** argv)
             options.stats_set = true;
             options.show_stats = strcmp(argv[i], "--stats") == 0;
         }
+#ifdef DEVELOPMENT
         else if (strcmp(argv[i], "--debug-views") == 0)
             options.debug_views = true;
+        else if (strcmp(argv[i],"--wireframe")==0) options.wireframe=true;
+#endif
         else if (strcmp(argv[i], "--no-activate") == 0)
             options.no_activate = true;
         else if (strcmp(argv[i],"--restart")==0) options.camera_input.restart=true;
