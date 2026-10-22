@@ -192,6 +192,7 @@ struct Simulation
     FlightObstacles flight_scratch; // Rebuilt by the movement phase.
     UnitGrid grid; // Scratch spatial index; positions may move up to UNIT_GRID_MOTION_MARGIN after a build.
     NeighborGrid neighbors; // Scratch; built from the positions at the start of movement.
+    NeighborGrid player_grid; // Live player craft; built by the sight phase from its positions.
     BodyGrid body_grid;
     SightField fog_memory;
     Projectile projectiles[MAX_PROJECTILES];
@@ -265,6 +266,8 @@ bool simulation_in_sight(const Simulation*,Vec3 position,float radius);
 bool simulation_body_known(const Simulation*,uint32_t cell);
 void simulation_update_sight(Simulation*);
 uint32_t simulation_query_units(const Simulation*,Vec3,float,uint32_t,uint16_t*);
+// Player craft near a point, a superset for the radius; valid from the sight phase until craft move.
+uint32_t simulation_query_player_units(const Simulation*,Vec3,float radius,uint16_t*);
 void simulation_emit_sound(Simulation*,SoundKind,Vec3,Faction);
 void simulation_update_fog(Simulation*,float dt);
 

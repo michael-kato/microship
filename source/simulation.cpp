@@ -194,6 +194,9 @@ static void grid_bounds(Simulation* s)
     }
     float spacing=w.combat.separation*w.content.max_unit_separation;
     s->neighbors.inverse_cell=spacing>0 ? 1/spacing : 0;
+    // Wide enough for sight and encounter reach around the largest cell.
+    float largest=0;for (uint32_t p=0;p<w.body_count;++p) largest=std::fmax(largest,w.bodies[p].radius);
+    s->player_grid.inverse_cell=1/(std::fmax(w.sight_radius,w.communications.encounter_radius)+largest+UNIT_GRID_MOTION_MARGIN);
 }
 static float body_grid_radius(const Body& b,float reach)
 { return b.radius*CELL_COLLISION_RADIUS_SCALE+reach+BODY_GRID_ROUNDING_SLACK; }
@@ -286,13 +289,13 @@ static uint32_t neighbor_bucket(int32_t x,int32_t y,int32_t z)
 { return ((uint32_t)x*NEIGHBOR_HASH_X^(uint32_t)y*NEIGHBOR_HASH_Y^(uint32_t)z*NEIGHBOR_HASH_Z)&(NEIGHBOR_BUCKETS-1); }
 static int32_t neighbor_axis(const NeighborGrid& g,float value) { return (int32_t)std::floor(value*g.inverse_cell); }
 static uint32_t neighbor_key(const NeighborGrid& g,Vec3 p) { return neighbor_bucket(neighbor_axis(g,p.x),neighbor_axis(g,p.y),neighbor_axis(g,p.z)); }
-static void neighbors_build(Simulation* s)
+static void neighbors_build(const Simulation* s,NeighborGrid& g,uint32_t factions)
 {
-    NeighborGrid& g=s->neighbors;if (g.inverse_cell<=0) return;
+    if (g.inverse_cell<=0) return;
     memset(g.start,0,sizeof(g.start));
-    for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) ++g.start[neighbor_key(g,s->units[i].position)+1];
+    for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0 && (factions&(1u<<s->units[i].faction))) ++g.start[neighbor_key(g,s->units[i].position)+1];
     for (uint32_t k=0;k<NEIGHBOR_BUCKETS;++k) { g.start[k+1]+=g.start[k];g.cursor[k]=g.start[k]; }
-    for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0) g.units[g.cursor[neighbor_key(g,s->units[i].position)]++]=(uint16_t)i;
+    for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0 && (factions&(1u<<s->units[i].faction))) g.units[g.cursor[neighbor_key(g,s->units[i].position)]++]=(uint16_t)i;
 }
 // Units in the 27 cells around the point, a superset of every unit within one
 // cell width. Hash collisions within the block are visited once.
@@ -312,20 +315,37 @@ static uint32_t neighbors_query(const NeighborGrid& g,Vec3 center,uint16_t* out)
     return count;
 }
 
-bool simulation_in_sight(const Simulation* s,Vec3 position,float radius)
+// Exact sight test against the given player cells and the craft a query returns.
+static bool sees(const Simulation* s,const uint32_t* cells,uint32_t cell_count,Vec3 position,float reach,const uint16_t* near,uint32_t count)
 {
-    if (s->world.sight_radius<=0) return true;
-    float reach=s->world.sight_radius+radius;
-    for (uint32_t p=0;p<s->world.body_count;++p)
-        if (s->colonies[p].active && s->colonies[p].faction==s->world.player_faction
-            && length(subtract(position,s->world.bodies[p].position))<reach+s->world.bodies[p].radius) return true;
-    uint16_t near[MAX_UNITS];uint32_t count=grid_query(s->grid,position,reach,1u<<s->world.player_faction,near);
+    for (uint32_t n=0;n<cell_count;++n)
+        if (length(subtract(position,s->world.bodies[cells[n]].position))<reach+s->world.bodies[cells[n]].radius) return true;
     for (uint32_t n=0;n<count;++n)
     {
         const Unit& u=s->units[near[n]];
         if (u.health>0 && u.faction==s->world.player_faction && length(subtract(position,u.position))<reach) return true;
     }
     return false;
+}
+static uint32_t player_cells(const Simulation* s,uint32_t* cells)
+{
+    uint32_t count=0;
+    for (uint32_t p=0;p<s->world.body_count;++p)
+        if (s->colonies[p].active && s->colonies[p].faction==s->world.player_faction) cells[count++]=p;
+    return count;
+}
+bool simulation_in_sight(const Simulation* s,Vec3 position,float radius)
+{
+    if (s->world.sight_radius<=0) return true;
+    float reach=s->world.sight_radius+radius;
+    uint32_t cells[MAX_BODIES],cell_count=player_cells(s,cells);
+    uint16_t near[MAX_UNITS];uint32_t count=grid_query(s->grid,position,reach,1u<<s->world.player_faction,near);
+    return sees(s,cells,cell_count,position,reach,near,count);
+}
+uint32_t simulation_query_player_units(const Simulation* s,Vec3 p,float radius,uint16_t* out)
+{
+    if (radius*s->player_grid.inverse_cell<=1) return neighbors_query(s->player_grid,p,out);
+    return grid_query(s->grid,p,radius,1u<<s->world.player_faction,out);
 }
 static bool opening_orbit(const Simulation* s,const Unit& unit)
 {
@@ -336,16 +356,20 @@ bool simulation_body_known(const Simulation* s,uint32_t p)
 
 void simulation_update_sight(Simulation* s)
 {
-    grid_build(s);
+    grid_build(s);neighbors_build(s,s->player_grid,1u<<s->world.player_faction);
+    bool all=s->world.sight_radius<=0;
+    uint32_t cells[MAX_BODIES],cell_count=player_cells(s,cells);uint16_t near[MAX_UNITS];
     for (uint32_t p=0;p<s->world.body_count;++p)
     {
-        s->visible_bodies[p]=simulation_in_sight(s,s->world.bodies[p].position,s->world.bodies[p].radius);
+        const Body& b=s->world.bodies[p];float reach=s->world.sight_radius+b.radius;
+        s->visible_bodies[p]=all || sees(s,cells,cell_count,b.position,reach,near,simulation_query_player_units(s,b.position,reach,near));
         s->discovered[p]=s->discovered[p] || s->visible_bodies[p];
     }
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         const Unit* u=&s->units[i];
-        s->visible_units[i]=u->health>0 && (u->faction==s->world.player_faction || simulation_in_sight(s,u->position,0));
+        s->visible_units[i]=u->health>0 && (u->faction==s->world.player_faction || all
+            || sees(s,cells,cell_count,u->position,s->world.sight_radius,near,simulation_query_player_units(s,u->position,s->world.sight_radius,near)));
     }
 }
 
@@ -1243,7 +1267,7 @@ static void move_units(Simulation* s, float dt)
     Vec3 positions[MAX_UNITS],velocities[MAX_UNITS];int32_t held_by[MAX_UNITS];
     for (uint32_t i=0;i<MAX_UNITS;++i)
     { positions[i]=s->units[i].position;velocities[i]=s->units[i].velocity;held_by[i]=-1;s->units[i].charging=false; }
-    grid_build(s);neighbors_build(s);
+    grid_build(s);neighbors_build(s,s->neighbors,~0u);
     uint16_t near[MAX_UNITS];
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {

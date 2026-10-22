@@ -6,7 +6,8 @@
 
 static bool near_units(const Simulation* s,Vec3 point,float radius,uint32_t factions)
 {
-    uint16_t nearby[MAX_UNITS];uint32_t count=simulation_query_units(s,point,radius,factions,nearby);
+    uint16_t nearby[MAX_UNITS];
+    uint32_t count=factions==1u<<s->world.player_faction ? simulation_query_player_units(s,point,radius,nearby) : simulation_query_units(s,point,radius,factions,nearby);
     for (uint32_t i=0;i<count;++i)
     {
         const Unit& u=s->units[nearby[i]];Vec3 delta=subtract(u.position,point);
