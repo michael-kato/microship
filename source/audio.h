@@ -1,5 +1,5 @@
-#ifndef NANOVA_AUDIO_H
-#define NANOVA_AUDIO_H
+#ifndef NANOVORE_AUDIO_H
+#define NANOVORE_AUDIO_H
 #include "sound_events.h"
 #include "content.h"
 #include <stdint.h>

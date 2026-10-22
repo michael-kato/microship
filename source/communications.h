@@ -1,5 +1,5 @@
-#ifndef NANOVA_COMMUNICATIONS_H
-#define NANOVA_COMMUNICATIONS_H
+#ifndef NANOVORE_COMMUNICATIONS_H
+#define NANOVORE_COMMUNICATIONS_H
 #include "content.h"
 #include <stdio.h>
 struct Simulation;

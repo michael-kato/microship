@@ -2,12 +2,12 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "nanova: run (Proton)",
+      "name": "nanovore: run (Proton)",
       "type": "node-terminal",
       "request": "launch",
-      "command": "python3 \"${workspaceFolder}/scripts/proton_run.py\" \"${workspaceFolder}/build/windows-cross/nanova.exe\"",
+      "command": "python3 \"${workspaceFolder}/scripts/proton_run.py\" \"${workspaceFolder}/build/windows-cross/nanovore.exe\"",
       "cwd": "${workspaceFolder}",
-      "preLaunchTask": "nanova: build Windows"
+      "preLaunchTask": "nanovore: build Windows"
     }
   ]
 }

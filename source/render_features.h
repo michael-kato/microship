@@ -1,5 +1,5 @@
-#ifndef NANOVA_RENDER_FEATURES_H
-#define NANOVA_RENDER_FEATURES_H
+#ifndef NANOVORE_RENDER_FEATURES_H
+#define NANOVORE_RENDER_FEATURES_H
 
 // F5 through F10 use these bits in key order.
 enum RenderFeature {

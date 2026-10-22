@@ -2,19 +2,19 @@
 
 The target is Windows. Linux cross-compiles with MinGW and `glslc`. Application checks run the Windows executable through Steam Proton 11. An explicit headless Linux target is available for performance diagnosis.
 
-A clean build needs the compiler, Vulkan headers and import library, `glslc`, and an initialized Proton prefix. Local tools are in `build/toolchains/`. Set `NANOVA_PROTON` and `STEAM_COMPAT_DATA_PATH` to use another Proton installation and prefix. The default prefix is `build/proton11-prefix`; it must contain `pfx/system.reg`. A normal Proton `run` command initializes it.
+A clean build needs the compiler, Vulkan headers and import library, `glslc`, and an initialized Proton prefix. Local tools are in `build/toolchains/`. Set `NANOVORE_PROTON` and `STEAM_COMPAT_DATA_PATH` to use another Proton installation and prefix. The default prefix is `build/proton11-prefix`; it must contain `pfx/system.reg`. A normal Proton `run` command initializes it.
 
 ```sh
 bash scripts/check.sh
-python3 scripts/proton_run.py build/windows-cross/nanova.exe
+python3 scripts/proton_run.py build/windows-cross/nanovore.exe
 ```
 
-In VS Code, open the `nanova` project folder. Press F5 and select
-**nanova: run (Proton)**. This entry builds the Windows executable, then
+In VS Code, open the `nanovore` project folder. Press F5 and select
+**nanovore: run (Proton)**. This entry builds the Windows executable, then
 starts it through Proton in a terminal. It uses the JavaScript Debugger
 that ships with VS Code. It starts the game; C++ breakpoints are not supported
 by this entry. The CMake extension's Run button is a separate command.
-Use **Terminal > Run Task > nanova: run (Proton)** to launch with the task
+Use **Terminal > Run Task > nanovore: run (Proton)** to launch with the task
 system. The faction tasks start the generated 128-cell map with `--faction`.
 
 `check.sh` defaults to an incremental build and short CPU application checks.
@@ -39,7 +39,7 @@ Build assets are copied beside the executable. Keep `build/` ignored. Remove `bu
 Select a level with `--world`:
 
 ```sh
-python3 scripts/proton_run.py build/windows-cross/nanova.exe --world assets/levels/immune-player-level.json
+python3 scripts/proton_run.py build/windows-cross/nanovore.exe --world assets/levels/immune-player-level.json
 ```
 
 `large_level.json` is the normal 128-cell map with all three factions; `--faction NAME` picks the player's side. The world seed generates the layout and home assignment. Older two-side levels remain diagnostic fixtures. `three_faction_stress.json` is the primary stress scene: 15 developed cells, 60 seconds of actual production per faction, and a shared battle point. `--world-seed N` fixes the variation seed. `--smoke` loads assets, runs the simulation, builds render input, and shuts down without a GPU. `--state PATH.json` and `--scene-state PATH.json` export diagnostics.
@@ -48,9 +48,9 @@ Per-frame diagnostic lines (`Scene time`, GPU stage times, `Application frame`) 
 
 All checks use the real application. Short GPU checks keep native 1920×1080, default renderer sampling. Each ordinary process uses at most two frames and ten seconds, with thirty seconds per sequential batch. Longer startup and performance limits are described below. See [PROFILING.md](PROFILING.md) for commands and validation limits.
 
-To record flight paths, run `python3 tests/e2e/navigation.py build/windows-cross/nanova.exe --output build/navigation`. With Matplotlib installed, run `python3 scripts/plot_flight.py build/navigation/paths.json --output build/navigation/flight-paths.svg`. The plot joins measured half-second positions.
+To record flight paths, run `python3 tests/e2e/navigation.py build/windows-cross/nanovore.exe --output build/navigation`. With Matplotlib installed, run `python3 scripts/plot_flight.py build/navigation/paths.json --output build/navigation/flight-paths.svg`. The plot joins measured half-second positions.
 
-For the frame profiler checks, build the small Win32 input driver with `cmake --build build/windows-cross --target nanova_input_probe`. Run `python3 tests/e2e/profiler_window.py build/windows-cross/nanova.exe --run` for F1 messages and OS middle-button input. Run `python3 tests/e2e/profiler_render.py build/windows-cross/nanova.exe --run` for normal zoom, close zoom, and F2 compatibility. Without `--run`, these scripts start no GPU work. The input check uses `--frame-delay-ms 250` between its two frames to allow input delivery. This diagnostic delay requires a bounded `--frames` run, has a 250 ms limit, and is outside measured CPU work. It changes frame cadence and must not be used for performance measurements.
+For the frame profiler checks, build the small Win32 input driver with `cmake --build build/windows-cross --target nanovore_input_probe`. Run `python3 tests/e2e/profiler_window.py build/windows-cross/nanovore.exe --run` for F1 messages and OS middle-button input. Run `python3 tests/e2e/profiler_render.py build/windows-cross/nanovore.exe --run` for normal zoom, close zoom, and F2 compatibility. Without `--run`, these scripts start no GPU work. The input check uses `--frame-delay-ms 250` between its two frames to allow input delivery. This diagnostic delay requires a bounded `--frames` run, has a 250 ms limit, and is outside measured CPU work. It changes frame cadence and must not be used for performance measurements.
 
 Factory roots use the transformed nucleus center and each organelle center
 for all factions. The nucleus part has `anchor_origin: true` in its mesh-part
@@ -79,8 +79,8 @@ only when the benchmark requests them. Setup time is separate from tick time.
 To compare a saved build with the current build, use:
 
 ```sh
-python3 tests/e2e/combat_perf.py build/windows-cross/nanova.exe \
-  --baseline /path/to/baseline/nanova.exe --world /path/to/unchanged/world.json
+python3 tests/e2e/combat_perf.py build/windows-cross/nanovore.exe \
+  --baseline /path/to/baseline/nanovore.exe --world /path/to/unchanged/world.json
 ```
 
 Keep the baseline executable and its assets together. Both builds use the
@@ -165,11 +165,11 @@ The GPU log separates static bake time from dynamic shadow work. F1 shows
 both in the `LIGHTING FIELDS` span and retains full GPU time accounting.
 
 The live invalidation check is
-`python3 tests/e2e/static_lighting_live.py build/windows-cross/nanova.exe --run`.
+`python3 tests/e2e/static_lighting_live.py build/windows-cross/nanovore.exe --run`.
 It checks bake invalidation and compares scene and simulation state at the same tick. Radiance-cascade image history can differ between the two runs.
 The camera check is
-`python3 tests/e2e/static_lighting_camera.py build/windows-cross/nanova.exe --run`;
-first build `nanova_input_probe`. It sends Win32 pan messages to the real
+`python3 tests/e2e/static_lighting_camera.py build/windows-cross/nanovore.exe --run`;
+first build `nanovore_input_probe`. It sends Win32 pan messages to the real
 window. On Proton it disables host audio for this input-only check. Its
 250 ms pause permits input delivery and must not be used for timings.
 
@@ -253,7 +253,7 @@ and does not change system Vulkan registration.
 Prepare the close-view capture with:
 
 ```sh
-python3 scripts/renderdoc_profile.py build/windows-cross/nanova.exe --output build/renderdoc-on
+python3 scripts/renderdoc_profile.py build/windows-cross/nanovore.exe --output build/renderdoc-on
 ```
 
 Add `--run` to start GPU work. The default uses native 1920 by 1080,
@@ -300,10 +300,10 @@ the fog-of-war filter. The keys open F1 and clear its timing averages.
 The normal window prepares SSS-on and SSS-off surface programs at startup;
 key presses do not compile shaders or replace Vulkan resources.
 
-Build `nanova_input_probe`, then prepare or run one check:
+Build `nanovore_input_probe`, then prepare or run one check:
 
 ```sh
-python3 tests/e2e/render_toggles.py build/windows-cross/nanova.exe --case off --run
+python3 tests/e2e/render_toggles.py build/windows-cross/nanovore.exe --case off --run
 ```
 
 Cases are `baseline`, `off`, `restore`, `repeat`, and `buffers`. Each uses
@@ -371,7 +371,7 @@ native menu, window or live audio; use `--headless` or `--smoke`. The
 Windows game remains the interactive target.
 
 ```sh
-cmake -S . -B build/linux-diagnostic -G Ninja -DCMAKE_BUILD_TYPE=Release -DNANOVA_NATIVE_DIAGNOSTIC=ON
+cmake -S . -B build/linux-diagnostic -G Ninja -DCMAKE_BUILD_TYPE=Release -DNANOVORE_NATIVE_DIAGNOSTIC=ON
 cmake --build build/linux-diagnostic --parallel
 ctest --test-dir build/linux-diagnostic --output-on-failure
 ```
@@ -508,7 +508,7 @@ keep their dependency checks. There is no temporal reconstruction.
 Use the former six-film/eight-step/32-cell settings with:
 
 ```sh
-python3 scripts/proton_run.py build/windows-cross/nanova.exe --config assets/rendering/renderer-quality.json
+python3 scripts/proton_run.py build/windows-cross/nanovore.exe --config assets/rendering/renderer-quality.json
 ```
 
 The fast preset trades subpixel coverage and scattering/shadow detail for
@@ -552,7 +552,7 @@ limit for a manual run; project checks use 100. Both build check scripts
 check JSON formatting before they build. The command rejects duplicate
 keys and non-JSON numbers, and preserves number precision and field order.
 
-VS Code tasks provide **nanova: format JSON** and **nanova: check JSON formatting**.
+VS Code tasks provide **nanovore: format JSON** and **nanovore: check JSON formatting**.
 The built-in JSON formatter keeps existing line breaks; use the format
 task to apply the array width rule. No additional packages are needed.
 
@@ -586,7 +586,7 @@ limit is 90 seconds; the checked run took about 45 seconds.
 Prepare the GPU check without starting the GPU:
 
 ```sh
-python3 tests/e2e/cell_animation_render.py build/windows-cross/nanova.exe
+python3 tests/e2e/cell_animation_render.py build/windows-cross/nanovore.exe
 ```
 
 Add `--run` to execute the prepared check within the approved ordinary limits.
@@ -797,13 +797,13 @@ the repeated taps were cache hits. Both were reverted.
 
 ## Faction balance runs
 
-`python3 tests/e2e/faction_balance.py build/windows-cross/nanova.exe` plays
+`python3 tests/e2e/faction_balance.py build/windows-cross/nanovore.exe` plays
 every faction pairing headless with the built-in AI on both sides
 (`match.player_ai`). Fog is off, each side starts with its faction's
 player-level roster, and every pairing runs with both roles and both start
 cells for each world seed (`--seeds`, default 10; `--minutes`, default 15
 game minutes; `--jobs`, default half the CPU threads). Each pairing, role and
-cell is one process: `nanova --smoke --ticks N --world-seed S --matches M`
+cell is one process: `nanovore --smoke --ticks N --world-seed S --matches M`
 plays M seeded matches back to back without audio or rendering, stops each at
 its outcome or N ticks, and prints one JSON summary line per match. The three
 factions (120 matches) take about 2.3 minutes on a 24-thread CPU, mostly in
@@ -816,7 +816,7 @@ State exports and match summaries carry `outcome_tick` and per-faction
 Matches with heavy parallel CPU load can exceed the per-process timeout of
 the ordinary checks; run those with lower `ctest -j`. Under Proton, a check
 can also fail with "ShellExecuteEx failed" or a 10 s timeout from a stuck
-Wine launch; the same check passes when rerun, and stale `nanova.exe` Wine
+Wine launch; the same check passes when rerun, and stale `nanovore.exe` Wine
 processes from the failed run should be stopped first.
 
 Results on Oct 20 (commit b0062ab, 40 matches per pairing): immune beats
@@ -916,7 +916,7 @@ prepares inputs by default; `--run` starts the bounded GPU batch.
 
 ## Pause menu checks
 
-Build the input driver with `cmake --build build/windows-cross --target nanova_input_probe`. Run `python3 tests/e2e/pause_menu.py build/windows-cross/nanova.exe` for CPU application checks of the production menu, settings files, faction changes and quit. These runs load the game, open its real Win32 menu and use its controls. They start no GPU work. The input driver sends Win32 messages to the selected application process. This does not establish physical input or native Windows behavior.
+Build the input driver with `cmake --build build/windows-cross --target nanovore_input_probe`. Run `python3 tests/e2e/pause_menu.py build/windows-cross/nanovore.exe` for CPU application checks of the production menu, settings files, faction changes and quit. These runs load the game, open its real Win32 menu and use its controls. They start no GPU work. The input driver sends Win32 messages to the selected application process. This does not establish physical input or native Windows behavior.
 
 `--smoke --pause-on-start --settings PATH.json` opens the production pause menu after game loading and before the smoke check continues. The explicit player file keeps the diagnostic separate from normal preferences. The smoke path does not check graphics resource changes. `--pause-on-start` also works with bounded window runs.
 
@@ -930,7 +930,7 @@ a 10-second process limit and no hardware tracing. It does not measure sustained
 performance or cover every graphics-setting combination.
 
 
-Run `python3 tests/e2e/pause_menu.py build/windows-cross/nanova.exe --gpu --os-input` to check OS Esc input, mouse navigation, Esc back and Enter resume. This captures only the menu window's native client pixels. Game captures remain native 1920x1080.
+Run `python3 tests/e2e/pause_menu.py build/windows-cross/nanovore.exe --gpu --os-input` to check OS Esc input, mouse navigation, Esc back and Enter resume. This captures only the menu window's native client pixels. Game captures remain native 1920x1080.
 
 Checked Oct 20: 24 CPU menu and audio application runs passed. Captured PCM confirmed volume gain and mute. The smoke, camera, screen selection and polish checks passed. All three faction choices passed through the main menu. Bounded GPU runs checked graphics Apply, renderer cleanup during a faction change, recovery after a settings save failure, input isolation and resume with the host Vulkan validation layer. OS menu input also passed.
 

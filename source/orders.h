@@ -1,5 +1,5 @@
-#ifndef NANOVA_ORDERS_H
-#define NANOVA_ORDERS_H
+#ifndef NANOVORE_ORDERS_H
+#define NANOVORE_ORDERS_H
 #include <stdint.h>
 struct Simulation;
 struct Audio;

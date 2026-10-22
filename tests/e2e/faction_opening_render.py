@@ -27,7 +27,7 @@ opening=deepcopy(settings);opening['camera'].update(position=[-103.92305,-60,20.
 cases.append(('owned_start',['--world',str(binary.parent/'assets/levels/large_level.json'),'--config',str(config),'--ticks','900']))
 (out/'cases.json').write_text(json.dumps(cases,indent=2)+'\n')
 if not a.run:print('Prepared three two-frame captures. No GPU work started.');raise SystemExit(0)
-env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1';env['NANOVA_GPU_TIMEOUT_SECONDS']='10'
+env=os.environ.copy();env['NANOVORE_VULKAN_VALIDATION']='1';env['NANOVORE_GPU_TIMEOUT_SECONDS']='10'
 records=[];start=time.monotonic()
 for name,args in cases:
  common=[*command,*args,'--world-seed','1234','--step-seconds','0']

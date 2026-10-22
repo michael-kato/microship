@@ -2,7 +2,7 @@
 #extension GL_EXT_ray_query : require
 #extension GL_GOOGLE_include_directive : require
 #include "render_bindings.glsl"
-#ifdef NANOVA_DEBUG_BUFFERS
+#ifdef NANOVORE_DEBUG_BUFFERS
 #include "debug_buffers.glsl"
 vec3 debug_direct = vec3(0.0),debug_sss=vec3(0.0);
 vec4 debug_vertex_hit = vec4(0.0), debug_normal_depth = vec4(0.0);
@@ -23,7 +23,7 @@ struct Vertex
 };
 
 layout(set = 0, binding = RENDER_BINDING_ACCELERATION) uniform accelerationStructureEXT scene_acceleration;
-#ifdef NANOVA_VOLUME_PASS
+#ifdef NANOVORE_VOLUME_PASS
 layout(set = 0, binding = RENDER_BINDING_BEAUTY, rgba16f) uniform image2D output_image;
 #else
 layout(set = 0, binding = RENDER_BINDING_BEAUTY, rgba16f) uniform writeonly image2D output_image;
@@ -150,7 +150,7 @@ bool closest_hit_within(vec3 origin, vec3 direction, float limit, out uint trian
     if (!scene_box_intersection(origin,direction,limit,0.0))
     { triangle_index=0u;barycentric=vec2(0);return false; }
     rayQueryEXT query;
-#if defined(NANOVA_DEBUG_BUFFERS) && !defined(NANOVA_NO_QUERY_COUNTERS)
+#if defined(NANOVORE_DEBUG_BUFFERS) && !defined(NANOVORE_NO_QUERY_COUNTERS)
     ++debug_closest_queries;
 #endif
     rayQueryInitializeEXT(query, scene_acceleration, gl_RayFlagsOpaqueEXT,
@@ -558,7 +558,7 @@ layout(set=0,binding=RENDER_BINDING_LIGHTING_INSTANCES,std430) readonly buffer L
 // attenuation. The subset selects stationary or moving blockers by instance mask.
 vec3 light_visibility(vec3 origin,vec3 direction,uint subset,bool medium_attenuation)
 {
-#if defined(NANOVA_DEBUG_BUFFERS) && !defined(NANOVA_NO_QUERY_COUNTERS)
+#if defined(NANOVORE_DEBUG_BUFFERS) && !defined(NANOVORE_NO_QUERY_COUNTERS)
     ++debug_shadow_queries;
 #endif
     uint mask=subset==LIGHTING_STATIC_ONLY ? STATIC_BLOCKER_RAY_MASK : subset==LIGHTING_DYNAMIC_ONLY ? DYNAMIC_BLOCKER_RAY_MASK : SURFACE_RAY_MASK;
@@ -712,7 +712,7 @@ float ambient_visibility(vec3 point,vec3 normal)
 // longer interval. Cascade 0 is merged with all farther cascades and projected
 // to RGB L1 spherical harmonics, which surfaces and media read for ambient light.
 layout(set=0,binding=RENDER_BINDING_CASCADES,std430) buffer RadianceCascades { vec4 cascade_data[]; };
-#ifdef NANOVA_CASCADE_PASS
+#ifdef NANOVORE_CASCADE_PASS
 const bool cascade_tracing=true;
 #else
 const bool cascade_tracing=false;
@@ -902,7 +902,7 @@ bool subsurface_exit(Surface s,vec3 direction,float limit,out vec3 exit_point,ou
     float epsilon=point_epsilon(s.point);
     vec3 origin=s.point-s.geometric_normal*epsilon;
     rayQueryEXT query;
-#if defined(NANOVA_DEBUG_BUFFERS) && !defined(NANOVA_NO_QUERY_COUNTERS)
+#if defined(NANOVORE_DEBUG_BUFFERS) && !defined(NANOVORE_NO_QUERY_COUNTERS)
     ++debug_shadow_queries;
 #endif
     rayQueryInitializeEXT(query,scene_acceleration,gl_RayFlagsNoOpaqueEXT,SURFACE_RAY_MASK,origin,0.0,direction,limit);
@@ -1057,13 +1057,13 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
             vec3 background=render.backdrop_style.x>0.0 ? texelFetch(soft_backdrop,ivec2(pixel),0).rgb : environment_radiance(direction);
             radiance+=weight*background;
             if (blur_radius<=0.0) film_sharp_sum+=weight*background;
-#ifdef NANOVA_DEBUG_BUFFERS
+#ifdef NANOVORE_DEBUG_BUFFERS
             debug_direct+=weight*background;
 #endif
             break;
         }
         Surface s;if (!surface_at(triangle,barycentric,direction,s)) break;
-#ifdef NANOVA_DEBUG_BUFFERS
+#ifdef NANOVORE_DEBUG_BUFFERS
         if (layer==0u)
         {
             ++debug_primary_hits;
@@ -1087,7 +1087,7 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
         vec3 contribution=weight*(direct+ambient_surface(s,-direction))*opacity;
         radiance+=contribution;
         if (blur_radius<=0.0) film_sharp_sum+=contribution;
-#ifdef NANOVA_DEBUG_BUFFERS
+#ifdef NANOVORE_DEBUG_BUFFERS
         debug_direct+=weight*direct*opacity;debug_sss+=weight*sss*opacity;
 #endif
         float clear=s.translucent ? membrane_clear(view_cosine) : 0.0;
@@ -1133,7 +1133,7 @@ vec3 trace_wireframe(uvec2 pixel)
         if (!closest_hit(origin,direction,triangle,barycentric,distance)) break;
         Surface s;if (!surface_at(triangle,barycentric,direction,s)) break;
         path+=distance;film_terminal_distance=path;
-#ifdef NANOVA_DEBUG_BUFFERS
+#ifdef NANOVORE_DEBUG_BUFFERS
         if (layer==0u) { debug_vertex_hit=vec4(s.color,s.translucent ? THIN_MEMBRANE_GUIDE_CODE : 1.0);debug_normal_depth=vec4(s.normal,distance); }
 #endif
         uvec4 t=triangles[triangle];
@@ -1236,7 +1236,7 @@ vec3 integrate_volume(uvec2 pixel,out vec3 sharp_result,out float terminal)
     return volume_count>0u ? volume_sum/float(volume_count) : vec3(0);
 }
 
-#ifdef NANOVA_DEBUG_BUFFERS
+#ifdef NANOVORE_DEBUG_BUFFERS
 // Volume anchors follow the per-pixel guides: two entries per stride cell.
 uint volume_anchor(uvec2 cell)
 {
@@ -1245,7 +1245,7 @@ uint volume_anchor(uvec2 cell)
 }
 #endif
 
-#if defined(NANOVA_CASCADE_PASS)
+#if defined(NANOVORE_CASCADE_PASS)
 layout(push_constant) uniform CascadePass { uint cascade;uint pass;uint media;uint first; } cascade_pass; // Media: bit per traced cell.
 const uint CASCADE_MAX_CROSSINGS=4u;
 
@@ -1372,7 +1372,7 @@ void main()
     float begin=interval_start(cascade,spacing),end=interval_start(cascade+1u,spacing);
     cascade_data[index]=trace_interval(position+direction*begin,direction,end-begin,cascade+1u==render.cascades.z);
 }
-#elif defined(NANOVA_SHADOW_GRID_PASS)
+#elif defined(NANOVORE_SHADOW_GRID_PASS)
 layout(push_constant) uniform GridPass { uint medium;uint pass;uint instance;uint triangle_count; } grid_pass;
 void main()
 {
@@ -1460,12 +1460,12 @@ void main()
 void main()
 {
     uvec2 pixel = gl_GlobalInvocationID.xy;
-#ifdef NANOVA_VOLUME_COARSE
+#ifdef NANOVORE_VOLUME_COARSE
     pixel*=volume_grid_stride;
 #endif
     if (pixel.x >= render.settings.x || pixel.y >= render.settings.y) return;
 
-#if defined(NANOVA_VOLUME_COARSE)
+#if defined(NANOVORE_VOLUME_COARSE)
     vec3 sharp=vec3(0),volume=vec3(0);float terminal=RAY_MAX;
     uint index=pixel.y*render.settings.x+pixel.x;
     if (pixel_may_intersect_medium(pixel)) volume=integrate_volume(pixel,sharp,terminal);
@@ -1473,7 +1473,7 @@ void main()
     uint anchor=volume_anchor(pixel/volume_grid_stride);
     guides[anchor]=vec4(volume,log2(1.0+terminal));
     guides[anchor+1u]=vec4(sharp,0);
-#elif defined(NANOVA_VOLUME_FILTER)
+#elif defined(NANOVORE_VOLUME_FILTER)
     uint index=pixel.y*render.settings.x+pixel.x;
     float depth=guides[index].z;
     uvec2 low=pixel/volume_grid_stride,extent=(render.settings.xy+volume_grid_stride-1u)/volume_grid_stride;
@@ -1498,17 +1498,17 @@ void main()
     { sharp_pixels[index].rgb+=sharp;radiance-=sharp; }
     imageStore(output_image,ivec2(pixel),vec4(radiance,surface.a));
 #else
-#ifndef NANOVA_VOLUME_PASS
-#ifndef NANOVA_DISABLE_VACUUM_SKIP
+#ifndef NANOVORE_VOLUME_PASS
+#ifndef NANOVORE_DISABLE_VACUUM_SKIP
     // All samples here have exactly the same uniform-environment radiance.
     // No path traversal, random draws or repeated per-sample normalization.
     if (render.backdrop_style.x>0.0 && render.wireframe_line.w<=0.0 && pixel_is_vacuum(pixel))
     {
         if (render.background_quality.w>0u) sharp_pixels[pixel.y*render.settings.x+pixel.x].a=0.0;
         vec3 background=texelFetch(soft_backdrop,ivec2(pixel),0).rgb;
-#ifdef NANOVA_DEBUG_BUFFERS
+#ifdef NANOVORE_DEBUG_BUFFERS
         guides[pixel.y*render.settings.x+pixel.x]=vec4(0,0,texelFetch(soft_backdrop,ivec2(pixel),0).a,0);
-#ifndef NANOVA_NO_QUERY_COUNTERS
+#ifndef NANOVORE_NO_QUERY_COUNTERS
         debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(vec4(0),vec4(0),
             vec4(background,0),vec4(background,0),vec4(0),vec4(0));
 #endif
@@ -1545,11 +1545,11 @@ void main()
         sharp_pixels[pixel.y*render.settings.x+pixel.x]=vec4(film_blur_max>0.0 ? film_sharp_sum/float(sample_count) : vec3(0),glow);
         if (film_blur_max>0.0) radiance-=film_sharp_sum/float(sample_count);
     }
-#ifdef NANOVA_DEBUG_BUFFERS
+#ifdef NANOVORE_DEBUG_BUFFERS
     // Effects and focus use first-hit guides. Spatial volume filtering also
     // uses terminal depth. Only F2 writes the full diagnostic record.
     guides[pixel.y*render.settings.x+pixel.x]=vec4(debug_normal_depth.w,debug_vertex_hit.w,log2(1.0+film_terminal_distance),0);
-#ifndef NANOVA_NO_QUERY_COUNTERS
+#ifndef NANOVORE_NO_QUERY_COUNTERS
     debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(debug_vertex_hit,debug_normal_depth,
         vec4(debug_direct/float(sample_count),float(debug_primary_hits)/float(sample_count)),
         vec4(sum/float(sample_count),float(debug_closest_queries)),
@@ -1573,7 +1573,7 @@ void main()
             sharp_pixels[pixel.y*render.settings.x+pixel.x].rgb+=sharp;radiance-=sharp;
         }
     }
-#if defined(NANOVA_DEBUG_BUFFERS) && !defined(NANOVA_NO_QUERY_COUNTERS)
+#if defined(NANOVORE_DEBUG_BUFFERS) && !defined(NANOVORE_NO_QUERY_COUNTERS)
     uint debug_index = pixel.y*render.settings.x+pixel.x;
     debug_pixels[debug_index].volume.rgb = volume;
     debug_pixels[debug_index].surface.w += float(debug_closest_queries);
@@ -1581,7 +1581,7 @@ void main()
 #endif
 #endif
     // Keep HDR energy until current-frame bloom and the display transform.
-    #ifdef NANOVA_VOLUME_PASS
+    #ifdef NANOVORE_VOLUME_PASS
     imageStore(output_image,ivec2(pixel),vec4(radiance,surface_radiance.a));
 #else
     imageStore(output_image,ivec2(pixel),vec4(radiance,film_blur_max));

@@ -26,7 +26,7 @@ def loaded_mesh(path,scene,triangles=None):
         assert dot(rows[a][4:7],rows[b][4:7])>.9999 and dot(rows[a][4:7],rows[c][4:7])>.9999,'A pointed mesh has smooth normals'
     return [v[:3] for v in rows]
 
-with tempfile.TemporaryDirectory(prefix='nanova_virus_shapes_') as directory:
+with tempfile.TemporaryDirectory(prefix='nanovore_virus_shapes_') as directory:
     out=Path(directory);data=stage_world(binary.parent/'assets/levels/virus-player-level.json',out)
     data['match'].pop('starts');data['match'].update(auto_colonize=False,fully_established=True)
     for i,b in enumerate(data['bodies']):b.update(position=[80+i*20,40,0],owner='virus' if i==0 else 'immune' if i==1 else 'neutral')

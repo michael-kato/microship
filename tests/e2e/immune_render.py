@@ -36,7 +36,7 @@ for (name,_,ticks),cmd in zip(cases,commands):
  assert probe.returncode==0,(name,probe.stdout,probe.stderr)
  unit=next(u for u in json.loads(state.read_text())['units'] if u['faction']==2)
  assert unit['charging'] if name=='charge' else unit['latch']>=0,(name,unit)
-os.environ['NANOVA_VULKAN_VALIDATION']='1';report={};start=time.monotonic()
+os.environ['NANOVORE_VULKAN_VALIDATION']='1';report={};start=time.monotonic()
 for (name,_,_),cmd in zip(cases,commands):
  remaining=gpu_process_timeout_seconds()
  result=subprocess.run(cmd,capture_output=True,text=True,timeout=remaining);(out/(name+'.log')).write_text(result.stdout+result.stderr);assert result.returncode==0,(name,result.stdout,result.stderr)

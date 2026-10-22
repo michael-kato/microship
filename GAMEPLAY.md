@@ -143,7 +143,7 @@ Keyboard camera speed, mouse pan and zoom sensitivity, inverted wheel zoom, cont
 
 Apply changes and saves the settings. Display changes apply immediately, with no countdown. Cancel discards changes made since the last Apply. Restore Defaults prepares the authored defaults; select Apply to use them. Invalid setting combinations show an error. Higher sample counts and larger grids increase GPU work and memory use. Borderless mode uses the primary monitor's native resolution. Window width and height apply in windowed mode.
 
-Player settings are saved in `%LOCALAPPDATA%\Nanova\player_settings.json`. They remain in effect after a faction change or program restart. `--settings PATH.json` selects another player file. Bounded diagnostics use authored defaults unless this option is present.
+Player settings are saved in `%LOCALAPPDATA%\Nanovore\player_settings.json`. They remain in effect after a faction change or program restart. `--settings PATH.json` selects another player file. Bounded diagnostics use authored defaults unless this option is present.
 
 The slider moves in one-percent steps. The left end makes fighters only; the right end makes bombers only. Each cell keeps its own setting. Units already in production finish before the new mix applies. The ratio controls future production, not surviving unit counts. Restart restores startup state. Fungal emitters produce spores only and have no ratio control.
 

@@ -12,7 +12,7 @@ out=a.output.resolve();binary=a.binary.resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 cases=[('normal',()),('near',('--camera-zoom','1000')),('buffers',('--debug-views',))]
 if not a.run:print('Prepared three sequential native 1920x1080 two-frame profiler captures; three film samples, one volume ray, one backdrop query No GPU work started.');raise SystemExit(0)
-os.environ['NANOVA_VULKAN_VALIDATION']='1';out.mkdir(parents=True,exist_ok=True);report={};started=time.monotonic()
+os.environ['NANOVORE_VULKAN_VALIDATION']='1';out.mkdir(parents=True,exist_ok=True);report={};started=time.monotonic()
 parents={'CPU FRAME':['INPUT','SIMULATION','SCENE + AUDIO','RENDER'],'RENDER':['ACQUIRE','UPLOAD + AS RECORD','PASS RECORD','SUBMIT','SLOT WAIT + QUERY','PRESENT WAIT','CAPTURE'],
  'GPU FRAME':['SCENE','POST','OUTPUT'],'SCENE':['AS UPDATE','BACKDROP','LIGHTING FIELDS','SURFACE + SSS','VOLUME'],'POST':['EFFECTS','CELL BLUR','FOG','TILT SHIFT','BLOOM + DISPLAY'],'OUTPUT':['HUD + PROFILER','OUTPUT COPY']}
 for name,extra in cases:

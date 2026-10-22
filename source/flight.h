@@ -1,5 +1,5 @@
-#ifndef NANOVA_FLIGHT_H
-#define NANOVA_FLIGHT_H
+#ifndef NANOVORE_FLIGHT_H
+#define NANOVORE_FLIGHT_H
 
 #include "simulation.h"
 

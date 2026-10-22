@@ -92,7 +92,7 @@ def check_tendril_sectors(path):
         # Each tube stays in its own 120 degree sector, including its thickness.
         assert all(abs(math.atan2(math.sin(math.atan2(v[2],v[0])-angle),math.cos(math.atan2(v[2],v[0])-angle)))<math.pi/3 for v in group),'A tendril crossed its neighbor sector'
 
-with tempfile.TemporaryDirectory(prefix='nanova-factory-curves-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanovore-factory-curves-') as directory:
     # The stress scene keeps authored cells; homes 0, 5 and 10 belong to the three factions.
     out=Path(directory);base=stage_world(root/'assets/levels/three_faction_stress.json',out)
     for key in ('production_seconds','formation_spacing','rally_point','player_ai'):base['match'].pop(key)

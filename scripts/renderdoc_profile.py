@@ -49,11 +49,11 @@ check_gpu_environment()
 subprocess.run(['cc','-shared','-fPIC','-O2','-Wall','-Wextra','-I',str(renderdoc/'include'),
     str(root/'scripts/renderdoc_capture.c'),'-o',str(out/'capture.so'),'-ldl'],check=True)
 manifest=json.loads((renderdoc/'etc/vulkan/implicit_layer.d/renderdoc_capture.json').read_text())
-layer=manifest['layer'];layer['library_path']=str(out/'capture.so');layer['name']='VK_LAYER_NANOVA_RenderDocCapture'
+layer=manifest['layer'];layer['library_path']=str(out/'capture.so');layer['name']='VK_LAYER_NANOVORE_RenderDocCapture'
 for key in ('pre_instance_functions','enable_environment','disable_environment'):layer.pop(key,None)
 layers=out/'layers';layers.mkdir(exist_ok=True);(layers/'renderdoc.json').write_text(json.dumps(manifest,indent=2)+'\n')
-env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0'
-env.update(NANOVA_RENDERDOC_LIBRARY=str(renderdoc/'lib/librenderdoc.so'),NANOVA_RENDERDOC_CAPTURE=str(out/'nanova'),
+env=os.environ.copy();env['NANOVORE_VULKAN_VALIDATION']='0'
+env.update(NANOVORE_RENDERDOC_LIBRARY=str(renderdoc/'lib/librenderdoc.so'),NANOVORE_RENDERDOC_CAPTURE=str(out/'nanovore'),
     VK_LAYER_PATH=str(layers),VK_INSTANCE_LAYERS=layer['name'],DISABLE_VULKAN_RENDERDOC_CAPTURE_1_44='1')
 started=time.monotonic()
 def run(name,args,environment):
@@ -71,12 +71,12 @@ def run(name,args,environment):
     if process.returncode:raise RuntimeError(name+' failed; see '+str(out/(name+'.log')))
     return time.monotonic()-before
 capture_seconds=run('capture',command,env)
-captures=list(out.glob('nanova*.rdc'));assert captures,'RenderDoc wrote no capture'
+captures=list(out.glob('nanovore*.rdc'));assert captures,'RenderDoc wrote no capture'
 capture=max(captures,key=lambda path:path.stat().st_mtime)
 assert 'RenderDoc ended second headless frame: 1.' in (out/'capture.log').read_text()
 replay_env=os.environ.copy();replay_env['VK_LAYER_PATH']=str(root/'build/toolchains/validation/usr/share/vulkan/explicit_layer.d')
-replay_env.update(NANOVA_RENDERDOC_OUTPUT=str(out),NANOVA_RENDERDOC_CAPTURE_FILE=str(capture),
-    NANOVA_RENDERDOC_SHADER_FOLDER=str(binary.parent/'assets/shaders'))
+replay_env.update(NANOVORE_RENDERDOC_OUTPUT=str(out),NANOVORE_RENDERDOC_CAPTURE_FILE=str(capture),
+    NANOVORE_RENDERDOC_SHADER_FOLDER=str(binary.parent/'assets/shaders'))
 replay_seconds=run('replay',[str(renderdoc/'bin/qrenderdoc'),'--python',str(root/'scripts/renderdoc_analyze.py')],replay_env)
 report=json.loads((out/'analysis.json').read_text());assert 'error' not in report,report.get('error')
 report.update(capture_seconds=capture_seconds,replay_seconds=replay_seconds,batch_seconds=time.monotonic()-started,

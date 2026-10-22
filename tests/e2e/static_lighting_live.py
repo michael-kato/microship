@@ -27,7 +27,7 @@ base=[*prefix,'--world',str(wp),'--config',str(cp),'--world-seed','1234','--came
 command=[*base,'--frames','2','--frame-delay-ms','100','--no-activate','--ticks','600','--capture',str(out/'live.pfm'),'--state',str(out/'live-state.json'),'--scene-state',str(out/'live-scene.json')]
 (out/'commands.json').write_text(json.dumps([command],indent=2)+'\n')
 if not a.run:print('Prepared one native 1920x1080 two-frame window and one fresh single-frame render. default renderer sampling; host validation no tracing. No GPU work started.');raise SystemExit(0)
-env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1';start=time.monotonic()
+env=os.environ.copy();env['NANOVORE_VULKAN_VALIDATION']='1';start=time.monotonic()
 def run(name,args):
  remaining=gpu_process_timeout_seconds()
  try:result=subprocess.run(args,env=env,capture_output=True,text=True,timeout=remaining)

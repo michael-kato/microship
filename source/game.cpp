@@ -432,7 +432,7 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (s->units[i].health>0 && s->units[i].faction==s->world.player_faction)
         { ++groups[simulation_unit_definition(s,&s->units[i])->group];++fleet;if (s->units[i].selected) ++selected; }
-    snprintf(r->hud[HUD_LINE_TITLE],HUD_LINE_CAPACITY,"NANOVA / %s     FLEET %u     SELECTED %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet,selected);
+    snprintf(r->hud[HUD_LINE_TITLE],HUD_LINE_CAPACITY,"NANOVORE / %s     FLEET %u     SELECTED %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet,selected);
     snprintf(r->hud[HUD_LINE_GROUPS],HUD_LINE_CAPACITY,"1 %-10s %-5u 2 %-10s %-5u 3 ALL",s->world.content.groups[0].plural,groups[0],s->world.content.groups[1].plural,groups[1]);
     snprintf(r->hud[HUD_LINE_MESSAGE],HUD_LINE_CAPACITY,"%.55s",s->outcome ? (s->outcome>0 ? "YOU WON / KEEP PLAYING / R TO RESTART" : "COLONY LOST / R TO RESTART") : s->message);
     snprintf(r->hud[HUD_LINE_HELP],HUD_LINE_CAPACITY,"F/B: ON SCREEN   RIGHT CLICK: ORDER   ESC: MENU");
@@ -442,7 +442,7 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
     snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,"SELECT YOUR SITE TO SET THE UNIT MIX");
     if (s->world.content.factions[s->world.player_faction].automatic)
     {
-        snprintf(r->hud[HUD_LINE_TITLE],HUD_LINE_CAPACITY,"NANOVA / %s     SPORES %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet);
+        snprintf(r->hud[HUD_LINE_TITLE],HUD_LINE_CAPACITY,"NANOVORE / %s     SPORES %u",s->outcome ? (s->outcome>0 ? "VICTORY" : "DEFEAT") : s->paused ? "PAUSED" : s->world.content.factions[s->world.player_faction].label,fleet);
         snprintf(r->hud[HUD_LINE_GROUPS],HUD_LINE_CAPACITY,"AUTOMATIC EMISSION / NO UNIT ORDERS");
         snprintf(r->hud[HUD_LINE_HELP],HUD_LINE_CAPACITY,"HOME: FOCUS   ESC: MENU   R: RESTART");
     }

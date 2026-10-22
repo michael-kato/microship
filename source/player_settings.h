@@ -1,5 +1,5 @@
-#ifndef NANOVA_PLAYER_SETTINGS_H
-#define NANOVA_PLAYER_SETTINGS_H
+#ifndef NANOVORE_PLAYER_SETTINGS_H
+#define NANOVORE_PLAYER_SETTINGS_H
 
 #include "render_config.h"
 #include <stddef.h>

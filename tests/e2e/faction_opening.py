@@ -7,7 +7,7 @@ from asset_data import stage_world,write_world,change
 root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
-with tempfile.TemporaryDirectory(prefix='nanova-opening-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanovore-opening-') as directory:
  out=Path(directory)
  base=stage_world(binary.parent/'assets/levels/virus-player-level.json',out)
  base['match']=dict(player='virus',opponent='immune')

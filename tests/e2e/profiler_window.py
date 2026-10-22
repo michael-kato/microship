@@ -6,9 +6,9 @@ from window_input import Desktop
 root=Path(__file__).resolve().parents[2]
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/profiler-window');p.add_argument('--run',action='store_true');a=p.parse_args()
 if not a.run:print('Prepared one two-frame native 1920x1080 F1/middle-pan check, 3 film samples, 1 volume ray, 1 backdrop query, host validation, 2s limit. No GPU work started.');raise SystemExit(0)
-helper=a.binary.resolve().parent/'nanova_input_probe.exe'
-if not helper.is_file():raise SystemExit('Build nanova_input_probe before this check.')
-os.environ['NANOVA_VULKAN_VALIDATION']='1';out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);desktop=Desktop();existing=desktop.windows();state=out/'state.json';capture=out/'profiler.ppm'
+helper=a.binary.resolve().parent/'nanovore_input_probe.exe'
+if not helper.is_file():raise SystemExit('Build nanovore_input_probe before this check.')
+os.environ['NANOVORE_VULKAN_VALIDATION']='1';out=a.output.resolve();out.mkdir(parents=True,exist_ok=True);desktop=Desktop();existing=desktop.windows();state=out/'state.json';capture=out/'profiler.ppm'
 prefix=[str(a.binary.resolve())] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(a.binary.resolve())]
 started=time.monotonic();process=subprocess.Popen([*prefix,'--no-menu','--frames','2','--frame-delay-ms','250','--samples','3','--world-seed','1234','--camera-zoom','1000','--no-stats','--capture',str(capture),'--state',str(state)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1)
 stdout=[];stderr=[];ready=threading.Event()
@@ -29,7 +29,7 @@ try:
  desktop.move(x+900,y+500);desktop.button(True,1);desktop.button(False,1)
  assert ready.wait(max(.01,1.5-(time.monotonic()-started))),'No first frame'
  helper_command=[str(helper)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(helper)]
- helper_environment=os.environ.copy();helper_environment['NANOVA_VULKAN_VALIDATION']='0'
+ helper_environment=os.environ.copy();helper_environment['NANOVORE_VULKAN_VALIDATION']='0'
  key_process=subprocess.Popen(helper_command,env=helper_environment,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
  desktop.move(x+900,y+500);time.sleep(.003);desktop.button(True,2);time.sleep(.003)
  desktop.move(x+980,y+480);time.sleep(.003);desktop.button(False,2)

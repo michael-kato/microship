@@ -96,10 +96,10 @@ class Application:
             from window_input import Desktop
             self.desktop = Desktop()
             self.prior_games = self.desktop.windows()
-            self.prior_pauses = self.desktop.windows('Nanova - Pause')
+            self.prior_pauses = self.desktop.windows('Nanovore - Pause')
         environment = os.environ.copy()
         if gpu:
-            environment['NANOVA_VULKAN_VALIDATION'] = '1'
+            environment['NANOVORE_VULKAN_VALIDATION'] = '1'
             if sys.platform != 'win32':
                 environment['WINEDLLOVERRIDES'] = environment.get('WINEDLLOVERRIDES', '') + ';winepulse.drv,winealsa.drv=d'
         controls = ['--no-menu', '--world-seed', '1234', '--settings', str(settings),
@@ -116,8 +116,8 @@ class Application:
         self.app = Process(command(args.binary) + controls, environment)
         process = self.app.wait_line(r'Application process: (\d+)\.').group(1)
         helper_environment = environment.copy()
-        helper_environment['NANOVA_VULKAN_VALIDATION'] = '0'
-        self.driver = Process(command(args.binary.parent / 'nanova_input_probe.exe') + ['--ui', process], helper_environment)
+        helper_environment['NANOVORE_VULKAN_VALIDATION'] = '0'
+        self.driver = Process(command(args.binary.parent / 'nanovore_input_probe.exe') + ['--ui', process], helper_environment)
         if not pause:
             if physical:
                 found = set()
@@ -439,7 +439,7 @@ def physical_gpu_check(args):
         found = set()
         deadline = time.monotonic() + 2
         while not found and time.monotonic() < deadline:
-            found = desktop.windows('Nanova - Pause') - active.prior_pauses
+            found = desktop.windows('Nanovore - Pause') - active.prior_pauses
             if not found:
                 time.sleep(.003)
         assert found, 'No pause menu window'
@@ -497,8 +497,8 @@ def main():
     args.binary = args.binary.resolve()
     args.output = args.output.resolve()
     args.output.mkdir(parents=True, exist_ok=True)
-    if not (args.binary.parent / 'nanova_input_probe.exe').is_file():
-        raise SystemExit('Build nanova_input_probe before this check.')
+    if not (args.binary.parent / 'nanovore_input_probe.exe').is_file():
+        raise SystemExit('Build nanovore_input_probe before this check.')
     if args.os_input and not args.gpu:
         parser.error('--os-input requires --gpu')
     if args.gpu:

@@ -12,7 +12,7 @@ from asset_data import stage_world,write_world
 root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
-with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanovore-small-factories-') as directory:
     out=Path(directory)
     def run(name,data,ticks=600,expected=0,seed=1234):
         global count

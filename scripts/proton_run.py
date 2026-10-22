@@ -17,10 +17,10 @@ def main():
     check_gpu_environment()
     repo = Path(__file__).resolve().parents[1]
     steam = Path(os.environ.get("STEAM_COMPAT_CLIENT_INSTALL_PATH", Path.home() / ".local/share/Steam"))
-    proton = Path(os.environ.get("NANOVA_PROTON", steam / "steamapps/common/Proton 11.0/proton"))
+    proton = Path(os.environ.get("NANOVORE_PROTON", steam / "steamapps/common/Proton 11.0/proton"))
     prefix = Path(os.environ.get("STEAM_COMPAT_DATA_PATH", repo / "build/proton11-prefix"))
     if not proton.is_file() or not (prefix / "pfx/system.reg").is_file():
-        print("Proton installation or initialized prefix missing. Set NANOVA_PROTON "
+        print("Proton installation or initialized prefix missing. Set NANOVORE_PROTON "
               "and STEAM_COMPAT_DATA_PATH; see README.md for initialization.", file=sys.stderr)
         return 2
     if len(sys.argv) < 2:
@@ -35,9 +35,9 @@ def main():
     environment["STEAM_COMPAT_DATA_PATH"] = str(prefix.resolve())
     environment.setdefault("PROTON_USE_XALIA", "0")
     environment["PROTON_LOG"] = "0"  # Keep application stdout/stderr observable.
-    validation = os.environ.get("NANOVA_VULKAN_VALIDATION", "0")
+    validation = os.environ.get("NANOVORE_VULKAN_VALIDATION", "0")
     if validation not in ("0", "1"):
-        raise RuntimeError('NANOVA_VULKAN_VALIDATION must be 0 or 1')
+        raise RuntimeError('NANOVORE_VULKAN_VALIDATION must be 0 or 1')
     if validation == "1":
         layers = repo / "build/toolchains/validation/usr/share/vulkan/explicit_layer.d"
         if not (layers / "VkLayer_khronos_validation.json").is_file():

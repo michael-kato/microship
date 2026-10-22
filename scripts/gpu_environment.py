@@ -6,9 +6,9 @@ import math
 
 def gpu_process_timeout_seconds():
     """Return a configurable timeout for a process that stops responding."""
-    seconds = float(os.environ.get('NANOVA_GPU_TIMEOUT_SECONDS', '120'))
+    seconds = float(os.environ.get('NANOVORE_GPU_TIMEOUT_SECONDS', '120'))
     if not math.isfinite(seconds) or seconds <= 0:
-        raise ValueError('NANOVA_GPU_TIMEOUT_SECONDS must be finite and positive')
+        raise ValueError('NANOVORE_GPU_TIMEOUT_SECONDS must be finite and positive')
     return seconds
 
 

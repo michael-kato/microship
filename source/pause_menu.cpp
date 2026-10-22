@@ -100,7 +100,7 @@ static void build_page(PauseMenu* menu)
     menu->building=true;SendMessageA(menu->handle,WM_SETREDRAW,FALSE,0);
     HWND child=GetWindow(menu->handle,GW_CHILD);
     while (child) { HWND next=GetWindow(child,GW_HWNDNEXT);DestroyWindow(child);child=next; }
-    label(menu,"NANOVA",28,22,500,28);
+    label(menu,"NANOVORE",28,22,500,28);
     HWND title=control(menu,"STATIC",page_title(menu->page),SS_LEFT,28,55,830,52,0);
     SendMessageA(title,WM_SETFONT,(WPARAM)menu->title_font,TRUE);
     if (menu->page>=0) settings_rows(menu);
@@ -196,7 +196,7 @@ static bool show(PauseMenu* menu,Window* owner)
 {
     if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) && GetLastError()!=ERROR_ACCESS_DENIED) return false;
     HINSTANCE instance=GetModuleHandleA(0);WNDCLASSA klass={};klass.hInstance=instance;klass.lpfnWndProc=menu_message;
-    klass.hCursor=LoadCursorA(0,IDC_ARROW);klass.lpszClassName="nanovaPauseMenu";
+    klass.hCursor=LoadCursorA(0,IDC_ARROW);klass.lpszClassName="nanovorePauseMenu";
     if (!RegisterClassA(&klass) && GetLastError()!=ERROR_CLASS_ALREADY_EXISTS) return false;
     RECT area;SystemParametersInfoA(SPI_GETWORKAREA,0,&area,0);
     menu->scale=(float)fmin(1.0,fmin((area.right-area.left)/(double)(MENU_WIDTH+24),
@@ -210,7 +210,7 @@ static bool show(PauseMenu* menu,Window* owner)
     int width=extent.right-extent.left,height=extent.bottom-extent.top;
     int x=area.left+((area.right-area.left)-width)/2,y=area.top+((area.bottom-area.top)-height)/2;
     menu->open=true;
-    HWND handle=CreateWindowExA(WS_EX_CONTROLPARENT,klass.lpszClassName,"Nanova - Pause",style,x,y,width,height,parent,0,instance,menu);
+    HWND handle=CreateWindowExA(WS_EX_CONTROLPARENT,klass.lpszClassName,"Nanovore - Pause",style,x,y,width,height,parent,0,instance,menu);
     if (!handle) return false;
     if (owner) { window_suspend_input(owner,true);EnableWindow(parent,FALSE); }
     build_page(menu);ShowWindow(handle,SW_SHOW);UpdateWindow(handle);

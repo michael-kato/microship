@@ -16,7 +16,7 @@ parser.add_argument('--output',type=Path)
 args=parser.parse_args();root=Path(__file__).resolve().parents[2];binary=args.binary.resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
-with tempfile.TemporaryDirectory(prefix='nanova-navigation-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanovore-navigation-') as directory:
     out=Path(directory)
     base=established_world(root/'assets/levels/virus-player-level.json',out)
     base['rules']['economy']['manufacture_seconds']=1000

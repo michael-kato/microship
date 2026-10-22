@@ -1,5 +1,5 @@
-#ifndef NANOVA_TYPES_H
-#define NANOVA_TYPES_H
+#ifndef NANOVORE_TYPES_H
+#define NANOVORE_TYPES_H
 
 // Plain records keep XYZ coordinates distinct from RGB channels without a library.
 

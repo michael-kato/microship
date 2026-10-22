@@ -19,8 +19,8 @@ static PFN_vkWaitForFences wait_fences_next;
 
 __attribute__((constructor)) static void capture_init(void)
 {
-    const char* library=getenv("NANOVA_RENDERDOC_LIBRARY");
-    const char* output=getenv("NANOVA_RENDERDOC_CAPTURE");
+    const char* library=getenv("NANOVORE_RENDERDOC_LIBRARY");
+    const char* output=getenv("NANOVORE_RENDERDOC_CAPTURE");
     if (!library || !output) return;
     capture_library=dlopen(library,RTLD_NOW|RTLD_GLOBAL);
     if (!capture_library) { fprintf(stderr,"RenderDoc load failed: %s\n",dlerror());return; }

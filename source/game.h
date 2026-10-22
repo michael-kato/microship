@@ -1,5 +1,5 @@
-#ifndef NANOVA_GAME_H
-#define NANOVA_GAME_H
+#ifndef NANOVORE_GAME_H
+#define NANOVORE_GAME_H
 
 #include <stdint.h>
 #include "camera.h"

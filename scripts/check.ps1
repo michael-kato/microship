@@ -14,7 +14,7 @@ if ($Gpu) {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
-& cmake -S $repo -B $build -A x64 "-DNANOVA_GPU_TESTS=$gpuTests"
+& cmake -S $repo -B $build -A x64 "-DNANOVORE_GPU_TESTS=$gpuTests"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & cmake --build $build --config Debug --parallel
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

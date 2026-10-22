@@ -48,7 +48,7 @@ for name in a.variants.split(','):
     commands.append((name,[*prefix,'--world',str(wp),'--config',str(cp),'--ticks','600','--world-seed','1234','--headless','--frames',str(a.frames),'--capture',str(out/(name+'.ppm')),'--state',str(out/(name+'-state.json')),'--no-stats']))
 (out/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
 if not a.run:print('Prepared native 1920x1080 backdrop checks; no GPU work started.');sys.exit(0)
-env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0' if a.timing else '1';start=time.monotonic();report={}
+env=os.environ.copy();env['NANOVORE_VULKAN_VALIDATION']='0' if a.timing else '1';start=time.monotonic();report={}
 for name,command in commands:
     remaining=gpu_process_timeout_seconds()
     result=subprocess.run(command,capture_output=True,text=True,env=env,timeout=remaining);(out/(name+'.log')).write_text(result.stdout+result.stderr)

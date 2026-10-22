@@ -1,5 +1,5 @@
-#ifndef NANOVA_CAMERA_H
-#define NANOVA_CAMERA_H
+#ifndef NANOVORE_CAMERA_H
+#define NANOVORE_CAMERA_H
 
 #include "types.h"
 #include <stdint.h>

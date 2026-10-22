@@ -1,5 +1,5 @@
-#ifndef NANOVA_ASSET_JSON_H
-#define NANOVA_ASSET_JSON_H
+#ifndef NANOVORE_ASSET_JSON_H
+#define NANOVORE_ASSET_JSON_H
 #include <stdint.h>
 #include <stddef.h>
 #include "types.h"

@@ -9,7 +9,7 @@ root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 quick='--quick' in sys.argv[2:]
 count=0
-with tempfile.TemporaryDirectory(prefix='nanova-factory-repair-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanovore-factory-repair-') as directory:
     out=Path(directory);base=stage_world(root/'assets/levels/virus-player-level.json',out)
     for start in base['match'].pop('starts'):base['bodies'][start['cell']]['owner']=start['faction']
     base['spawns']=[];base['rules'].pop('exploration',None)

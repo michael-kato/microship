@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "nanova rules",
+  "title": "nanovore rules",
   "type": "object",
   "properties": {
     "$schema": {

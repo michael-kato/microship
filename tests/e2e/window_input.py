@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Drive a real nanova window with OS mouse/keyboard events, then exit it."""
+"""Drive a real nanovore window with OS mouse/keyboard events, then exit it."""
 
 import json
 import ctypes as c
@@ -65,7 +65,7 @@ class Desktop:
             self.xt.XTestFakeButtonEvent.argtypes = [c.c_void_p, c.c_uint, c.c_int, c.c_ulong]
             self.xt.XTestFakeKeyEvent.argtypes = [c.c_void_p, c.c_uint, c.c_int, c.c_ulong]
 
-    def windows(self, name="Nanova"):
+    def windows(self, name="Nanovore"):
         result = set()
         if sys.platform == 'win32':
             def visit(handle, _):
@@ -166,8 +166,8 @@ def main():
     # The explicit legacy entry point accepts the same binary/config arguments.
     # Production input is now covered by the bounded keyboard and mouse scenario.
     binary=Path(sys.argv[1]).resolve()
-    os.environ['NANOVA_VULKAN_VALIDATION']='1'
-    with tempfile.TemporaryDirectory(prefix='nanova-window-input-') as folder:
+    os.environ['NANOVORE_VULKAN_VALIDATION']='1'
+    with tempfile.TemporaryDirectory(prefix='nanovore-window-input-') as folder:
         print(run_window(binary,Path(folder)))
 
 

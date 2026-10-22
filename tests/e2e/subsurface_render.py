@@ -57,7 +57,7 @@ for name,world,settings in cases:
     commands.append([*prefix,'--world',str(wp),'--config',str(cp),'--ticks','1','--world-seed','1234','--headless','--frames','1','--capture',str(out/(name+'.ppm')),'--state',str(out/(name+'-state.json')),'--no-stats'])
 (out/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
 if not a.run:print('Prepared six native 1920x1080 one-frame SSS checks; no GPU work started.');sys.exit(0)
-env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1';start=time.monotonic()
+env=os.environ.copy();env['NANOVORE_VULKAN_VALIDATION']='1';start=time.monotonic()
 for (name,_,_),command in zip(cases,commands):
     remaining=gpu_process_timeout_seconds()
     result=subprocess.run(command,capture_output=True,text=True,env=env,timeout=remaining);(out/(name+'.log')).write_text(result.stdout+result.stderr)

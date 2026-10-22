@@ -7,7 +7,7 @@ from asset_data import established_world,write_world
 root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
-with tempfile.TemporaryDirectory(prefix='nanova-screen-selection-') as folder:
+with tempfile.TemporaryDirectory(prefix='nanovore-screen-selection-') as folder:
  out=Path(folder);base=established_world(root/'tests/e2e/scenes/virus-two-cell-test-level.json',out)
  # Include each screen edge, the bottom HUD, the rear half-space, and enemies.
  positions=[(0,0,0),(3,0,0),(-40,0,0),(40,0,0),(0,30,0),(0,-30,0),(0,-6,0),(0,0,30)]

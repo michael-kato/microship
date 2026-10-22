@@ -1,5 +1,5 @@
-#ifndef NANOVA_PRESENTATION_H
-#define NANOVA_PRESENTATION_H
+#ifndef NANOVORE_PRESENTATION_H
+#define NANOVORE_PRESENTATION_H
 #include "render_scene.h"
 #include "world.h"
 struct Simulation;

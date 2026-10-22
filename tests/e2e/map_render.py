@@ -45,7 +45,7 @@ if not args.run:
 
 check_gpu_environment()
 env = os.environ.copy()
-env['NANOVA_VULKAN_VALIDATION'] = '1'
+env['NANOVORE_VULKAN_VALIDATION'] = '1'
 for name, invocation in zip(('cpu', 'gpu'), cases):
     result = subprocess.run(invocation, capture_output=True, text=True, env=env, timeout=10)
     (out / (name + '.log')).write_text(result.stdout + result.stderr)

@@ -1,5 +1,5 @@
-#ifndef NANOVA_VECTOR_MATH_H
-#define NANOVA_VECTOR_MATH_H
+#ifndef NANOVORE_VECTOR_MATH_H
+#define NANOVORE_VECTOR_MATH_H
 
 #include "types.h"
 #include <cmath>

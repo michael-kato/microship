@@ -6,7 +6,7 @@ from pathlib import Path
 from asset_data import stage_world,write_world
 root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve();prefix=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
-with tempfile.TemporaryDirectory(prefix='nanova-targets-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanovore-targets-') as directory:
  out=Path(directory);base=stage_world(root/'assets/levels/virus-player-level.json',out);base['match']['auto_colonize']=False
  def run(name,world=base,ticks=60,orders=''):
   global count

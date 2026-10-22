@@ -19,7 +19,7 @@ parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('binary'
 args=parser.parse_args();binary=args.binary.resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
-with tempfile.TemporaryDirectory(prefix='nanova_communications_') as temporary:
+with tempfile.TemporaryDirectory(prefix='nanovore_communications_') as temporary:
  out=args.output.resolve() if args.output else Path(temporary);out.mkdir(parents=True,exist_ok=True)
  def run(name,data,ticks=1,extra=(),expected=0):
   global count

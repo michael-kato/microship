@@ -1,5 +1,5 @@
-#ifndef NANOVA_MAP_LAYOUT_H
-#define NANOVA_MAP_LAYOUT_H
+#ifndef NANOVORE_MAP_LAYOUT_H
+#define NANOVORE_MAP_LAYOUT_H
 
 #include <stdint.h>
 #include "types.h"

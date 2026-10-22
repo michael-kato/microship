@@ -1,5 +1,5 @@
-#ifndef NANOVA_EFFECTS_H
-#define NANOVA_EFFECTS_H
+#ifndef NANOVORE_EFFECTS_H
+#define NANOVORE_EFFECTS_H
 #include "render_scene.h"
 struct Simulation;
 struct Camera;

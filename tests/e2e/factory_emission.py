@@ -11,7 +11,7 @@ root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
 power=json.loads((root/'assets/presentation/scene.json').read_text())['factory_appearance']['emission_fresnel']['power']
-with tempfile.TemporaryDirectory(prefix='nanova-factory-emission-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanovore-factory-emission-') as directory:
     out=Path(directory);base=stage_world(root/'assets/levels/virus-player-level.json',out)
     def run(name,data=base,expected=0):
         global count

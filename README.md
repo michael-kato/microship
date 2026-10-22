@@ -1,4 +1,4 @@
-# Nanova
+# Nanovore
 
 Microscopic strategy inside a body, inspired by Eufloria. Command craft, scout living cells, establish factories, and expand. All three factions start on a 128-cell map. Fighters prefer units; bombers prefer factories. A slider sets their production ratio. Destroy enemy factories to win.
 
@@ -8,7 +8,7 @@ Virus and Immune bombers can seed a cell without being spent. A visible seed fal
 
 Nutrients are local to each cell. Factories collect them from the cell's availability and production rate into storage capped at 180. Unit jobs pay their cost when scheduled. Repairs also spend nutrients and stop unit production during repair. Empty storage can delay new jobs. Cells do not transfer nutrients, and there is no player control for collection or transfer. This change keeps that economy. In diagnostic state output, `energy` is the stored amount and `nutrients` is the availability multiplier.
 
-The current small combat changes raise Immune fighter speed from 2.6 to 2.8, increase the Virus fighter shot interval from 0.6 to 0.66 seconds, and raise Fungal burst damage from 3 to 3.6 and cloud damage from 1 to 1.2 per second. In 18 controlled fights at the 1:2:5 ratios, Virus still won against both sides and Immune still won against Fungus. These small changes have not made the ratios equal in combat. Capture costs stay fixed. Run `python3 tests/e2e/starting_force_balance.py build/windows-cross/nanova.exe --output build/colonization_review/duels --seeds 3` to repeat the measurement.
+The current small combat changes raise Immune fighter speed from 2.6 to 2.8, increase the Virus fighter shot interval from 0.6 to 0.66 seconds, and raise Fungal burst damage from 3 to 3.6 and cloud damage from 1 to 1.2 per second. In 18 controlled fights at the 1:2:5 ratios, Virus still won against both sides and Immune still won against Fungus. These small changes have not made the ratios equal in combat. Capture costs stay fixed. Run `python3 tests/e2e/starting_force_balance.py build/windows-cross/nanovore.exe --output build/colonization_review/duels --seeds 3` to repeat the measurement.
 
 Virus forces use large swarms of light craft and spike projectiles. Immune forces use fewer, tougher craft that stun a target with a blob, devour it, then heal nearby allies. The fungal trial fields swarms of melee spores that burst into toxic clouds. Immune fighters take 2 seconds to manufacture and bombers take 2.5 seconds before factory-size and AI modifiers. Immune factory trunks have 5,760 health and withstand 96 direct hits; branches have 3,600 health and withstand 64 direct hits. Small factories scale health and manufacture rate by area.
 
@@ -32,15 +32,15 @@ Enemy craft that become visible near an owned cell create a territory alert. The
 
 Enemy messages appear at the bottom right. Each faction has separate lines for first contact with player ships and cells. It also has one line for each control threshold from 10 through 90 cells. A threshold runs once per match, including when ownership starts above that threshold. Messages play in order, with a seven-second display and a three-second gap. The profiles hold the text; the game does not select behavior by faction name.
 
-The primary stress scene is `assets/levels/three_faction_stress.json`: five fully developed cells and 60 seconds of actual production per faction, with all armies and reinforcements ordered to the center. Preparation runs 3,600 normal production steps with full initial nutrient storage and no combat or unit expiry. The produced armies assemble at their front cells. Counts follow faction production; unit storage holds 4,096. Run it with `python3 scripts/proton_run.py build/windows-cross/nanova.exe --world assets/levels/three_faction_stress.json`.
+The primary stress scene is `assets/levels/three_faction_stress.json`: five fully developed cells and 60 seconds of actual production per faction, with all armies and reinforcements ordered to the center. Preparation runs 3,600 normal production steps with full initial nutrient storage and no combat or unit expiry. The produced armies assemble at their front cells. Counts follow faction production; unit storage holds 4,096. Run it with `python3 scripts/proton_run.py build/windows-cross/nanovore.exe --world assets/levels/three_faction_stress.json`.
 
 C++ and Vulkan target Windows. Linux builds use MinGW, `glslc`, and an initialized Steam Proton 11 prefix:
 
 ```sh
 bash scripts/check.sh
-python3 scripts/proton_run.py build/windows-cross/nanova.exe
+python3 scripts/proton_run.py build/windows-cross/nanovore.exe
 ```
-The larger CPU stress scene is `assets/levels/territory_stress.json`. It uses 128 mature cells, with 41 Virus, 46 Immune, and 41 Fungal cells. It prepares ten seconds of actual production. Longer preparation can exceed the 4,096-unit storage capacity and must fail at startup. Run `python3 tests/e2e/combat_perf.py build/windows-cross/nanova.exe --world assets/levels/territory_stress.json --ticks 1800 --repeats 3`. This measures CPU simulation; it does not measure rendered frame rate. `communications` and `faction_motion` are real-application CTest groups for the new behavior.
+The larger CPU stress scene is `assets/levels/territory_stress.json`. It uses 128 mature cells, with 41 Virus, 46 Immune, and 41 Fungal cells. It prepares ten seconds of actual production. Longer preparation can exceed the 4,096-unit storage capacity and must fail at startup. Run `python3 tests/e2e/combat_perf.py build/windows-cross/nanovore.exe --world assets/levels/territory_stress.json --ticks 1800 --repeats 3`. This measures CPU simulation; it does not measure rendered frame rate. `communications` and `faction_motion` are real-application CTest groups for the new behavior.
 
 On a Ryzen 9 9900X, three paired 1,800-tick runs of the 128-cell stress scene reached 4,096 active units. Early rejection of distant factory bounds and squared cell-distance checks reduced mean CPU simulation time from 12.62 ms to 11.07 ms. The 95th percentile changed from 17.64–18.34 ms to 16.04–16.20 ms. The full exported state at 1,200 ticks and the final match results matched the build before this change. These are CPU simulation measurements through Proton, not application frame times or sustained GPU results.
 

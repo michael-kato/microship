@@ -24,11 +24,11 @@ if not a.run:
  print('Prepared one native 1920x1080 two-frame game window,',a.samples,'film + 1 volume grid + 1 backdrop starts; host validation,',process_limit,'s process; no tracing. No GPU work started.')
  raise SystemExit(0)
 check_gpu_environment()
-helper=binary.parent/'nanova_input_probe.exe';assert helper.is_file(),'Build nanova_input_probe first'
+helper=binary.parent/'nanovore_input_probe.exe';assert helper.is_file(),'Build nanovore_input_probe first'
 helper_prefix=[str(helper)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(helper)]
-env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1'
+env=os.environ.copy();env['NANOVORE_VULKAN_VALIDATION']='1'
 if sys.platform!='win32':env['WINEDLLOVERRIDES']=env.get('WINEDLLOVERRIDES','')+';winepulse.drv,winealsa.drv=d'
-helper_env=env.copy();helper_env['NANOVA_VULKAN_VALIDATION']='0'
+helper_env=env.copy();helper_env['NANOVORE_VULKAN_VALIDATION']='0'
 started=time.monotonic();process=subprocess.Popen(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
 stdout=[];stderr=[];ready=threading.Event()
 def read(pipe,lines):

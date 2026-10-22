@@ -1,5 +1,5 @@
-#ifndef NANOVA_WINDOW_H
-#define NANOVA_WINDOW_H
+#ifndef NANOVORE_WINDOW_H
+#define NANOVORE_WINDOW_H
 
 #include <stdint.h>
 #include "camera.h"

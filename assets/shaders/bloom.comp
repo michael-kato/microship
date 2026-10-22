@@ -1,8 +1,8 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
 #include "render_bindings.glsl"
-#define NANOVA_DEBUG_BINDING BLOOM_BINDING_DEBUG
-#define NANOVA_GUIDE_BINDING BLOOM_BINDING_GUIDES
+#define NANOVORE_DEBUG_BINDING BLOOM_BINDING_DEBUG
+#define NANOVORE_GUIDE_BINDING BLOOM_BINDING_GUIDES
 #include "debug_buffers.glsl"
 #include "display_transform.glsl"
 

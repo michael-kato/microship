@@ -8,8 +8,8 @@ import traceback
 from pathlib import Path
 import renderdoc as rd
 
-out=Path(os.environ['NANOVA_RENDERDOC_OUTPUT'])
-report={'capture':os.environ['NANOVA_RENDERDOC_CAPTURE_FILE']}
+out=Path(os.environ['NANOVORE_RENDERDOC_OUTPUT'])
+report={'capture':os.environ['NANOVORE_RENDERDOC_CAPTURE_FILE']}
 controller=None
 capture=None
 try:
@@ -52,7 +52,7 @@ try:
     report['duration_event_count']=sum(item['gpu_ms'] is not None for item in report['events'])
     report['disassembly_targets']=list(controller.GetDisassemblyTargets(True))
     report['shaders']=[]
-    shader_folder=Path(os.environ['NANOVA_RENDERDOC_SHADER_FOLDER'])
+    shader_folder=Path(os.environ['NANOVORE_RENDERDOC_SHADER_FOLDER'])
     known={hashlib.sha256(p.read_bytes()).hexdigest():p.name for p in shader_folder.glob('*.spv')}
     # Identify the surface and volume programs by captured SPIR-V hashes.
     # Spatial-volume programs have different dispatch dimensions.

@@ -1,5 +1,5 @@
-#ifndef NANOVA_WORLD_H
-#define NANOVA_WORLD_H
+#ifndef NANOVORE_WORLD_H
+#define NANOVORE_WORLD_H
 
 #include <stdint.h>
 #include "types.h"

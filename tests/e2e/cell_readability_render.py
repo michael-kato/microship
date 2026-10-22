@@ -50,7 +50,7 @@ check=subprocess.run([*prefix,'--smoke','--world',str(out/'depth-ramp-world.json
 assert check.returncode==0,(check.stdout,check.stderr)
 base=json.loads((out/'probe-state.json').read_text())['unit_capacity']
 scene=json.loads(probe.read_text());assert all(any(i['slot']==base+n for i in scene['instances']) for n in (0,2,3,4))
-env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1';images={};report={};start=time.monotonic()
+env=os.environ.copy();env['NANOVORE_VULKAN_VALIDATION']='1';images={};report={};start=time.monotonic()
 for (name,*_),cmd in zip(cases,commands):
  remaining=gpu_process_timeout_seconds()
  result=subprocess.run(cmd,capture_output=True,text=True,env=env,timeout=remaining);(out/(name+'.log')).write_text(result.stdout+result.stderr)

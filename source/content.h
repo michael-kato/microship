@@ -1,5 +1,5 @@
-#ifndef NANOVA_CONTENT_H
-#define NANOVA_CONTENT_H
+#ifndef NANOVORE_CONTENT_H
+#define NANOVORE_CONTENT_H
 #include "types.h"
 #include <stdint.h>
 #include "asset_limits.h"

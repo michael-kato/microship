@@ -22,23 +22,23 @@ application_env=os.environ.copy()
 if a.gpu and sys.platform!='win32':
     application_env['WINEDLLOVERRIDES']=application_env.get('WINEDLLOVERRIDES','')+';winepulse.drv,winealsa.drv=d'
 desktop=None if a.queued_input else Desktop();started=time.monotonic()
-helper=a.binary.resolve().parent/'nanova_input_probe.exe'
-if a.queued_input:assert helper.is_file(),'Build nanova_input_probe first'
+helper=a.binary.resolve().parent/'nanovore_input_probe.exe'
+if a.queued_input:assert helper.is_file(),'Build nanovore_input_probe first'
 helper_prefix=[str(helper)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(helper)]
 for choice,faction in ([(1,1)] if a.gpu else [(0,0),(1,1),(2,2),(3,3)]):
-    existing=desktop.windows('nanova - Choose faction') if desktop else set();state=out/(str(choice)+'-state.json')
+    existing=desktop.windows('nanovore - Choose faction') if desktop else set();state=out/(str(choice)+'-state.json')
     args=['--menu','--no-activate','--frames','1','--samples',str(a.samples),'--state',str(state),'--capture',str(out/'menu-game.ppm')] if a.gpu else ([] if choice==0 else ['--smoke','--menu','--state',str(state)])
     p=subprocess.Popen([*command,*args],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True,env=application_env)
     try:
         if a.queued_input:
             args=['--menu-close'] if choice==0 else ['--menu-click',str(352+(choice-1)*608),'570']
-            env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='0'
+            env=os.environ.copy();env['NANOVORE_VULKAN_VALIDATION']='0'
             result=subprocess.run([*helper_prefix,*args],capture_output=True,text=True,env=env,timeout=2)
             assert result.returncode==0,(result.stdout,result.stderr)
         else:
             deadline=time.monotonic()+(process_limit-.6 if a.gpu else 4);handle=None
             while time.monotonic()<deadline and p.poll() is None:
-                found=desktop.windows('nanova - Choose faction')-existing
+                found=desktop.windows('nanovore - Choose faction')-existing
                 if found:handle=next(iter(found));break
                 time.sleep(.005)
             assert handle,'The launch menu did not appear'

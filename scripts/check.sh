@@ -11,7 +11,7 @@ quick_scope=all
 if [[ "${1:-}" == --gpu && $# == 1 ]]; then
     check_mode=full
     gpu_tests=ON
-    export NANOVA_VULKAN_VALIDATION=1
+    export NANOVORE_VULKAN_VALIDATION=1
     python3 "$script_dir/gpu_environment.py"
 elif [[ "${1:-}" == --cpu && $# == 1 ]]; then
     check_mode=full
@@ -32,7 +32,7 @@ cmake_args=(-S "$repo_root" -B "$build_dir" -DCMAKE_BUILD_TYPE=Release
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
     -DCMAKE_TOOLCHAIN_FILE="$repo_root/cmake/windows-mingw.cmake"
     "-DCMAKE_CROSSCOMPILING_EMULATOR=python3;$script_dir/proton_run.py"
-    -DNANOVA_GPU_TESTS="$gpu_tests")
+    -DNANOVORE_GPU_TESTS="$gpu_tests")
 if [[ ! -f "$build_dir/CMakeCache.txt" ]] && command -v ninja >/dev/null 2>&1; then
     cmake_args+=(-G Ninja)
 fi
@@ -43,10 +43,10 @@ if [[ "$check_mode" == quick ]]; then
     printf 'Quick CPU checks (%s). Use --cpu for the complete suite.\n' "$quick_scope"
     ctest --test-dir "$build_dir" --build-config Release --output-on-failure -R '^smoke$'
     if [[ "$quick_scope" == all || "$quick_scope" == repair ]]; then
-        python3 "$repo_root/tests/e2e/factory_repair.py" "$build_dir/nanova.exe" --quick
+        python3 "$repo_root/tests/e2e/factory_repair.py" "$build_dir/nanovore.exe" --quick
     fi
     if [[ "$quick_scope" == all || "$quick_scope" == fungal ]]; then
-        python3 "$repo_root/tests/e2e/fungal_defence.py" "$build_dir/nanova.exe" --quick
+        python3 "$repo_root/tests/e2e/fungal_defence.py" "$build_dir/nanovore.exe" --quick
     fi
 else
     ctest --test-dir "$build_dir" --build-config Release --output-on-failure

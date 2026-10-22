@@ -12,16 +12,16 @@ struct DebugPixel
     vec4 volume;       // Current-frame in-scattering; W: actual shadow BVH queries.
     vec4 scatter_blur; // SSS light contribution RGB; maximum cell blur radius in pixels.
 };
-#ifndef NANOVA_DEBUG_BINDING
-#define NANOVA_DEBUG_BINDING RENDER_BINDING_DEBUG
+#ifndef NANOVORE_DEBUG_BINDING
+#define NANOVORE_DEBUG_BINDING RENDER_BINDING_DEBUG
 #endif
-layout(set = 0, binding = NANOVA_DEBUG_BINDING, std430) buffer DebugBuffer { DebugPixel debug_pixels[]; };
+layout(set = 0, binding = NANOVORE_DEBUG_BINDING, std430) buffer DebugBuffer { DebugPixel debug_pixels[]; };
 
 // Compact current-frame guides used outside F2: x first-hit distance, y hit code
 // (0 background, 1 opaque surface, 3 thin membrane), z log2(1 + terminal depth).
 // Spatial volume anchors follow, two vec4 (volume + log depth, sharp scattering)
 // per stride cell. Every entry is overwritten each frame.
-#ifndef NANOVA_GUIDE_BINDING
-#define NANOVA_GUIDE_BINDING RENDER_BINDING_GUIDES
+#ifndef NANOVORE_GUIDE_BINDING
+#define NANOVORE_GUIDE_BINDING RENDER_BINDING_GUIDES
 #endif
-layout(set = 0, binding = NANOVA_GUIDE_BINDING, std430) buffer GuideBuffer { vec4 guides[]; };
+layout(set = 0, binding = NANOVORE_GUIDE_BINDING, std430) buffer GuideBuffer { vec4 guides[]; };

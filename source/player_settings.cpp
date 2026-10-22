@@ -215,10 +215,10 @@ bool player_settings_user_path(char* path,size_t capacity)
 #ifdef _WIN32
     char local[ASSET_PATH_CAPACITY];DWORD count=GetEnvironmentVariableA("LOCALAPPDATA",local,sizeof(local));
     if (!count || count>=sizeof(local)) return false;
-    int length=snprintf(path,capacity,"%s\\Nanova",local);
+    int length=snprintf(path,capacity,"%s\\Nanovore",local);
     if (length<=0 || (size_t)length>=capacity) return false;
     if (!CreateDirectoryA(path,0) && GetLastError()!=ERROR_ALREADY_EXISTS) return false;
-    length=snprintf(path,capacity,"%s\\Nanova\\player_settings.json",local);
+    length=snprintf(path,capacity,"%s\\Nanovore\\player_settings.json",local);
     return length>0 && (size_t)length<capacity;
 #else
     (void)path;(void)capacity;return false;

@@ -27,7 +27,7 @@ def check_layout(layout,colonies):
  assert min(gaps)>=layout['minimum_gap']-1e-4,min(gaps)
  return points
 
-with tempfile.TemporaryDirectory(prefix='nanova-three-factions-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanovore-three-factions-') as directory:
  out=Path(directory)
  def run(name,world,ticks=1,expected=0,extra=()):
   global count

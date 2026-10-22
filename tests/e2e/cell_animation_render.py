@@ -30,7 +30,7 @@ for name,seconds,step,frames in [('pose_10',10,0,2),('pose_14',14,0,1),('after_p
 (out/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
 if not a.run:
     print('Prepared three sequential native 1920x1080 processes, at most two frames each, host validation. No GPU work started.');raise SystemExit()
-check_gpu_environment();env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1';start=time.monotonic();report={}
+check_gpu_environment();env=os.environ.copy();env['NANOVORE_VULKAN_VALIDATION']='1';start=time.monotonic();report={}
 for name,command in commands:
     remaining=gpu_process_timeout_seconds()
     process=subprocess.Popen(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)

@@ -14,10 +14,10 @@ MAX_DESCRIPTION_CHARACTERS = 64
 ROOT = Path(__file__).resolve().parents[1] / 'screenshots'
 
 def ppm_png(data):
-    # Preserve nanova's display-mapped RGB8 without resizing or changing pixels.
+    # Preserve nanovore's display-mapped RGB8 without resizing or changing pixels.
     header = re.match(rb'P6\s+(\d+)\s+(\d+)\s+255(?:\r\n|[\t\n\r ])', data)
     if not header:
-        raise ValueError('Expected a nanova RGB8 .ppm display capture')
+        raise ValueError('Expected a nanovore RGB8 .ppm display capture')
     width, height = map(int, header.groups())
     pixels = data[header.end():]
     if width <= 0 or height <= 0 or len(pixels) != width * height * 3:

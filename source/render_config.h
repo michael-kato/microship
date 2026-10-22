@@ -1,5 +1,5 @@
-#ifndef NANOVA_RENDER_CONFIG_H
-#define NANOVA_RENDER_CONFIG_H
+#ifndef NANOVORE_RENDER_CONFIG_H
+#define NANOVORE_RENDER_CONFIG_H
 
 #include <stdint.h>
 #include "types.h"

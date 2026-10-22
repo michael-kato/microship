@@ -6,7 +6,7 @@ from asset_data import established_world,write_world
 root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
-with tempfile.TemporaryDirectory(prefix='nanova-cell-send-') as folder:
+with tempfile.TemporaryDirectory(prefix='nanovore-cell-send-') as folder:
  out=Path(folder);world=established_world(root/'tests/e2e/scenes/virus-two-cell-test-level.json',out)
  wp=out/'world.json';write_world(wp,world)
  config=json.loads((root/'assets/rendering/renderer.json').read_text());config['camera']['position']=[0,0,20]

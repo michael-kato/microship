@@ -1,5 +1,5 @@
-#ifndef NANOVA_RENDERER_H
-#define NANOVA_RENDERER_H
+#ifndef NANOVORE_RENDERER_H
+#define NANOVORE_RENDERER_H
 
 #include <stdint.h>
 #include "profiler.h"

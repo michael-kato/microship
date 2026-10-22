@@ -1,5 +1,5 @@
-#ifndef NANOVA_ASSET_LIMITS_H
-#define NANOVA_ASSET_LIMITS_H
+#ifndef NANOVORE_ASSET_LIMITS_H
+#define NANOVORE_ASSET_LIMITS_H
 
 // Name and path capacities include the terminating NUL byte.
 enum { ASSET_NAME_CAPACITY=32, ASSET_PATH_CAPACITY=256 };

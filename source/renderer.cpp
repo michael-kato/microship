@@ -353,7 +353,7 @@ static bool create_instance(RendererState* state)
     };
     VkApplicationInfo application = {};
     application.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    application.pApplicationName = "nanova";
+    application.pApplicationName = "nanovore";
     application.apiVersion = VK_API_VERSION_1_2;
     VkDebugUtilsMessengerCreateInfoEXT debug = {};
     debug.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;

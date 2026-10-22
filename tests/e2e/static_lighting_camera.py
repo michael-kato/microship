@@ -19,12 +19,12 @@ prefix=[str(a.binary.resolve())] if sys.platform=='win32' else [sys.executable,s
 command=[*prefix,'--world',str(wp),'--config',str(cp),'--frames','2','--frame-delay-ms','250','--world-seed','1234','--camera-zoom','1000','--no-stats','--no-activate','--ticks','1','--capture',str(out/'camera.ppm'),'--state',str(out/'state.json')]
 (out/'commands.json').write_text(json.dumps([command],indent=2)+'\n')
 if not a.run:print('Prepared one native 1920x1080 two-frame Win32 camera window, default renderer sampling; host validation, 10s process cap, no tracing. No GPU work started.');raise SystemExit(0)
-env=os.environ.copy();env['NANOVA_VULKAN_VALIDATION']='1'
+env=os.environ.copy();env['NANOVORE_VULKAN_VALIDATION']='1'
 # This input check does not test audio; avoid blocking on the host sound device.
 if sys.platform!='win32':env['WINEDLLOVERRIDES']=env.get('WINEDLLOVERRIDES','')+';winepulse.drv,winealsa.drv=d'
 started=time.monotonic()
-helper=a.binary.resolve().parent/'nanova_input_probe.exe'
-assert helper.is_file(),'Build nanova_input_probe first'
+helper=a.binary.resolve().parent/'nanovore_input_probe.exe'
+assert helper.is_file(),'Build nanovore_input_probe first'
 process=subprocess.Popen(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1)
 stdout=[];stderr=[];ready=threading.Event()
 def read(pipe,lines):
@@ -36,7 +36,7 @@ for thread in readers:thread.start()
 try:
  assert ready.wait(max(.01,PROCESS_TIMEOUT_SECONDS-(time.monotonic()-started))),'No first frame'
  helper_prefix=[str(helper)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(helper)]
- helper_env=env.copy();helper_env['NANOVA_VULKAN_VALIDATION']='0'
+ helper_env=env.copy();helper_env['NANOVORE_VULKAN_VALIDATION']='0'
  helper_result=subprocess.run([*helper_prefix,'--pan'],env=helper_env,capture_output=True,text=True,timeout=max(.01,PROCESS_TIMEOUT_SECONDS-(time.monotonic()-started)))
  assert helper_result.returncode==0,(helper_result.stdout,helper_result.stderr)
  process.wait(timeout=max(.01,PROCESS_TIMEOUT_SECONDS-(time.monotonic()-started)))

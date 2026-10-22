@@ -1,5 +1,5 @@
-#ifndef NANOVA_PROFILER_H
-#define NANOVA_PROFILER_H
+#ifndef NANOVORE_PROFILER_H
+#define NANOVORE_PROFILER_H
 #include <stdint.h>
 
 enum ProfileNode {

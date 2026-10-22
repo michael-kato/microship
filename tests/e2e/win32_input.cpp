@@ -19,8 +19,8 @@ static int menu_input(int argc,char** argv)
     if (!close && (argc!=4 || strcmp(argv[1],"--menu-click"))) return 2;
     HWND window=0;
     for (unsigned attempt=0;!window && attempt<200;++attempt)
-    { window=FindWindowA("nanovaStartMenu","nanova - Choose faction");if (!window) Sleep(5); }
-    if (!window) { fprintf(stderr,"Nanova menu not found.\n");return 1; }
+    { window=FindWindowA("nanovoreStartMenu","nanovore - Choose faction");if (!window) Sleep(5); }
+    if (!window) { fprintf(stderr,"Nanovore menu not found.\n");return 1; }
     if (close) return PostMessageA(window,WM_CLOSE,0,0) ? 0 : 1;
     char* end=0;long x=strtol(argv[2],&end,10);if (end==argv[2] || *end || x<0 || x>8191) return 2;
     long y=strtol(argv[3],&end,10);if (end==argv[3] || *end || y<0 || y>8191) return 2;
@@ -52,7 +52,7 @@ static HWND ui_control(DWORD process,const char* klass,const char* text,HWND* pa
 {
     for (unsigned attempt=0;attempt<400;++attempt)
     {
-        UiTarget target={process,"nanovaPauseMenu",0};EnumWindows(find_ui,(LPARAM)&target);
+        UiTarget target={process,"nanovorePauseMenu",0};EnumWindows(find_ui,(LPARAM)&target);
         HWND child=target.window ? FindWindowExA(target.window,0,klass,text) : 0;
         if (child) { *parent=target.window;return child; }
         Sleep(5);
@@ -67,8 +67,8 @@ static int ui_input(DWORD process)
         char* end=strpbrk(line,"\r\n");if (end) *end=0;
         char* command=strtok(line,"|"),*label=strtok(0,"|"),*value=strtok(0,"|");
         if (!command) return 2;
-        const char* klass=!strcmp(command,"game_escape") || !strcmp(command,"game_dirty") ? "nanovaWindow"
-            : !strcmp(command,"faction") ? "nanovaStartMenu" : "nanovaPauseMenu";
+        const char* klass=!strcmp(command,"game_escape") || !strcmp(command,"game_dirty") ? "nanovoreWindow"
+            : !strcmp(command,"faction") ? "nanovoreStartMenu" : "nanovorePauseMenu";
         HWND window=ui_window(process,klass);if (!window) { fprintf(stderr,"UI window not found: %s.\n",klass);return 1; }
         if (!strcmp(command,"game_escape") || !strcmp(command,"escape"))
         { if (!press(window,VK_ESCAPE)) return 1; }
@@ -113,7 +113,7 @@ static int ui_input(DWORD process)
             bool found=false;
             for (unsigned attempt=0;!found && attempt<400;++attempt)
             {
-                UiTarget target={process,"nanovaPauseMenu",0};EnumWindows(find_ui,(LPARAM)&target);
+                UiTarget target={process,"nanovorePauseMenu",0};EnumWindows(find_ui,(LPARAM)&target);
                 found=target.window && label && FindWindowExA(target.window,0,"STATIC",label);
                 if (!found) Sleep(5);
             }
@@ -131,10 +131,10 @@ int main(int argc,char** argv)
     { char* end=0;unsigned long process=strtoul(argv[2],&end,10);if (*end || !process) return 2;return ui_input((DWORD)process); }
     if (argc>=2 && (!strcmp(argv[1],"--menu-click") || !strcmp(argv[1],"--menu-close"))) return menu_input(argc,argv);
     bool render=argc>=2 && !strcmp(argv[1],"--render-keys");
-    HWND window=FindWindowA("nanovaWindow","Nanova");
+    HWND window=FindWindowA("nanovoreWindow","Nanovore");
     if (render) for (unsigned attempt=0;!window && attempt<100;++attempt)
-    { Sleep(5);window=FindWindowA("nanovaWindow","Nanova"); }
-    if (!window) { fprintf(stderr,"Nanova window not found.\n");return 1; }
+    { Sleep(5);window=FindWindowA("nanovoreWindow","Nanovore"); }
+    if (!window) { fprintf(stderr,"Nanovore window not found.\n");return 1; }
     if (render)
     {
         for (int i=2;i<argc;++i)

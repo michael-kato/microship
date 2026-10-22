@@ -20,7 +20,7 @@ def run_window(binary,out,limit=2,keys=('W','D'),axes=(1,1),issue_order=True,scr
    found=desktop.windows()-existing
    if found:handle=next(iter(found));break
    time.sleep(.002)
-  assert handle,'The Nanova window did not appear'
+  assert handle,'The Nanovore window did not appear'
   x,y=desktop.focus_point(handle);x-=80;y-=80
   desktop.move(x+600,y+250);desktop.button(True,1);desktop.move(x+1320,y+850);desktop.button(False,1)
   if screen_key:
@@ -68,5 +68,5 @@ if __name__=='__main__':
  import argparse
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/control-window');p.add_argument('--run',action='store_true');a=p.parse_args()
  if not a.run:print('Prepared one two-frame 1920x1080 OS input check. Use --run to start it.');sys.exit(0)
- import os;os.environ['NANOVA_VULKAN_VALIDATION']='1'
+ import os;os.environ['NANOVORE_VULKAN_VALIDATION']='1'
  print(json.dumps(run_window(a.binary.resolve(),a.output.resolve()),indent=2))

@@ -1,5 +1,5 @@
-#ifndef NANOVA_DISPLAY_TRANSFORM_GLSL
-#define NANOVA_DISPLAY_TRANSFORM_GLSL
+#ifndef NANOVORE_DISPLAY_TRANSFORM_GLSL
+#define NANOVORE_DISPLAY_TRANSFORM_GLSL
 
 // AgX display transform for linear Rec.709 scene radiance (Troy Sobotka's AgX
 // base look, minimal fit by Benjamin Wrensch). An inset matrix, a log2 encode

@@ -10,7 +10,7 @@ from control_window import run_window
 root=Path(__file__).resolve().parents[2]
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/keyboard-window');p.add_argument('--run',action='store_true');a=p.parse_args()
 if not a.run:print('Prepared five two-frame 1920x1080 input checks. No GPU work started.');raise SystemExit(0)
-os.environ['NANOVA_VULKAN_VALIDATION']='1';out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
+os.environ['NANOVORE_VULKAN_VALIDATION']='1';out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 cases=[('wasd-up-right',('W','D'),(1,1),True),('wasd-down-left',('S','A'),(-1,-1),True),('arrows-up-right',('UP','RIGHT'),(1,1),True),('arrows-down-left',('DOWN','LEFT'),(-1,-1),True),('opposed-middle',('W','S','A','D','UP','DOWN','LEFT','RIGHT'),(0,0),False)]
 report={};start=time.monotonic()
 for name,keys,axes,order in cases:

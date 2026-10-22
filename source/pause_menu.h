@@ -1,5 +1,5 @@
-#ifndef NANOVA_PAUSE_MENU_H
-#define NANOVA_PAUSE_MENU_H
+#ifndef NANOVORE_PAUSE_MENU_H
+#define NANOVORE_PAUSE_MENU_H
 
 #include "player_settings.h"
 struct Window;

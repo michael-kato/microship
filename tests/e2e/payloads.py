@@ -11,7 +11,7 @@ from asset_data import established_world,write_world,producers,branches,change
 root=Path(__file__).resolve().parents[2];binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
-with tempfile.TemporaryDirectory(prefix='nanova-payloads-') as directory:
+with tempfile.TemporaryDirectory(prefix='nanovore-payloads-') as directory:
     out=Path(directory)
     data=branches(producers(established_world(root/'tests/e2e/scenes/virus-two-cell-test-level.json',out),collection=.0001),count=1)
     for u in data['content']['units']:
