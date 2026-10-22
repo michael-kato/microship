@@ -1143,7 +1143,7 @@ vec3 trace_wireframe(uvec2 pixel)
         vec3 heights=length(cross(b-a,c-a))/vec3(length(c-b),length(a-c),length(b-a));
         vec3 edges=s.barycentric*heights;
         float pixels=min(edges.x,min(edges.y,edges.z))/(path*pixel_angle);
-        float line=1.0-smoothstep(half_width,half_width+1.0,pixels);
+        float line=1.0-smoothstep(half_width-.5,half_width+.5,pixels);
         color+=weight*line*render.wireframe_line.rgb*(.35+.65*s.color);
         if (!s.translucent) break;
         weight*=.5;origin=s.point-s.geometric_normal*point_epsilon(s.point);
