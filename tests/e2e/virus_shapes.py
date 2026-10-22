@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='nanova_virus_shapes_') as directory:
     data['match'].pop('starts');data['match'].update(auto_colonize=False,fully_established=True)
     for i,b in enumerate(data['bodies']):b.update(position=[80+i*20,40,0],owner='virus' if i==0 else 'immune' if i==1 else 'neutral')
     data['rules'].pop('exploration',None)
-    for u in data['content']['units']:u.update(manufacture_seconds=10000,colonizes=False)
+    for u in data['content']['units']:u.update(manufacture_seconds=10000,colonizes=False);u.pop('colonization',None);u.pop('carrier',None)
     data['spawns']=[dict(type='virus_fighter',position=[-2,0,0]),dict(type='virus_bomber',position=[2,0,0])]
     replay=out/'flight.orders';replay.write_text('0 select all\n0 move 10 4 3\n')
     def run(name,world,expected=0):

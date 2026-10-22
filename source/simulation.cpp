@@ -137,7 +137,7 @@ float simulation_unit_scale(const Simulation* s,const Unit* unit)
     float size=simulation_unit_definition(s,unit)->scale;
     if (!s->world.combat.flight_enabled) return size;
     float t=unit->hatched ? 1 : std::fmin(1.0f,unit->age/SPAWN_SCALE_SECONDS);t=t*t*(3-2*t);size*=SPAWN_START_SCALE+SPAWN_GROWTH_SCALE*t;
-    if (unit->landing>0) size*=1-LANDING_SHRINK_SCALE*std::fmin(1.0f,unit->landing/s->world.gameplay.landing_seconds);
+    if (unit->landing>0 && simulation_unit_definition(s,unit)->consume_colonists) size*=1-LANDING_SHRINK_SCALE*std::fmin(1.0f,unit->landing/s->world.gameplay.landing_seconds);
     return size;
 }
 
@@ -712,7 +712,7 @@ static void establish_colony(Simulation* s,uint32_t p,Faction faction)
     sound(s,SOUND_COLONIZE,c->surface,c->faction);
 }
 
-static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,const Vec3* heading=0)
+static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,const Vec3* heading=0,uint32_t* spawned=0)
 {
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (s->units[i].health<=0)
@@ -731,6 +731,7 @@ static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,const 
             s->trails[i]=Trail();s->trails[i].points[0]=simulation_trail_origin(s,&unit);s->trails[i].count=1;
             s->units[i]=unit;++s->births;++s->faction_stats[unit.faction].built;
             sound(s,SOUND_BIRTH,position,definition->faction);
+            if (spawned) *spawned=i;
             return true;
         }
     return false;
@@ -786,7 +787,9 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
         for (uint32_t p=0;p<s->world.body_count;++p)
             if (s->world.bodies[p].owner!=FACTION_NEUTRAL && s->world.content.bodies[s->world.bodies[p].type].hosts_site)
             {
-                establish_colony(s,p,s->home_owner[p]);s->colonies[p].growth=1;
+                establish_colony(s,p,s->home_owner[p]);
+                if (s->world.colonized_starts) continue;
+                s->colonies[p].growth=1;
                 Colony& c=s->colonies[p];const ProducerDefinition& d=*simulation_producer_definition(s,p);
                 c.establishment_age=d.establishment_seconds;
                 for (uint32_t k=1;k<c.root_count;++k)
@@ -823,12 +826,13 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
             s->faction_stats[u.faction].peak_units=counts[u.faction];
         }
     }
+    uint32_t opening_count=0;
     if (s->world.auto_colonize && s->world.neutral_start)
         for (uint32_t i=0;i<MAX_UNITS;++i)
         {
             Unit& u=s->units[i];const UnitDefinition& d=*simulation_unit_definition(s,&u);
             if (u.health<=0 || u.faction!=s->world.player_faction || d.group!=0 || !d.colonizes) continue;
-            u.commanded=true;u.task=TASK_COLONIZE;break;
+            u.commanded=true;u.task=TASK_COLONIZE;if (++opening_count>=d.colonization_units) break;
         }
     simulation_update_sight(s);simulation_update_fog(s,0);
     snprintf(s->message,sizeof(s->message),"RIGHT-CLICK OPEN SPACE TO SCOUT. ORDER A KNOWN BODY TO INTERACT.");
@@ -836,6 +840,11 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed)
     {
         s->selected_body=home_body(s,s->world.player_faction);
         snprintf(s->message,sizeof(s->message),"SEEKING SPORES LAUNCH AUTOMATICALLY FROM HOME.");
+    }
+    if (s->world.colonized_starts)
+    {
+        s->selected_body=home_body(s,s->world.player_faction);
+        snprintf(s->message,sizeof(s->message),"HOME OWNED / FACTORIES ARE GROWING");
     }
     if (s->world.neutral_start)
     {
@@ -1038,7 +1047,7 @@ static bool attention_valid(const Simulation* s,const Unit& u,const Vec3* positi
     else return false;
     return within_leash(s,u,point) && length(subtract(point,u.position))<=radius*ATTENTION_RETENTION_RADIUS_SCALE;
 }
-static void local_task(Simulation* s,Unit* u,const Vec3* positions,const int32_t settlers[MAX_BODIES][MAX_FACTIONS],const FactoryTargets& targets,float dt)
+static void local_task(Simulation* s,Unit* u,const Vec3* positions,const FactoryTargets& targets,float dt)
 {
     const UnitDefinition& d=*simulation_unit_definition(s,u);
     bool valid=attention_valid(s,*u,positions,targets);
@@ -1080,7 +1089,6 @@ static void local_task(Simulation* s,Unit* u,const Vec3* positions,const int32_t
     for (uint32_t p=0;p<s->world.body_count;++p)
     {
         if (!s->world.content.bodies[s->world.bodies[p].type].hosts_site || s->colonies[p].active
-            || (settlers[p][u->faction]>=0 && settlers[p][u->faction]!=(int32_t)(u-s->units))
             || (u->faction==s->world.player_faction && !simulation_body_known(s,p))) continue;
         float distance=length(subtract(u->position,s->world.bodies[p].position))-s->world.bodies[p].radius;
         if (distance<nearest && !defended(s,p,u->faction)) { nearest=distance;chosen=p; }
@@ -1110,6 +1118,44 @@ int32_t simulation_held_by(const Simulation* s,uint32_t unit)
     return -1;
 }
 
+struct SettlementGroup { uint16_t units[MAX_COLONIZATION_UNITS];uint32_t count; };
+static void settlement_groups(Simulation* s,SettlementGroup groups[MAX_BODIES][MAX_UNIT_TYPES])
+{
+    memset(groups,0,sizeof(SettlementGroup)*MAX_BODIES*MAX_UNIT_TYPES);
+    bool held[MAX_UNITS]={},pending[MAX_BODIES]={};int8_t blocked[MAX_BODIES][MAX_FACTIONS]={};
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    {
+        const Unit& u=s->units[i];
+        if (!u.latch_colony && simulation_attachment_valid(s,&u)) held[u.latch]=true;
+    }
+    for (uint32_t i=0;i<MAX_PROJECTILES;++i)
+        if (s->projectiles[i].active && s->projectiles[i].seed) pending[s->projectiles[i].target]=true;
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    {
+        const Unit& u=s->units[i];const UnitDefinition& d=*simulation_unit_definition(s,&u);
+        if (u.health<=0 || u.moving || u.target<0 || held[i] || u.stun>0 || simulation_attachment_valid(s,&u)
+            || opening_orbit(s,u) || !d.colonizes || u.seed_cooldown>0) continue;
+        uint32_t p=(uint32_t)u.target;
+        if (s->colonies[p].active || pending[p] || !s->world.content.bodies[s->world.bodies[p].type].hosts_site) continue;
+        int8_t& defense=blocked[p][u.faction];
+        if (!defense) defense=defended(s,p,u.faction) ? 1 : -1;
+        if (defense>0) continue;
+        SettlementGroup& g=groups[p][u.type];uint32_t k=0;
+        Vec3 goal=add(s->colonies[p].surface,scale(s->world.bodies[p].colony_normal,COLONIZE_SURFACE_OFFSET));
+        float distance=dot(subtract(u.position,goal),subtract(u.position,goal));
+        while (k<g.count)
+        {
+            Vec3 delta=subtract(s->units[g.units[k]].position,goal);
+            if (distance<dot(delta,delta)) break;
+            ++k;
+        }
+        if (k>=d.colonization_units) continue;
+        uint32_t count=std::min(g.count+1,d.colonization_units);
+        for (uint32_t j=count-1;j>k;--j) g.units[j]=g.units[j-1];
+        g.units[k]=(uint16_t)i;g.count=count;
+    }
+}
+
 static void move_units(Simulation* s, float dt)
 {
     const CombatVisuals* flight=&s->world.combat;
@@ -1125,18 +1171,10 @@ static void move_units(Simulation* s, float dt)
         const Unit& u=s->units[i];
         if (!u.latch_colony && simulation_attachment_valid(s,&u) && held_by[u.latch]<0) held_by[u.latch]=(int32_t)i;
     }
-    // One approach slot per side and cell keeps a group from blocking its own landing point.
-    int32_t settlers[MAX_BODIES][MAX_FACTIONS];
-    for (uint32_t p=0;p<MAX_BODIES;++p) for (uint32_t f=0;f<MAX_FACTIONS;++f) settlers[p][f]=-1;
-    for (uint32_t i=0;i<MAX_UNITS;++i)
-    {
-        const Unit& u=s->units[i];
-        if (u.health<=0 || u.moving || u.target<0 || opening_orbit(s,u) || !simulation_unit_definition(s,&u)->colonizes) continue;
-        uint32_t p=(uint32_t)u.target;
-        if (s->colonies[p].active || defended(s,p,u.faction)) continue;
-        int32_t old=settlers[p][u.faction];Vec3 goal=s->colonies[p].surface;
-        if (old<0 || length(subtract(positions[i],goal))<length(subtract(positions[old],goal))) settlers[p][u.faction]=(int32_t)i;
-    }
+    SettlementGroup groups[MAX_BODIES][MAX_UNIT_TYPES];settlement_groups(s,groups);
+    bool approaching[MAX_UNITS]={};
+    for (uint32_t p=0;p<s->world.body_count;++p) for (uint32_t t=0;t<s->world.content.unit_count;++t)
+        for (uint32_t k=0;k<groups[p][t].count;++k) approaching[groups[p][t].units[k]]=true;
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         Unit* u=&s->units[i];
@@ -1156,7 +1194,7 @@ static void move_units(Simulation* s, float dt)
         Vec3 combat_target={};bool strafe=false;
         uint32_t p=(uint32_t)u->target;
         if (!u->moving && s->colonies[p].active && s->colonies[p].faction==u->faction) u->commanded=false;
-        bool colonizing=u->target>=0 && settlers[p][u->faction]==(int32_t)i && !opening_orbit(s,*u) && simulation_unit_definition(s,u)->colonizes && s->world.content.bodies[s->world.bodies[p].type].hosts_site
+        bool colonizing=u->target>=0 && approaching[i] && !opening_orbit(s,*u) && simulation_unit_definition(s,u)->colonizes && s->world.content.bodies[s->world.bodies[p].type].hosts_site
             && !s->colonies[p].active && !defended(s,p,u->faction);
         Vec3 goal=u->moving ? u->destination : add(s->colonies[p].surface,scale(s->world.bodies[p].colony_normal,colonizing ? COLONIZE_SURFACE_OFFSET : LEGACY_ORBIT_SURFACE_OFFSET));
         if (!u->moving && !colonizing)
@@ -1178,7 +1216,7 @@ static void move_units(Simulation* s, float dt)
                 goal=add(s->world.bodies[p].position,scale(normal,height));
             }
             goal=add(goal,add(scale(tangent,std::cos(angle)*spread),scale(bitangent,std::sin(angle)*spread)));
-            local_task(s,u,positions,settlers,targets,dt);
+            local_task(s,u,positions,targets,dt);
             if (u->task==TASK_ATTACK_UNIT) goal=positions[u->attention];
             else if (u->task==TASK_ATTACK_STRUCTURE) goal=targets.points[u->attention][u->attention_structure];
             else if (u->task==TASK_COLONIZE) goal=add(s->colonies[u->target].surface,scale(s->world.bodies[u->target].colony_normal,COLONIZE_SURFACE_OFFSET));
@@ -1568,7 +1606,7 @@ static void projectile_combat(Simulation* s,float dt)
     grid_build(s);uint16_t near[MAX_UNITS];
     if (s->world.spikes.enabled) for (uint32_t i=0;i<MAX_PROJECTILES;++i)
     {
-        const Projectile* p=&s->projectiles[i];if (!p->active) continue;
+        const Projectile* p=&s->projectiles[i];if (!p->active || p->seed) continue;
         bool valid=p->colony ? s->colonies[p->target].generation==p->generation
             && structure_generation(&s->colonies[p->target],p->structure)==p->structure_generation : s->units[p->target].generation==p->generation;
         if (valid && !p->blob) ++incoming[p->colony ? structure_slot(p->target,p->structure) : p->target];
@@ -1708,7 +1746,7 @@ static void projectile_combat(Simulation* s,float dt)
     }
     for (uint32_t i=0;i<MAX_PROJECTILES;++i)
     {
-        Projectile* p=&s->projectiles[i];if (!p->active) continue;
+        Projectile* p=&s->projectiles[i];if (!p->active || p->seed) continue;
         bool valid=p->colony ? s->colonies[p->target].active && s->colonies[p->target].faction!=p->faction && s->colonies[p->target].generation==p->generation
             && structure_health(&s->colonies[p->target],p->structure)>0 && structure_generation(&s->colonies[p->target],p->structure)==p->structure_generation
             : s->units[p->target].health>0 && s->units[p->target].generation==p->generation;
@@ -1834,29 +1872,94 @@ static void projectile_combat(Simulation* s,float dt)
         }
 }
 
+static bool launch_seed(Simulation* s,Unit* u,uint32_t cell)
+{
+    const UnitDefinition& d=*simulation_unit_definition(s,u);int32_t payload=-1;
+    if (d.payload_count)
+    {
+        for (uint32_t k=0;k<d.payload_count;++k) if (u->payloads[k]>=1) { payload=(int32_t)k;break; }
+        if (payload<0) return false;
+    }
+    for (uint32_t i=0;i<MAX_PROJECTILES;++i) if (!s->projectiles[i].active)
+    {
+        Projectile p={};p.active=true;p.seed=true;p.colony=true;p.target=cell;p.generation=s->colonies[cell].generation;
+        p.faction=u->faction;p.unit_type=u->type;p.launch_scale=d.seed_scale;p.anchor=p.position=p.previous=u->position;
+        if (payload>=0) p.anchor=p.position=p.previous=add(u->position,scale(world_direction(u,d.payload_sockets[payload]),d.scale));
+        p.direction=normalize(subtract(s->world.bodies[cell].factory_origin,p.position));s->projectiles[i]=p;
+        if (payload>=0) u->payloads[payload]=0;
+        u->seed_cooldown=d.seed_reload;u->landing=0;++s->seed_launches;
+        sound(s,SOUND_SHOT,u->position,u->faction);return true;
+    }
+    return false;
+}
 static void colonize_cells(Simulation* s, float dt)
 {
-    for (uint32_t i=0;i<MAX_UNITS;++i)
+    for (uint32_t i=0;i<MAX_PROJECTILES;++i)
     {
-        Unit* u=&s->units[i];
-        if (u->health<=0 || u->target<0 || u->task!=TASK_COLONIZE || opening_orbit(s,*u) || !simulation_unit_definition(s,u)->colonizes
-            || !s->world.content.bodies[s->world.bodies[u->target].type].hosts_site) continue;
-        uint32_t p=(uint32_t)u->target;Colony* c=&s->colonies[p];
-        if (defended(s,p,u->faction))
+        Projectile& p=s->projectiles[i];if (!p.active || !p.seed) continue;
+        uint32_t cell=(uint32_t)p.target;
+        if (s->colonies[cell].active || s->colonies[cell].generation!=p.generation || defended(s,cell,p.faction))
+        { p.active=false;++s->blocked_landings;continue; }
+        p.previous=p.position;p.age+=dt;
+        float t=std::fmin(1.0f,p.age/s->world.gameplay.landing_seconds);
+        p.position=add(scale(p.anchor,1-t),scale(s->world.bodies[cell].factory_origin,t));
+        if (t>=1) { establish_colony(s,cell,p.faction);++s->landings;p.active=false; }
+    }
+    SettlementGroup groups[MAX_BODIES][MAX_UNIT_TYPES];settlement_groups(s,groups);
+    bool progressing[MAX_UNITS]={};
+    // Reusable seed craft act first. A simultaneous fighter group keeps its units.
+    for (uint32_t pass=0;pass<2;++pass)
+    for (uint32_t p=0;p<s->world.body_count;++p)
+    for (uint32_t t=0;t<s->world.content.unit_count;++t)
+    {
+        const UnitDefinition& d=s->world.content.units[t];SettlementGroup& g=groups[p][t];
+        if (!d.colonizes || d.consume_colonists!=(pass!=0) || s->colonies[p].active || g.count<d.colonization_units) continue;
+        bool ready=true;float progress=s->world.gameplay.landing_seconds;
+        Vec3 goal=add(s->colonies[p].surface,scale(s->world.bodies[p].colony_normal,COLONIZE_SURFACE_OFFSET));
+        for (uint32_t k=0;k<g.count;++k)
         {
-            if (u->landing>=0) ++s->blocked_landings;
-            u->landing=-1;
-            if (u->selected) snprintf(s->message,sizeof(s->message),"CLEAR DEFENDERS BEFORE COLONIZING.");
+            const Unit& u=s->units[g.units[k]];
+            if (u.task!=TASK_COLONIZE || length(subtract(u.position,goal))>LANDING_COMPLETION_RADIUS) ready=false;
+            progress=std::fmin(progress,std::fmax(0.0f,u.landing));
+        }
+        if (!ready) continue;
+        if (!d.consume_colonists)
+        {
+            if (launch_seed(s,&s->units[g.units[0]],p))
+            { for (uint32_t type=0;type<s->world.content.unit_count;++type) groups[p][type].count=0; }
             continue;
         }
-        if (u->landing<0) u->landing=0;
-        if (c->active) continue;
-        Vec3 goal=add(c->surface,scale(s->world.bodies[p].colony_normal,COLONIZE_SURFACE_OFFSET));
-        if (length(subtract(u->position,goal))>LANDING_COMPLETION_RADIUS) continue;
-        u->landing+=dt;
-        if (u->landing<s->world.gameplay.landing_seconds) continue;
-        establish_colony(s,p,u->faction);u->health=0;u->selected=false;s->trails[i]=Trail();++s->landings;
-        if (u->faction==s->world.player_faction) snprintf(s->message,sizeof(s->message),"PRODUCTION SITE ESTABLISHED: %u",p+1);
+        progress+=dt;
+        for (uint32_t k=0;k<g.count;++k) { progressing[g.units[k]]=true;s->units[g.units[k]].landing=progress; }
+        if (progress<s->world.gameplay.landing_seconds) continue;
+        establish_colony(s,p,d.faction);++s->landings;s->colonists_spent+=g.count;
+        for (uint32_t k=0;k<g.count;++k)
+        { uint32_t i=g.units[k];s->units[i].health=0;s->units[i].selected=false;s->trails[i]=Trail(); }
+        if (d.faction==s->world.player_faction) snprintf(s->message,sizeof(s->message),"PRODUCTION SITE ESTABLISHED: %u",p+1);
+    }
+    for (uint32_t i=0;i<MAX_UNITS;++i) if (!progressing[i]) s->units[i].landing=0;
+}
+static void grow_carriers(Simulation* s,float dt)
+{
+    bool held[MAX_UNITS]={};
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    {
+        const Unit& u=s->units[i];
+        if (!u.latch_colony && simulation_attachment_valid(s,&u)) held[u.latch]=true;
+    }
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    {
+        Unit& u=s->units[i];if (u.health<=0) continue;
+        u.seed_cooldown=std::fmax(0.0f,u.seed_cooldown-dt);
+        const UnitDefinition& d=*simulation_unit_definition(s,&u);
+        if (d.carrier_seconds<=0 || held[i] || u.stun>0 || simulation_attachment_valid(s,&u)) continue;
+        u.carrier_timer=std::fmin(d.carrier_seconds,u.carrier_timer+dt);
+        if (u.carrier_timer<d.carrier_seconds) continue;
+        Vec3 offset=scale(world_direction(&u,d.carrier_offset),d.scale);uint32_t child=0;
+        u.carrier_blocked=!spawn(s,d.carrier_unit,add(u.position,offset),u.target,&u.forward,&child);
+        if (u.carrier_blocked) continue;
+        Unit& fighter=s->units[child];fighter.commanded=u.commanded;fighter.moving=u.moving;fighter.destination=u.destination;fighter.flight_goal=u.moving ? u.destination : fighter.position;
+        u.carrier_timer=0;++s->carrier_births;
     }
 }
 
@@ -2093,6 +2196,13 @@ static void outcome(Simulation* s)
         units=units || (s->units[i].health>0 && s->units[i].faction==s->world.player_faction);
         enemy_units=enemy_units || (s->units[i].health>0 && s->units[i].faction!=s->world.player_faction && !s->faction_established[s->units[i].faction]);
     }
+    // A launched seed can restore a site after its last craft is lost.
+    for (uint32_t i=0;i<MAX_PROJECTILES;++i)
+    {
+        const Projectile& p=s->projectiles[i];if (!p.active || !p.seed) continue;
+        units=units || p.faction==s->world.player_faction;
+        enemy_units=enemy_units || (p.faction!=s->world.player_faction && !s->faction_established[p.faction]);
+    }
     if (friendly && !hostile && !enemy_units) { s->outcome=1;s->outcome_tick=s->tick_count;sound(s,SOUND_WIN,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"YOU WON. CONTINUE PLAYING OR PRESS R TO RESTART."); }
     else if (!friendly && !units) { s->outcome=-1;s->outcome_tick=s->tick_count;sound(s,SOUND_LOSE,s->world.bodies[0].position);snprintf(s->message,sizeof(s->message),"COLONY LOST. R TO RESTART."); }
 }
@@ -2128,7 +2238,7 @@ void simulation_step(Simulation* s,SimulationTimings* timings)
         simulation_phase_end(timings,SIM_MOVEMENT,&phase_start);
         projectile_combat(s,dt);
         simulation_phase_end(timings,SIM_COMBAT,&phase_start);
-        colonize_cells(s,dt);grow_colonies(s,dt);outcome(s);
+        grow_carriers(s,dt);colonize_cells(s,dt);grow_colonies(s,dt);outcome(s);
         simulation_phase_end(timings,SIM_GROWTH,&phase_start);
         simulation_update_sight(s);communications_update(s);
         simulation_phase_end(timings,SIM_SIGHT,&phase_start);
@@ -2200,6 +2310,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
     fprintf(file,"{\"tick\":%u,\"time\":%.9f,\"unit_capacity\":%u,\"outcome\":%d,\"outcome_tick\":%u,\"births\":%u,\"losses\":%u,\"landings\":%u,\"blocked_landings\":%u,",
         s->tick_count,s->time_seconds,(uint32_t)MAX_UNITS,s->outcome,s->outcome_tick,s->births,s->losses,s->landings,s->blocked_landings);
     fprintf(file,"\"prepared_production_ticks\":%u,\"factory_path_segments\":%u,\"factory_growth_segments\":%u,",s->world.production_ticks,(uint32_t)GROWTH_PATH_SEGMENTS,(uint32_t)GROWTH_SEGMENTS);
+    fprintf(file,"\"settlement\":{\"colonists_spent\":%u,\"seed_launches\":%u,\"carrier_births\":%u},",s->colonists_spent,s->seed_launches,s->carrier_births);
     write_faction_stats(s,file);communications_write_state(s,file);
     fprintf(file,",\"haze\":{\"damage\":%.6f,\"healing\":%.6f}",s->haze_damage,s->haze_healing);
     uint32_t clouds=0;for (uint32_t i=0;i<MAX_SPORE_CLOUDS;++i) clouds+=s->clouds[i].age<s->clouds[i].seconds;
@@ -2268,6 +2379,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
             fprintf(file,"%s{\"slot\":%u,\"generation\":%u,\"faction\":%d,\"kind\":%d,\"health\":%.6f,\"target\":%d,\"position\":[%.6f,%.6f,%.6f],\"velocity\":[%.6f,%.6f,%.6f],\"bank\":%.6f,\"selected\":%s,\"wounds\":%u,\"ready_spikes\":%u,\"flash\":%.6f,\"visible\":%s,\"moving\":%s",
                 first ? "" : ",",i,u->generation,(int)u->faction,(int)simulation_unit_definition(s,u)->group,u->health,u->target,u->position.x,u->position.y,u->position.z,u->velocity.x,u->velocity.y,u->velocity.z,u->bank,u->selected ? "true" : "false",u->wounds,ready,u->flash,s->visible_units[i] ? "true" : "false",u->moving ? "true" : "false");
             fprintf(file,",\"exposure\":%.6f,\"stun\":%.6f,\"aura\":%.6f",u->exposure,u->stun,u->aura);
+            fprintf(file,",\"landing\":%.6f,\"seed_cooldown\":%.6f,\"carrier_timer\":%.6f,\"carrier_blocked\":%s",u->landing,u->seed_cooldown,u->carrier_timer,u->carrier_blocked ? "true" : "false");
             uint32_t pods=0;const UnitDefinition* definition=simulation_unit_definition(s,u);
             for (uint32_t j=0;j<definition->payload_count;++j) pods+=u->payloads[j]>=1;
             fprintf(file,",\"ready_payloads\":%u,\"payload_growth\":[",pods);
@@ -2283,8 +2395,9 @@ bool simulation_write_state(const Simulation* s, const char* path)
     for (uint32_t i=0;i<MAX_PROJECTILES;++i) if (s->projectiles[i].active)
     {
         const Projectile& p=s->projectiles[i];
-        fprintf(file,"%s{\"type\":\"%s\",\"payload\":%s,\"position\":[%.6f,%.6f,%.6f],\"previous\":[%.6f,%.6f,%.6f],\"scale\":%.6f}",
-            first ? "" : ",",s->world.content.units[p.unit_type].name,p.payload ? "true" : "false",p.position.x,p.position.y,p.position.z,p.previous.x,p.previous.y,p.previous.z,p.launch_scale);first=false;
+        fprintf(file,"%s{\"seed\":%s,\"cell\":%d,",first ? "" : ",",p.seed ? "true" : "false",p.seed ? p.target : NO_BODY);
+        fprintf(file,"\"type\":\"%s\",\"payload\":%s,\"position\":[%.6f,%.6f,%.6f],\"previous\":[%.6f,%.6f,%.6f],\"scale\":%.6f}",
+            s->world.content.units[p.unit_type].name,p.payload ? "true" : "false",p.position.x,p.position.y,p.position.z,p.previous.x,p.previous.y,p.previous.z,p.launch_scale);first=false;
     }
     uint32_t projectiles=0,pops=0,trails=0,flashes=0,low=0,impacts=0;
     for (uint32_t i=0;i<MAX_PROJECTILES;++i) projectiles+=s->projectiles[i].active;

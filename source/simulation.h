@@ -66,7 +66,8 @@ struct Unit
     bool commanded;
     Vec3 flight_goal;
     Vec3 position;
-    float health, landing;
+    float health, landing,seed_cooldown,carrier_timer;
+    bool carrier_blocked;
     uint32_t type, generation;
     uint32_t path_marker_tick; // Selection/order feedback only.
     Faction faction;
@@ -105,7 +106,7 @@ struct Projectile
     Vec3 anchor;
     float launch_scale;
     uint32_t unit_type;
-    bool payload;
+    bool payload,seed;
     bool blob; float stun; // A blob incapacitates its unit target for stun seconds instead of wounding it.
 };
 struct Pop { Vec3 position; float age, duration,blast_radius; Faction faction; };
@@ -195,6 +196,7 @@ struct Simulation
     bool discovered[MAX_BODIES], visible_bodies[MAX_BODIES], visible_units[MAX_UNITS];
     uint32_t healed,regrown,detached;
     uint32_t births, losses, landings, blocked_landings, next_generation;
+    uint32_t colonists_spent,seed_launches,carrier_births;
     int32_t selected_body;
     int32_t order_body;
     uint32_t order_tick,order_count;

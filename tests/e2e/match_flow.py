@@ -26,7 +26,8 @@ with tempfile.TemporaryDirectory(prefix='nanova-match-') as directory:
         return json.loads((out/(name+'.json')).read_text()),json.loads((out/(name+'-scene.json')).read_text())
     for choice,faction in ((1,1),(2,2),(3,3)):
         s,scene=run('menu-'+str(choice),extra=('--menu-select',str(choice)))
-        assert s['player_faction']==faction and not any(c['active'] for c in s['colonies'])
+        assert s['player_faction']==faction and sum(c['active'] for c in s['colonies'])==3
+        assert [sum(u['faction']==f for u in s['units']) for f in (1,2,3)]==[10,5,25]
         assert scene['medium_shadows'][-1] is False and all(scene['medium_shadows'][:-1])
         assert scene['fog']['tint'][0]>scene['fog']['tint'][2]>scene['fog']['tint'][1]
         assert any(i['mask']==4 and i['style'][7]==1 for i in scene['instances'])

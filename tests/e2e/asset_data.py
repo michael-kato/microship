@@ -23,7 +23,9 @@ def established_world(source,directory):
         'swarm_fighter':dict(speed=3.84,health=24,hits=2,range=3.2,cost=7,shot_interval=.8),
         'swarm_bomber':dict(speed=2.8,health=40,hits=2,range=3.2,cost=18,shot_interval=2.4),
     }
+    data['match'].pop('colonized_starts',None)
     for unit in data['content']['units']:
+        unit.pop('colonization',None);unit.pop('carrier',None)
         if unit['name'] in prior:
             unit.update(prior[unit['name']]);unit.pop('manufacture_seconds',None)
             if 'payload' in unit:unit['payload']['reload_seconds']=12

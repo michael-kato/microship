@@ -57,7 +57,8 @@ for choice,faction in ([(1,1)] if a.gpu else [(0,0),(1,1),(2,2),(3,3)]):
         assert 'Start menu ready.' in output
         if choice:
             result=json.loads(state.read_text());assert result['player_faction']==faction,(choice,result['player_faction'])
-            assert not any(c['active'] for c in result['colonies'])
+            assert sum(c['active'] for c in result['colonies'])==3
+            assert [sum(u['faction']==f for u in result['units']) for f in (1,2,3)]==[10,5,25]
         else:assert 'Loaded world' not in output,'Closing the menu started a game'
         if a.gpu:
             assert 'Vulkan validation: enabled.' in output

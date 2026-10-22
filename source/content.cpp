@@ -240,7 +240,7 @@ static bool load_units(Content* c,Json root,const char* path)
     json_object(shared,"secondary_interval_factor");float secondary_interval=json_float(json_get(shared,"secondary_interval_factor"),1,MAX_UNIT_INTERVAL_FACTOR);JsonArray a=json_array(json_get(root,"units"),MAX_UNIT_TYPES);Json j={};
     while (json_next(&a,&j))
     {
-        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|trail_origin|pick_radius|cue_radius|hits|brood|manufacture_seconds|attack|secondary_attack|autonomy|payload|rear_tint");
+        json_object(j,"name|faction|group|model|scale|yaw_degrees|tint|speed|health|range|cost|shot_interval|separation|targets|colonizes|detaches|trails|trail_origin|pick_radius|cue_radius|hits|brood|manufacture_seconds|attack|secondary_attack|autonomy|payload|rear_tint|colonization|carrier");
         UnitDefinition u={};definition_name(j,u.name);u.charge_speed=u.charge_acceleration=1;
         Json manufacture=json_find(j,"manufacture_seconds");
         if (json_present(manufacture)) u.manufacture_seconds=json_positive(manufacture,MAX_BUILDING_GROWTH_SECONDS);
@@ -321,6 +321,33 @@ static bool load_units(Content* c,Json root,const char* path)
         Json trail_origin=json_find(j,"trail_origin");
         if (json_present(trail_origin)) u.trail_origin=json_vector(trail_origin,-10,10);
         u.colonizes=json_bool(json_get(j,"colonizes"));u.detaches=json_bool(json_get(j,"detaches"));u.trails=json_bool(json_get(j,"trails"));
+        u.colonization_units=1;u.consume_colonists=true;
+        Json colonization=json_find(j,"colonization");
+        if (json_present(colonization))
+        {
+            json_object(colonization,"required_units|consume_units|seed");
+            if (!u.colonizes) json_error(colonization,"colonization requires colonizes true");
+            u.colonization_units=json_uint(json_get(colonization,"required_units"),1,MAX_COLONIZATION_UNITS);
+            u.consume_colonists=json_bool(json_get(colonization,"consume_units"));
+            Json seed=json_find(colonization,"seed");
+            if (u.consume_colonists==json_present(seed)) json_error(colonization,"only reusable colonizers require a seed");
+            if (json_present(seed))
+            {
+                json_object(seed,"model|scale|reload_seconds");
+                if (u.colonization_units!=1) json_error(seed,"seed launch requires one unit");
+                json_path(json_get(seed,"model"),path,u.seed_model);
+                u.seed_scale=json_positive(json_get(seed,"scale"),MAX_UNIT_SCALE);
+                u.seed_reload=json_positive(json_get(seed,"reload_seconds"),3600);
+            }
+        }
+        Json carrier=json_find(j,"carrier");
+        if (json_present(carrier))
+        {
+            json_object(carrier,"unit|interval_seconds|launch_offset");
+            json_string(json_get(carrier,"unit"),u.carrier_name,ASSET_NAME_CAPACITY);
+            u.carrier_seconds=json_positive(json_get(carrier,"interval_seconds"),3600);
+            u.carrier_offset=json_vector(json_get(carrier,"launch_offset"),-10,10);
+        }
         Json payload=json_find(j,"payload");
         if (json_present(payload))
         {
@@ -560,6 +587,13 @@ bool content_finish(Content* c,const char* path)
         if (faction<=0 || group<0) { valid=false;break; }
         u->faction=(Faction)faction;u->group=(uint32_t)group;
         c->max_unit_range=std::fmax(c->max_unit_range,u->range);c->max_unit_separation=std::fmax(c->max_unit_separation,u->separation);
+    }
+    for (uint32_t i=0;valid && i<c->unit_count;++i) if (c->units[i].carrier_seconds>0)
+    {
+        UnitDefinition& u=c->units[i];int child=content_unit(c,u.carrier_name);
+        if (child<0 || c->units[child].faction!=u.faction || c->units[child].group!=0 || c->units[child].carrier_seconds>0)
+        { valid=false;break; }
+        u.carrier_unit=(uint32_t)child;
     }
     for (uint32_t i=0;valid && i<c->producer_count;++i)
     {

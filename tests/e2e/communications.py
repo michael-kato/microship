@@ -33,7 +33,7 @@ with tempfile.TemporaryDirectory(prefix='nanova_communications_') as temporary:
  base['match'].pop('starts');base['match'].update(auto_colonize=False,fully_established=True)
  base['rules']['ai']['expansion_delay']=300;base['rules']['economy']['enemy_attack_seconds']=10000
  for u in base['content']['units']:
-  u.update(speed=.01,range=.01,shot_interval=1000,colonizes=False,manufacture_seconds=10000)
+  u.update(speed=.01,range=.01,shot_interval=1000,colonizes=False,manufacture_seconds=10000);u.pop('colonization',None);u.pop('carrier',None)
   if 'blob' in u.get('attack',{}):u['attack']['blob']['range']=.01
  template=deepcopy(base['bodies'][0]);template['radius']=4.2
  def contact(faction):

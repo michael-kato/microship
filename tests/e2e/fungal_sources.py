@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-sources-') as directory:
         building.update(growth_seconds=.01,sprout_seconds=.01,establishment_seconds=.01)
         building['branches'].update(seconds=.01,root_offset_seconds=0)
     for unit in base['content']['units']:
-        unit.update(manufacture_seconds=10000,colonizes=False)
+        unit.update(manufacture_seconds=10000,colonizes=False);unit.pop('colonization',None);unit.pop('carrier',None)
         if unit['name']=='fungal_spore':unit['manufacture_seconds']=.5;unit['attack']['lifetime']=.2
     def fungus(data):return next(b for b in data['content']['buildings'] if b['faction']=='fungus')
     def run(name,data,ticks=120,expected=0):

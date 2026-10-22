@@ -110,6 +110,11 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
             p->blob_meshes[i]=(uint32_t)sources.size();
             sources.push_back(MeshSource{w->content.units[i].blob_model,Vec3{},1,0,Color{1,1,1},0,0,0,0,0});
         }
+        for (uint32_t i=0;i<w->content.unit_count;++i) if (w->content.units[i].seed_model[0])
+        {
+            p->seed_meshes[i]=(uint32_t)sources.size();
+            sources.push_back(MeshSource{w->content.units[i].seed_model,Vec3{},1,0,Color{1,1,1},0,0,0,0,0});
+        }
         for (uint32_t i=0;i<w->content.producer_count;++i)
         {
             p->factory_meshes[i]=(uint32_t)sources.size();
@@ -267,11 +272,11 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
     for (uint32_t i=0;i<MAX_PROJECTILES;++i)
     {
         const Projectile* p=&s->projectiles[i];if (!p->active || !simulation_in_sight(s,p->position,0)) continue;
-        if (p->blob)
+        if (p->blob || p->seed)
         {
             Vec3 axis=std::fabs(p->direction.y)<SPIKE_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0};
             Vec3 x=normalize(cross(axis,p->direction)),y=cross(p->direction,x);
-            set_instance(state,flying+i,state->blob_meshes[p->unit_type],p->position,scale(x,p->launch_scale),scale(y,p->launch_scale),scale(p->direction,p->launch_scale));
+            set_instance(state,flying+i,(p->seed ? state->seed_meshes[p->unit_type] : state->blob_meshes[p->unit_type]),p->position,scale(x,p->launch_scale),scale(y,p->launch_scale),scale(p->direction,p->launch_scale));
             ++state->flying_spikes;continue;
         }
         if (p->payload)

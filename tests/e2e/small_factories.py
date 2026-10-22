@@ -41,7 +41,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-small-factories-') as directory:
         for building in data['content']['buildings']:
             building.update(growth_seconds=.01,sprout_seconds=.01,establishment_seconds=.01)
             building['branches'].update(seconds=.01,root_offset_seconds=0)
-        for unit in data['content']['units']:unit.update(manufacture_seconds=.005,cost=.001,speed=.01,colonizes=False)
+        for unit in data['content']['units']:unit.update(manufacture_seconds=.005,cost=.001,speed=.01,colonizes=False);unit.pop('colonization',None);unit.pop('carrier',None)
         profile=next(b for b in data['content']['buildings'] if b['faction']==side);branch=profile['branches']
         for radius,expected_roots in [(2.1,4),(2.7,6),(4.2,10)]:
             case=deepcopy(data);case['bodies'][home]['radius']=radius

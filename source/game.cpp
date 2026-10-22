@@ -463,7 +463,14 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
             snprintf(r->hud[HUD_LINE_RESOURCE],HUD_LINE_CAPACITY,"SPORES CAN BE SHOT DOWN");
             snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,"BLASTS ALSO DAMAGE NEARBY FRIENDLIES");
         }
-        if (!ours) snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,c->active ? "CLEAR DEFENDERS TO ESTABLISH A SITE" : "ORDER CRAFT HERE TO ESTABLISH A SITE");
+        if (!ours)
+        {
+            const FactionDefinition& faction=s->world.content.factions[s->world.player_faction];
+            const UnitDefinition& colonizer=s->world.content.units[faction.default_unit];
+            snprintf(r->hud[HUD_LINE_PRIORITY],HUD_LINE_CAPACITY,"CAPTURE COST: %u %.16s",colonizer.colonization_units,s->world.content.groups[colonizer.group].plural);
+            const UnitDefinition& bomber=s->world.content.units[faction.assault_unit];
+            if (bomber.colonizes && !bomber.consume_colonists) snprintf(r->hud[HUD_LINE_RESOURCE],HUD_LINE_CAPACITY,"OR ONE BOMBER / BOMBER IS RETAINED");
+        }
         r->hud_status[0]=-1;r->hud_status[1]=c->growth;
         r->hud_status[2]=c->energy/s->world.gameplay.storage;r->hud_status[3]=c->building ? c->manufacturing : 0;
         if (s->order_body==p && s->order_count) r->hud_feedback[0]=(s->tick_count-s->order_tick)/SIMULATION_TICKS_PER_SECOND_FLOAT;

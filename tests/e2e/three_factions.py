@@ -39,8 +39,10 @@ with tempfile.TemporaryDirectory(prefix='nanova-three-factions-') as directory:
  for side in ('virus','immune','fungus'):
   path=root/'assets/levels'/(side+'_large_level.json');d=json.loads(path.read_text())
   assert d['layout']['cells']==128 and {v['faction'] for v in d['match']['starts']}=={'virus','immune','fungus'}
-  assert [v['cell'] for v in d['match']['starts']]==[0,1,2] and [s['cell'] for s in d['spawns']]==[0,1,2]
-  initial=run(side+'_initial',path);assert {u['faction'] for u in initial['units']}=={1,2,3}
+  assert [v['cell'] for v in d['match']['starts']]==[0,1,2] and [sum(s['cell']==i for s in d['spawns']) for i in (0,1,2)]==[10,5,25]
+  initial=run(side+'_initial',path,extra=('--restart',));assert [sum(u['faction']==f for u in initial['units']) for f in (1,2,3)]==[10,5,25]
+  assert sum(c['active'] for c in initial['colonies'])==3
+  assert all(c['growth']==0 and c['establishment_age']==0 for c in initial['colonies'][:3])
   layout=check_layout(d['layout'],initial['colonies'])
   layouts.append(layout)
   game=run(side+'_settled',path,2400)
@@ -55,6 +57,9 @@ with tempfile.TemporaryDirectory(prefix='nanova-three-factions-') as directory:
  assert all(o!=layouts[0] for o in others) and len({tuple(map(tuple,o)) for o in others})==3
  # One opponent expires before settling. The third faction's founder must prevent victory.
  pending=stage_world(root/'assets/levels/virus_large_level.json',out)
+ pending['match'].update(colonized_starts=False,auto_colonize=True)
+ pending['spawns']=[next(s for s in pending['spawns'] if s['cell']==i) for i in (0,1,2)]
+ for u in pending['content']['units']:u.pop('colonization',None);u.pop('carrier',None)
  spore=next(u for u in pending['content']['units'] if u['name']=='fungal_spore')
  for u in pending['content']['units']:
   u['manufacture_seconds']=10000

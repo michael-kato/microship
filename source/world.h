@@ -85,7 +85,7 @@ struct World
     Body bodies[MAX_BODIES];
     uint32_t body_count;
     Faction start_owner[MAX_BODIES];
-    bool neutral_start,auto_colonize;
+    bool neutral_start,auto_colonize,colonized_starts;
     uint32_t active_factions;
     bool fully_established,rally_enabled;Vec3 rally_point;
     uint32_t production_ticks;float formation_spacing; // Production-only stress preparation.

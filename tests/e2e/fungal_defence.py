@@ -30,7 +30,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-defence-') as directory:
         if expected:assert not state.exists();return None,None
         return json.loads(state.read_text()),json.loads(scene.read_text())
     spore=next(u for u in base['content']['units'] if u['name']=='fungal_spore')
-    assert spore['speed']==5.04 and spore['brood']==1 and spore['attack']['damage']==3 and spore['attack']['cloud']['damage']==1
+    assert spore['speed']==5.04 and spore['brood']==1 and spore['attack']['damage']==3.6 and spore['attack']['cloud']['damage']==1.2
     assert spore['manufacture_seconds']==.5 and spore['cost']==.1
     if not quick:
         movement=deepcopy(base);movement['spawns']=[dict(type='fungal_spore',position=[0,0,20])]
@@ -118,7 +118,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-fungal-defence-') as directory:
     contact['spawns']=[dict(type='watch',position=[0,0,20]),dict(type='fungal_spore',position=[.1,0,20])]
     weaker,_=run('weaker_spore',contact,ticks=15)
     target=next(u for u in weaker['units'] if u['type']=='watch')
-    assert weaker['faction_events']['spore_bursts']==1 and target['wounds']==0 and 3.1<target['exposure']<3.3,target
+    assert weaker['faction_events']['spore_bursts']==1 and target['wounds']==0 and 3.7<target['exposure']<3.9,target
     # A burst wounds an allied unit once. The haze must repair actual wounds and partial damage.
     healing=deepcopy(defence);healing['content']['units'][-1]['faction']='fungus'
     attacker=deepcopy(spore);attacker.update(name='test_burst',faction='virus',speed=.01,range=.4,targets=['units'])

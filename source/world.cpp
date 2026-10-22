@@ -610,7 +610,7 @@ bool world_load(World* world,const char* path,uint32_t seed)
     Json rules=json_find(root,"rules");if (json_present(rules) && (!json_path(rules,path,file) || !load_rules(&loaded,file))) return false;
     Json effects=json_find(root,"effects");if (json_present(effects) && (!json_path(effects,path,file) || !load_effects(&loaded,file))) return false;
     if (!json_path(json_get(root,"appearance"),path,loaded.appearance_path) || !load_appearance(&loaded,loaded.appearance_path,seed)) return false;
-    Json match=json_get(root,"match");json_object(match,"player|opponent|starts|auto_colonize|player_ai|fully_established|rally_point|production_seconds|formation_spacing");
+    Json match=json_get(root,"match");json_object(match,"player|opponent|starts|auto_colonize|colonized_starts|player_ai|fully_established|rally_point|production_seconds|formation_spacing");
     Json automatic=json_find(match,"auto_colonize");if (json_present(automatic)) loaded.auto_colonize=json_bool(automatic);
     Json player_ai=json_find(match,"player_ai");if (json_present(player_ai)) loaded.player_ai=json_bool(player_ai);
     loaded.player_faction=read_owner(&loaded,json_get(match,"player"));loaded.opponent_faction=read_owner(&loaded,json_get(match,"opponent"));
@@ -637,7 +637,10 @@ bool world_load(World* world,const char* path,uint32_t seed)
             return json_error(production,"production preparation requires developed cells, a rally point and no starting units");
     }
     else if (json_present(spacing)) return json_error(spacing,"formation_spacing requires production_seconds");
+    Json colonized=json_find(match,"colonized_starts");
+    if (json_present(colonized)) loaded.colonized_starts=json_bool(colonized);
     Json starts=json_find(match,"starts");
+    if (loaded.colonized_starts && !json_present(starts)) return json_error(match,"colonized_starts requires starts");
     if (json_present(starts))
     {
         loaded.neutral_start=true;bool seen[MAX_FACTIONS]={};bool cells[MAX_BODIES]={};
@@ -654,6 +657,11 @@ bool world_load(World* world,const char* path,uint32_t seed)
         if (count<2 || !seen[loaded.player_faction] || !seen[loaded.opponent_faction]) return json_error(starts,"starts require both selected factions");
         if (loaded.fully_established) return json_error(starts,"fully_established requires owned cells");
         for (uint32_t p=0;p<loaded.body_count;++p) if (loaded.bodies[p].owner!=FACTION_NEUTRAL) return json_error(starts,"neutral starts cannot contain established factories");
+    }
+    if (loaded.colonized_starts)
+    {
+        loaded.neutral_start=false;
+        for (uint32_t p=0;p<loaded.body_count;++p) loaded.bodies[p].owner=loaded.start_owner[p];
     }
     if (!validate_world(&loaded,path)) return false;
     *world=loaded;return true;

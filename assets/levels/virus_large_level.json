@@ -21,7 +21,8 @@
         "cell": 2
       }
     ],
-    "auto_colonize": true
+    "auto_colonize": false,
+    "colonized_starts": true
   },
   "layout": {
     "field_radius": 120,
@@ -108,17 +109,202 @@
     {
       "type": "virus_fighter",
       "cell": 0,
-      "offset": [0, 0, 7]
+      "offset": [4.0, 0.0, 7]
+    },
+    {
+      "type": "virus_fighter",
+      "cell": 0,
+      "offset": [3.23607, 2.35114, 7]
+    },
+    {
+      "type": "virus_fighter",
+      "cell": 0,
+      "offset": [1.23607, 3.80423, 7]
+    },
+    {
+      "type": "virus_fighter",
+      "cell": 0,
+      "offset": [-1.23607, 3.80423, 7]
+    },
+    {
+      "type": "virus_fighter",
+      "cell": 0,
+      "offset": [-3.23607, 2.35114, 7]
+    },
+    {
+      "type": "virus_fighter",
+      "cell": 0,
+      "offset": [-4.0, 0.0, 7]
+    },
+    {
+      "type": "virus_fighter",
+      "cell": 0,
+      "offset": [-3.23607, -2.35114, 7]
+    },
+    {
+      "type": "virus_fighter",
+      "cell": 0,
+      "offset": [-1.23607, -3.80423, 7]
+    },
+    {
+      "type": "virus_fighter",
+      "cell": 0,
+      "offset": [1.23607, -3.80423, 7]
+    },
+    {
+      "type": "virus_fighter",
+      "cell": 0,
+      "offset": [3.23607, -2.35114, 7]
     },
     {
       "type": "immune_fighter",
       "cell": 1,
-      "offset": [0, 0, 7]
+      "offset": [4.0, 0.0, 7]
+    },
+    {
+      "type": "immune_fighter",
+      "cell": 1,
+      "offset": [1.23607, 3.80423, 7]
+    },
+    {
+      "type": "immune_fighter",
+      "cell": 1,
+      "offset": [-3.23607, 2.35114, 7]
+    },
+    {
+      "type": "immune_fighter",
+      "cell": 1,
+      "offset": [-3.23607, -2.35114, 7]
+    },
+    {
+      "type": "immune_fighter",
+      "cell": 1,
+      "offset": [1.23607, -3.80423, 7]
     },
     {
       "type": "fungal_spore",
       "cell": 2,
-      "offset": [0, 0, 7]
+      "offset": [4.0, 0.0, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [3.87433, 0.99476, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [3.50523, 1.92701, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [2.91587, 2.73819, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [2.14331, 3.37731, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [1.23607, 3.80423, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [0.25116, 3.99211, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [-0.74953, 3.92915, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [-1.70312, 3.61931, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [-2.5497, 3.08205, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [-3.23607, 2.35114, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [-3.71911, 1.4725, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [-3.96846, 0.50133, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [-3.96846, -0.50133, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [-3.71911, -1.4725, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [-3.23607, -2.35114, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [-2.5497, -3.08205, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [-1.70312, -3.61931, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [-0.74953, -3.92915, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [0.25116, -3.99211, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [1.23607, -3.80423, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [2.14331, -3.37731, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [2.91587, -2.73819, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [3.50523, -1.92701, 7]
+    },
+    {
+      "type": "fungal_spore",
+      "cell": 2,
+      "offset": [3.87433, -0.99476, 7]
     }
   ]
 }

@@ -6,7 +6,7 @@
 
 typedef uint32_t Faction;
 enum { FACTION_NEUTRAL=0, MAX_FACTIONS=9, MAX_GROUPS=8, MAX_UNIT_TYPES=32, MAX_PRODUCER_TYPES=8, MAX_BODY_TYPES=32, MAX_FACTORY_STRUCTURES=128 };
-enum { MAX_UNIT_PAYLOADS=6, MAX_HIT_COUNT=32, MAX_STRUCTURE_HIT_COUNT=128, BRANCH_FIELDS_COMPLETE=3 };
+enum { MAX_UNIT_PAYLOADS=6, MAX_COLONIZATION_UNITS=16, MAX_HIT_COUNT=32, MAX_STRUCTURE_HIT_COUNT=128, BRANCH_FIELDS_COMPLETE=3 };
 enum { MAX_CELL_DISPLACEMENT_FEATURES=256 };
 enum GrowthGrammar { GROWTH_AXIAL,GROWTH_FAN,GROWTH_HYPHA,GROWTH_TREE };
 enum { TARGET_UNITS=1, TARGET_STRUCTURES=2 };
@@ -48,6 +48,11 @@ struct UnitDefinition
     uint32_t group,targets,secondary_targets,hits;
     float secondary_interval;
     bool colonizes,detaches,trails;
+    uint32_t colonization_units,carrier_unit;
+    bool consume_colonists;
+    char seed_model[ASSET_PATH_CAPACITY],carrier_name[ASSET_NAME_CAPACITY];
+    float seed_scale,seed_reload,carrier_seconds;
+    Vec3 carrier_offset;
     Vec3 trail_origin;
     char payload_model[ASSET_PATH_CAPACITY];
     Vec3 payload_sockets[MAX_UNIT_PAYLOADS];

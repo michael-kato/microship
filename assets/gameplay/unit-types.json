@@ -16,7 +16,7 @@
       "health": 72,
       "range": 4,
       "cost": 6,
-      "shot_interval": 0.6,
+      "shot_interval": 0.66,
       "separation": 1.0,
       "targets": ["units"],
       "colonizes": true,
@@ -37,7 +37,11 @@
         "cruise_fraction": 0.65
       },
       "trail_origin": [0, 0, -0.66],
-      "manufacture_seconds": 6
+      "manufacture_seconds": 6,
+      "colonization": {
+        "required_units": 2,
+        "consume_units": true
+      }
     },
     {
       "name": "virus_bomber",
@@ -83,7 +87,16 @@
           [0.34, -0.1, 0.4]
         ]
       },
-      "manufacture_seconds": 8
+      "manufacture_seconds": 8,
+      "colonization": {
+        "required_units": 1,
+        "consume_units": false,
+        "seed": {
+          "model": "../models/virus_bomb.fmesh",
+          "scale": 0.14,
+          "reload_seconds": 8
+        }
+      }
     },
     {
       "name": "immune_fighter",
@@ -93,7 +106,7 @@
       "scale": 0.38,
       "yaw_degrees": 0.0,
       "tint": [1.0, 1.0, 1.0],
-      "speed": 2.6,
+      "speed": 2.8,
       "health": 864,
       "range": 0.65,
       "cost": 22,
@@ -142,7 +155,11 @@
         "color": [0.58, 0.42, 0.51],
         "strength": 0.7
       },
-      "manufacture_seconds": 2.0
+      "manufacture_seconds": 2.0,
+      "colonization": {
+        "required_units": 1,
+        "consume_units": true
+      }
     },
     {
       "name": "immune_bomber",
@@ -188,7 +205,21 @@
         "color": [0.58, 0.42, 0.51],
         "strength": 0.7
       },
-      "manufacture_seconds": 2.5
+      "manufacture_seconds": 2.5,
+      "colonization": {
+        "required_units": 1,
+        "consume_units": false,
+        "seed": {
+          "model": "../models/immune_blob.fmesh",
+          "scale": 0.22,
+          "reload_seconds": 8
+        }
+      },
+      "carrier": {
+        "unit": "immune_fighter",
+        "interval_seconds": 12,
+        "launch_offset": [0, -0.25, -1.2]
+      }
     },
     {
       "name": "fungal_spore",
@@ -215,11 +246,11 @@
       "attack": {
         "mode": "spore",
         "friendly_fire": false,
-        "damage": 3,
+        "damage": 3.6,
         "cloud": {
           "radius": 1.4,
           "seconds": 5,
-          "damage": 1
+          "damage": 1.2
         }
       },
       "autonomy": {
@@ -230,7 +261,11 @@
         "response_seconds": 0.5,
         "cruise_fraction": 0.6
       },
-      "manufacture_seconds": 0.5
+      "manufacture_seconds": 0.5,
+      "colonization": {
+        "required_units": 5,
+        "consume_units": true
+      }
     },
     {
       "name": "swarm_fighter",

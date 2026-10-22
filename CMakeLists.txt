@@ -260,7 +260,7 @@ add_test(NAME production_ratio COMMAND ${Python3_EXECUTABLE}
 set_tests_properties(production_ratio PROPERTIES TIMEOUT 45)
 
 
-foreach(group IN ITEMS communications faction_motion virus_shapes selection colony_forms cell_animation small_factories factory_curves three_factions factory_emission factory_repair fungal_defence fungal_sources)
+foreach(group IN ITEMS faction_opening communications faction_motion virus_shapes selection colony_forms cell_animation small_factories factory_curves three_factions factory_emission factory_repair fungal_defence fungal_sources)
     add_test(NAME ${group} COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/${group}.py $<TARGET_FILE:nanova>)
     set_tests_properties(${group} PROPERTIES TIMEOUT 60)

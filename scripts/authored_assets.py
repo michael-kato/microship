@@ -38,6 +38,7 @@ def stage_world(source, directory):
             if name=='factions':model(item,'personality',definition.parent)
             model(item,'model',definition.parent)
             if 'payload' in item:model(item['payload'],'model',definition.parent)
+            if 'seed' in item.get('colonization',{}):model(item['colonization']['seed'],'model',definition.parent)
             if 'blob' in item.get('attack',{}):model(item['attack']['blob'],'model',definition.parent)
             if 'variation' in item:model(item['variation'],'parts',definition.parent)
             if 'growth_meshes' in item:

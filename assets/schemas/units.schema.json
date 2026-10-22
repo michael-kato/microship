@@ -416,6 +416,68 @@
             "type": "number",
             "exclusiveMinimum": 0,
             "maximum": 10000
+          },
+          "colonization": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "required_units": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16
+              },
+              "consume_units": {
+                "type": "boolean"
+              },
+              "seed": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "scale": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000
+                  },
+                  "reload_seconds": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 3600
+                  }
+                },
+                "required": ["model", "scale", "reload_seconds"]
+              }
+            },
+            "required": ["required_units", "consume_units"]
+          },
+          "carrier": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "interval_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 3600
+              },
+              "launch_offset": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": "number",
+                  "minimum": -10,
+                  "maximum": 10
+                }
+              }
+            },
+            "required": ["unit", "interval_seconds", "launch_offset"]
           }
         },
         "required": [
