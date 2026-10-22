@@ -17,7 +17,9 @@ static const float MIN_NORMAL_SQUARED_LENGTH = .98f;
 static const float MAX_NORMAL_SQUARED_LENGTH = 1.02f;
 static const float MIN_MATERIAL_ROUGHNESS = .02f;
 static const float MAX_LOCAL_COORDINATE = 1.5f;
-static const int MAX_SCENE_MESHES = 128;
+static const int MAX_SCENE_VERTICES = 8000000;
+static const int MAX_SCENE_TRIANGLES = 8000000;
+static const int MAX_SCENE_MESHES = 512;
 static const int MAX_SPHERE_SEGMENTS = 512;
 static const int MAX_SPHERE_RINGS = 256;
 static const float SURFACE_DETERMINANT_EPSILON = 1e-8f;
@@ -246,7 +248,7 @@ bool geometry_build(Geometry* geometry,const MeshSource* sources,uint32_t count,
         uint32_t vertices=2+(config->sphere_rings-1)*config->sphere_segments;
         uint32_t triangles=2*config->sphere_segments*(config->sphere_rings-1);
         if (sources[i].path[0] && !mesh_counts(sources[i].path,&vertices,&triangles)) return false;
-        if (vertices>MAX_MESH_VERTICES-vertex_capacity || triangles>MAX_MESH_TRIANGLES-triangle_capacity)
+        if (vertices>MAX_SCENE_VERTICES-vertex_capacity || triangles>MAX_SCENE_TRIANGLES-triangle_capacity)
         { fprintf(stderr,"geometry: scene exceeds mesh capacity\n");return false; }
         vertex_capacity+=vertices;triangle_capacity+=triangles;
     }

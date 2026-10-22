@@ -202,7 +202,7 @@
         "required": ["type", "owner", "position", "radius", "tint"],
         "additionalProperties": false
       },
-      "maxItems": 16
+      "maxItems": 128
     },
     "layout": {
       "type": "object",
@@ -215,7 +215,7 @@
         "cells": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 16
+          "maximum": 128
         },
         "first_home_degrees": {
           "type": "number",

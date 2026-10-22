@@ -24,11 +24,11 @@
     "auto_colonize": true
   },
   "layout": {
-    "field_radius": 36.95041723,
-    "cells": 15,
+    "field_radius": 120,
+    "cells": 128,
     "first_home_degrees": 210,
     "minimum_gap": 4,
-    "centroid_steps": 1,
+    "centroid_steps": 3,
     "home": {
       "count": 3,
       "cell": {

@@ -606,13 +606,15 @@ struct GridBounds { vec4 low,high; };
 layout(set=0,binding=RENDER_BINDING_LIGHTING_BOUNDS,std430) readonly buffer LightingBounds { GridBounds lighting_bounds[]; };
 layout(set=0,binding=RENDER_BINDING_DYNAMIC_LIGHTING,std430) buffer DynamicLighting { vec4 dynamic_visibility[]; };
 uint grid_index(uint medium,uint light,uvec3 p,uint n);
-vec3 texture_visibility(uint medium,int light,vec3 q)
+vec3 lighting_uv(uint medium,int light,vec3 q)
 {
-    float n=float(render.quality.y);
-    vec3 offset=vec3(float(light),0,float(medium))*n;
-    vec3 extent=vec3(3.0*n,n,n*float(max(1u,render.scene.y)));
-    return textureLod(lighting_texture,(q+offset+.5)/extent,0).rgb;
+    uint n=render.quality.y;ivec3 extent=textureSize(lighting_texture,0);
+    uint rows=uint(extent.y)/n;
+    vec3 offset=vec3(float(light),float(medium%rows),float(medium/rows))*float(n);
+    return (q+offset+.5)/vec3(extent);
 }
+vec3 texture_visibility(uint medium,int light,vec3 q)
+{ return textureLod(lighting_texture,lighting_uv(medium,light,q),0).rgb; }
 vec3 current_dynamic_visibility(vec3 point,int light)
 {
     uint n=render.quality.y;
@@ -692,9 +694,7 @@ float ambient_visibility(vec3 point,vec3 normal)
         vec3 q;if (!grid_coordinates(i,point,normal,q)) continue;
         if (texture_lighting_grid)
         {
-            float size=float(n);
-            vec3 extent=vec3(3.0*size,size,size*float(max(1u,render.scene.y)));
-            return textureLod(lighting_texture,(q+vec3(0,0,float(i))*size+.5)/extent,0).a;
+            return textureLod(lighting_texture,lighting_uv(i,0,q),0).a;
         }
         uvec3 low=min(uvec3(floor(q)),uvec3(n-2u));vec3 f=q-vec3(low);float sum=0.0;
         for (uint z=0u;z<2u;++z) for (uint y=0u;y<2u;++y) for (uint x=0u;x<2u;++x)
@@ -782,8 +782,7 @@ vec3 interpolated_volume_lighting(uint index,vec3 q,vec3 ambient,vec3 phases,boo
         // Cell interiors see the environment through their wall.
         if (texture_lighting_grid)
         {
-            float size=float(n);
-            ambient*=textureLod(lighting_texture,(q+vec3(0,0,float(index))*size+.5)/vec3(3.0*size,size,size*float(max(1u,render.scene.y))),0).a;
+            ambient*=textureLod(lighting_texture,lighting_uv(index,0,q),0).a;
         }
         else
         {
@@ -1214,7 +1213,7 @@ uint volume_anchor(uvec2 cell)
 #endif
 
 #if defined(NANOVA_CASCADE_PASS)
-layout(push_constant) uniform CascadePass { uint cascade;uint pass;uint media;uint unused; } cascade_pass; // Media: bit per traced cell.
+layout(push_constant) uniform CascadePass { uint cascade;uint pass;uint media;uint first; } cascade_pass; // Media: bit per traced cell.
 const uint CASCADE_MAX_CROSSINGS=4u;
 
 vec3 octahedron_point(uvec2 texel,uint side)
@@ -1307,8 +1306,8 @@ vec3 upper_radiance(uint medium,uint cascade,vec3 position,uvec2 texel)
 
 void main()
 {
-    uint medium=gl_WorkGroupID.z;
-    if ((cascade_pass.media&(1u<<medium))==0u || !cascade_medium(medium)) return;
+    uint medium=gl_WorkGroupID.z+cascade_pass.first;
+    if ((cascade_pass.media&(1u<<(medium-cascade_pass.first)))==0u || !cascade_medium(medium)) return;
     uint item=gl_WorkGroupID.x*COMPUTE_GROUP_SIZE*COMPUTE_GROUP_SIZE+gl_LocalInvocationIndex;
     uint n0=render.cascades.x;
     if (cascade_pass.pass==CASCADE_PASS_PROJECT)

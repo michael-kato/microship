@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory(prefix='nanova-three-factions-') as directory:
  layouts=[]
  for side in ('virus','immune','fungus'):
   path=root/'assets/levels'/(side+'_large_level.json');d=json.loads(path.read_text())
-  assert d['layout']['cells']==15 and {v['faction'] for v in d['match']['starts']}=={'virus','immune','fungus'}
+  assert d['layout']['cells']==128 and {v['faction'] for v in d['match']['starts']}=={'virus','immune','fungus'}
   assert [v['cell'] for v in d['match']['starts']]==[0,1,2] and [s['cell'] for s in d['spawns']]==[0,1,2]
   initial=run(side+'_initial',path);assert {u['faction'] for u in initial['units']}=={1,2,3}
   layout=check_layout(d['layout'],initial['colonies'])

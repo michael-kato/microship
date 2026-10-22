@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "types.h"
 
-enum { MAX_LAYOUT_CELLS=16 };
+enum { MAX_LAYOUT_CELLS=128 };
 
 // A circular field: homes sit evenly on its circle and an optional center cell
 // sits near its middle. Every other cell sits at the centroid of its seeded

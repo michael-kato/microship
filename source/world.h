@@ -43,7 +43,7 @@ struct Background
     Color color;
     char model_path[ASSET_PATH_CAPACITY];
 };
-enum { MAX_BODIES=16,MAX_SPAWNS=64 };
+enum { MAX_BODIES=128,MAX_SPAWNS=64 };
 struct GameplayRules
 {
     bool enabled;

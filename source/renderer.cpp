@@ -1351,7 +1351,8 @@ static bool create_lighting_texture(RendererState* state)
 {
     uint32_t n=state->config.texture_lighting_grid && !state->custom_shader ? state->config.shadow_grid_resolution : 0;
     uint32_t count=state->medium_count ? state->medium_count : 1;
-    state->lighting_extent=n ? VkExtent3D{3*n,n,count*n} : VkExtent3D{1,1,1};
+    uint32_t rows=count>32 ? 4 : 1;
+    state->lighting_extent=n ? VkExtent3D{3*n,rows*n,((count+rows-1)/rows)*n} : VkExtent3D{1,1,1};
     uint32_t limit=state->properties.limits.maxImageDimension3D;
     if (state->lighting_extent.width>limit || state->lighting_extent.height>limit || state->lighting_extent.depth>limit)
     { fprintf(stderr,"Lighting texture exceeds the 3D image limit.\n");return false; }
@@ -1379,7 +1380,7 @@ static bool create_lighting_texture(RendererState* state)
         VkBufferImageCopy& copy=state->lighting_copies[medium*3+light];
         copy.bufferOffset=(VkDeviceSize)(medium*3+light)*n*n*n*4*sizeof(float);
         copy.imageSubresource=VkImageSubresourceLayers{VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
-        copy.imageOffset=VkOffset3D{(int32_t)(light*n),0,(int32_t)(medium*n)};
+        copy.imageOffset=VkOffset3D{(int32_t)(light*n),(int32_t)((medium%rows)*n),(int32_t)((medium/rows)*n)};
         copy.imageExtent=VkExtent3D{n,n,n};
     }
     return true;
@@ -1451,9 +1452,9 @@ static bool create_output(RendererState* state)
         || !create_buffer(state,&state->surface_lighting,surface_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
     // Every cascade holds half the texels of the one below it, per medium.
     VkDeviceSize probes=state->uniform_data.cascades[0],side=state->uniform_data.cascades[1];
-    // Cascade passes select traced cells with a 32-bit push-constant mask.
-    if (probes && state->medium_count>32)
-    { fprintf(stderr,"Radiance cascades support at most 32 media.\n");return false; }
+    // Each dispatch selects a block of 32 media; the final block can be partial.
+    if (probes && state->medium_count>256)
+    { fprintf(stderr,"Radiance cascades support at most 256 media.\n");return false; }
     VkDeviceSize cascade_texels=probes*probes*probes*CASCADE_SH_COEFFICIENTS;
     for (uint32_t c=0;c<state->uniform_data.cascades[2];++c) cascade_texels+=(probes>>c)*(probes>>c)*(probes>>c)*(side<<c)*(side<<c);
     VkDeviceSize cascade_bytes=probes ? cascade_texels*(state->medium_count ? state->medium_count : 1)*4*sizeof(float) : 4*sizeof(float);
@@ -1952,7 +1953,7 @@ static void record_radiance_cascades(RendererState* state)
     const RenderMedium* media=(const RenderMedium*)frame_data(state).media.mapped;
     if (state->cascade_age.size()!=state->medium_count)
         state->cascade_age.assign(state->medium_count,UINT32_MAX);
-    uint32_t selected=0,count=0,limit=state->config.cascade_cells_per_frame;
+    uint32_t selected[8]={},count=0,limit=state->config.cascade_cells_per_frame;
     for (uint32_t i=0;i<state->medium_count;++i)
         if (state->cascade_age[i]<UINT32_MAX) ++state->cascade_age[i];
     for (;;)
@@ -1965,7 +1966,7 @@ static void record_radiance_cascades(RendererState* state)
             if (best==UINT32_MAX || state->cascade_age[i]>state->cascade_age[best]) best=i;
         }
         if (best==UINT32_MAX || (limit && count==limit)) break;
-        selected|=1u<<best;++count;state->cascade_age[best]=0;
+        selected[best/32]|=1u<<(best%32);++count;state->cascade_age[best]=0;
     }
     state->cascade_updates=count;
     if (!count) return;
@@ -1982,9 +1983,13 @@ static void record_radiance_cascades(RendererState* state)
         uint32_t pass=step==0 ? CASCADE_PASS_TRACE : step==count_c ? CASCADE_PASS_PROJECT : CASCADE_PASS_MERGE;
         uint32_t cascade=pass==CASCADE_PASS_MERGE ? count_c-1-step : 0;
         uint32_t items=pass==CASCADE_PASS_TRACE ? traced : pass==CASCADE_PASS_PROJECT ? n0*n0*n0 : block0>>cascade;
-        uint32_t parameters[4]={cascade,pass,selected,0};
-        vkCmdPushConstants(state->command,state->pipeline_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,BACKDROP_PUSH_BYTES,parameters);
-        vkCmdDispatch(state->command,(items+group-1)/group,1,state->medium_count);
+        for (uint32_t first=0;first<state->medium_count;first+=32)
+        {
+            if (!selected[first/32]) continue;
+            uint32_t parameters[4]={cascade,pass,selected[first/32],first};
+            vkCmdPushConstants(state->command,state->pipeline_layout,VK_SHADER_STAGE_COMPUTE_BIT,0,BACKDROP_PUSH_BYTES,parameters);
+            vkCmdDispatch(state->command,(items+group-1)/group,1,std::min(32u,state->medium_count-first));
+        }
         shader_buffer_barrier(state->command);
     }
 }
