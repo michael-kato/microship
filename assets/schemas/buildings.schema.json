@@ -28,7 +28,7 @@
           "hits": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 64
+            "maximum": 128
           },
           "branches": {
             "type": "object",
@@ -56,7 +56,7 @@
               "hits": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 64
+                "maximum": 128
               },
               "grammar": {
                 "type": "string",

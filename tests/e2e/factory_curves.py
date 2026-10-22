@@ -126,9 +126,9 @@ with tempfile.TemporaryDirectory(prefix='nanova-factory-curves-') as directory:
         root_limb=intact['colonies'][cell]['structures'][0];tip=root_limb['position']
         attacker=deepcopy(next(v for v in damaged['content']['units'] if v['name']=='fungal_spore'))
         attacker.update(name='curve_cutter_'+side,faction='virus' if side=='fungus' else 'fungus',range=.4,speed=.01,targets=['structures'])
-        attacker['attack'].update(damage=root_limb['health']/4+.01,lifetime=.4,cloud=dict(radius=.01,seconds=.05,damage=.001))
+        attacker['attack'].update(damage=root_limb['health']/8+.01,lifetime=.4,cloud=dict(radius=.01,seconds=.05,damage=.001))
         damaged['content']['units'].append(attacker)
-        damaged['spawns'].append(dict(type=attacker['name'],position=[tip[0],tip[1],tip[2]+.1]))
+        damaged['spawns'].extend([dict(type=attacker['name'],position=[tip[0],tip[1],tip[2]+.1])]*2)
     cut,scene=run('cut_quarter',damaged,ticks=10)
     for cell in (0,5,10):
         limb=cut['colonies'][cell]['structures'][0]

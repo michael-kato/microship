@@ -1385,3 +1385,19 @@ per match. Peak population was 3731. The median mean CPU tick was
 5.260 ms; median p99 was 12.882 ms; the largest observed tick was
 13.440 ms. No other check ran during these measurements. This is
 bounded CPU evidence, not a sustained GPU or native Windows result.
+
+
+## Second Immune buff (Oct 21)
+
+Immune manufacture times are now 2 seconds for fighters and 2.5 seconds
+for bombers. Factory trunks have 5,760 health and 96 hits; branches have
+3,600 health and 64 hits. These values double the previous rate and
+durability. Setup speed remains 2. The building hit limit is now 128 in
+both the loader and schema. Damage fixtures use eighth-health bursts
+to remain within the damage asset limit.
+
+Real Proton application checks passed for smoke, natural_factory,
+factory_curves, and three_factions. Controlled production work ratios
+were 1.999953 for fighters and 1.999975 for bombers. Every structure in
+the 35-structure cell had twice its prior health. Inputs, states, and
+logs are in `build/immune_second_buff_review/`.

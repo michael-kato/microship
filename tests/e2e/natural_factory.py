@@ -124,16 +124,17 @@ with tempfile.TemporaryDirectory(prefix='nanova-natural-factory-') as directory:
         original=initial['colonies'][0]['structures'];tip=original[0]['position']
         attacker=deepcopy(next(u for u in regrow['content']['units'] if u['name']=='fungal_spore'))
         attacker.update(name='root_breaker',faction=enemy,range=.4,speed=.01)
-        attacker['attack'].update(damage=definition['health']/4+.01,lifetime=.4,cloud=dict(radius=.25,seconds=.1,damage=.001))
+        attacker['attack'].update(damage=definition['health']/8+.01,lifetime=.4,cloud=dict(radius=.25,seconds=.1,damage=.001))
         regrow['content']['units'].append(attacker)
         regrow['spawns']=[dict(type='root_breaker',position=[tip[0],tip[1],tip[2]+.1])]
         damaged=deepcopy(regrow)
         for building in damaged['content']['buildings']:building['hits']=4
-        damaged['content']['units'][-1]['attack']['damage']=definition['health']/4+.01
+        damaged['content']['units'][-1]['attack']['damage']=definition['health']/8+.01
+        damaged['spawns']*=2
         wounded,_=run(side+'_damaged_leaf',damaged,ticks=10)
         root=wounded['colonies'][0]['structures'][0]
         assert root['health']>0 and root['wounds']==1 and root['visible_growth']==.75,side
-        regrow['spawns']*=4  # Four quarter-health bursts fit the damage asset limit.
+        regrow['spawns']*=8  # Eighth-health bursts fit the damage asset limit.
         lost,_=run(side+'_lost_root',regrow,ticks=10)
         assert lost['colonies'][0]['health']==0 and lost['colonies'][0]['active'],side
         rebuilt,_=run(side+'_regrown',regrow,ticks=120);c=rebuilt['colonies'][0]
