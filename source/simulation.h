@@ -20,6 +20,7 @@ struct FlightObstacles
     FlightObstacle values[MAX_BODIES*MAX_FACTORY_STRUCTURES*(GROWTH_PATH_SEGMENTS+1)];
     uint32_t count,cell_count,first[MAX_BODIES+1];
     Vec3 low[MAX_BODIES],high[MAX_BODIES];
+    int32_t slot[MAX_BODIES]; // Each body's obstacle group, or -1 without obstacles.
 };
 
 static const float SIMULATION_TICKS_PER_SECOND_FLOAT=(float)SIMULATION_TICKS_PER_SECOND;

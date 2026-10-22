@@ -33,18 +33,25 @@ static Vec3 nearest(Vec3 point,const FlightObstacle& o)
     float t=squared>MIN_OBSTACLE_SEGMENT_SQUARED_LENGTH ? std::fmax(0.0f,std::fmin(1.0f,dot(subtract(point,o.start),delta)/squared)) : 0;
     return add(o.start,scale(delta,t));
 }
+// Craft meet factories only while orbiting a cell, and only that cell's factories.
+// Spores and launching craft never do. Returns the obstacle group, or -1.
+static int32_t orbited_obstacles(const Simulation* s,const FlightObstacles& obstacles,const Unit& u)
+{
+    const UnitDefinition& d=*simulation_unit_definition(s,&u);
+    if (d.attack==ATTACK_SPORE || (u.hatched && u.age<UNIT_LAUNCH_SECONDS) || u.moving || u.target<0) return -1;
+    return obstacles.slot[u.target];
+}
 // Contact attackers must reach their target. A digester attacking a structure
 // ignores every limb of that colony: dense trees surround each head with other
 // limbs, whose clearance would otherwise hold it outside its attach range.
 static bool contact_task(const Simulation* s,const Unit& u,const FlightObstacle& o)
 {
-    const UnitDefinition& d=*simulation_unit_definition(s,&u);
-    return d.attack==ATTACK_SPORE || (u.hatched && u.age<UNIT_LAUNCH_SECONDS)
-        || (d.attack==ATTACK_DIGEST && u.task==TASK_ATTACK_STRUCTURE && u.attention==(int32_t)o.cell);
+    return simulation_unit_definition(s,&u)->attack==ATTACK_DIGEST && u.task==TASK_ATTACK_STRUCTURE && u.attention==(int32_t)o.cell;
 }
 void flight_obstacles(const Simulation* s,FlightObstacles* out)
 {
     out->count=out->cell_count=0;out->first[0]=0;
+    for (uint32_t p=0;p<MAX_BODIES;++p) out->slot[p]=-1;
     if (s->world.combat.lookahead<=0) return;
     for (uint32_t p=0;p<s->world.body_count;++p)
     {
@@ -79,6 +86,7 @@ void flight_obstacles(const Simulation* s,FlightObstacles* out)
             low=Vec3{std::fmin(low.x,o.center.x-o.bound),std::fmin(low.y,o.center.y-o.bound),std::fmin(low.z,o.center.z-o.bound)};
             high=Vec3{std::fmax(high.x,o.center.x+o.bound),std::fmax(high.y,o.center.y+o.bound),std::fmax(high.z,o.center.z+o.bound)};
         }
+        out->slot[p]=(int32_t)out->cell_count;
         out->low[out->cell_count]=low;out->high[out->cell_count]=high;out->first[++out->cell_count]=out->count;
     }
 }
@@ -87,16 +95,14 @@ Vec3 flight_avoid(Simulation* s,const FlightObstacles& obstacles,const Unit& u,V
     const CombatVisuals& f=s->world.combat;
     if (f.lookahead<=0) return desired;
     const UnitDefinition& d=*simulation_unit_definition(s,&u);
-    // These units ignore every factory obstacle. Skip the entire query.
-    if (d.attack==ATTACK_SPORE || (u.hatched && u.age<UNIT_LAUNCH_SECONDS)) return desired;
+    int32_t c=orbited_obstacles(s,obstacles,u);if (c<0) return desired;
     Vec3 ahead=scale(u.velocity,f.lookahead),force={};
     if (dot(ahead,ahead)<MIN_LOOKAHEAD_SQUARED_LENGTH) ahead=scale(desired,f.lookahead);
     bool avoided=false;
     // Probes lie within |ahead| of the craft. Skip obstacles whose bound cannot come within safe distance.
     float reach=length(ahead)+d.scale*CRAFT_COLLISION_RADIUS_SCALE+f.obstacle_clearance;
-    for (uint32_t c=0;c<obstacles.cell_count;++c)
+    if (!outside_box(u.position,obstacles.low[c],obstacles.high[c],reach))
     {
-        if (outside_box(u.position,obstacles.low[c],obstacles.high[c],reach)) continue;
         for (uint32_t i=obstacles.first[c];i<obstacles.first[c+1];++i)
         {
             const FlightObstacle& o=obstacles.values[i];
@@ -135,11 +141,10 @@ Vec3 flight_avoid(Simulation* s,const FlightObstacles& obstacles,const Unit& u,V
 void flight_clip(Simulation* s,const FlightObstacles& obstacles,Unit* u,Vec3 previous)
 {
     const UnitDefinition& d=*simulation_unit_definition(s,u);
-    if (d.attack==ATTACK_SPORE || (u->hatched && u->age<UNIT_LAUNCH_SECONDS)) return;
+    int32_t c=orbited_obstacles(s,obstacles,*u);if (c<0) return;
     float craft=d.scale*CRAFT_COLLISION_RADIUS_SCALE;
-    for (uint32_t c=0;c<obstacles.cell_count;++c)
+    if (!outside_box(u->position,obstacles.low[c],obstacles.high[c],craft))
     {
-        if (outside_box(u->position,obstacles.low[c],obstacles.high[c],craft)) continue;
         for (uint32_t i=obstacles.first[c];i<obstacles.first[c+1];++i)
         {
             const FlightObstacle& o=obstacles.values[i];
