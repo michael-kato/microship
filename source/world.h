@@ -160,6 +160,9 @@ struct World
 	                                   // reserved.
 	float organelle_style[4];          // Edge saturation/width, center emission
 	                                   // multiplier/power.
+	// Electron microscope relief: dome frequency/depth, wrinkle
+	// frequency/depth, fuzz frequency/depth, crease shadow; zero depth: off.
+	float relief[8];
 	float organelle_squash, organelle_period, membrane_ripple,
 	    membrane_wavelength, membrane_period, factory_sway, factory_period;
 	StudioLight studio[3];

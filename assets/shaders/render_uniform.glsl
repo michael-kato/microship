@@ -33,4 +33,5 @@ layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
     vec4 cascade_interval; // First interval in probe spacings, interval growth per cascade.
     vec4 wireframe_line; // RGB edge color, W line width in pixels; zero W: normal shading.
     vec4 wireframe_fill; // RGB face and empty-space color.
+    vec4 relief[2]; // Object-space detail per unit length and slope depth: domes XY, wrinkles ZW; fuzz XY, crease shadow Z.
 } render;

@@ -38,7 +38,7 @@ static const int GPU_MEDIUM_BYTES = 96;
 // Scene style floats, then surface weight, fog reveal, SSS weight and ray mask.
 static const int INSTANCE_STYLE_GPU_FLOATS = INSTANCE_STYLE_FLOATS + 4;
 static const float MAX_PROJECTED_PIXELS = 1e6f;
-static const int GPU_RENDER_UNIFORM_BYTES = 656;
+static const int GPU_RENDER_UNIFORM_BYTES = 688;
 static const int GPU_DEBUG_PUSH_BYTES = 128;
 static const double MILLISECONDS_PER_SECOND = 1000.0;
 static const double BINARY_UNIT_SCALE = 1024.0;
@@ -166,6 +166,7 @@ struct RenderUniform
 	uint32_t cascades[4];
 	float cascade_interval[4];
 	float wireframe_line[4], wireframe_fill[4];
+	float relief[8];
 };
 
 static_assert(sizeof(GpuVertex) == GPU_VERTEX_BYTES, "Vertex shader layout");
@@ -1078,6 +1079,7 @@ static void scene_uniform(RenderUniform* uniform, const RenderScene* scene)
 	       sizeof(uniform->emission_color));
 	memcpy(uniform->membrane_ripple, scene->membrane_ripple,
 	       sizeof(uniform->membrane_ripple));
+	memcpy(uniform->relief, scene->relief, sizeof(uniform->relief));
 	uniform->background[0] = scene->ambient.r;
 	uniform->background[1] = scene->ambient.g;
 	uniform->background[2] = scene->ambient.b;

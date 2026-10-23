@@ -328,6 +328,7 @@ bool presentation_initialize(Presentation* p, const Simulation* s,
 	       sizeof(scene->emission_fresnel));
 	memcpy(scene->emission_color, w->factory_emission_color,
 	       sizeof(scene->emission_color));
+	memcpy(scene->relief, w->relief, sizeof(scene->relief));
 	scene->ambient = w->ambient;
 	scene->ambient_top = w->ambient_top;
 	scene->ambient_bottom = w->ambient_bottom;

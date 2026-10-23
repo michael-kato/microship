@@ -395,6 +395,78 @@
       "required": ["edge_saturation", "edge_width", "center_glow", "center_power"],
       "additionalProperties": false
     },
+    "electron_microscope": {
+      "type": "object",
+      "description": "Colorized electron microscope surface look.",
+      "properties": {
+        "relief": {
+          "type": "object",
+          "description": "Procedural object-space detail. Frequency: features per object-space unit; depth: slope scale, zero disables a layer. Layers fade out below a few pixels per feature.",
+          "properties": {
+            "domes": {
+              "type": "object",
+              "properties": {
+                "frequency": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1000
+                },
+                "depth": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 4
+                }
+              },
+              "required": ["frequency", "depth"],
+              "additionalProperties": false
+            },
+            "wrinkles": {
+              "type": "object",
+              "properties": {
+                "frequency": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1000
+                },
+                "depth": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 4
+                }
+              },
+              "required": ["frequency", "depth"],
+              "additionalProperties": false
+            },
+            "fuzz": {
+              "type": "object",
+              "properties": {
+                "frequency": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1000
+                },
+                "depth": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 4
+                }
+              },
+              "required": ["frequency", "depth"],
+              "additionalProperties": false
+            },
+            "crease_shadow": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": ["domes", "wrinkles", "fuzz", "crease_shadow"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["relief"],
+      "additionalProperties": false
+    },
     "animation": {
       "type": "object",
       "properties": {

@@ -109,5 +109,22 @@
     },
     "emission_color": [1.0, 0.55, 0.25]
   },
+  "electron_microscope": {
+    "relief": {
+      "domes": {
+        "frequency": 7,
+        "depth": 0.35
+      },
+      "wrinkles": {
+        "frequency": 3,
+        "depth": 0.3
+      },
+      "fuzz": {
+        "frequency": 40,
+        "depth": 0.25
+      },
+      "crease_shadow": 0.75
+    }
+  },
   "communications": "communications.json"
 }

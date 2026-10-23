@@ -30,6 +30,8 @@ static const int MAX_STUDIO_IRRADIANCE = 100;
 static const int MAX_GRADIENT_BOTTOM_RADIANCE = 10000;
 static const int MAX_GRADIENT_TOP_RADIANCE = 10000;
 static const int MAX_AMBIENT_RADIANCE = 10000;
+static const int MAX_RELIEF_FREQUENCY = 1000; // Features per object-space unit.
+static const int MAX_RELIEF_DEPTH = 4;         // Slope scale.
 static const int MAX_SPIKE_LENGTH = 2;
 static const int MAX_EFFECTS_POP_RADIUS = 100;
 static const int MAX_EFFECTS_POP_SECONDS = 2;
@@ -376,7 +378,8 @@ static bool load_appearance(World* w, const char* path, uint32_t seed)
 	Json root = json_root(&d);
 	json_object(root, "$schema|communications|ambient|gradient|lights|thin_"
 	                  "surface|backdrop|atmosphere|fog|self_glow|organelle_"
-	                  "appearance|factory_appearance|animation");
+	                  "appearance|factory_appearance|animation|electron_"
+	                  "microscope");
 
 	Json comm = json_find(root, "communications");
 	if (json_present(comm))
@@ -475,6 +478,24 @@ static bool load_appearance(World* w, const char* path, uint32_t seed)
 		    json_float(json_get(organelles, "center_glow"), 0, 8);
 		w->organelle_style[3] =
 		    json_float(json_get(organelles, "center_power"), 0, 16);
+	}
+	Json electron = json_find(root, "electron_microscope");
+	if (json_present(electron))
+	{
+		json_object(electron, "relief");
+		Json relief = json_get(electron, "relief");
+		json_object(relief, "domes|wrinkles|fuzz|crease_shadow");
+		const char* layers[] = {"domes", "wrinkles", "fuzz"};
+		for (uint32_t i = 0; i < 3; ++i)
+		{
+			Json layer = json_get(relief, layers[i]);
+			json_object(layer, "frequency|depth");
+			w->relief[2 * i] =
+			    json_positive(json_get(layer, "frequency"), MAX_RELIEF_FREQUENCY);
+			w->relief[2 * i + 1] =
+			    json_float(json_get(layer, "depth"), 0, MAX_RELIEF_DEPTH);
+		}
+		w->relief[6] = json_float(json_get(relief, "crease_shadow"), 0, 1);
 	}
 	w->factory_emission_fresnel[1] = 1;
 	Json factory = json_find(root, "factory_appearance");

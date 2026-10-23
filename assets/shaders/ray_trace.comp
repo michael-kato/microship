@@ -299,6 +299,11 @@ const bool transparent_pass=true;
 #else
 const bool transparent_pass=false;
 #endif
+#ifdef NANOVORE_CASCADE_PASS
+const bool cascade_tracing=true;
+#else
+const bool cascade_tracing=false;
+#endif
 // One flag word per pixel: half-float throughput blue and flags (-1 none,
 // +1 sharp contribution, +2 pixel blurred). Pixels with a hit also store seven
 // words after all flag words: triangle, instance, barycentric bits, half-float
@@ -533,9 +538,86 @@ struct Surface
     bool metal,translucent,unshadowed,front_face;
     vec4 subsurface;
     float detail,reveal,ambient; // Screen-space and fog level of detail; ambient light weight.
+    float occlusion; // Ambient openness: 1 open, toward 0 deep in relief creases.
     uint instance,triangle;
     vec3 barycentric;
 };
+
+// Procedural relief: fixed object-space height fields, so detail stays on
+// moving objects and every frame shades the same surface. Analytic gradients
+// tilt the shading normal; each layer fades out below a few pixels per feature.
+uvec3 relief_hash(ivec3 cell)
+{
+    // pcg3d (Jarzynski and Olano 2020).
+    uvec3 v=uvec3(cell)*1664525u+1013904223u;
+    v.x+=v.y*v.z;v.y+=v.z*v.x;v.z+=v.x*v.y;v^=v>>16u;
+    v.x+=v.y*v.z;v.y+=v.z*v.x;v.z+=v.x*v.y;return v;
+}
+vec3 relief_random(ivec3 cell) { return vec3(relief_hash(cell)>>8u)*(1.0/16777216.0); }
+// Perlin gradient noise: value in about [-.7,.7] and its gradient. Corners
+// accumulate one at a time with their quintic trilinear weights.
+vec4 gradient_noise(vec3 p)
+{
+    ivec3 base=ivec3(floor(p));vec3 f=fract(p);
+    vec3 u=f*f*f*(f*(f*6.0-15.0)+10.0),du=30.0*f*f*(f*(f-2.0)+1.0);
+    vec4 sum=vec4(0);
+    for (int k=0;k<8;++k)
+    {
+        vec3 o=vec3(k&1,(k>>1)&1,k>>2),w=mix(1.0-u,u,o),side=2.0*o-1.0;
+        vec3 slope=normalize(relief_random(base+ivec3(o))*2.0-1.0+1e-4);
+        float ramp=dot(slope,f-o),weight=w.x*w.y*w.z;
+        sum+=vec4(weight*ramp,weight*slope+ramp*du*side*vec3(w.y*w.z,w.x*w.z,w.x*w.y));
+    }
+    return sum;
+}
+// Rounded cellular domes: height 1 at a jittered site, 0 where neighbors meet.
+vec4 cellular_domes(vec3 p)
+{
+    ivec3 base=ivec3(floor(p));vec3 f=fract(p);
+    float nearest=8.0;vec3 offset=vec3(0);
+    for (int k=0;k<27;++k)
+    {
+        ivec3 o=ivec3(k%3,(k/3)%3,k/9)-1;
+        vec3 d=vec3(o)+.15+.7*relief_random(base+o)-f;float d2=dot(d,d);
+        if (d2<nearest) { nearest=d2;offset=d; }
+    }
+    float open=max(0.0,1.0-nearest);
+    // h=open^2, so grad h = 2*open*grad(open) and grad(open) = 2*offset.
+    return vec4(open*open,4.0*open*offset);
+}
+// Layer weight from object-space wavelength over object-space pixel footprint;
+// zero depth disables the layer.
+float relief_detail(float frequency,float depth,float footprint)
+{ return depth>0.0 ? smoothstep(2.0,6.0,1.0/(frequency*footprint)) : 0.0; }
+void apply_relief(inout Surface s,vec3 object_point,float instance_scale)
+{
+    float footprint=length(s.point-render.camera_position.xyz)*2.0*render.display.y/float(render.settings.y)/instance_scale;
+    vec4 layers=render.relief[0],fuzz=render.relief[1];
+    vec3 slope=vec3(0);float cavity=1.0,crease=fuzz.z;
+    float w=relief_detail(layers.x,layers.y,footprint);
+    if (w>0.0)
+    {
+        vec4 dome=cellular_domes(object_point*layers.x);
+        slope+=w*layers.y*dome.yzw;cavity*=1.0-w*crease*(1.0-sqrt(dome.x));
+    }
+    w=relief_detail(layers.z,layers.w,footprint);
+    if (w>0.0)
+    {
+        // Ridged noise: sharp creases where the noise crosses zero.
+        vec4 n=gradient_noise(object_point*layers.z+17.0);
+        slope-=w*layers.w*sign(n.x)*n.yzw;cavity*=1.0-w*crease*.5*(1.0-smoothstep(0.0,.25,abs(n.x)));
+    }
+    w=relief_detail(fuzz.x,fuzz.y,footprint);
+    if (w>0.0)
+    {
+        vec4 n=gradient_noise(object_point*fuzz.x+41.0);
+        slope+=w*fuzz.y*n.yzw;cavity*=1.0-w*crease*.4*smoothstep(0.0,-.5,n.x);
+    }
+    // Height gradients are covectors: they transform like normals; the scale keeps the slope.
+    vec3 g=instance_scale*(hit_normal_to_world*slope);
+    s.normal=normalize(s.normal-(g-s.normal*dot(s.normal,g)));
+    s.occlusion=cavity;
+}
 
 bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surface surface)
 {
@@ -543,6 +625,7 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
     Vertex a = vertices[triangle.x];
     Vertex b = vertices[triangle.y];
     Vertex c = vertices[triangle.z];
+    vec3 object_point=a.position.xyz*(1.0-barycentric.x-barycentric.y)+b.position.xyz*barycentric.x+c.position.xyz*barycentric.y;
     a.position.xyz=hit_to_world*vec4(a.position.xyz,1.0);
     b.position.xyz=hit_to_world*vec4(b.position.xyz,1.0);
     c.position.xyz=hit_to_world*vec4(c.position.xyz,1.0);
@@ -578,6 +661,13 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
         vec3 gradient=render.membrane_ripple.x*(first*cos(a)*sin(b)+second*sin(a)*cos(b));
         normal=normalize(normal-gradient+normal*dot(normal,gradient));
     }
+    float instance_scale=min(length(hit_to_world[0]),min(length(hit_to_world[1]),length(hit_to_world[2])));
+    surface.point=point;surface.normal=normal;surface.occlusion=1.0;
+    // Cascade rays gather smooth ambient light; they have no pixel footprint.
+    // The membrane walk only records its opaque hit; the opaque pass shades it.
+    if (!cascade_tracing && (!transparent_pass || triangle.w==THIN_MEMBRANE_MATERIAL))
+        apply_relief(surface,object_point,instance_scale);
+    normal=surface.normal;
     float view_cosine=dot(normal,-direction);
     if (triangle.w==THIN_MEMBRANE_MATERIAL)
     {
@@ -588,7 +678,6 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
     }
     else if (view_cosine<=0.0) normal=geometric_normal;
 
-    float instance_scale=min(length(hit_to_world[0]),min(length(hit_to_world[1]),length(hit_to_world[2])));
     surface.subsurface=a.subsurface*weights.x+b.subsurface*weights.y+c.subsurface*weights.z;
     surface.subsurface.rgb*=instance_scale;
     surface.subsurface.a*=instance_style[hit_instance].detail.z;
@@ -790,11 +879,6 @@ float ambient_visibility(vec3 point,vec3 normal)
 // longer interval. Cascade 0 is merged with all farther cascades and projected
 // to RGB L1 spherical harmonics, which surfaces and media read for ambient light.
 layout(set=0,binding=RENDER_BINDING_CASCADES,std430) buffer RadianceCascades { vec4 cascade_data[]; };
-#ifdef NANOVORE_CASCADE_PASS
-const bool cascade_tracing=true;
-#else
-const bool cascade_tracing=false;
-#endif
 const float SH_Y0=.282094791773878;
 const float SH_Y1=.488602511902920;
 bool cascade_medium(uint i)
@@ -1112,7 +1196,7 @@ vec3 ambient_surface(Surface s,vec3 outgoing)
     if (transmission>0.0)
         result+=s.color*behind*(transmission*(1.0-render.thin_material.w))*
             exp(-render.thin_material.y/max(MIN_MEMBRANE_DIRECTION_COSINE,cosine));
-    return result*s.ambient;
+    return result*s.ambient*s.occlusion;
 }
 
 vec3 surface_glow_color(Surface s)
