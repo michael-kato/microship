@@ -84,9 +84,9 @@ def main():
     cases=[('full',world,config),('single-structure',single,config),('sphere-bodies',spheres,config),
            ('one-transmission-layer',world,setting(config,'max_transmission_layers',1)),
            ('half-samples',world,setting(config,'samples_per_pixel',max(1,args.samples//2)))]
-    if any('medium' in body for body in world['bodies']):
+    if 'cell_medium' in world['appearance']:
         no_volumes=deepcopy(world)
-        for body in no_volumes['bodies']:body.pop('medium',None)
+        no_volumes['appearance'].pop('cell_medium')
         cases.append(('no-volumes',no_volumes,config))
         if args.volume_samples:
             cases.extend([('no-in-scattering',world,setting(config,'rays_per_pixel',0)),

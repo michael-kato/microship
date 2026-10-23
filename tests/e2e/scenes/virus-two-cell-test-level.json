@@ -1,9 +1,6 @@
 {
   "$schema": "../../../assets/schemas/world.schema.json",
-  "content": "../../../assets/gameplay/gameplay.json",
   "rules": "two-cell-test-gameplay-rules.json",
-  "appearance": "../../../assets/presentation/scene.json",
-  "effects": "../../../assets/presentation/combat-effects.json",
   "match": {
     "player": "virus",
     "opponent": "immune"
@@ -14,17 +11,9 @@
       "owner": "virus",
       "position": [-6.0, 0.0, 0.0],
       "radius": 3.2,
-      "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
         "normal": [0, 0, 1]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.035, 0.045, 0.04],
-        "absorption": 0.012,
-        "anisotropy": 0.2
       }
     },
     {
@@ -32,17 +21,9 @@
       "owner": "immune",
       "position": [6.0, 0.0, 0.0],
       "radius": 3.2,
-      "tint": [1.0, 1.0, 1.0],
       "site": {
         "availability": 1.0,
         "normal": [0, 0, 1]
-      },
-      "medium": {
-        "radius_fraction": 0.94,
-        "edge_fade": 0.28,
-        "scattering": [0.035, 0.045, 0.04],
-        "absorption": 0.012,
-        "anisotropy": 0.2
       }
     }
   ],

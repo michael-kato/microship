@@ -372,6 +372,54 @@ static bool load_effects(World* w, const char* path)
 	}
 	return d.valid;
 }
+// The interior medium of every cell, from the appearance file.
+static void read_cell_medium(Json medium, CellMedium* m)
+{
+	json_object(medium, "radius_fraction|edge_fade|scattering|absorption|"
+	                    "anisotropy|depth_blur");
+	Json blur = json_find(medium, "depth_blur");
+	if (json_present(blur))
+	{
+		json_object(blur, "pixels_per_unit|sharp_distance|max_radius|start_"
+		                  "fraction|full_fraction");
+		m->blur_fraction =
+		    json_present(json_find(blur, "start_fraction")) ||
+		    json_present(json_find(blur, "full_fraction"));
+		if (m->blur_fraction)
+		{
+			m->blur_rate =
+			    json_float(json_get(blur, "start_fraction"), 0, 1);
+			m->blur_sharp =
+			    json_float(json_get(blur, "full_fraction"), 0, 1);
+			if (m->blur_sharp <= m->blur_rate ||
+			    json_present(json_find(blur, "pixels_per_unit")) ||
+			    json_present(json_find(blur, "sharp_distance")))
+				json_error(blur, "fractional blur requires start < full "
+				                 "and no distance fields");
+		}
+		else
+		{
+			m->blur_rate =
+			    json_float(json_get(blur, "pixels_per_unit"), 0, 32);
+			m->blur_sharp =
+			    json_float(json_get(blur, "sharp_distance"), 0, 100);
+		}
+		m->blur_max =
+		    json_float(json_get(blur, "max_radius"), 0, 32);
+	}
+	m->radius =
+	    json_positive(json_get(medium, "radius_fraction"), 1);
+	m->fade = json_float(json_get(medium, "edge_fade"), 0, 1);
+	m->scattering =
+	    json_color(json_get(medium, "scattering"), MAX_MEDIUM_SCATTERING);
+	m->absorption = json_float(json_get(medium, "absorption"), 0,
+	                                   MAX_MEDIUM_ABSORPTION);
+	Json anisotropy = json_get(medium, "anisotropy");
+	m->anisotropy = json_float(anisotropy, -MAX_MEDIUM_ANISOTROPY,
+	                                   MAX_MEDIUM_ANISOTROPY);
+	if (std::fabs(m->anisotropy) >= MAX_MEDIUM_ANISOTROPY)
+		json_error(anisotropy, "anisotropy must be in (-.95,.95)");
+}
 static bool load_appearance(World* w, const char* path, uint32_t seed)
 {
 	JsonDocument d;
@@ -381,7 +429,10 @@ static bool load_appearance(World* w, const char* path, uint32_t seed)
 	json_object(root, "$schema|communications|ambient|gradient|lights|thin_"
 	                  "surface|backdrop|atmosphere|fog|self_glow|organelle_"
 	                  "appearance|factory_appearance|animation|electron_"
-	                  "microscope");
+	                  "microscope|cell_medium");
+	Json cell_medium = json_find(root, "cell_medium");
+	if (json_present(cell_medium))
+		read_cell_medium(cell_medium, &w->cell_medium);
 
 	Json comm = json_find(root, "communications");
 	if (json_present(comm))
@@ -714,9 +765,9 @@ static bool load_appearance(World* w, const char* path, uint32_t seed)
 // neither, and the neutral template takes its radius from the layout.
 static bool read_body(World* w, Json j, bool placed, bool sized, Body* out)
 {
-	json_object(j, placed  ? "type|owner|position|radius|tint|site|medium|seed"
-	               : sized ? "type|owner|radius|tint|site|medium"
-	                       : "type|owner|tint|site|medium");
+	json_object(j, placed  ? "type|owner|position|radius|tint|site|seed"
+	               : sized ? "type|owner|radius|tint|site"
+	                       : "type|owner|tint|site");
 	Body b = {};
 	b.availability = -1;
 	Json seed = placed ? json_find(j, "seed") : Json{};
@@ -736,7 +787,9 @@ static bool read_body(World* w, Json j, bool placed, bool sized, Body* out)
 			            MAX_PLACEMENT_COORDINATE);
 	if (sized)
 		b.radius = json_positive(json_get(j, "radius"), MAX_BODY_RADIUS);
-	b.color = json_color(json_get(j, "tint"));
+	// Test override only, for example to mark diagnostic probes.
+	Json tint = json_find(j, "tint");
+	b.color = json_present(tint) ? json_color(tint) : Color{1, 1, 1};
 	Json site = json_find(j, "site");
 	if (json_present(site))
 	{
@@ -745,54 +798,6 @@ static bool read_body(World* w, Json j, bool placed, bool sized, Body* out)
 		b.availability = json_float(json_get(site, "availability"), 0, 1);
 		if (!w->content.bodies[index].hosts_site)
 			return json_error(site, "body type cannot host a production site");
-	}
-	Json medium = json_find(j, "medium");
-	if (json_present(medium))
-	{
-		json_object(medium, "radius_fraction|edge_fade|scattering|absorption|"
-		                    "anisotropy|depth_blur");
-		Json blur = json_find(medium, "depth_blur");
-		if (json_present(blur))
-		{
-			json_object(blur, "pixels_per_unit|sharp_distance|max_radius|start_"
-			                  "fraction|full_fraction");
-			b.interior_blur_fraction =
-			    json_present(json_find(blur, "start_fraction")) ||
-			    json_present(json_find(blur, "full_fraction"));
-			if (b.interior_blur_fraction)
-			{
-				b.interior_blur_rate =
-				    json_float(json_get(blur, "start_fraction"), 0, 1);
-				b.interior_blur_sharp =
-				    json_float(json_get(blur, "full_fraction"), 0, 1);
-				if (b.interior_blur_sharp <= b.interior_blur_rate ||
-				    json_present(json_find(blur, "pixels_per_unit")) ||
-				    json_present(json_find(blur, "sharp_distance")))
-					json_error(blur, "fractional blur requires start < full "
-					                 "and no distance fields");
-			}
-			else
-			{
-				b.interior_blur_rate =
-				    json_float(json_get(blur, "pixels_per_unit"), 0, 32);
-				b.interior_blur_sharp =
-				    json_float(json_get(blur, "sharp_distance"), 0, 100);
-			}
-			b.interior_blur_max =
-			    json_float(json_get(blur, "max_radius"), 0, 32);
-		}
-		b.interior_radius =
-		    json_positive(json_get(medium, "radius_fraction"), 1);
-		b.interior_fade = json_float(json_get(medium, "edge_fade"), 0, 1);
-		b.interior_scattering =
-		    json_color(json_get(medium, "scattering"), MAX_MEDIUM_SCATTERING);
-		b.interior_absorption = json_float(json_get(medium, "absorption"), 0,
-		                                   MAX_MEDIUM_ABSORPTION);
-		Json anisotropy = json_get(medium, "anisotropy");
-		b.interior_anisotropy = json_float(anisotropy, -MAX_MEDIUM_ANISOTROPY,
-		                                   MAX_MEDIUM_ANISOTROPY);
-		if (std::fabs(b.interior_anisotropy) >= MAX_MEDIUM_ANISOTROPY)
-			json_error(anisotropy, "anisotropy must be in (-.95,.95)");
 	}
 	*out = b;
 	return j.document->valid;
@@ -1045,8 +1050,24 @@ static bool validate_world(const World* world, const char* path)
 	return true;
 }
 
-bool world_load(World* world, const char* path, uint32_t seed,
-                const char* player)
+// The level's own reference overrides the global file, for tests only.
+static bool world_file(Json root, const char* key, const char* level,
+                       const char* global, char* file)
+{
+	Json local = json_find(root, key);
+	if (json_present(local))
+		return json_path(local, level, file);
+	if (strlen(global) >= ASSET_PATH_CAPACITY)
+	{
+		fprintf(stderr, "%s: global %s path is too long\n", level, key);
+		return false;
+	}
+	strcpy(file, global);
+	return true;
+}
+
+bool world_load(World* world, const char* path, const WorldFiles& files,
+                uint32_t seed, const char* player)
 {
 	JsonDocument d;
 	if (!json_load(&d, path))
@@ -1057,20 +1078,16 @@ bool world_load(World* world, const char* path, uint32_t seed,
 	    "$schema|content|rules|appearance|effects|match|bodies|layout|spawns");
 	World loaded = {};
 	loaded.ambient_top = loaded.ambient_bottom = Color{1, 1, 1};
-	if (!json_path(json_get(root, "content"), path, loaded.content_path) ||
-	    !content_load(&loaded.content, loaded.content_path))
-		return false;
 	char file[ASSET_PATH_CAPACITY] = {};
-	Json rules = json_find(root, "rules");
-	if (json_present(rules) &&
-	    (!json_path(rules, path, file) || !load_rules(&loaded, file)))
-		return false;
-	Json effects = json_find(root, "effects");
-	if (json_present(effects) &&
-	    (!json_path(effects, path, file) || !load_effects(&loaded, file)))
-		return false;
-	if (!json_path(json_get(root, "appearance"), path,
-	               loaded.appearance_path) ||
+	if (!world_file(root, "content", path, files.content,
+	                loaded.content_path) ||
+	    !content_load(&loaded.content, loaded.content_path) ||
+	    !world_file(root, "rules", path, files.rules, file) ||
+	    !load_rules(&loaded, file) ||
+	    !world_file(root, "effects", path, files.effects, file) ||
+	    !load_effects(&loaded, file) ||
+	    !world_file(root, "appearance", path, files.appearance,
+	                loaded.appearance_path) ||
 	    !load_appearance(&loaded, loaded.appearance_path, seed))
 		return false;
 	Json match = json_get(root, "match");

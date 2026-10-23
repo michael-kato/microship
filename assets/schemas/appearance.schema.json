@@ -395,6 +395,90 @@
       "required": ["edge_saturation", "edge_width", "center_glow", "center_power"],
       "additionalProperties": false
     },
+    "cell_medium": {
+      "type": "object",
+      "properties": {
+        "radius_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "edge_fade": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "scattering": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "absorption": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "anisotropy": {
+          "type": "number",
+          "exclusiveMinimum": -0.95,
+          "exclusiveMaximum": 0.95
+        },
+        "depth_blur": {
+          "type": "object",
+          "properties": {
+            "pixels_per_unit": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 32
+            },
+            "sharp_distance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "max_radius": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 32
+            },
+            "start_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "full_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": ["max_radius"],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": ["pixels_per_unit", "sharp_distance"],
+              "not": {
+                "anyOf": [{"required": ["start_fraction"]}, {"required": ["full_fraction"]}]
+              }
+            },
+            {
+              "required": ["start_fraction", "full_fraction"],
+              "not": {
+                "anyOf": [{"required": ["pixels_per_unit"]}, {"required": ["sharp_distance"]}]
+              }
+            }
+          ]
+        }
+      },
+      "required": ["radius_fraction", "edge_fade", "scattering", "absorption", "anisotropy"],
+      "additionalProperties": false,
+      "description": "Interior medium shared by every cell."
+    },
     "electron_microscope": {
       "type": "object",
       "description": "Colorized electron microscope surface look.",

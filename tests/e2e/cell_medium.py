@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory(prefix='nanovore-medium-') as directory:
     orders='0 select all\n0 order 0\n600 ratio 65\n'
     baseline,view=run('grown',data,4800,orders)
     disabled=deepcopy(data);disabled['appearance']['thin_surface'].pop('edge_fade');disabled['appearance']['thin_surface'].pop('blur_radius',None)
-    for body in disabled['bodies']:body['medium'].pop('depth_blur')
+    disabled['appearance']['cell_medium'].pop('depth_blur')
     reference,clear=run('effects-off',disabled,4800,orders)
     assert baseline==reference,'Membrane and medium presentation changed game state'
     for a,b in zip(view['meshes'],clear['meshes']):assert a==b,'Presentation settings changed geometry'
@@ -87,8 +87,8 @@ with tempfile.TemporaryDirectory(prefix='nanovore-medium-') as directory:
         config=deepcopy(settings);config['lighting']['shadow_grid_resolution']=n
         run('bad-grid-'+str(n),data,config=config,expected=1)
     for path,value in [('appearance.thin_surface.blur_radius',33),('appearance.thin_surface.edge_fade.strength',1.1),('appearance.thin_surface.edge_fade.power',0),
-                       ('appearance.thin_surface.edge_fade.extra',True),('bodies.0.medium.depth_blur.pixels_per_unit',-1),
-                       ('bodies.0.medium.depth_blur.max_radius',33),('bodies.0.medium.depth_blur.sharp_distance',-1),
-                       ('bodies.0.medium.depth_blur.start_fraction',.8),('bodies.0.medium.depth_blur.full_fraction',.2),('bodies.0.medium.depth_blur.full_fraction',1.1),('appearance.membrane',dict(inner_radius_fraction=.965))]:
+                       ('appearance.thin_surface.edge_fade.extra',True),('appearance.cell_medium.depth_blur.pixels_per_unit',-1),
+                       ('appearance.cell_medium.depth_blur.max_radius',33),('appearance.cell_medium.depth_blur.sharp_distance',-1),
+                       ('appearance.cell_medium.depth_blur.start_fraction',.8),('appearance.cell_medium.depth_blur.full_fraction',.2),('appearance.cell_medium.depth_blur.full_fraction',1.1),('appearance.membrane',dict(inner_radius_fraction=.965))]:
         run('bad-'+str(count),change(data,path,value),expected=1)
 print(f'Cell medium E2E passed: {count} application runs; one authored wall, fixed topology, angle fade, medium-depth blur, quality-independent simulation and rejected settings.')

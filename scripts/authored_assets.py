@@ -9,6 +9,16 @@ FACTORY_SHARED_FIELDS=('growth_seconds', 'sprout_seconds', 'establishment_second
 FACTORY_SHARED_BRANCH_FIELDS=('seconds', 'seed', 'regrow_seconds', 'roots', 'root_limit', 'root_minimum_radius', 'additional_root_scale', 'additional_root_width_scale', 'additional_root_branch', 'surface_clearance', 'all_leaf_nodes', 'root_offset_seconds')
 
 
+STARTUP=Path(__file__).resolve().parents[1]/'assets/startup.json'
+
+
+def world_reference(world, source, name):
+    """A level's own reference is a test override; otherwise startup.json names the global file."""
+    if name in world:
+        return (source.parent/world[name]).resolve()
+    return (STARTUP.parent/json.loads(STARTUP.read_text())[name]).resolve()
+
+
 def stage_world(source, directory):
     def read(path):
         data=json.loads(path.read_text());data.pop('$schema',None)
@@ -17,7 +27,7 @@ def stage_world(source, directory):
         if key in data:
             data[key]=Path(os.path.relpath((origin/data[key]).resolve(),directory)).as_posix()
     world=read(source)
-    manifest=(source.parent/world['content']).resolve()
+    manifest=world_reference(world,source,'content')
     content={}
     for name,path in read(manifest).items():
         definition=(manifest.parent/path).resolve()
@@ -45,8 +55,7 @@ def stage_world(source, directory):
                 for key in ('segment','tip'):model(item['growth_meshes'],key,definition.parent)
     world['content']=content
     for name in ('rules','appearance','effects'):
-        if name not in world:continue
-        path=(source.parent/world[name]).resolve();world[name]=read(path)
+        path=world_reference(world,source,name);world[name]=read(path)
         if name=='appearance':model(world[name],'communications',path.parent)
         if name=='appearance' and 'backdrop' in world[name]:
             backdrop=world[name]['backdrop'];model(backdrop,'model',path.parent)

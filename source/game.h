@@ -7,6 +7,8 @@
 struct GameOptions
 {
 	const char* world_path;
+	// Global content, rules, appearance and effects files from startup.json.
+	const char *content_path, *rules_path, *appearance_path, *effects_path;
 	const char* player_faction; // Overrides match.player when set.
 	const char* config_path;
 	const char* shader_path;

@@ -305,7 +305,8 @@ bool presentation_initialize(Presentation* p, const Simulation* s,
 		scene->effect_tiles.resize(2 * scene->tile_count + 1 +
 		                           MAX_EFFECT_REFERENCES);
 		for (uint32_t i = 0; i < w->body_count; ++i)
-			if (w->bodies[i].interior_radius > 0)
+			if (w->cell_medium.radius > 0 &&
+			    w->content.bodies[w->bodies[i].type].hosts_site)
 			{
 				p->medium_bodies[scene->media.size()] = (int32_t)i;
 				scene->media.push_back(RenderMedium{});
@@ -1217,20 +1218,20 @@ bool presentation_build(Presentation* p, const Simulation* s,
 		medium->center_radius[3] =
 		    (simulation_body_known(s, p->medium_bodies[i]) ||
 			 scene->fog_blur > 0)
-		        ? c->radius * c->interior_radius
+		        ? c->radius * w->cell_medium.radius
 		        : 0;
-		medium->scattering[0] = c->interior_scattering.r;
-		medium->scattering[1] = c->interior_scattering.g;
-		medium->scattering[2] = c->interior_scattering.b;
-		medium->scattering[3] = c->interior_fade;
+		medium->scattering[0] = w->cell_medium.scattering.r;
+		medium->scattering[1] = w->cell_medium.scattering.g;
+		medium->scattering[2] = w->cell_medium.scattering.b;
+		medium->scattering[3] = w->cell_medium.fade;
 		medium->absorption_phase[0] = medium->absorption_phase[1] =
-		    medium->absorption_phase[2] = c->interior_absorption;
-		medium->blur[0] = c->interior_blur_rate;
-		medium->blur[1] = c->interior_blur_sharp;
-		medium->blur[2] = c->interior_blur_max;
-		medium->blur[3] = c->interior_blur_fraction ? 1.0f : 0.0f;
+		    medium->absorption_phase[2] = w->cell_medium.absorption;
+		medium->blur[0] = w->cell_medium.blur_rate;
+		medium->blur[1] = w->cell_medium.blur_sharp;
+		medium->blur[2] = w->cell_medium.blur_max;
+		medium->blur[3] = w->cell_medium.blur_fraction ? 1.0f : 0.0f;
 		medium->lighting[3] = c->radius;
-		medium->absorption_phase[3] = c->interior_anisotropy;
+		medium->absorption_phase[3] = w->cell_medium.anisotropy;
 		medium->lighting[0] = 1;
 		medium->lighting[1] = 1;
 		const MeshRange& mesh =

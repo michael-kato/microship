@@ -1,6 +1,10 @@
 {
   "$schema": "schemas/startup.schema.json",
   "world": "levels/large_level.json",
+  "content": "gameplay/gameplay.json",
+  "rules": "gameplay/gameplay-rules.json",
+  "appearance": "presentation/scene.json",
+  "effects": "presentation/combat-effects.json",
   "render": "rendering/renderer.json",
   "shader": "shaders/ray_trace.comp.spv",
   "audio": "audio/audio.json",

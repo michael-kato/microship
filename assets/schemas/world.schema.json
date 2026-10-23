@@ -7,16 +7,20 @@
       "type": "string"
     },
     "content": {
-      "$ref": "shared.schema.json#/$defs/path"
+      "$ref": "shared.schema.json#/$defs/path",
+      "description": "Test override only; the game uses the global file named in startup.json."
     },
     "rules": {
-      "$ref": "shared.schema.json#/$defs/path"
+      "$ref": "shared.schema.json#/$defs/path",
+      "description": "Test override only; the game uses the global file named in startup.json."
     },
     "appearance": {
-      "$ref": "shared.schema.json#/$defs/path"
+      "$ref": "shared.schema.json#/$defs/path",
+      "description": "Test override only; the game uses the global file named in startup.json."
     },
     "effects": {
-      "$ref": "shared.schema.json#/$defs/path"
+      "$ref": "shared.schema.json#/$defs/path",
+      "description": "Test override only; the game uses the global file named in startup.json."
     },
     "match": {
       "type": "object",
@@ -142,9 +146,6 @@
             "exclusiveMinimum": 0,
             "maximum": 1000000
           },
-          "tint": {
-            "$ref": "shared.schema.json#/$defs/color"
-          },
           "site": {
             "type": "object",
             "properties": {
@@ -160,96 +161,24 @@
             "required": ["normal", "availability"],
             "additionalProperties": false
           },
-          "medium": {
-            "type": "object",
-            "properties": {
-              "radius_fraction": {
-                "type": "number",
-                "exclusiveMinimum": 0,
-                "maximum": 1
-              },
-              "edge_fade": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1
-              },
-              "scattering": {
-                "type": "array",
-                "items": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1000
-                },
-                "minItems": 3,
-                "maxItems": 3
-              },
-              "absorption": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1000
-              },
-              "anisotropy": {
-                "type": "number",
-                "exclusiveMinimum": -0.95,
-                "exclusiveMaximum": 0.95
-              },
-              "depth_blur": {
-                "type": "object",
-                "properties": {
-                  "pixels_per_unit": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 32
-                  },
-                  "sharp_distance": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 100
-                  },
-                  "max_radius": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 32
-                  },
-                  "start_fraction": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 1
-                  },
-                  "full_fraction": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 1
-                  }
-                },
-                "required": ["max_radius"],
-                "additionalProperties": false,
-                "oneOf": [
-                  {
-                    "required": ["pixels_per_unit", "sharp_distance"],
-                    "not": {
-                      "anyOf": [{"required": ["start_fraction"]}, {"required": ["full_fraction"]}]
-                    }
-                  },
-                  {
-                    "required": ["start_fraction", "full_fraction"],
-                    "not": {
-                      "anyOf": [{"required": ["pixels_per_unit"]}, {"required": ["sharp_distance"]}]
-                    }
-                  }
-                ]
-              }
-            },
-            "required": ["radius_fraction", "edge_fade", "scattering", "absorption", "anisotropy"],
-            "additionalProperties": false
-          },
           "seed": {
             "type": "integer",
             "minimum": 0,
             "maximum": 16777215
+          },
+          "tint": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "minItems": 3,
+            "maxItems": 3,
+            "description": "Test override only: vertex color multiplier, white by default."
           }
         },
-        "required": ["type", "owner", "position", "radius", "tint"],
+        "required": ["type", "owner", "position", "radius"],
         "additionalProperties": false
       },
       "maxItems": 128
@@ -376,7 +305,7 @@
       "maxItems": 64
     }
   },
-  "required": ["content", "appearance", "match"],
+  "required": ["match"],
   "additionalProperties": false,
   "anyOf": [
     {
@@ -427,9 +356,6 @@
           "exclusiveMinimum": 0,
           "maximum": 1000000
         },
-        "tint": {
-          "$ref": "shared.schema.json#/$defs/color"
-        },
         "site": {
           "type": "object",
           "properties": {
@@ -445,91 +371,19 @@
           "required": ["normal", "availability"],
           "additionalProperties": false
         },
-        "medium": {
-          "type": "object",
-          "properties": {
-            "radius_fraction": {
-              "type": "number",
-              "exclusiveMinimum": 0,
-              "maximum": 1
-            },
-            "edge_fade": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "scattering": {
-              "type": "array",
-              "items": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1000
-              },
-              "minItems": 3,
-              "maxItems": 3
-            },
-            "absorption": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1000
-            },
-            "anisotropy": {
-              "type": "number",
-              "exclusiveMinimum": -0.95,
-              "exclusiveMaximum": 0.95
-            },
-            "depth_blur": {
-              "type": "object",
-              "properties": {
-                "pixels_per_unit": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 32
-                },
-                "sharp_distance": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 100
-                },
-                "max_radius": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 32
-                },
-                "start_fraction": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1
-                },
-                "full_fraction": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1
-                }
-              },
-              "required": ["max_radius"],
-              "additionalProperties": false,
-              "oneOf": [
-                {
-                  "required": ["pixels_per_unit", "sharp_distance"],
-                  "not": {
-                    "anyOf": [{"required": ["start_fraction"]}, {"required": ["full_fraction"]}]
-                  }
-                },
-                {
-                  "required": ["start_fraction", "full_fraction"],
-                  "not": {
-                    "anyOf": [{"required": ["pixels_per_unit"]}, {"required": ["sharp_distance"]}]
-                  }
-                }
-              ]
-            }
+        "tint": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
           },
-          "required": ["radius_fraction", "edge_fade", "scattering", "absorption", "anisotropy"],
-          "additionalProperties": false
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "Test override only: vertex color multiplier, white by default."
         }
       },
-      "required": ["type", "owner", "radius", "tint"],
+      "required": ["type", "owner", "radius"],
       "additionalProperties": false
     },
     "neutral_template": {
@@ -541,9 +395,6 @@
         "owner": {
           "$ref": "shared.schema.json#/$defs/name"
         },
-        "tint": {
-          "$ref": "shared.schema.json#/$defs/color"
-        },
         "site": {
           "type": "object",
           "properties": {
@@ -559,91 +410,19 @@
           "required": ["normal", "availability"],
           "additionalProperties": false
         },
-        "medium": {
-          "type": "object",
-          "properties": {
-            "radius_fraction": {
-              "type": "number",
-              "exclusiveMinimum": 0,
-              "maximum": 1
-            },
-            "edge_fade": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "scattering": {
-              "type": "array",
-              "items": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1000
-              },
-              "minItems": 3,
-              "maxItems": 3
-            },
-            "absorption": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1000
-            },
-            "anisotropy": {
-              "type": "number",
-              "exclusiveMinimum": -0.95,
-              "exclusiveMaximum": 0.95
-            },
-            "depth_blur": {
-              "type": "object",
-              "properties": {
-                "pixels_per_unit": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 32
-                },
-                "sharp_distance": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 100
-                },
-                "max_radius": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 32
-                },
-                "start_fraction": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1
-                },
-                "full_fraction": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1
-                }
-              },
-              "required": ["max_radius"],
-              "additionalProperties": false,
-              "oneOf": [
-                {
-                  "required": ["pixels_per_unit", "sharp_distance"],
-                  "not": {
-                    "anyOf": [{"required": ["start_fraction"]}, {"required": ["full_fraction"]}]
-                  }
-                },
-                {
-                  "required": ["start_fraction", "full_fraction"],
-                  "not": {
-                    "anyOf": [{"required": ["pixels_per_unit"]}, {"required": ["sharp_distance"]}]
-                  }
-                }
-              ]
-            }
+        "tint": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
           },
-          "required": ["radius_fraction", "edge_fade", "scattering", "absorption", "anisotropy"],
-          "additionalProperties": false
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "Test override only: vertex color multiplier, white by default."
         }
       },
-      "required": ["type", "owner", "tint"],
+      "required": ["type", "owner"],
       "additionalProperties": false
     }
   }

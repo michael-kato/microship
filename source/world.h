@@ -14,7 +14,7 @@ struct Body
 	Faction owner;
 	Vec3 position;
 	float radius;
-	Color color;
+	Color color; // Vertex color multiplier; white unless a test sets a tint.
 	char model_path[ASSET_PATH_CAPACITY];
 	Vec3 colony_normal;
 	Vec3 factory_root;
@@ -27,11 +27,23 @@ struct Body
 	float factory_surface_radius; // Startup bound includes every faction wall
 	                              // shape.
 	float availability;
-	float interior_radius, interior_fade;
-	Color interior_scattering;
-	float interior_absorption, interior_anisotropy;
-	float interior_blur_rate, interior_blur_sharp, interior_blur_max;
-	bool interior_blur_fraction;
+};
+
+// The interior medium every cell shares; zero radius means no medium.
+struct CellMedium
+{
+	float radius, fade; // Fraction of the cell radius; outer fade fraction.
+	Color scattering;
+	float absorption, anisotropy;
+	float blur_rate, blur_sharp, blur_max;
+	bool blur_fraction;
+};
+
+// Global game files named by assets/startup.json. A level may name its own
+// only to override one for a test.
+struct WorldFiles
+{
+	const char *content, *rules, *appearance, *effects;
 };
 
 struct Spawn
@@ -129,6 +141,7 @@ struct World
 	Content content;
 	char content_path[ASSET_PATH_CAPACITY],
 	    appearance_path[ASSET_PATH_CAPACITY];
+	CellMedium cell_medium;
 	GameplayRules gameplay;
 	CommunicationSettings communications;
 	float sight_radius;
@@ -181,8 +194,8 @@ struct World
 };
 
 // A non-null player names the controlled faction instead of match.player.
-bool world_load(World* world, const char* path, uint32_t seed,
-                const char* player = 0);
+bool world_load(World* world, const char* path, const WorldFiles& files,
+                uint32_t seed, const char* player = 0);
 bool world_reload_appearance(World* output, const World* current,
                              uint32_t seed);
 void world_copy_appearance(World* output, const World* source);

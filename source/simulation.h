@@ -349,7 +349,8 @@ struct Simulation
 bool simulation_attachment_valid(const Simulation*, const Unit*);
 int32_t simulation_held_by(const Simulation*, uint32_t unit);
 bool simulation_initialize(Simulation* simulation, const char* world_path,
-                           uint32_t seed = 0, const char* player = 0);
+                           const WorldFiles& files, uint32_t seed = 0,
+                           const char* player = 0);
 enum SimulationPhase
 {
 	SIM_AI,

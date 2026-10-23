@@ -1364,7 +1364,8 @@ static bool spawn(Simulation* s, uint32_t type, Vec3 position, int target,
 
 static void grow_colonies(Simulation*, float dt);
 
-bool simulation_initialize(Simulation* s, const char* world_path, uint32_t seed,
+bool simulation_initialize(Simulation* s, const char* world_path,
+                           const WorldFiles& files, uint32_t seed,
                            const char* player)
 {
 	// Construct in place: a temporary of this size would not fit the 2 MB
@@ -1372,7 +1373,7 @@ bool simulation_initialize(Simulation* s, const char* world_path, uint32_t seed,
 	s->~Simulation();
 	new (s) Simulation();
 	s->selected_body = s->order_body = NO_BODY;
-	if (!world_load(&s->world, world_path, seed, player))
+	if (!world_load(&s->world, world_path, files, seed, player))
 		return false;
 	grid_bounds(s);
 	body_grid_build(s);

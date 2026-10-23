@@ -28,8 +28,7 @@ for x,depth,tint in [(-1.3,.18,[.95,.25,.05]),(0,.5,[.1,.9,.2]),(1.3,.82,[.05,.3
  base['bodies'].append(dict(type='depth_probe',owner='neutral',position=point,radius=.35,tint=tint))
 config=json.loads((root/'assets/rendering/renderer.json').read_text());config['sampling']['samples_per_pixel']=3;config['camera']['position']=[0,3,10];config.pop('depth_of_field')
 clear=deepcopy(base)
-for b in clear['bodies']:
- if 'medium' in b:b['medium']['depth_blur']['max_radius']=0
+clear['appearance']['cell_medium']['depth_blur']['max_radius']=0
 legacy=deepcopy(clear);legacy['appearance']['thin_surface']['blur_radius']=18
 normal=stage_world(root/'assets/levels/virus-player-level.json',out);normal['rules']['ai']['expansion_delay']=300
 without_sss=deepcopy(config);without_sss['subsurface']['strength']=0

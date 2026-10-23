@@ -32,7 +32,8 @@ static const double MAX_CURSOR_ANCHOR_COORDINATE = 100000.0;
 static const int MAX_AUDIO_CAPTURE_TICKS = 3600;
 
 static bool asset_paths(char* world, char* config, char* shader, char* audio,
-                        char* menu, char* settings, size_t capacity)
+                        char* menu, char* settings, char* content, char* rules,
+                        char* appearance, char* effects, size_t capacity)
 {
 	char executable[EXECUTABLE_PATH_CAPACITY];
 #ifdef _WIN32
@@ -57,7 +58,8 @@ static bool asset_paths(char* world, char* config, char* shader, char* audio,
 	if (!json_load(&document, manifest))
 		return false;
 	Json root = json_root(&document);
-	json_object(root, "$schema|world|render|shader|audio|menu|settings");
+	json_object(root, "$schema|world|content|rules|appearance|effects|render|"
+	                  "shader|audio|menu|settings");
 	return json_path(json_get(root, "world"), manifest, world, capacity) &&
 	       json_path(json_get(root, "render"), manifest, config, capacity) &&
 	       json_path(json_get(root, "shader"), manifest, shader, capacity) &&
@@ -65,6 +67,11 @@ static bool asset_paths(char* world, char* config, char* shader, char* audio,
 	       json_path(json_get(root, "menu"), manifest, menu, capacity) &&
 	       json_path(json_get(root, "settings"), manifest, settings,
 	                 capacity) &&
+	       json_path(json_get(root, "content"), manifest, content, capacity) &&
+	       json_path(json_get(root, "rules"), manifest, rules, capacity) &&
+	       json_path(json_get(root, "appearance"), manifest, appearance,
+	                 capacity) &&
+	       json_path(json_get(root, "effects"), manifest, effects, capacity) &&
 	       document.valid;
 }
 
@@ -127,18 +134,27 @@ int main(int argc, char** argv)
 	    shader_path[EXECUTABLE_PATH_CAPACITY],
 	    audio_path[EXECUTABLE_PATH_CAPACITY],
 	    menu_path[EXECUTABLE_PATH_CAPACITY],
-	    settings_defaults_path[EXECUTABLE_PATH_CAPACITY];
+	    settings_defaults_path[EXECUTABLE_PATH_CAPACITY],
+	    content_path[EXECUTABLE_PATH_CAPACITY],
+	    rules_path[EXECUTABLE_PATH_CAPACITY],
+	    appearance_path[EXECUTABLE_PATH_CAPACITY],
+	    effects_path[EXECUTABLE_PATH_CAPACITY];
 	bool no_menu = false, force_menu = false;
 	uint32_t menu_selection = 0;
 	char menu_faction[ASSET_NAME_CAPACITY] = {};
 	if (!asset_paths(world_path, config_path, shader_path, audio_path,
-	                 menu_path, settings_defaults_path, sizeof(world_path)))
+	                 menu_path, settings_defaults_path, content_path, rules_path,
+	                 appearance_path, effects_path, sizeof(world_path)))
 	{
 		fprintf(stderr,
 		        "Cannot locate assets beside the nanovore executable.\n");
 		return 1;
 	}
 	options.world_path = world_path;
+	options.content_path = content_path;
+	options.rules_path = rules_path;
+	options.appearance_path = appearance_path;
+	options.effects_path = effects_path;
 	options.config_path = config_path;
 	options.shader_path = shader_path;
 	options.builtin_shader_path = shader_path;

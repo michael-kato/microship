@@ -43,6 +43,7 @@ with tempfile.TemporaryDirectory(prefix='nanovore-json-e2e-') as directory:
     minimal=dict(content=dict(bodies=[dict(name='fixture',label='BODY',geometry='sphere',hosts_site=False)],
                 factions=[dict(id=1,name='virus',label='VIRUS',color=[.45,.9,.75]),dict(id=2,name='immune',label='IMMUNE',color=[1,.55,.65])],
                 groups=[],units=[],buildings=[]),appearance=dict(ambient=[.07,.055,.065]),
+                rules=dict(resource_label='NUTRIENTS',cell_infection=dict(morph_seconds=18,tint_seconds=24)),effects=dict(),
                 match=dict(player='virus',opponent='immune'),
                 bodies=[dict(type='fixture',owner='neutral',position=[9,8,7],radius=2,tint=[.2,.3,.4])],spawns=[])
     success(run(binary,out),128)
@@ -94,8 +95,9 @@ with tempfile.TemporaryDirectory(prefix='nanovore-json-e2e-') as directory:
         result=run(binary,out,[flag,value]);assert result.returncode==2 and flag in result.stderr,result.stdout+result.stderr
 
     variants=[minimal,change(minimal,'bodies',minimal['bodies']*128),
-              change(minimal,'bodies.0.medium',dict(radius_fraction=.94,edge_fade=.28,scattering=[.035,.045,.04],absorption=.012,anisotropy=.2)),
-              change(minimal,'content.bodies.0.label','BODY with spaces \u03bc')]
+              change(minimal,'appearance.cell_medium',dict(radius_fraction=.94,edge_fade=.28,scattering=[.035,.045,.04],absorption=.012,anisotropy=.2)),
+              change(minimal,'content.bodies.0.label','BODY with spaces \u03bc'),
+              remove(minimal,'appearance')]  # The global appearance file applies.
     for value in variants:
         write_world(scene,value);success(run(binary,out,['--world',str(scene)]),len(value['bodies']))
     # JSON whitespace, escaping, and exponent numbers must load through the application.
@@ -108,7 +110,7 @@ with tempfile.TemporaryDirectory(prefix='nanovore-json-e2e-') as directory:
              change(minimal,'bodies.0.radius',0),change(minimal,'bodies.0.tint',[-.2,.3,.4]),
              change(minimal,'bodies.0.tint',[1.2,.3,.4]),change(minimal,'bodies.0.position',['nine',8,7]),
              change(minimal,'bodies.0.position',[float('nan'),8,7]),change(minimal,'bodies.0.position',[1e100,8,7]),
-             change(minimal,'bodies.0.extra',1),remove(minimal,'match'),remove(minimal,'appearance'),
+             change(minimal,'bodies.0.extra',1),remove(minimal,'match'),change(minimal,'appearance','absent.json'),
              change(minimal,'content','absent.json'),change(minimal,'match.opponent','virus'),
              change(minimal,'content.bodies.0.hosts_site',1)]
     for value in invalid:

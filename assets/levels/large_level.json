@@ -1,9 +1,5 @@
 {
   "$schema": "../schemas/world.schema.json",
-  "content": "../gameplay/gameplay.json",
-  "rules": "../gameplay/gameplay-rules.json",
-  "appearance": "../presentation/scene.json",
-  "effects": "../presentation/combat-effects.json",
   "match": {
     "player": "virus",
     "starts": [
@@ -38,22 +34,9 @@
         "type": "unclaimed",
         "owner": "neutral",
         "radius": 4.2,
-        "tint": [1.0, 1.0, 1.0],
         "site": {
           "availability": 1.0,
           "normal": [0, 0, 1]
-        },
-        "medium": {
-          "radius_fraction": 0.94,
-          "edge_fade": 0.28,
-          "scattering": [0.1, 0.075, 0.085],
-          "absorption": 0.018,
-          "anisotropy": 0.2,
-          "depth_blur": {
-            "start_fraction": 0.3333333333333333,
-            "full_fraction": 0.6666666666666666,
-            "max_radius": 18
-          }
         }
       }
     },
@@ -63,22 +46,9 @@
         "type": "unclaimed",
         "owner": "neutral",
         "radius": 6.0,
-        "tint": [1.0, 1.0, 1.0],
         "site": {
           "availability": 1.0,
           "normal": [0, 0, 1]
-        },
-        "medium": {
-          "radius_fraction": 0.94,
-          "edge_fade": 0.28,
-          "scattering": [0.1, 0.075, 0.085],
-          "absorption": 0.018,
-          "anisotropy": 0.2,
-          "depth_blur": {
-            "start_fraction": 0.3333333333333333,
-            "full_fraction": 0.6666666666666666,
-            "max_radius": 18
-          }
         }
       }
     },
@@ -87,22 +57,9 @@
       "cell": {
         "type": "unclaimed",
         "owner": "neutral",
-        "tint": [1.0, 1.0, 1.0],
         "site": {
           "availability": 1.0,
           "normal": [0, 0, 1]
-        },
-        "medium": {
-          "radius_fraction": 0.94,
-          "edge_fade": 0.28,
-          "scattering": [0.1, 0.075, 0.085],
-          "absorption": 0.018,
-          "anisotropy": 0.2,
-          "depth_blur": {
-            "start_fraction": 0.3333333333333333,
-            "full_fraction": 0.6666666666666666,
-            "max_radius": 18
-          }
         }
       }
     }

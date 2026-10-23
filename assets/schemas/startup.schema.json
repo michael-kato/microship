@@ -9,6 +9,18 @@
     "world": {
       "$ref": "shared.schema.json#/$defs/path"
     },
+    "content": {
+      "$ref": "shared.schema.json#/$defs/path"
+    },
+    "rules": {
+      "$ref": "shared.schema.json#/$defs/path"
+    },
+    "appearance": {
+      "$ref": "shared.schema.json#/$defs/path"
+    },
+    "effects": {
+      "$ref": "shared.schema.json#/$defs/path"
+    },
     "render": {
       "$ref": "shared.schema.json#/$defs/path"
     },
@@ -25,6 +37,17 @@
       "$ref": "shared.schema.json#/$defs/path"
     }
   },
-  "required": ["world", "render", "shader", "audio", "menu", "settings"],
+  "required": [
+    "world",
+    "content",
+    "rules",
+    "appearance",
+    "effects",
+    "render",
+    "shader",
+    "audio",
+    "menu",
+    "settings"
+  ],
   "additionalProperties": false
 }

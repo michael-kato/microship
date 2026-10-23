@@ -35,6 +35,13 @@ static const float CELL_PICK_RADIUS_SCALE = 1.08f;
 static const float MOVE_PLANE_DIRECTION_EPSILON = .0001f;
 static const float SELECTION_MARKER_RADIUS_SCALE = 1.14f;
 static const int PERCENT_SCALE = 100;
+
+static WorldFiles world_files(const GameOptions* options)
+{
+	WorldFiles files = {options->content_path, options->rules_path,
+	                    options->appearance_path, options->effects_path};
+	return files;
+}
 static const double MILLISECONDS_PER_SECOND = 1000.0;
 static const double MAX_FRAME_CATCHUP_SECONDS = 0.25;
 static const int SMOKE_SIMULATION_TICKS = 3;
@@ -888,7 +895,8 @@ static int run_matches(const GameOptions* options)
 	{
 		uint32_t seed = options->world_seed + i;
 		double setup_start = options->cpu_benchmark ? profiler_clock_ms() : 0;
-		if (!simulation_initialize(simulation.get(), options->world_path, seed,
+		if (!simulation_initialize(simulation.get(), options->world_path,
+		                           world_files(options), seed,
 		                           options->player_faction))
 			return 1;
 		double setup_ms =
@@ -1166,7 +1174,8 @@ int game_run(const GameOptions* options)
 #endif
 	}
 	printf("World variation seed: %u. Restart keeps this layout.\n", seed);
-	if (!simulation_initialize(&game.simulation, options->world_path, seed,
+	if (!simulation_initialize(&game.simulation, options->world_path,
+	                           world_files(options), seed,
 	                           options->player_faction))
 		return 1;
 	if (!audio_load(&audio, options->audio_path, options->audio_capture_path,
