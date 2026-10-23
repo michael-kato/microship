@@ -102,6 +102,7 @@ struct RenderScene
 	float organelle_style[4], membrane_ripple[4], emission_fresnel[4],
 	    emission_color[4];
 	float relief[8], electron[8]; // Layouts of World::relief and ::electron.
+	float saturation;
 	float bounds_min[3], bounds_max[3], foreground_min[3], foreground_max[3];
 	double time_seconds;
 };

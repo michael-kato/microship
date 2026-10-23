@@ -330,6 +330,7 @@ bool presentation_initialize(Presentation* p, const Simulation* s,
 	       sizeof(scene->emission_color));
 	memcpy(scene->relief, w->relief, sizeof(scene->relief));
 	memcpy(scene->electron, w->electron, sizeof(scene->electron));
+	scene->saturation = w->saturation;
 	scene->ambient = w->ambient;
 	scene->ambient_top = w->ambient_top;
 	scene->ambient_bottom = w->ambient_bottom;

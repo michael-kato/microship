@@ -82,6 +82,7 @@ bool render_scene_validate(const RenderScene* scene)
 		valid = valid && std::isfinite(scene->relief[i]) &&
 		        scene->relief[i] >= 0 && std::isfinite(scene->electron[i]) &&
 		        scene->electron[i] >= 0;
+	valid = valid && std::isfinite(scene->saturation) && scene->saturation >= 0;
 	valid = valid && scene->emission_fresnel[0] >= 0 &&
 	        scene->emission_fresnel[0] <= 1 &&
 	        scene->emission_fresnel[1] >= .01f &&

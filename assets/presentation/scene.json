@@ -1,19 +1,19 @@
 {
   "$schema": "../schemas/appearance.schema.json",
-  "ambient": [0.04, 0.032, 0.038],
+  "ambient": [0.03, 0.03, 0.04],
   "gradient": {
-    "top": [1.0, 1.0, 1.0],
-    "bottom": [0.5, 0.5, 0.6]
+    "top": [0.45, 0.45, 0.55],
+    "bottom": [0.1, 0.1, 0.16]
   },
   "backdrop": {
     "model": "../models/anatomy_flesh.fmesh",
     "position": [0.0, 2.0, -14.0],
     "scale": 110.0,
-    "tint": [1.0, 1.0, 1.0],
+    "tint": [0.18, 0.08, 0.45],
     "soft": {
       "blur_radius": 4,
-      "glow": 0.25,
-      "ambient": 0.65,
+      "glow": 0.1,
+      "ambient": 0.35,
       "pulse_amplitude": 0.008,
       "period_seconds": 7.0
     },
@@ -35,18 +35,18 @@
   "lights": {
     "key": {
       "direction": [-0.55, 0.7, 0.6],
-      "color": [1.0, 0.76, 0.68],
-      "irradiance": 6.5
+      "color": [1, 1, 1],
+      "irradiance": 2.0
     },
     "fill": {
       "direction": [0.65, 0.2, 0.75],
-      "color": [0.68, 0.8, 1.0],
-      "irradiance": 0.75
+      "color": [0.7, 0.8, 1],
+      "irradiance": 0.3
     },
     "rim": {
       "direction": [0.4, 0.45, -0.8],
-      "color": [1.0, 0.38, 0.5],
-      "irradiance": 6
+      "color": [1, 1, 1],
+      "irradiance": 4.5
     }
   },
   "thin_surface": {
@@ -62,7 +62,7 @@
     "center": [0, 0, 0],
     "radius": 160,
     "edge_fade": 0.2,
-    "scattering": [0.0045, 0.0013, 0.0018],
+    "scattering": [0.0005, 0.0004, 0.0008],
     "absorption": 0.0007,
     "anisotropy": 0.45,
     "shadows": false
@@ -71,20 +71,20 @@
     "blur_radius": 96,
     "sight_feather": 12,
     "plane_z": 0,
-    "tint": [0.34, 0.09, 0.13],
+    "tint": [0.05, 0.02, 0.1],
     "memory_half_life_seconds": 3
   },
   "self_glow": {
-    "cell_interior": 0.1,
-    "organelles": 0.65,
-    "factory_stems": 2.5,
-    "factory_leaves": 1.8,
-    "units": 0.22
+    "cell_interior": 0.02,
+    "organelles": 0.15,
+    "factory_stems": 0.6,
+    "factory_leaves": 0.5,
+    "units": 0.05
   },
   "organelle_appearance": {
     "edge_saturation": 1.8,
     "edge_width": 0.65,
-    "center_glow": 4.5,
+    "center_glow": 1.5,
     "center_power": 2.5
   },
   "animation": {
@@ -126,14 +126,15 @@
       "crease_shadow": 0.75
     },
     "edge": {
-      "signal": [0.2, 0.2, 0.2],
-      "strength": 7,
-      "power": 3
+      "signal": [0.22, 0.22, 0.22],
+      "strength": 10,
+      "power": 3.5
     },
     "sheen": {
       "strength": 0.8,
       "roughness": 0.35
-    }
+    },
+    "saturation": 2.2
   },
   "communications": "communications.json"
 }

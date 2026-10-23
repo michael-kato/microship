@@ -481,10 +481,12 @@ static bool load_appearance(World* w, const char* path, uint32_t seed)
 		w->organelle_style[3] =
 		    json_float(json_get(organelles, "center_power"), 0, 16);
 	}
+	w->saturation = 1;
 	Json electron = json_find(root, "electron_microscope");
 	if (json_present(electron))
 	{
-		json_object(electron, "relief|sheen|edge");
+		json_object(electron, "relief|sheen|edge|saturation");
+		w->saturation = json_float(json_get(electron, "saturation"), 0, 4);
 		Json relief = json_get(electron, "relief");
 		json_object(relief, "domes|wrinkles|fuzz|crease_shadow");
 		const char* layers[] = {"domes", "wrinkles", "fuzz"};

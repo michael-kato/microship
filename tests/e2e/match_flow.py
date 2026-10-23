@@ -29,7 +29,8 @@ with tempfile.TemporaryDirectory(prefix='nanovore-match-') as directory:
         assert s['player_faction']==faction and sum(c['active'] for c in s['colonies'])==3
         assert [sum(u['faction']==f for u in s['units']) for f in (1,2,3)]==[10,5,25]
         assert scene['medium_shadows'][-1] is False and all(scene['medium_shadows'][:-1])
-        assert scene['fog']['tint'][0]>scene['fog']['tint'][2]>scene['fog']['tint'][1]
+        fog=json.loads((root/'assets/presentation/scene.json').read_text())['fog']['tint']
+        assert all(abs(a-b)<1e-5 for a,b in zip(scene['fog']['tint'],fog)),(scene['fog']['tint'],fog)
         assert any(i['mask']==4 and i['style'][7]==1 for i in scene['instances'])
     # Check menu data through the executable-relative startup path, without a GPU.
     copied=out/'menu-app';(copied/'assets').mkdir(parents=True);shutil.copy2(binary,copied/'nanovore.exe')

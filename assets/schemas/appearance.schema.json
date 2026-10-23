@@ -508,9 +508,15 @@
           },
           "required": ["strength", "roughness"],
           "additionalProperties": false
+        },
+        "saturation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4,
+          "description": "Scales every pigment's distance from its luminance; 1 keeps authored colors."
         }
       },
-      "required": ["relief", "edge", "sheen"],
+      "required": ["relief", "edge", "sheen", "saturation"],
       "additionalProperties": false
     },
     "animation": {

@@ -165,6 +165,7 @@ struct World
 	float relief[8];
 	// Edge signal RGB and strength; edge power, sheen strength and roughness.
 	float electron[8];
+	float saturation; // Pigment saturation scale; one keeps authored colors.
 	float organelle_squash, organelle_period, membrane_ripple,
 	    membrane_wavelength, membrane_period, factory_sway, factory_period;
 	StudioLight studio[3];

@@ -613,6 +613,9 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
         float edge=pow(1.0-facing,render.emission_fresnel.y);
         surface.emission*=1.0-render.emission_fresnel.x*edge;
     }
+    // False color: push every pigment away from its luminance.
+    float grey=dot(surface.color,vec3(.2126,.7152,.0722));
+    surface.color=clamp(grey+(surface.color-grey)*render.colorize.x,vec3(0),vec3(1));
     surface.unshadowed=(flags&1u)!=0u;
     surface.detail=instance_style[hit_instance].detail.x;surface.reveal=instance_style[hit_instance].detail.y;
     surface.ambient=(flags&16u)!=0u ? surface.detail : 1.0;
