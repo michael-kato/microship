@@ -5,6 +5,7 @@
 #endif
 #include <vulkan/vulkan.h>
 
+#include "asset_json.h"
 #include "geometry.h"
 #include "math_constants.h"
 #include "microfacet.h"
@@ -2976,11 +2977,7 @@ static bool load_companion(RendererState* state, const char* ray_trace_path,
                            const char* filename, VkPipelineLayout layout,
                            VkPipeline* pipeline, bool no_subsurface = false)
 {
-	const char* slash = strrchr(ray_trace_path, '/');
-	const char* backslash = strrchr(ray_trace_path, '\\');
-	if (backslash && (!slash || backslash > slash))
-		slash = backslash;
-	size_t directory_length = slash ? (size_t)(slash - ray_trace_path + 1) : 0;
+	size_t directory_length = path_directory_length(ray_trace_path);
 	char path[COMPANION_SHADER_PATH_CAPACITY];
 	if (directory_length + strlen(filename) + 1 > sizeof(path))
 		return false;

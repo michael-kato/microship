@@ -44,13 +44,10 @@ static bool asset_paths(char* world, char* config, char* shader, char* audio,
 	if (!count || count >= sizeof(executable))
 		return false;
 	executable[count] = 0;
-	char* slash = strrchr(executable, '/');
-	char* backslash = strrchr(executable, '\\');
-	if (backslash && (!slash || backslash > slash))
-		slash = backslash;
-	if (!slash)
+	size_t directory = path_directory_length(executable);
+	if (!directory)
 		return false;
-	*slash = 0;
+	executable[directory - 1] = 0;
 	char manifest[EXECUTABLE_PATH_CAPACITY];
 	int length = snprintf(manifest, sizeof(manifest), "%s/assets/startup.json",
 	                      executable);

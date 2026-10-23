@@ -324,6 +324,14 @@ bool json_string(Json j, char* output, size_t capacity)
 	memcpy(output, s->string, s->string_size + 1);
 	return true;
 }
+size_t path_directory_length(const char* path)
+{
+	const char* slash = strrchr(path, '/');
+	const char* backslash = strrchr(path, '\\');
+	if (backslash && (!slash || backslash > slash))
+		slash = backslash;
+	return slash ? (size_t)(slash - path + 1) : 0;
+}
 bool json_path(Json j, const char* source, char* output, size_t capacity)
 {
 	char value[ASSET_PATH_CAPACITY] = {};
@@ -331,11 +339,7 @@ bool json_path(Json j, const char* source, char* output, size_t capacity)
 		return false;
 	if (value[0] == '/' || value[0] == '\\' || strchr(value, ':'))
 		return json_error(j, "asset path must be relative to this file");
-	const char* slash = strrchr(source, '/');
-	const char* backslash = strrchr(source, '\\');
-	if (backslash && (!slash || backslash > slash))
-		slash = backslash;
-	size_t directory = slash ? (size_t)(slash - source + 1) : 0;
+	size_t directory = path_directory_length(source);
 	if (directory + strlen(value) >= capacity)
 		return json_error(j, "resolved asset path exceeds storage capacity");
 	memcpy(output, source, directory);

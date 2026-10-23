@@ -28,6 +28,8 @@ struct JsonArray
 	JsonDocument* document;
 	void* next;
 };
+// Length of the folder part of path, through its last '/' or '\'; 0 if none.
+size_t path_directory_length(const char* path);
 bool json_load(JsonDocument*, const char* path);
 Json json_root(JsonDocument*);
 Json json_get(Json, const char* key);
