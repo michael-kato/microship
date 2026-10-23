@@ -16,7 +16,6 @@ import sys
 import time
 from authored_assets import stage_world, write_world
 from gpu_environment import gpu_process_timeout_seconds
-from save_progress import archive_capture
 
 root = Path(__file__).resolve().parents[1]
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -165,8 +164,6 @@ try:
             report['frame_times_ms'][key] = values
         report['validation'] = 'enabled' if 'Vulkan validation: enabled.' in text else 'not reported'
         print('Application GPU timers:', report['frame_times_ms'])
-    if a.mode != 'replay':
-        archive_capture(out / 'display.ppm', 'native_profile_' + a.mode)
     status = 'complete'
 except BaseException as error:
     report = dict(plan, elapsed_seconds=time.monotonic() - started, error=str(error))

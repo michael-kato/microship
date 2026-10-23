@@ -39,8 +39,6 @@ for name,extra in cases:
   assert frame['SUBMIT']['last']>0 and (index==0 or frame['GPU FRAME']['last']>0)
  report[name]=dict(seconds=seconds,frames=frames)
 report['batch_seconds']=time.monotonic()-started
-sys.path.insert(0,str(root/'scripts'));from save_progress import archive_capture
-for name,_ in cases:archive_capture(out/(name+'.ppm'),'profiler-'+name)
 (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
 for name,_ in cases:
  stages=report[name]['frames'][-1];print(name, 'CPU',stages['CPU FRAME']['last'],'GPU',stages['GPU FRAME']['last'],'ms; stages',[(n,stages[n]['last']) for n in parents['SCENE']+parents['POST']])

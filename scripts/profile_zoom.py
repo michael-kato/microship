@@ -13,7 +13,6 @@ import sys
 import time
 
 from authored_assets import stage_world,write_world
-from save_progress import archive_capture
 from gpu_environment import gpu_process_timeout_seconds
 
 root=Path(__file__).resolve().parents[1]
@@ -101,7 +100,7 @@ for case in cases:
         assert scene['meshes']==meshes,'Zoom changed geometry'
     else:reference=state;meshes=scene['meshes']
     item=dict(case=name,frames_ms=frames,mean_ms={key:statistics.mean(values) for key,values in frames.items()},
-        capture=str(archive_capture(case['capture'],'zoom-'+name)))
+        capture=str(case['capture']))
     report.append(item);(out/'report.json').write_text(json.dumps(dict(elapsed=time.monotonic()-started,budget=budget,cases=report),indent=2)+'\n')
     print(name,item['mean_ms'],flush=True)
 print('Bounded zoom diagnosis complete. Two frames per case do not establish steady performance.')

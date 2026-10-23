@@ -117,10 +117,4 @@ report['surface_deltas_ms'] = {
            - next(r['spans_ms']['SURFACE + SSS'] for r in report['runs'] if r['case'] == case and r['round'] == index + 1)
            for index in range(args.rounds)] for case in cases if case != 'baseline'}
 (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
-sys.path.insert(0, str(root / 'scripts'))
-from save_progress import archive_capture
-for case in cases:
-    run = next(r for r in reversed(report['runs']) if r['case'] == case)
-    capture = json.loads(Path(run['report']).read_text())['scenes']['zoomed_in']['capture']
-    archive_capture(Path(capture), 'surface_profile_' + case)
 print('Report:', out / 'report.json')

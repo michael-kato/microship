@@ -55,5 +55,4 @@ assert all(abs(a-b)<.0001 for a,b in zip(movement,expected)),(movement,expected)
 result=json.loads(state.read_text());assert result['order']['count']==0,'Middle pan issued an order'
 assert len(re.findall(r'^Profile .*samples 2\.',output,re.M))==31,'Incomplete profiler traces'
 report=dict(seconds=time.monotonic()-started,frames=2,profiler='Win32 F1 press/repeat/release enabled once',pan_pixels=[80,-20],camera_movement=movement,orders=0)
-sys.path.insert(0,str(root/'scripts'));from save_progress import archive_capture
-archive_capture(capture,'profiler-middle-pan');(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))
