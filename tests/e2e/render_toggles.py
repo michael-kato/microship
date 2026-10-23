@@ -86,8 +86,8 @@ for s in settings:
  mask=int(s[0]);assert s[1]==('OFF' if mask&1 else 'ON'),s
  for bit,value in zip((2,4,8,16),s[2:]):assert (float(value)==0)==bool(mask&bit),s
 profiles=re.findall(r'Profile (.*?): start ([0-9.]+) ms; last ([0-9.]+) ms; mean ([0-9.]+) ms; samples (\d+)\.',output)
-assert len(profiles)==56,len(profiles)
-frames=[profiles[:28],profiles[28:]]
+assert len(profiles)==62,len(profiles)
+frames=[profiles[:31],profiles[31:]]
 assert [int(f[0][-1]) for f in frames]==([1,1] if a.case in ('off','restore','buffers','glow-off','glow-restore') else [1,2]),frames
 for f in frames:
  for _,_,last,mean,samples in f:

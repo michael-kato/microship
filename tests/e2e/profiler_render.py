@@ -11,13 +11,14 @@ p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path
 out=a.output.resolve();binary=a.binary.resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 cases=[('normal',()),('near',('--camera-zoom','1000')),('buffers',('--debug-views',))]
-if not a.run:print('Prepared three sequential native 1920x1080 two-frame profiler captures; three film samples, one volume ray, one backdrop query No GPU work started.');raise SystemExit(0)
+if not a.run:print('Prepared three sequential native 1920x1080 two-frame profiler captures; default film samples, one volume ray, one backdrop query No GPU work started.');raise SystemExit(0)
 os.environ['NANOVORE_VULKAN_VALIDATION']='1';out.mkdir(parents=True,exist_ok=True);report={};started=time.monotonic()
 parents={'CPU FRAME':['INPUT','SIMULATION','SCENE + AUDIO','RENDER'],'RENDER':['ACQUIRE','UPLOAD + AS RECORD','PASS RECORD','SUBMIT','SLOT WAIT + QUERY','PRESENT WAIT','CAPTURE'],
+ 'SLOT WAIT + QUERY':['SLOT FENCE WAIT','TIMESTAMP READ','TIMING REPORT'],
  'GPU FRAME':['SCENE','POST','OUTPUT'],'SCENE':['AS UPDATE','BACKDROP','LIGHTING FIELDS','SURFACE + SSS','VOLUME'],'POST':['EFFECTS','CELL BLUR','FOG','TILT SHIFT','BLOOM + DISPLAY'],'OUTPUT':['HUD + PROFILER','OUTPUT COPY']}
 for name,extra in cases:
  remaining=gpu_process_timeout_seconds()
- cmd=[*command,'--headless','--frames','2','--samples','3','--stats','--world-seed','1234','--ticks','600','--time','10','--step-seconds','0','--capture',str(out/(name+'.ppm')),*extra]
+ cmd=[*command,'--headless','--frames','2','--stats','--world-seed','1234','--ticks','600','--time','10','--step-seconds','0','--capture',str(out/(name+'.ppm')),*extra]
  now=time.monotonic();result=subprocess.run(cmd,capture_output=True,text=True,timeout=remaining);seconds=time.monotonic()-now;(out/(name+'.log')).write_text(result.stdout+result.stderr)
  assert result.returncode==0,(name,result.stdout,result.stderr)
  assert 'Vulkan validation: enabled.' in result.stdout
@@ -25,7 +26,7 @@ for name,extra in cases:
  for label,start,last,mean,samples in re.findall(r'Profile (.*?): start ([0-9.]+) ms; last ([0-9.]+) ms; mean ([0-9.]+) ms; samples ([0-9]+)\.',result.stdout):
   index=int(samples)-1;assert index in (0,1);frames[index][label]=dict(start=float(start),last=float(last),mean=float(mean))
  for index,frame in enumerate(frames):
-  assert len(frame)==28,(name,index,frame)
+  assert len(frame)==31,(name,index,frame)
   for label,node in frame.items():
    assert all(math.isfinite(v) and v>=0 for v in node.values()),node
    expected=sum(f[label]['last'] for f in frames[:index+1])/(index+1)

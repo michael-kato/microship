@@ -2203,7 +2203,7 @@ static void profile_overlay(RendererState* state,const Renderer* renderer,Profil
     snprintf(line,sizeof(line),"SEPARATE CPU/GPU CLOCKS / SAME SCALE 0 TO %.1F MS / BARS SHOW MEAN / HOVER FOR LAST",range);
     profile_text(state,line,8,44,STATS_TEXT_WIDTH-8);
     profile_text(state,"CPU / WALL TIME INCLUDING WAIT / CHILDREN BELOW PARENTS",8,64,STATS_TEXT_WIDTH-8);
-    profile_text(state,"GPU / EXECUTION TIME / CHILDREN BELOW PARENTS",8,156,STATS_TEXT_WIDTH-8);
+    profile_text(state,"GPU / EXECUTION TIME / CHILDREN BELOW PARENTS",8,164,STATS_TEXT_WIDTH-8);
     static const float palette[8][3]={{.24f,.47f,.68f},{.38f,.56f,.77f},{.33f,.62f,.52f},{.66f,.48f,.29f},{.56f,.42f,.66f},{.55f,.35f,.32f},{.31f,.57f,.61f},{.53f,.53f,.34f}};
     int hover=-1;
     for (uint32_t i=0;i<PROFILE_NODE_COUNT;++i)
@@ -2212,8 +2212,8 @@ static void profile_overlay(RendererState* state,const Renderer* renderer,Profil
         if (sample.duration_ms<=0) continue;
         int32_t* r=bars->rectangles[i];
         r[0]=8+(int)(sample.start_ms/range*(STATS_TEXT_WIDTH-16));
-        r[1]=(i<PROFILE_GPU_FRAME ? 84 : 176)+definition.depth*22;
-        r[2]=std::min(STATS_TEXT_WIDTH-8,std::max(r[0]+1,8+(int)((sample.start_ms+sample.duration_ms)/range*(STATS_TEXT_WIDTH-16))));r[3]=r[1]+20;
+        r[1]=(i<PROFILE_GPU_FRAME ? 84 : 184)+definition.depth*20;
+        r[2]=std::min(STATS_TEXT_WIDTH-8,std::max(r[0]+1,8+(int)((sample.start_ms+sample.duration_ms)/range*(STATS_TEXT_WIDTH-16))));r[3]=r[1]+18;
         memcpy(bars->colors[i],palette[i%8],3*sizeof(float));bars->colors[i][3]=1;
         snprintf(line,sizeof(line),"%s %.2F",profile_name(state,i),sample.duration_ms);
         profile_text(state,line,r[0]+4,r[1]+3,r[2]-3);
@@ -2237,7 +2237,7 @@ static void profile_overlay(RendererState* state,const Renderer* renderer,Profil
         snprintf(line,sizeof(line),"TOP GPU: %s %.2F / %s %.2F / %s %.2F MS",profile_name(state,(uint32_t)top[0]),p->mean[top[0]].duration_ms,
             profile_name(state,(uint32_t)top[1]),p->mean[top[1]].duration_ms,profile_name(state,(uint32_t)top[2]),p->mean[top[2]].duration_ms);
     }
-    profile_text(state,line,8,250,STATS_TEXT_WIDTH-8);
+    profile_text(state,line,8,246,STATS_TEXT_WIDTH-8);
 }
 
 static void draw_debug(RendererState* state, const Renderer* renderer)
@@ -2597,13 +2597,15 @@ static bool fog_covers_view(const RenderUniform& u,const SightField& field)
 
 // Reads a completed slot's timestamps. Lines and profiler spans describe that
 // earlier frame, so bounded runs still print one report per rendered frame.
-static bool report_frame(RendererState* state,Renderer* renderer,FrameResources& frame)
+static bool report_frame(RendererState* state,Renderer* renderer,FrameResources& frame,double slot_start=0)
 {
     Profiler* profile=&renderer->profiler;
     uint64_t timestamps[GPU_TIMESTAMP_COUNT];
     if (!vk_ok(vkGetQueryPoolResults(state->device, frame.queries, 0, GPU_TIMESTAMP_COUNT, sizeof(timestamps),
         timestamps, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT), "Read GPU timestamps"))
         return false;
+    double query_end=profiler_clock_ms();
+    if (slot_start>0) profiler_cpu(profile,PROFILE_QUERY_READ,slot_start,query_end);
     frame.pending=false;
     const FrameReport& report=frame.report;const RenderUniform* uniform=&report.uniform;
     uint64_t difference = timestamps[GPU_TIME_VOLUME_END] - timestamps[GPU_TIME_UPLOAD_END];
@@ -2722,8 +2724,12 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     FrameResources& frame=frame_data(state);
     // Only this slot's previous submission must finish; the other slot keeps the GPU busy.
     if (!vk_ok(vkWaitForFences(state->device,1,&frame.fence,VK_TRUE,UINT64_MAX),"Wait for frame slot")) return false;
-    if (frame.pending && !report_frame(state,renderer,frame)) return false;
-    double phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_READ_TIMES,phase_start,phase_end);phase_start=phase_end;
+    double fence_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_SLOT_FENCE,phase_start,fence_end);
+    profiler_cpu(profile,PROFILE_QUERY_READ,fence_end,fence_end);
+    if (frame.pending && !report_frame(state,renderer,frame,fence_end)) return false;
+    double phase_end=profiler_clock_ms();
+    profiler_cpu(profile,PROFILE_QUERY_REPORT,fence_end+profile->current[PROFILE_QUERY_READ].duration_ms,phase_end);
+    profiler_cpu(profile,PROFILE_READ_TIMES,phase_start,phase_end);phase_start=phase_end;
     if (!state->headless)
     {
         if (!renderer->scene_submissions) printf("Window frame: acquire.\n");
