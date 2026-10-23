@@ -7,7 +7,6 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'scripts'))
 from authored_assets import stage_world,write_world
-from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,required=True);p.add_argument('--run',action='store_true');a=p.parse_args()
 binary=a.binary.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(ROOT/'scripts/proton_run.py'),str(binary)]
@@ -42,7 +41,7 @@ for name,args in cases:
  scene=json.loads((out/(name+'_gpu_scene.json')).read_text());assert all(0<=i['mesh']<len(scene['meshes']) for i in scene['instances'])
  if name!='owned_start':assert gpu['settlement']['seed_launches']==1 and any(p['seed'] for p in gpu['projectile_state'])
  else:assert sum(c['active'] for c in gpu['colonies'])==3
- records.append(dict(case=name,gpu_ms=times,screenshot=str(archive_capture(out/(name+'.ppm'),name)),simulation_equal=True))
+ records.append(dict(case=name,gpu_ms=times,screenshot=str(out/(name+'.ppm')),simulation_equal=True))
  assert time.monotonic()-start<30,'Capture batch exceeded 30 seconds'
 (out/'report.json').write_text(json.dumps(dict(cases=records,seconds=time.monotonic()-start,limits='Two frames per process, default sampling, host validation. Sustained GPU and native Windows are not tested.'),indent=2)+'\n')
 print('Faction opening render E2E passed:',out/'report.json')

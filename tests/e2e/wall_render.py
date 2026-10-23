@@ -15,7 +15,6 @@ import time
 
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
 from authored_assets import stage_world,write_world
-from save_progress import archive_capture
 parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('binary',type=Path)
 parser.add_argument('--output',type=Path,default=root/'build/wall-review');parser.add_argument('--run',action='store_true')
 args=parser.parse_args();out=args.output.resolve();out.mkdir(parents=True,exist_ok=True);binary=args.binary.resolve()
@@ -41,7 +40,7 @@ for name,capture,invocation in cases:
     p=subprocess.run(invocation,capture_output=True,text=True,env=environment,timeout=remaining)
     (out/(name+'.log')).write_text(p.stdout+p.stderr)
     if p.returncode or 'Vulkan validation: enabled.' not in p.stdout:raise RuntimeError(name+': '+p.stdout+p.stderr)
-    saved=archive_capture(capture,'wall-'+name)
+    saved=capture
     frames=[float(v) for v in re.findall(r'Application frame: ([0-9.]+) ms',p.stdout)]
     updates=[int(v) for v in re.findall(r'Deformed mesh updates: ([0-9]+) BLAS refits',p.stdout)]
     item=dict(case=name,capture=str(saved),application_ms=frames,blas_refits=updates);report.append(item)

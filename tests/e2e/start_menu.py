@@ -62,8 +62,7 @@ for choice,faction in ([(1,1)] if a.gpu else [(0,0),(1,1),(2,2),(3,3)]):
         else:assert 'Loaded world' not in output,'Closing the menu started a game'
         if a.gpu:
             assert 'Vulkan validation: enabled.' in output
-            sys.path.insert(0,str(root/'scripts'));from save_progress import archive_capture
-            print(archive_capture(out/'menu-game.ppm','start-menu-virus-launch'))
+            print(out/'menu-game.ppm')
     except subprocess.TimeoutExpired as error:
         def text(value):return value.decode(errors='replace') if isinstance(value,bytes) else value or ''
         (out/(str(choice)+'.log')).write_text(text(error.stdout)+text(error.stderr))

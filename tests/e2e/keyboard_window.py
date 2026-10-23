@@ -18,6 +18,4 @@ for name,keys,axes,order in cases:
  report[name]=run_window(a.binary.resolve(),out/name,remaining,keys,axes,order)
 report['batch_seconds']=time.monotonic()-start
 from sys import path
-path.insert(0,str(root/'scripts'));from save_progress import archive_capture
-for name,_,_,_ in cases:archive_capture(out/name/'controls.ppm','keyboard-'+name)
 (out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))

@@ -10,7 +10,6 @@ from pathlib import Path
 root=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(root/'scripts'))
 from authored_assets import stage_world,write_world
-from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/cell-readability');p.add_argument('--run',action='store_true');a=p.parse_args()
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 base=stage_world(root/'assets/levels/virus-player-level.json',out);base['match']['auto_colonize']=False
@@ -59,7 +58,6 @@ for (name,*_),cmd in zip(cases,commands):
  raw=(out/(name+'.ppm')).read_bytes();header=re.match(rb'P6\s+1920\s+1080\s+255\s',raw);assert header;images[name]=raw[header.end():]
  report[name]={'application_ms':list(map(float,re.findall(r'Application frame: ([0-9.]+)',result.stdout)))}
 report['batch_seconds']=time.monotonic()-start
-for name in images:archive_capture(out/(name+'.ppm'),'cell-'+name)
 def delta(a,b,box):
  x0,y0,x1,y1=box
  return sum(abs(images[a][(y*1920+x)*3+c]-images[b][(y*1920+x)*3+c]) for y in range(y0,y1) for x in range(x0,x1) for c in range(3))/((x1-x0)*(y1-y0)*3)

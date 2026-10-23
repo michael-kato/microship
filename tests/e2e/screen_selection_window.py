@@ -17,6 +17,4 @@ for key in ('F','B'):
  report[key]=run_window(a.binary.resolve(),out/key,remaining,(),(0,0),False,key)
 report['batch_seconds']=time.monotonic()-started
 from sys import path
-path.insert(0,str(root/'scripts'));from save_progress import archive_capture
-for key in ('F','B'):archive_capture(out/key/'controls.ppm','screen-select-'+key.lower())
 (out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))

@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from authored_assets import stage_world, write_world
 from gpu_environment import check_gpu_environment
-from save_progress import archive_capture
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('binary', type=Path)
@@ -77,7 +76,7 @@ raw = (out / 'map.ppm').read_bytes()
 header = re.match(rb'P6\s+1920\s+1080\s+255\s', raw)
 assert header and len(raw) - header.end() == 1920 * 1080 * 3
 assert len(set(raw[header.end():])) > 16, 'The capture is empty'
-saved = archive_capture(out / 'map.ppm', 'map_128_default_lighting')
+saved = out / 'map.ppm'
 report = dict(cells=128, media=media, gpu_frames=2, gpu_ms=render_ms,
               lighting_texture=[width, height, depth], cascade_updates=updates,
               simulation_equal=True, screenshot=str(saved),

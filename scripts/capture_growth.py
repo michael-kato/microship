@@ -12,7 +12,6 @@ import sys
 import time
 from authored_assets import stage_world,write_world
 from gpu_environment import check_gpu_environment
-from save_progress import archive_capture
 from gpu_environment import gpu_process_timeout_seconds
 
 NATIVE_WIDTH = 1920
@@ -90,7 +89,6 @@ for name,world,render,ticks,frames in cases:
     (out/(name+'.log')).write_text(stdout+stderr);assert p.returncode==0,stdout+stderr
     assert re.match(rb'P6\s+1920\s+1080\s+255\s',capture.read_bytes())
     if os.environ.get('NANOVORE_VULKAN_VALIDATION')=='1':assert 'Vulkan validation: enabled.' in stdout
-    archive_capture(capture,name)
     d=json.loads(state.read_text())
     if name=='immune-breaks-factory-limbs':
         assert d['fractures']['limbs']>=3 and d['fractures']['fragments']>0

@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""Save a display screenshot as NUMBER_description.png in screenshots/, unless an identical image is already there."""
+"""Save one display screenshot per commit as NUMBER_description.png in screenshots/.
+
+Run it once after committing a visible change. Tests and comparisons do not save here.
+"""
 
 import argparse
 from pathlib import Path
 import re
 import struct
+import subprocess
 import sys
 import zlib
 
@@ -23,16 +27,33 @@ def ppm_png(data):
     if width <= 0 or height <= 0 or len(pixels) != width * height * 3:
         raise ValueError('Capture dimensions or RGB payload are invalid')
 
-    def chunk(kind, payload):
-        return (struct.pack('>I', len(payload)) + kind + payload
-                + struct.pack('>I', zlib.crc32(kind + payload)))
-
     stride = width * 3
     rows = b''.join(b'\0' + pixels[start:start+stride]
                     for start in range(0, len(pixels), stride))
     return (b'\x89PNG\r\n\x1a\n'
             + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, PNG_SAMPLE_BITS, 2, 0, 0, 0))
             + chunk(b'sRGB', b'\0') + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))
+
+COMMIT_KEY = b'nanovore-commit'
+
+def chunk(kind, payload):
+    return (struct.pack('>I', len(payload)) + kind + payload
+            + struct.pack('>I', zlib.crc32(kind + payload)))
+
+def png_commit(data):
+    # Walk the PNG chunks for the commit stamp written below.
+    at = 8
+    while at + 8 <= len(data):
+        length, kind = struct.unpack('>I4s', data[at:at+8])
+        payload = data[at+8:at+8+length]
+        if kind == b'tEXt' and payload.startswith(COMMIT_KEY + b'\0'):
+            return payload[len(COMMIT_KEY)+1:].decode()
+        at += 12 + length
+    return None
+
+def head_commit():
+    return subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=Path(__file__).resolve().parent,
+                          capture_output=True, text=True, check=True).stdout.strip()
 
 def archive_capture(capture, description=None):
     capture = Path(capture)
@@ -47,34 +68,19 @@ def archive_capture(capture, description=None):
     if not description:
         raise ValueError('Description must contain letters or numbers')
     ROOT.mkdir(parents=True, exist_ok=True)
-    # Save only when the image changed: identical pixels encode to identical bytes.
-    for path in sorted(ROOT.glob('*.png'), reverse=True):
-        if path.stat().st_size == len(data) and path.read_bytes() == data:
-            print(f'Screenshot unchanged: {path}', flush=True)
-            return path
-    numbers =(re.fullmatch(r'(\d+)(?:[-_][a-z0-9_-]+)?\.png', path.name)
-               for path in ROOT.glob('*.png'))
-    number = max((int(match[1]) for match in numbers if match), default=0) + 1
-    while True:
-        # Claim the numeric name first so concurrent writers with different
-        # descriptions cannot create two files with the same sequence number.
-        claim = ROOT / f'{number:06d}.png'
-        try:
-            with claim.open('xb') as output:
-                occupied = any(ROOT.glob(f'{number:06d}[-_]*.png'))
-                if not occupied:
-                    output.write(data)
-        except FileExistsError:
-            number += 1
-            continue
-        if occupied:
-            claim.unlink()
-            number += 1
-            continue
-        path = ROOT / f'{number:06d}_{description}.png'
-        claim.rename(path)
-        break
-    print(f'Screenshot saved: {path}', flush=True)
+    numbered = sorted((int(m[1]), path) for path in ROOT.glob('*.png')
+                      if (m := re.fullmatch(r'(\d+)(?:[-_][a-z0-9_-]+)?\.png', path.name)))
+    commit = head_commit()
+    # One screenshot per commit: the newest one carries the commit it shows.
+    if numbered and png_commit(numbered[-1][1].read_bytes()) == commit:
+        print(f'Screenshot for commit {commit} already exists: {numbered[-1][1]}', flush=True)
+        return numbered[-1][1]
+    ihdr_end = 8 + 12 + struct.unpack('>I', data[8:12])[0]
+    data = data[:ihdr_end] + chunk(b'tEXt', COMMIT_KEY + b'\0' + commit.encode()) + data[ihdr_end:]
+    path = ROOT / f'{(numbered[-1][0] if numbered else 0) + 1:06d}_{description}.png'
+    with path.open('xb') as output:
+        output.write(data)
+    print(f'Screenshot saved for commit {commit}: {path}', flush=True)
     return path
 
 def main():

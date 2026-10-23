@@ -5,7 +5,6 @@ import argparse,json,os,re,subprocess,sys,time
 from pathlib import Path
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
 from authored_assets import stage_world,write_world
-from save_progress import archive_capture
 from gpu_environment import gpu_process_timeout_seconds
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/fog-appearance');p.add_argument('--run',action='store_true');p.add_argument('--timing',action='store_true');p.add_argument('--frames',type=int,choices=[1,2],default=1);a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 data=stage_world(root/'assets/levels/virus-player-level.json',out)
@@ -33,7 +32,6 @@ for (name,_,_),command in zip(cases,commands):
  result=subprocess.run(command,capture_output=True,text=True,env=env,timeout=remaining);(out/(name+'.log')).write_text(result.stdout+result.stderr);assert result.returncode==0,(name,result.stdout,result.stderr)
  if not a.timing:assert 'Vulkan validation: enabled.' in result.stdout
  raw=(out/(name+'.ppm')).read_bytes();header=re.match(rb'P6\s+1920\s+1080\s+255\s',raw);assert header;images[name]=raw[header.end():]
- archive_capture(out/(name+'.ppm'),'fog-memory-'+name)
  report[name]={key:list(map(float,re.findall(pattern,result.stdout))) for key,pattern in [('gpu_ms',r'total render: ([0-9.]+)'),('app_ms',r'Application frame: ([0-9.]+)'),('fog_display_ms',r'GPU fog/bloom/display: ([0-9.]+)')]}
 report['batch_seconds']=time.monotonic()-start
 # Fixed-image measurements use a region behind the departing scout. The scene

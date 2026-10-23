@@ -12,7 +12,6 @@ import time
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
 from authored_assets import stage_world,write_world
 from gpu_environment import check_gpu_environment, gpu_process_timeout_seconds
-from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/cell_animation_render');p.add_argument('--run',action='store_true')
 a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
@@ -43,7 +42,7 @@ for name,command in commands:
     assert process.returncode==0,(name,stdout,stderr)
     assert 'Vulkan validation: enabled.' in stdout and 'VUID-' not in stdout+stderr and 'Validation Error' not in stdout+stderr
     capture=out/(name+'.ppm');assert re.match(rb'P6\s+1920\s+1080\s+255\s',capture.read_bytes())
-    report[name]={'gpu_ms':list(map(float,re.findall(r'total render: ([0-9.]+)',stdout))),'screenshot':str(archive_capture(capture,'cell_animation_'+name))}
+    report[name]={'gpu_ms':list(map(float,re.findall(r'total render: ([0-9.]+)',stdout))),'screenshot':str(capture)}
 # Radiance cascades retain lighting history. Compare scene input, not final pixels.
 assert json.loads((out/'pose_14_scene.json').read_text())==json.loads((out/'after_pose_10_scene.json').read_text()),'Current scene depends on an earlier pose'
 assert (out/'pose_10.ppm').read_bytes()!=(out/'pose_14.ppm').read_bytes(),'Motion did not change the image'

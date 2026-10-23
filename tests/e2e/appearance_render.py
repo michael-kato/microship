@@ -17,7 +17,6 @@ import time
 root=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(root/'scripts'))
 from authored_assets import stage_world,write_world
-from save_progress import archive_capture
 
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('binary',type=Path)
@@ -57,7 +56,7 @@ for name,capture,invocation in prepared:
     (out/(name+'.log')).write_text(process.stdout+process.stderr)
     if process.returncode or 'Vulkan validation: enabled.' not in process.stdout:
         raise RuntimeError(name+' failed validation or application shutdown: '+process.stdout+process.stderr)
-    saved=archive_capture(capture,'appearance-'+name)
+    saved=capture
     frames=[float(v) for v in re.findall(r'Application frame: ([0-9.]+) ms',process.stdout)]
     report.append(dict(case=name,capture=str(saved),application_ms=frames))
     print(name+': '+str(frames)+' ms',flush=True)

@@ -15,7 +15,6 @@ import sys
 import time
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
 from authored_assets import stage_world,write_world
-from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/background-review');p.add_argument('--run',action='store_true');p.add_argument('--variants',default='flesh,bone,red_organs,blue_organs');p.add_argument('--view',choices=['wide','home','isolated','overview'],default='wide');p.add_argument('--timing',action='store_true');p.add_argument('--frames',type=int,choices=[1,2],default=1)
 a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 base=stage_world(root/'assets/levels/virus-player-level.json',out);base['appearance']['backdrop'].pop('variants')
@@ -55,7 +54,7 @@ for name,command in commands:
     assert result.returncode==0,(name,result.stdout,result.stderr)
     if not a.timing:assert 'Vulkan validation: enabled.' in result.stdout
     raw=(out/(name+'.ppm')).read_bytes();header=re.match(rb'P6\s+1920\s+1080\s+255\s',raw);assert header and len(raw)-header.end()==1920*1080*3
-    report[name]={'archive':str(archive_capture(out/(name+'.ppm'),'anatomy-'+a.view+'-'+name)),'log':result.stdout}
+    report[name]={'archive':str(out/(name+'.ppm')),'log':result.stdout}
 report['batch_seconds']=time.monotonic()-start
 # Measurements below use only the real application display captures.
 def pixels(name):

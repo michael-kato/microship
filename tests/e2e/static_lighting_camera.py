@@ -4,7 +4,6 @@ import argparse,json,os,re,subprocess,sys,threading,time
 from pathlib import Path
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
 from authored_assets import stage_world,write_world
-from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--thickness-cache',action='store_true');p.add_argument('--run',action='store_true');p.add_argument('--output',type=Path,default=root/'build/static-lighting-camera');a=p.parse_args()
 out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 PROCESS_TIMEOUT_SECONDS=10
@@ -48,7 +47,6 @@ finally:
  for thread in readers:thread.join()
  output=''.join(stdout);errors=''.join(stderr);(out/'camera.log').write_text(output+errors)
 seconds=time.monotonic()-started
-if process.returncode==0:archive_capture(out/'camera.ppm','static-lighting-camera-reuse')
 assert process.returncode==0,(output,errors)
 assert 'Vulkan validation: enabled.' in output
 cache=[tuple(map(int,v)) for v in re.findall(r'Static lighting: (\d+) baked, (\d+) reused; (\d+) bytes; (\d+) surface bakes',output)]

@@ -9,7 +9,6 @@ import argparse,json,os,re,subprocess,sys,time
 from pathlib import Path
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
 from authored_assets import stage_world,write_world
-from save_progress import archive_capture
 from control_window import run_window
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('binary',type=Path);p.add_argument('--output',type=Path,default=root/'build/immune-appearance');p.add_argument('--run',action='store_true');a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 data=stage_world(root/'assets/levels/immune-player-level.json',out);data['match']['auto_colonize']=False;data['rules']['ai']['expansion_delay']=300
@@ -41,11 +40,9 @@ for (name,_,_),cmd in zip(cases,commands):
  remaining=gpu_process_timeout_seconds()
  result=subprocess.run(cmd,capture_output=True,text=True,timeout=remaining);(out/(name+'.log')).write_text(result.stdout+result.stderr);assert result.returncode==0,(name,result.stdout,result.stderr)
  assert 'Vulkan validation: enabled.' in result.stdout
- archive_capture(out/(name+'.ppm'),'immune-'+name)
  state=json.loads((out/(name+'-state.json')).read_text());scene=json.loads((out/(name+'-scene.json')).read_text());unit=next(u for u in state['units'] if u['faction']==2)
  if name=='charge':assert unit['charging'] and any(e[7]==4 for e in scene['effect_segments']),unit
  else:assert unit['latch']>=0 and not any(e[7]==4 for e in scene['effect_segments']),unit
  report[name]={'application_ms':list(map(float,re.findall(r'Application frame: ([0-9.]+)',result.stdout)))}
 remaining=gpu_process_timeout_seconds();report['controls']=run_window(a.binary.resolve(),out,remaining);report['batch_seconds']=time.monotonic()-start
-archive_capture(out/'controls.ppm','immune-controls')
 (out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))

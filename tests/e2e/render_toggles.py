@@ -4,7 +4,6 @@ import argparse,json,os,re,signal,subprocess,sys,threading,time
 from pathlib import Path
 root=Path(__file__).resolve().parents[2];sys.path.insert(0,str(root/'scripts'))
 from gpu_environment import check_gpu_environment
-from save_progress import archive_capture
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('binary',type=Path)
 p.add_argument('--samples',type=int,choices=(1,3,6),default=1)
@@ -75,7 +74,6 @@ finally:
  output=''.join(stdout);errors=''.join(stderr);(out/'window.log').write_text(output+errors)
 seconds=time.monotonic()-started
 assert process.returncode==0,(output,errors)
-archive_capture(out/'display.ppm','render-toggles-'+a.case)
 assert seconds<=process_limit,seconds
 assert 'Vulkan validation: enabled.' in output
 settings=re.findall(r'Render settings: disabled (\d+); SSS (ON|OFF|N/A); volume rays (\d+); cell blur (\d+); tilt radius ([0-9.]+); fog radius ([0-9]+\.[0-9]+)\.',output)
