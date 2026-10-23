@@ -246,7 +246,8 @@ float medium_blur_radius(vec3 direction,float distance)
     if (render.quality.w==0u) return 0;
     float radius=0;
     uint node=0u,i;
-    while (next_ray_medium(node,render.camera_position.xyz,direction,RAY_MAX,i))
+    // Blur needs a medium interval that starts before the hit; farther media add nothing.
+    while (next_ray_medium(node,render.camera_position.xyz,direction,distance,i))
     {
         Medium m=media[i];if (m.blur.z<=0.0) continue;
         float begin,end;
