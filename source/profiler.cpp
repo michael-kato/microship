@@ -34,7 +34,6 @@ const ProfileDefinition profile_definitions[PROFILE_NODE_COUNT] = {
     {"VOLUME", PROFILE_GPU_SCENE, 2},
     {"POST", PROFILE_GPU_FRAME, 1},
     {"EFFECTS", PROFILE_GPU_POST, 2},
-    {"CELL BLUR", PROFILE_GPU_POST, 2},
     {"FOG", PROFILE_GPU_POST, 2},
     {"DEPTH OF FIELD", PROFILE_GPU_POST, 2},
     {"BLOOM + DISPLAY", PROFILE_GPU_POST, 2},

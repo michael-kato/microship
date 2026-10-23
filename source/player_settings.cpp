@@ -105,8 +105,6 @@ static const SettingField FIELDS[] = {
 	         optical_depth_lut, 0, 1, OFF_ON),
     GRAPHICS(VOLUME, "lighting_grid", "Volume lighting grid", BOOL,
 	         volume_lighting_grid, 0, 1, OFF_ON),
-    FIELD(EFFECTS, "cell_blur", "Cell depth blur", BOOL, cell_blur, 0, 1,
-	      OFF_ON),
     FIELD(EFFECTS, "depth_of_field", "Depth of field", BOOL, depth_of_field, 0,
 	      1, OFF_ON),
     FIELD(EFFECTS, "fog_blur", "Fog of war blur", BOOL, fog_blur, 0, 1, OFF_ON),
@@ -352,7 +350,6 @@ uint32_t player_settings_disabled_features(const PlayerSettings* s)
 {
 	return (s->subsurface ? 0u : (uint32_t)RENDER_SSS) |
 	       (s->volume ? 0u : (uint32_t)RENDER_VOLUME) |
-	       (s->cell_blur ? 0u : (uint32_t)RENDER_CELL_BLUR) |
 	       (s->depth_of_field ? 0u : (uint32_t)RENDER_DEPTH_OF_FIELD) |
 	       (s->fog_blur ? 0u : (uint32_t)RENDER_FOG_BLUR) |
 	       (s->glow ? 0u : (uint32_t)RENDER_GLOW);

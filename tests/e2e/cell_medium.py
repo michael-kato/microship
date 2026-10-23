@@ -34,17 +34,12 @@ with tempfile.TemporaryDirectory(prefix='nanovore-medium-') as directory:
         authored=sum(struct.unpack_from('<I',raw,16+vertices*(64 if raw[:8]==b'FLMESH02' else 48)+t*16+12)[0]==3 for t in range(triangles))
         drawn=sum(t[3]==3 for t in mesh['deformation']['indices'])
         assert authored==drawn>0,'An extra membrane wall was added'
-    assert scene['wall_blur_radius']==0
-    assert all(abs(v[0]-1/3)<1e-6 and abs(v[1]-2/3)<1e-6 and v[2]==18 for v in scene['medium_blur'][:-1]) and scene['medium_blur'][-1]==[0,0,0]
-    assert scene['medium_blur_fractional']==[True]*len(data['bodies'])+[False]
     orders='0 select all\n0 order 0\n600 ratio 65\n'
     baseline,view=run('grown',data,4800,orders)
-    disabled=deepcopy(data);disabled['appearance']['thin_surface'].pop('blur_radius',None)
-    disabled['appearance']['cell_medium'].pop('depth_blur')
+    disabled=deepcopy(data);disabled['appearance']['cell_medium']['scattering']=[0,0,0]
     reference,clear=run('effects-off',disabled,4800,orders)
     assert baseline==reference,'Membrane and medium presentation changed game state'
     for a,b in zip(view['meshes'],clear['meshes']):assert a==b,'Presentation settings changed geometry'
-    assert clear['wall_blur_radius']==0 and all(v==[0,0,0] for v in clear['medium_blur'])
     settings=json.loads((root/'assets/rendering/renderer.json').read_text())
     for n in (0,8,64):
         config=deepcopy(settings);config['lighting']['shadow_grid_resolution']=n
@@ -86,9 +81,8 @@ with tempfile.TemporaryDirectory(prefix='nanovore-medium-') as directory:
     for n in (1,7,65):
         config=deepcopy(settings);config['lighting']['shadow_grid_resolution']=n
         run('bad-grid-'+str(n),data,config=config,expected=1)
-    for path,value in [('appearance.thin_surface.blur_radius',33),('appearance.thin_surface.clarity',.2),
-                       ('appearance.cell_medium.depth_blur.pixels_per_unit',-1),
-                       ('appearance.cell_medium.depth_blur.max_radius',33),('appearance.cell_medium.depth_blur.sharp_distance',-1),
-                       ('appearance.cell_medium.depth_blur.start_fraction',.8),('appearance.cell_medium.depth_blur.full_fraction',.2),('appearance.cell_medium.depth_blur.full_fraction',1.1),('appearance.membrane',dict(inner_radius_fraction=.965))]:
+    for path,value in [('appearance.thin_surface.blur_radius',0),
+                       ('appearance.cell_medium.depth_blur',dict(start_fraction=1/3,full_fraction=2/3,max_radius=18)),
+                       ('appearance.thin_surface.clarity',.2),('appearance.membrane',dict(inner_radius_fraction=.965))]:
         run('bad-'+str(count),change(data,path,value),expected=1)
-print(f'Cell medium E2E passed: {count} application runs; one authored wall, fixed topology, medium-depth blur, quality-independent simulation and rejected settings.')
+print(f'Cell medium E2E passed: {count} application runs; one authored wall, fixed topology, quality-independent simulation and rejected settings.')

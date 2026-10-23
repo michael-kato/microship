@@ -53,6 +53,6 @@ positions=[[float(value.rstrip('.')) for value in row] for row in re.findall(r'S
 movement=[b-a for a,b in zip(*positions)];pixel=2*8*math.tan(math.radians(22.5))/1080;expected=[-80*pixel,-20*pixel*20/math.sqrt(436),20*pixel*6/math.sqrt(436)]
 assert all(abs(a-b)<.0001 for a,b in zip(movement,expected)),(movement,expected)
 result=json.loads(state.read_text());assert result['order']['count']==0,'Middle pan issued an order'
-assert len(re.findall(r'^Profile .*samples 2\.',output,re.M))==33,'Incomplete profiler traces'
+assert len(re.findall(r'^Profile .*samples 2\.',output,re.M))==32,'Incomplete profiler traces'
 report=dict(seconds=time.monotonic()-started,frames=2,profiler='Win32 F1 press/repeat/release enabled once',pan_pixels=[80,-20],camera_movement=movement,orders=0)
 (out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))

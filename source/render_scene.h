@@ -39,9 +39,9 @@ struct RenderRange
 };
 struct RenderMedium
 {
-	float center_radius[4], scattering[4], absorption_phase[4], lighting[4],
-	    blur[4]; // Lighting: shadow enabled, grid eligible, grid active, full
-		         // cell radius.
+	float center_radius[4], scattering[4], absorption_phase[4];
+	float lighting[4]; // Shadow enabled, grid eligible, grid active,
+	                   // full cell radius.
 	float
 	    detail[4]; // Written by the renderer each frame: screen size in pixels,
 		           // fog reveal, moving-shadow weight, cascade weight.
@@ -92,7 +92,7 @@ struct RenderScene
 	Color fog_tint;
 	Color ambient, ambient_top, ambient_bottom;
 	RenderLight lights[3];
-	float thin_transmission, thin_absorption, thin_blur_radius,
+	float thin_transmission, thin_absorption,
 	    thin_bleed_strength, thin_bleed_depth;
 	bool lights_enabled, guides_required, self_glow;
 	uint32_t background_samples, background_triangles;

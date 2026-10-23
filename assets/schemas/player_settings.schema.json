@@ -176,10 +176,6 @@
     "effects": {
       "type": "object",
       "properties": {
-        "cell_blur": {
-          "title": "Cell depth blur",
-          "type": "boolean"
-        },
         "depth_of_field": {
           "title": "Depth of field",
           "type": "boolean"

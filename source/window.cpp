@@ -214,7 +214,8 @@ static LRESULT CALLBACK window_message(HWND handle, UINT message, WPARAM wparam,
 			}
 			return 0;
 		}
-		if (wparam >= VK_F5 && wparam <= VK_F10)
+		if ((wparam == VK_F5 || wparam == VK_F6) ||
+		    (wparam >= VK_F8 && wparam <= VK_F10))
 		{
 			uint32_t bit = 1u << (wparam - VK_F5);
 			if (message == WM_KEYUP)

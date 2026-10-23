@@ -82,7 +82,7 @@ Cells keep one authored membrane wall. A Fresnel-style response makes the wall m
 
 Edit `thin_surface.edge_fade` in `assets/presentation/scene.json`. Set `strength` to `1` to stop clear transmission at the grazing-angle limit. Lower `power` to widen the opaque rim; `0.5` gives a wider rim than `2`. Higher values make the rim narrower. At full strength the face-on wall stays clear. As clear transmission closes at the rim, surface lighting uses the opaque material response. The rim shows the lit vertex color with its noise and faction tint; opacity does not add black pigment. Membrane normals and wrapped scattering stay continuous at the view and light horizons. Adjoining triangles use the same cached light sample at each shared wall vertex. This avoids triangle-shaped patches under strong Fresnel without increasing mesh density or film sampling. With the fade disabled (`strength: 0`), `transmission * clarity` sets the baseline clear transmission. `subsurface.membrane_thickness` controls scattering and does not set wall opacity. Build after editing source assets, then restart the game to reload the bundled files.
 
-Cell scattering is RGB 0.10/0.075/0.085, with absorption 0.018. Cell depth blur starts one third of the way along each camera ray through the cell and reaches its eighteen-pixel limit at two thirds. The front third, including its opaque internals, stays sharp. The same depth rule applies to light and objects behind the wall. `medium.depth_blur.start_fraction`, `full_fraction`, and `max_radius` set this profile. The filter uses current-frame radiance only. The global miniature focus filter leaves cell-wall pixels to this depth filter.
+Cell scattering is RGB 0.10/0.075/0.085, with absorption 0.018. The camera focus filter controls depth of field.
 
 A miniature focus band keeps the middle of the view sharp and softens its upper and lower areas. The render file's `tilt_shift` object sets the band center, half width, falloff, and maximum blur radius. The HUD is drawn after both filters. Maximum camera distance is 180, up from 38; the view can cover 4.7 times the previous map width. Organelle vertex colors distinguish the purple nucleus, orange mitochondria, blue reticulum, and varied vesicles. Faction color changes affect the membrane.
 
@@ -117,7 +117,6 @@ Audio uses twelve generated PCM effects and a fixed sixteen-voice mixer. Off-scr
 | F1 / F2 | Toggle the frame profiler / current render buffers |
 | F5 | Toggle subsurface scattering (SSS) |
 | F6 | Toggle volume scattering; keep absorption |
-| F7 | Toggle cell depth and membrane blur |
 | F8 | Toggle tilt shift |
 | F9 | Toggle the fog-of-war blur and tint |
 | F10 | Toggle surface self-glow and its halo |
@@ -128,14 +127,14 @@ A normal launch opens the faction menu. `--world PATH` selects a level directly.
 
 Press Esc during play to open the pause menu. The match clock stops and game sound is muted. Resume continues the same match. Main Menu ends the match and returns to faction selection. Quit to Desktop closes the program. Both exit actions ask before ending the match.
 
-Settings has six pages. Display, Lighting, Volume, and Effects contain 40 graphics controls. Audio and Controls contain six sound and camera controls.
+Settings has six pages. Display, Lighting, Volume, and Effects contain 38 graphics controls. Audio and Controls contain six sound and camera controls.
 
 | Page | Controls |
 | --- | --- |
 | Display | Borderless fullscreen, window size, VSync, film samples, spatial anti-aliasing, exposure, field of view, frame statistics |
 | Lighting | Transmission layers, subsurface scattering and samples, light wrap, transmission, optical thickness, energy compensation, lighting grid and caches |
 | Volume | Scattering, rays, integration steps and method, spatial filter and stride, optical lookup, lighting grid |
-| Effects | Cell blur, tilt shift, fog blur, glow, bloom radius and strength, bloom threshold, focus band and blur radius |
+| Effects | Tilt shift, fog blur, glow, bloom radius and strength, bloom threshold, focus band and blur radius |
 | Audio | Master volume and sound effects volume |
 | Controls | Drag from a cell to another cell to send every unit stationed at the first cell (orbiting or defending it, not moving elsewhere). The drag replaces the selection with those units and orders them to the second cell. A drag that starts on a cell without stationed units, or ends on open space, box-selects as before.
 
@@ -151,7 +150,7 @@ A replay line has a tick, command, and argument. `0 ratio 75` requests 75 percen
 
 One starting fighter automatically approaches and colonizes your neutral home cell. WASD or arrow keys move the camera. Right-click sends an order. Drag with the middle button to pan the camera.
 
-F2 shows twelve current-frame panels. SSS CONTRIBUTION shows wrapped and transmitted scattering light. SSS FRACTION OF DIRECT shows its share of direct light. CELL BLUR RADIUS / 32 shows the cell blur radius, from black at zero to white at thirty-two pixels. These diagnostics use a shared current-frame buffer. Normal rendering does not allocate separate SSS or blur images.
+F2 shows eleven current-frame panels. SSS CONTRIBUTION shows wrapped and transmitted scattering light. SSS FRACTION OF DIRECT shows its share of direct light. These diagnostics use a shared current-frame buffer. Normal rendering does not allocate a separate SSS image.
 
 Immune craft accelerate toward an enemy inside 5.5 world units (often one their blob has already incapacitated), with 3.5 times their normal top speed and three times their flight acceleration. Contact attaches the immune craft and holds a mobile victim. A held victim cannot move or fire. Digestion damages the victim and heals one wound per successful bite. Three incoming hits break the attachment and prevent a new hold for 2.5 seconds. Killing the immune craft also releases its victim. A darker rear makes the forward direction easier to see.
 
@@ -161,10 +160,10 @@ Keyboard camera speed is twenty-four world units per second at the starting zoom
 
 F1 opens the frame profiler. CPU and GPU icicle graphs show a rolling mean of up to 120 completed frames. Child bars are below their parent. Both graphs use the same millisecond scale, but their clocks are not aligned. Hover over a bar to see its latest duration and mean. The top three GPU costs are shown below the graphs. The panel starts closed; `--stats` opens it at launch.
 
-CPU spans cover input, simulation, scene and audio preparation, render command recording, GPU submission and wait, presentation wait, and capture. CPU wall time includes time blocked on the GPU. GPU spans cover acceleration updates, backdrop, shadow grid, surface lighting and SSS, volume scattering, effects, cell blur, fog, tilt shift, bloom and display, the HUD, and output copy. Surface lighting and SSS share one shader and one timing span. Timings include stage barriers. The header shows both latest and mean durations. The panel uses the previous completed frame; no extra GPU wait is added for profiling. Timing history contains numbers only, with no image or lighting history. Bounded `--frames N --stats` runs also print each span and its mean.
+CPU spans cover input, simulation, scene and audio preparation, render command recording, GPU submission and wait, presentation wait, and capture. CPU wall time includes time blocked on the GPU. GPU spans cover acceleration updates, backdrop, shadow grid, surface lighting and SSS, volume scattering, effects, fog, tilt shift, bloom and display, the HUD, and output copy. Surface lighting and SSS share one shader and one timing span. Timings include stage barriers. The header shows both latest and mean durations. The panel uses the previous completed frame; no extra GPU wait is added for profiling. Timing history contains numbers only, with no image or lighting history. Bounded `--frames N --stats` runs also print each span and its mean.
 
 
-F5 through F10 change rendering during play. A second press restores the
+F5, F6, F8, F9, and F10 change rendering during play. A second press restores the
 values from the loaded assets. A held key changes its feature once.
 These keys open the F1 profiler, which shows ON, OFF or N/A for each
 feature. N/A means that the loaded scene or config does not provide that
@@ -173,8 +172,8 @@ completed frame starts the new average. F1 can hide the panel again.
 
 F5 selects a surface shader with SSS compiled out when disabled. Both
 shader choices are prepared at startup. F6 skips the volume scattering
-pass but keeps medium attenuation on surface and light paths. F7 removes
-cell depth blur and transmitted membrane blur. F8 removes the miniature
+pass but keeps medium attenuation on surface and light paths. F7 has no assigned action.
+F8 removes the miniature
 focus filter. F9 removes the fog blur and tint; enemy visibility and
 exploration rules still apply. F2 keeps its existing diagnostic behavior:
 it bypasses the tilt-shift and fog filters. Changes last for the current

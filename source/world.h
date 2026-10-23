@@ -35,8 +35,6 @@ struct CellMedium
 	float radius, fade; // Fraction of the cell radius; outer fade fraction.
 	Color scattering;
 	float absorption, anisotropy;
-	float blur_rate, blur_sharp, blur_max;
-	bool blur_fraction;
 };
 
 // Global game files named by assets/startup.json. A level may name its own
@@ -186,8 +184,7 @@ struct World
 	float thin_transmission, thin_absorption;
 	bool thin_transmission_set;
 	float thin_bleed_strength, thin_bleed_depth;
-	float thin_blur_radius,
-	    ai_production, ai_expansion;
+	float ai_production, ai_expansion;
 	bool ai_production_set;
 	SpikeRules spikes;
 	CombatVisuals combat;

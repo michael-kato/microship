@@ -8,7 +8,7 @@ struct PlayerSettings
 {
 	RenderConfig graphics;
 	bool borderless, show_stats;
-	bool subsurface, volume, cell_blur, depth_of_field, fog_blur, glow;
+	bool subsurface, volume, depth_of_field, fog_blur, glow;
 	float master_volume, effects_volume, drag_sensitivity, zoom_sensitivity;
 	bool invert_zoom;
 };

@@ -378,37 +378,7 @@ static bool load_effects(World* w, const char* path)
 static void read_cell_medium(Json medium, CellMedium* m)
 {
 	json_object(medium, "radius_fraction|edge_fade|scattering|absorption|"
-	                    "anisotropy|depth_blur");
-	Json blur = json_find(medium, "depth_blur");
-	if (json_present(blur))
-	{
-		json_object(blur, "pixels_per_unit|sharp_distance|max_radius|start_"
-		                  "fraction|full_fraction");
-		m->blur_fraction =
-		    json_present(json_find(blur, "start_fraction")) ||
-		    json_present(json_find(blur, "full_fraction"));
-		if (m->blur_fraction)
-		{
-			m->blur_rate =
-			    json_float(json_get(blur, "start_fraction"), 0, 1);
-			m->blur_sharp =
-			    json_float(json_get(blur, "full_fraction"), 0, 1);
-			if (m->blur_sharp <= m->blur_rate ||
-			    json_present(json_find(blur, "pixels_per_unit")) ||
-			    json_present(json_find(blur, "sharp_distance")))
-				json_error(blur, "fractional blur requires start < full "
-				                 "and no distance fields");
-		}
-		else
-		{
-			m->blur_rate =
-			    json_float(json_get(blur, "pixels_per_unit"), 0, 32);
-			m->blur_sharp =
-			    json_float(json_get(blur, "sharp_distance"), 0, 100);
-		}
-		m->blur_max =
-		    json_float(json_get(blur, "max_radius"), 0, 32);
-	}
+	                    "anisotropy");
 	m->radius =
 	    json_positive(json_get(medium, "radius_fraction"), 1);
 	m->fade = json_float(json_get(medium, "edge_fade"), 0, 1);
@@ -657,7 +627,7 @@ static bool load_appearance(World* w, const char* path, uint32_t seed)
 	Json thin = json_find(root, "thin_surface");
 	if (json_present(thin))
 	{
-		json_object(thin, "transmission|absorption|blur_radius|bleed");
+		json_object(thin, "transmission|absorption|bleed");
 		Json bleed = json_find(thin, "bleed");
 		if (json_present(bleed))
 		{
@@ -667,9 +637,6 @@ static bool load_appearance(World* w, const char* path, uint32_t seed)
 			w->thin_bleed_depth =
 			    json_float(json_get(bleed, "depth"), 0, MAX_WALL_BLEED_DEPTH);
 		}
-		Json blur = json_find(thin, "blur_radius");
-		if (json_present(blur))
-			w->thin_blur_radius = json_float(blur, 0, 32);
 		w->thin_transmission = json_float(json_get(thin, "transmission"), 0,
 		                                  MAX_MEMBRANE_TRANSMISSION);
 		w->thin_absorption = json_float(json_get(thin, "absorption"), 0,
@@ -1353,7 +1320,6 @@ void world_copy_appearance(World* output, const World* source)
 	output->thin_transmission = source->thin_transmission;
 	output->thin_absorption = source->thin_absorption;
 	output->thin_transmission_set = source->thin_transmission_set;
-	output->thin_blur_radius = source->thin_blur_radius;
 	memcpy(output->factory_emission_color, source->factory_emission_color,
 	       sizeof(output->factory_emission_color));
 	memcpy(output->factory_emission_fresnel, source->factory_emission_fresnel,

@@ -140,12 +140,7 @@
     "edge_fade": 0.28,
     "scattering": [0.1, 0.075, 0.085],
     "absorption": 0.018,
-    "anisotropy": 0.2,
-    "depth_blur": {
-      "start_fraction": 0.3333333333333333,
-      "full_fraction": 0.6666666666666666,
-      "max_radius": 18
-    }
+    "anisotropy": 0.2
   },
   "communications": "communications.json"
 }

@@ -31,7 +31,7 @@ layout(push_constant) uniform Bloom
     float debug_views;
     uint emissive_only;
 } bloom;
-layout(set=0,binding=BLOOM_BINDING_SHARP_LAYER,std430) readonly buffer EmissionGuide { vec4 sharp_pixels[]; };
+layout(set=0,binding=BLOOM_BINDING_GLOW,std430) readonly buffer EmissionGuide { float glow_pixels[]; };
 
 vec3 linear_to_srgb(vec3 linear)
 {
@@ -99,7 +99,7 @@ void write_display(ivec2 pixel,vec3 linear)
 vec3 bright(vec3 value,ivec2 pixel)
 {
     float peak=max(value.r,max(value.g,value.b));
-    float source=bloom.emissive_only!=0u ? min(peak,sharp_pixels[pixel.y*bloom.extent.x+pixel.x].a) : peak;
+    float source=bloom.emissive_only!=0u ? min(peak,glow_pixels[pixel.y*bloom.extent.x+pixel.x]) : peak;
     return value*max(0.0,source-bloom.threshold)/max(peak,MIN_BLOOM_PEAK);
 }
 

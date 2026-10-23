@@ -343,7 +343,6 @@ bool presentation_initialize(Presentation* p, const Simulation* s,
 	scene->guides_required = w->combat.enabled;
 	scene->thin_transmission = w->thin_transmission;
 	scene->thin_absorption = w->thin_absorption;
-	scene->thin_blur_radius = w->thin_blur_radius;
 	scene->thin_bleed_strength = w->thin_bleed_strength;
 	scene->thin_bleed_depth = w->thin_bleed_depth;
 	scene->background_samples = w->backdrop_soft ? 0 : w->backdrop_samples;
@@ -1225,10 +1224,6 @@ bool presentation_build(Presentation* p, const Simulation* s,
 		medium->scattering[3] = w->cell_medium.fade;
 		medium->absorption_phase[0] = medium->absorption_phase[1] =
 		    medium->absorption_phase[2] = w->cell_medium.absorption;
-		medium->blur[0] = w->cell_medium.blur_rate;
-		medium->blur[1] = w->cell_medium.blur_sharp;
-		medium->blur[2] = w->cell_medium.blur_max;
-		medium->blur[3] = w->cell_medium.blur_fraction ? 1.0f : 0.0f;
 		medium->lighting[3] = c->radius;
 		medium->absorption_phase[3] = w->cell_medium.anisotropy;
 		medium->lighting[0] = 1;

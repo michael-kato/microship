@@ -12,7 +12,7 @@ if(NOT GLSLC)
 endif()
 
 # Shipping builds set this OFF: no wireframe, buffer views or debug hotkeys.
-option(DEVELOPMENT "Wireframe view, F2 buffer views and F1/F3/F5-F10 debug hotkeys" ON)
+option(DEVELOPMENT "Wireframe view, F2 buffer views and F1/F3/F5/F6/F8-F10 debug hotkeys" ON)
 set(dev_shader_flags)
 if(DEVELOPMENT)
     set(dev_shader_flags -DDEVELOPMENT=1)
@@ -85,11 +85,6 @@ add_custom_command(OUTPUT "${depth_of_field_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
     COMMAND ${GLSLC} --target-env=vulkan1.2 -O "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/depth_of_field.comp" -o "${depth_of_field_output}"
     DEPENDS assets/shaders/render_bindings.glsl assets/shaders/render_uniform.glsl assets/shaders/debug_buffers.glsl assets/shaders/depth_of_field.comp VERBATIM)
-set(medium_blur_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/medium_blur.comp.spv")
-add_custom_command(OUTPUT "${medium_blur_output}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/medium_blur.comp" -o "${medium_blur_output}"
-    DEPENDS assets/shaders/render_bindings.glsl assets/shaders/medium_blur.comp VERBATIM)
 set(effects_output "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/effects.comp.spv")
 add_custom_command(OUTPUT "${effects_output}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"
@@ -125,7 +120,7 @@ add_custom_command(OUTPUT "${json_license}"
     DEPENDS third_party/json/LICENSE VERBATIM)
 set(asset_outputs)
 # Do not leave a second renderer or obsolete reconstruction kernels in the bundle.
-foreach(old_shader IN ITEMS path_trace.comp.spv denoise.comp.spv debug_guide_volume.comp.spv)
+foreach(old_shader IN ITEMS path_trace.comp.spv denoise.comp.spv debug_guide_volume.comp.spv medium_blur.comp.spv)
     file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders/${old_shader}")
 endforeach()
 file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/licenses/nile.txt")
@@ -194,7 +189,7 @@ foreach(model IN LISTS model_files)
         DEPENDS "${model}" VERBATIM)
     list(APPEND model_outputs "${model_output}")
 endforeach()
-add_custom_target(nanovore_assets DEPENDS "${depth_of_field_output}" "${medium_blur_output}" "${shadow_grid_output}" "${cascade_output}" "${fog_output}" "${effects_output}" "${backdrop_output}" "${json_license}" "${shader_output}" "${bloom_output}" "${volume_output}" "${debug_overlay}" ${debug_outputs} ${model_outputs} ${asset_outputs})
+add_custom_target(nanovore_assets DEPENDS "${depth_of_field_output}" "${shadow_grid_output}" "${cascade_output}" "${fog_output}" "${effects_output}" "${backdrop_output}" "${json_license}" "${shader_output}" "${bloom_output}" "${volume_output}" "${debug_overlay}" ${debug_outputs} ${model_outputs} ${asset_outputs})
 
 if(WIN32)
     set(platform_sources source/window.cpp source/start_menu.cpp source/pause_menu.cpp)

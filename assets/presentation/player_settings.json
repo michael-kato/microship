@@ -12,7 +12,6 @@
     "enabled": true
   },
   "effects": {
-    "cell_blur": true,
     "depth_of_field": true,
     "fog_blur": true,
     "glow": true

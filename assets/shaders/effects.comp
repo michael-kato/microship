@@ -27,7 +27,6 @@ layout(set=0,binding = RENDER_BINDING_BEAUTY,rgba16f) uniform image2D beauty;
 struct Segment { vec4 a,b,color; };
 layout(set=0,binding = RENDER_BINDING_EFFECTS,std430) readonly buffer Segments { Segment segments[]; };
 layout(set=0,binding = RENDER_BINDING_EFFECT_TILES,std430) readonly buffer Tiles { uint tiles[]; };
-layout(set=0,binding=RENDER_BINDING_SHARP_LAYER,std430) buffer SharpLayer { vec4 sharp_pixels[]; };
 void main()
 {
     uvec2 p=gl_GlobalInvocationID.xy;
@@ -36,7 +35,7 @@ void main()
     uint tile=(p.y/EFFECT_TILE_SIZE_UNSIGNED)*width+p.x/EFFECT_TILE_SIZE_UNSIGNED,start=tiles[tile],end=tiles[tile+1u];
     if (start==end) return;
     uint index=p.y*render.settings.x+p.x,base=2u*width*height+1u;
-    vec4 guide=guides[index];vec3 light=vec3(0),sharp=vec3(0);
+    vec4 guide=guides[index];vec3 light=vec3(0);
     vec4 value=imageLoad(beauty,ivec2(p));
     for (uint i=start;i<end;++i)
     {
@@ -64,10 +63,7 @@ void main()
         if (s.b.w>.5 && s.b.w<RING_KIND_LOWER_BOUND)
             alpha+=exp(-distance*distance/max(1.0,s.a.w*s.a.w*BURST_HALO_VARIANCE_SCALE))*BURST_HALO_GAIN;
         vec3 contribution=s.color.rgb*(s.color.a*alpha*strength);
-        bool foreground=s.b.w>SELECTION_KIND_LOWER_BOUND || (guide.x>0.0 && depth<=guide.x+margin);
-        if (render.quality.w>0u && value.a>0.0 && foreground) sharp+=contribution;
-        else light+=contribution;
+        light+=contribution;
     }
-    if (render.quality.w>0u && value.a>0.0) sharp_pixels[index].rgb+=sharp;
     imageStore(beauty,ivec2(p),vec4(value.rgb+light,value.a));
 }

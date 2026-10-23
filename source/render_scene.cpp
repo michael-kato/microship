@@ -87,8 +87,6 @@ bool render_scene_validate(const RenderScene* scene)
 	        scene->emission_fresnel[0] <= 1 &&
 	        scene->emission_fresnel[1] >= .01f &&
 	        scene->emission_fresnel[1] <= 16;
-	valid = valid && std::isfinite(scene->thin_blur_radius) &&
-	        scene->thin_blur_radius >= 0 && scene->thin_blur_radius <= 32;
 	valid = valid && std::isfinite(scene->fog_tint.r) &&
 	        scene->fog_tint.r >= 0 && scene->fog_tint.r <= 1 &&
 	        std::isfinite(scene->fog_tint.g) && scene->fog_tint.g >= 0 &&
@@ -134,13 +132,7 @@ bool render_scene_validate(const RenderScene* scene)
 			valid = valid && std::isfinite(m->center_radius[j]) &&
 			        std::isfinite(m->scattering[j]) &&
 			        std::isfinite(m->absorption_phase[j]) &&
-			        std::isfinite(m->lighting[j]) && std::isfinite(m->blur[j]);
-		valid =
-		    valid &&
-		    (m->blur[3] == 0 ||
-			 (m->blur[3] == 1 && m->blur[0] < m->blur[1] && m->blur[1] <= 1)) &&
-		    m->blur[0] >= 0 && m->blur[0] <= 32 && m->blur[1] >= 0 &&
-		    m->blur[1] <= 100 && m->blur[2] >= 0 && m->blur[2] <= 32;
+			        std::isfinite(m->lighting[j]);
 		valid = valid && (m->lighting[0] == 0 || m->lighting[0] == 1) &&
 		        m->center_radius[3] >= 0 && m->scattering[3] >= 0 &&
 		        m->scattering[3] <= 1;
@@ -305,17 +297,6 @@ bool render_scene_write(const RenderScene* scene, const char* path)
 		        m->center_radius[0], m->center_radius[1], m->center_radius[2],
 		        m->center_radius[3]);
 	}
-	fprintf(file,
-	        "],\"wall_blur_radius\":%.6f,\"medium_blur\":[",
-	        scene->thin_blur_radius);
-	for (uint32_t i = 0; i < scene->media.size(); ++i)
-		fprintf(file, "%s[%.6f,%.6f,%.6f]", i ? "," : "",
-		        scene->media[i].blur[0], scene->media[i].blur[1],
-		        scene->media[i].blur[2]);
-	fprintf(file, "],\"medium_blur_fractional\":[");
-	for (uint32_t i = 0; i < scene->media.size(); ++i)
-		fprintf(file, "%s%s", i ? "," : "",
-		        scene->media[i].blur[3] > 0 ? "true" : "false");
 	fprintf(file, "],\"medium_shadows\":[");
 	for (uint32_t i = 0; i < scene->media.size(); ++i)
 		fprintf(file, "%s%s", i ? "," : "",

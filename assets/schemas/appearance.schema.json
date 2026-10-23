@@ -139,11 +139,6 @@
           "minimum": 0,
           "maximum": 10
         },
-        "blur_radius": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 32
-        },
         "bleed": {
           "type": "object",
           "description": "Interior light a cell wall shows from depth (world units) beneath it, from the cell's radiance cascades; organelle colors appear as soft blobs.",
@@ -420,52 +415,6 @@
           "type": "number",
           "exclusiveMinimum": -0.95,
           "exclusiveMaximum": 0.95
-        },
-        "depth_blur": {
-          "type": "object",
-          "properties": {
-            "pixels_per_unit": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 32
-            },
-            "sharp_distance": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 100
-            },
-            "max_radius": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 32
-            },
-            "start_fraction": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "full_fraction": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "required": ["max_radius"],
-          "additionalProperties": false,
-          "oneOf": [
-            {
-              "required": ["pixels_per_unit", "sharp_distance"],
-              "not": {
-                "anyOf": [{"required": ["start_fraction"]}, {"required": ["full_fraction"]}]
-              }
-            },
-            {
-              "required": ["start_fraction", "full_fraction"],
-              "not": {
-                "anyOf": [{"required": ["pixels_per_unit"]}, {"required": ["sharp_distance"]}]
-              }
-            }
-          ]
         }
       },
       "required": ["radius_fraction", "edge_fade", "scattering", "absorption", "anisotropy"],

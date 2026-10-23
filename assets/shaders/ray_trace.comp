@@ -86,7 +86,6 @@ struct Medium
     vec4 scattering; // RGB coefficient; W outer fade fraction.
     vec4 absorption_phase;
     vec4 lighting;
-    vec4 blur;
     vec4 detail; // Projected radius in pixels, fog reveal, moving-shadow weight, cascade weight.
 };
 layout(set = 0, binding = RENDER_BINDING_MEDIA, std430) readonly buffer MediaBuffer { Medium media[]; };
@@ -226,58 +225,7 @@ float medium_density(Medium medium, vec3 point)
     return fade*fade*(3.0-2.0*fade);
 }
 
-// Artistic forward-scatter blur follows distance inside authored interior media.
-// It has no camera focal plane and does not blur vacuum.
-float medium_blur_radius(vec3 direction,float distance)
-{
-    if (render.quality.w==0u) return 0;
-    float radius=0;
-    uint node=0u,i;
-    // Blur needs a medium interval that starts before the hit; farther media add nothing.
-    while (next_ray_medium(node,render.camera_position.xyz,direction,distance,i))
-    {
-        Medium m=media[i];if (m.blur.z<=0.0) continue;
-        float begin,end;
-        if (m.blur.w>0.0)
-        {
-            if (m.lighting.w>0.0) m.center_radius.w=m.lighting.w;
-            if (medium_interval(m,render.camera_position.xyz,direction,RAY_MAX,begin,end))
-            {
-                float depth=(distance-begin)/max(end-begin,MIN_SHADING_DENOMINATOR);
-                radius=max(radius,m.blur.z*smoothstep(m.blur.x,m.blur.y,depth));
-            }
-        }
-        else if (medium_interval(m,render.camera_position.xyz,direction,distance,begin,end))
-            radius=max(radius,min(m.blur.z,max(0.0,end-begin-m.blur.y)*m.blur.x));
-    }
-    return radius;
-}
-// Blur starts once along a camera ray. Volume quadrature only needs this
-// boundary, not the pixel radius at every integration point.
-float medium_sharp_limit(vec3 direction)
-{
-    float limit=RAY_MAX;
-    if (render.quality.w==0u) return limit;
-    uint node=0u,i;
-    while (next_ray_medium(node,render.camera_position.xyz,direction,RAY_MAX,i))
-    {
-        Medium medium=media[i];if (medium.blur.z<=0.0) continue;
-        float begin,end;
-        if (medium.blur.w>0.0)
-        {
-            if (medium.lighting.w>0.0) medium.center_radius.w=medium.lighting.w;
-            if (medium_interval(medium,render.camera_position.xyz,direction,RAY_MAX,begin,end))
-                limit=min(limit,begin+medium.blur.x*(end-begin));
-        }
-        else if (medium.blur.x>0.0
-            && medium_interval(medium,render.camera_position.xyz,direction,RAY_MAX,begin,end)
-            && end-begin>medium.blur.y)
-            limit=min(limit,begin+medium.blur.y);
-    }
-    return limit;
-}
-
-vec3 film_sharp_sum=vec3(0),film_volume=vec3(0),film_emission=vec3(0);
+vec3 film_volume=vec3(0),film_emission=vec3(0);
 // Split surface shading. The transparent pass walks membranes and shades them;
 // it stops at the first opaque hit and records it. The opaque pass shades that
 // hit, so shadow and SSS exit rays run apart from the membrane walk.
@@ -291,18 +239,16 @@ const bool cascade_tracing=true;
 #else
 const bool cascade_tracing=false;
 #endif
-// One flag word per pixel: half-float throughput blue and flags (-1 none,
-// +1 sharp contribution, +2 pixel blurred). Pixels with a hit also store seven
-// words after all flag words: triangle, instance, barycentric bits, half-float
+// One flag word per pixel: half-float throughput blue and hit status (-1 none,
+// 0 hit). Pixels with a hit also store seven words after all flag words: triangle, instance, barycentric bits, half-float
 // throughput red/green and membrane emission RGB. Misses touch only the flag word.
 layout(set=0,binding=RENDER_BINDING_OPAQUE_HITS,std430) buffer OpaqueHits { uint opaque_hits[]; };
 const uint OPAQUE_HIT_WORDS=7u;
 uvec4 opaque_hit=uvec4(0);vec3 opaque_weight=vec3(0);float opaque_flags=-1.0;
-void store_opaque_hit(uint index,float blur_max)
+void store_opaque_hit(uint index)
 {
-    float flags=opaque_flags<0.0 ? -1.0 : opaque_flags+(blur_max>0.0 ? 2.0 : 0.0);
-    opaque_hits[index]=packHalf2x16(vec2(opaque_weight.b,flags));
-    if (flags<0.0) return;
+    opaque_hits[index]=packHalf2x16(vec2(opaque_weight.b,opaque_flags));
+    if (opaque_flags<0.0) return;
     uint first=render.settings.x*render.settings.y+index*OPAQUE_HIT_WORDS;
     for (uint i=0u;i<4u;++i) opaque_hits[first+i]=opaque_hit[i];
     opaque_hits[first+4u]=packHalf2x16(opaque_weight.rg);
@@ -310,8 +256,7 @@ void store_opaque_hit(uint index,float blur_max)
     opaque_hits[first+6u]=packHalf2x16(vec2(film_emission.b,0));
 }
 float film_terminal_distance=RAY_MAX;
-float film_blur_max=0.0;
-layout(set=0,binding=RENDER_BINDING_SHARP_LAYER,std430) buffer SharpLayer { vec4 sharp_pixels[]; };
+layout(set=0,binding=RENDER_BINDING_GLOW,std430) buffer EmissionGuide { float glow_pixels[]; };
 
 // The table stores the integral from a chord's midpoint to a positive distance.
 // Half-chord and position are normalized by radius. Signed differences cover
@@ -372,10 +317,9 @@ vec3 sampled_visibility(vec3 point,vec3 normal,int light);
 
 vec3 volume_incident(vec3 point,uint medium_index,vec3 ambient,vec3 phases,vec3 view);
 
-vec3 single_scattering(vec3 origin,vec3 direction,float distance,float sharp_limit,out vec3 sharp)
+vec3 single_scattering(vec3 origin,vec3 direction,float distance)
 {
-    vec3 radiance=vec3(0);sharp=vec3(0);
-    float path_offset=dot(origin-render.camera_position.xyz,direction);
+    vec3 radiance=vec3(0);
     uint steps=integration_steps();
     uint node=0u,i;
     while (next_ray_medium(node,origin,direction,distance,i))
@@ -407,7 +351,6 @@ vec3 single_scattering(vec3 origin,vec3 direction,float distance,float sharp_lim
             vec3 point=origin+direction*d;
             vec3 contribution=transmittance(origin,direction,d)*medium_density(medium,point)*(medium.scattering.rgb*volume_incident(point,i,ambient,phases,direction))*(volume_gauss ? (end-begin)*weight : stride);
             radiance+=contribution;
-            if (path_offset+d<=sharp_limit) sharp+=contribution;
         }
     }
     return radiance;
@@ -1103,26 +1046,21 @@ float backdrop_remaining(vec3 origin,vec3 direction,uvec2 pixel)
 vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float subsurface_sample_weight)
 {
     vec3 radiance=vec3(0);
-    float sharp_limit=fused_volume ? medium_sharp_limit(direction) : RAY_MAX;
     uint triangle;vec2 barycentric;float distance;
     bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
     if (!hit && render.backdrop_style.x>0.0)
         distance=backdrop_remaining(origin,direction,pixel);
     if (fused_volume && render.quality.x>0u)
     {
-        vec3 sharp;
-        vec3 volume=single_scattering(origin,direction,distance,sharp_limit,sharp);
-        radiance+=volume;film_volume+=volume;film_sharp_sum+=sharp;
+        vec3 volume=single_scattering(origin,direction,distance);
+        radiance+=volume;film_volume+=volume;
     }
     vec3 weight=transmittance(origin,direction,distance);
     if (sample_index==0u) film_terminal_distance=distance;
-    float blur_radius=medium_blur_radius(direction,distance);
-    film_blur_max=max(film_blur_max,blur_radius);
     if (!hit)
     {
         vec3 background=render.backdrop_style.x>0.0 ? texelFetch(soft_backdrop,ivec2(pixel),0).rgb : environment_radiance(direction);
         radiance+=weight*background;
-        if (blur_radius<=0.0) film_sharp_sum+=weight*background;
 #ifdef NANOVORE_DEBUG_BUFFERS
         debug_direct+=weight*background;
 #endif
@@ -1141,7 +1079,7 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
     if (transparent_pass && !s.translucent)
     {
         opaque_hit=uvec4(triangle,hit_instance,floatBitsToUint(barycentric));
-        opaque_weight=weight;opaque_flags=blur_radius<=0.0 ? 1.0 : 0.0;
+        opaque_weight=weight;opaque_flags=0.0;
         return radiance;
     }
     vec3 glow_color=surface_glow_color(s);
@@ -1154,7 +1092,6 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
     film_emission+=weight*glow_color*s.emission;
     vec3 contribution=weight*(direct+ambient_surface(s,-direction));
     radiance+=contribution;
-    if (blur_radius<=0.0) film_sharp_sum+=contribution;
 #ifdef NANOVORE_DEBUG_BUFFERS
     debug_direct+=weight*direct;debug_sss+=weight*sss;
 #endif
@@ -1260,34 +1197,31 @@ bool pixel_only_background(uvec2 pixel)
         farthest*cone+point_epsilon(center),low,high);
 }
 
-vec3 integrate_volume(uvec2 pixel,out vec3 sharp_result,out float terminal)
+vec3 integrate_volume(uvec2 pixel,out float terminal)
 {
     uint volume_count = render.scene.y > 0u ? render.quality.x : 0u;
-    vec3 volume_sum = vec3(0.0),sharp_volume_sum=vec3(0.0);terminal=RAY_MAX;
+    vec3 volume_sum = vec3(0.0);terminal=RAY_MAX;
     for (uint sample_index = 0u; sample_index < volume_count; ++sample_index)
     {
         vec3 direction=film_direction(pixel,film_sample(sample_index,volume_count));
         vec3 origin=render.camera_position.xyz;
-        float sharp_limit=medium_sharp_limit(direction);
         // Media in front of the first surface only: cell walls are opaque.
         uint triangle;vec2 barycentric;float distance;
         bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
         if (!hit && render.backdrop_style.x>0.0)
             distance=backdrop_remaining(origin,direction,pixel);
         terminal=distance;
-        vec3 sharp;
-        volume_sum+=single_scattering(origin,direction,distance,sharp_limit,sharp);sharp_volume_sum+=sharp;
+        volume_sum+=single_scattering(origin,direction,distance);
     }
-    sharp_result=volume_count>0u ? sharp_volume_sum/float(volume_count) : vec3(0);
     return volume_count>0u ? volume_sum/float(volume_count) : vec3(0);
 }
 
 #ifdef NANOVORE_DEBUG_BUFFERS
-// Volume anchors follow the per-pixel guides: two entries per stride cell.
+// Volume anchors follow the per-pixel guides: one entry per stride cell.
 uint volume_anchor(uvec2 cell)
 {
     uint width=(render.settings.x+volume_grid_stride-1u)/volume_grid_stride;
-    return render.settings.x*render.settings.y+2u*(cell.y*width+cell.x);
+    return render.settings.x*render.settings.y+cell.y*width+cell.x;
 }
 #endif
 
@@ -1496,19 +1430,18 @@ void main()
     if (pixel.x >= render.settings.x || pixel.y >= render.settings.y) return;
 
 #if defined(NANOVORE_VOLUME_COARSE)
-    vec3 sharp=vec3(0),volume=vec3(0);float terminal=RAY_MAX;
+    vec3 volume=vec3(0);float terminal=RAY_MAX;
     uint index=pixel.y*render.settings.x+pixel.x;
-    if (pixel_may_intersect_medium(pixel)) volume=integrate_volume(pixel,sharp,terminal);
+    if (pixel_may_intersect_medium(pixel)) volume=integrate_volume(pixel,terminal);
     else terminal=exp2(guides[index].z)-1.0;
     uint anchor=volume_anchor(pixel/volume_grid_stride);
     guides[anchor]=vec4(volume,log2(1.0+terminal));
-    guides[anchor+1u]=vec4(sharp,0);
 #elif defined(NANOVORE_VOLUME_FILTER)
     uint index=pixel.y*render.settings.x+pixel.x;
     float depth=guides[index].z;
     uvec2 low=pixel/volume_grid_stride,extent=(render.settings.xy+volume_grid_stride-1u)/volume_grid_stride;
     vec2 f=vec2(pixel%uvec2(volume_grid_stride))/float(volume_grid_stride);
-    vec3 volume=vec3(0),sharp=vec3(0);float total=0;
+    vec3 volume=vec3(0);float total=0;
     for (uint y=0u;y<2u;++y) for (uint x=0u;x<2u;++x)
     {
         uint source=volume_anchor(min(low+uvec2(x,y),extent-1u));
@@ -1518,14 +1451,12 @@ void main()
         // About two percent terminal-depth agreement. Thin silhouettes with
         // no matching sample use exact current-pixel camera integration below.
         if (abs(value.w-depth)>.03) continue;
-        volume+=weight*value.rgb;sharp+=weight*guides[source+1u].rgb;total+=weight;
+        volume+=weight*value.rgb;total+=weight;
     }
-    if (total>0.0) { volume/=total;sharp/=total; }
-    else { float terminal;volume=integrate_volume(pixel,sharp,terminal); }
+    if (total>0.0) volume/=total;
+    else { float terminal;volume=integrate_volume(pixel,terminal); }
     vec4 surface=imageLoad(output_image,ivec2(pixel));
     vec3 radiance=surface.rgb+volume;
-    if (render.quality.w>0u && surface.a>0.0)
-    { sharp_pixels[index].rgb+=sharp;radiance-=sharp; }
     imageStore(output_image,ivec2(pixel),vec4(radiance,surface.a));
 #elif defined(NANOVORE_OPAQUE_PASS)
     // Shade the opaque hit the transparent pass recorded and add it to that
@@ -1536,7 +1467,6 @@ void main()
     uint first=render.settings.x*render.settings.y+index*OPAQUE_HIT_WORDS;
     uvec4 hit=uvec4(opaque_hits[first],opaque_hits[first+1u],opaque_hits[first+2u],opaque_hits[first+3u]);
     vec3 weight=vec3(unpackHalf2x16(opaque_hits[first+4u]),last.x);
-    uint flags=uint(last.y);
     hit_instance=hit.y;
     LightingInstance instance=lighting_instances[hit_instance];
     hit_to_world=transpose(mat3x4(instance.row0,instance.row1,instance.row2));
@@ -1553,18 +1483,8 @@ void main()
     vec3 emitted=vec3(unpackHalf2x16(opaque_hits[first+5u]),unpackHalf2x16(opaque_hits[first+6u]).x)+weight*glow_color*s.emission;
     float glow=max(emitted.r,max(emitted.g,emitted.b));
     vec4 radiance=imageLoad(output_image,ivec2(pixel));
-    if (render.quality.w>0u)
-    {
-        // A blurred pixel keeps sharp light in its own layer, outside the beauty image.
-        vec4 layer=sharp_pixels[index];
-        if (flags==3u) layer.rgb+=contribution; else radiance.rgb+=contribution;
-        sharp_pixels[index]=vec4(layer.rgb,glow);
-    }
-    else
-    {
-        radiance.rgb+=contribution;
-        if (render.background_quality.w>0u) sharp_pixels[index].a=glow;
-    }
+    radiance.rgb+=contribution;
+    if (render.background_quality.w>0u) glow_pixels[index]=glow;
     imageStore(output_image,ivec2(pixel),radiance);
 #else
 #ifndef NANOVORE_VOLUME_PASS
@@ -1573,7 +1493,7 @@ void main()
     // No path traversal, random draws or repeated per-sample normalization.
     if (render.backdrop_style.x>0.0 && render.wireframe_line.w<=0.0 && pixel_is_vacuum(pixel))
     {
-        if (render.background_quality.w>0u) sharp_pixels[pixel.y*render.settings.x+pixel.x].a=0.0;
+        if (render.background_quality.w>0u) glow_pixels[pixel.y*render.settings.x+pixel.x]=0.0;
         vec3 background=texelFetch(soft_backdrop,ivec2(pixel),0).rgb;
 #ifdef NANOVORE_DEBUG_BUFFERS
         guides[pixel.y*render.settings.x+pixel.x]=vec4(0,0,texelFetch(soft_backdrop,ivec2(pixel),0).a,0);
@@ -1583,7 +1503,7 @@ void main()
 #endif
 #endif
 #ifdef NANOVORE_TRANSPARENT_PASS
-        store_opaque_hit(pixel.y*render.settings.x+pixel.x,0.0);
+        store_opaque_hit(pixel.y*render.settings.x+pixel.x);
 #endif
         imageStore(output_image,ivec2(pixel),vec4(background,0.0));
         return;
@@ -1611,12 +1531,8 @@ void main()
     vec3 radiance = sum/float(sample_count);
     vec3 emitted=film_emission/float(sample_count);
     float glow=max(emitted.r,max(emitted.g,emitted.b));
-    if (render.background_quality.w>0u && render.quality.w==0u) sharp_pixels[pixel.y*render.settings.x+pixel.x].a=glow;
-    if (render.quality.w>0u)
-    {
-        sharp_pixels[pixel.y*render.settings.x+pixel.x]=vec4(film_blur_max>0.0 ? film_sharp_sum/float(sample_count) : vec3(0),glow);
-        if (film_blur_max>0.0) radiance-=film_sharp_sum/float(sample_count);
-    }
+    if (render.background_quality.w>0u) glow_pixels[pixel.y*render.settings.x+pixel.x]=glow;
+
 #ifdef NANOVORE_DEBUG_BUFFERS
     // Effects and focus use first-hit guides. Spatial volume filtering also
     // uses terminal depth. Only F2 writes the full diagnostic record.
@@ -1625,7 +1541,7 @@ void main()
     debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(debug_vertex_hit,debug_normal_depth,
         vec4(debug_direct/float(sample_count),float(debug_primary_hits)/float(sample_count)),
         vec4(sum/float(sample_count),float(debug_closest_queries)),
-        vec4(film_volume/float(sample_count),float(debug_shadow_queries)),vec4(debug_sss/float(sample_count),film_blur_max));
+        vec4(film_volume/float(sample_count),float(debug_shadow_queries)),vec4(debug_sss/float(sample_count),0));
 #endif
 #endif
 #else
@@ -1635,15 +1551,11 @@ void main()
     vec4 surface_radiance = imageLoad(output_image,ivec2(pixel));
     vec3 radiance = surface_radiance.rgb;
     // Volume film rays use the same fixed rule. Quadrature is deterministic.
-    vec3 sharp;float terminal;
-    vec3 volume=integrate_volume(pixel,sharp,terminal);
+    float terminal;
+    vec3 volume=integrate_volume(pixel,terminal);
     if (render.quality.x>0u)
     {
         radiance+=volume;
-        if (render.quality.w>0u && surface_radiance.a>0.0)
-        {
-            sharp_pixels[pixel.y*render.settings.x+pixel.x].rgb+=sharp;radiance-=sharp;
-        }
     }
 #if defined(NANOVORE_DEBUG_BUFFERS) && !defined(NANOVORE_NO_QUERY_COUNTERS)
     uint debug_index = pixel.y*render.settings.x+pixel.x;
@@ -1657,9 +1569,9 @@ void main()
     imageStore(output_image,ivec2(pixel),vec4(radiance,surface_radiance.a));
 #else
 #ifdef NANOVORE_TRANSPARENT_PASS
-    store_opaque_hit(pixel.y*render.settings.x+pixel.x,film_blur_max);
+    store_opaque_hit(pixel.y*render.settings.x+pixel.x);
 #endif
-    imageStore(output_image,ivec2(pixel),vec4(radiance,film_blur_max));
+    imageStore(output_image,ivec2(pixel),vec4(radiance,0));
 #endif
 #endif // Spatial volume variants.
 }

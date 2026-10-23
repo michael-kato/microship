@@ -33,7 +33,7 @@
 
 static_assert(SIGHT_FIELD_SIDE == FOG_FIELD_SIZE, "Fog CPU/GPU grid layout");
 static const int GPU_VERTEX_BYTES = 64;
-static const int GPU_MEDIUM_BYTES = 96;
+static const int GPU_MEDIUM_BYTES = 80;
 // Scene style floats, then surface weight, fog reveal, SSS weight and ray mask.
 static const int INSTANCE_STYLE_GPU_FLOATS = INSTANCE_STYLE_FLOATS + 4;
 static const float MAX_PROJECTED_PIXELS = 1e6f;
@@ -66,7 +66,7 @@ static const int HUD_MAX_LINE_CHARACTERS =
     (HUD_TEXT_WIDTH - 2 * TEXT_MARGIN) / HUD_MASK_CHARACTER_SPACING;
 static const unsigned int STATS_TEXT_WIDTH_UNSIGNED = STATS_TEXT_WIDTH;
 static const unsigned int STATS_TEXT_HEIGHT_UNSIGNED = STATS_TEXT_HEIGHT;
-static const int GPU_TIMESTAMP_COUNT = 18;
+static const int GPU_TIMESTAMP_COUNT = 17;
 static const int TIMESTAMP_WORD_BITS = 64;
 
 enum
@@ -92,13 +92,12 @@ enum
 	GPU_TIME_UPLOAD_END = 8,
 	GPU_TIME_EFFECTS_END = 9,
 	GPU_TIME_GRID_END = 10,
-	GPU_TIME_MEDIUM_BLUR_END = 11,
-	GPU_TIME_FOG_END = 12,
-	GPU_TIME_DEPTH_OF_FIELD_END = 13,
-	GPU_TIME_COPY_END = 14,
-	GPU_TIME_BAKE_END = 15,
-	GPU_TIME_CASCADE_END = 16,
-	GPU_TIME_TRANSPARENT_END = 17
+	GPU_TIME_FOG_END = 11,
+	GPU_TIME_DEPTH_OF_FIELD_END = 12,
+	GPU_TIME_COPY_END = 13,
+	GPU_TIME_BAKE_END = 14,
+	GPU_TIME_CASCADE_END = 15,
+	GPU_TIME_TRANSPARENT_END = 16
 };
 
 struct GpuBuffer
@@ -289,7 +288,7 @@ struct RendererState
 	std::vector<VkDeviceSize> vertex_upload_offsets;
 	GpuBuffer tlas_buffer;
 	GpuBuffer tlas_scratch;
-	GpuBuffer shadow_grid, sharp_layer, static_lighting, surface_lighting,
+	GpuBuffer shadow_grid, glow_guide, static_lighting, surface_lighting,
 	    dynamic_lighting;
 	GpuBuffer radiance_cascades; // Cascade 0 SH projection, then every cascade;
 	                             // persists as bounce feedback.
@@ -382,8 +381,7 @@ struct RendererState
 	VkDescriptorPool bloom_descriptor_pool;
 	VkDescriptorSet bloom_descriptors;
 	VkPipelineLayout bloom_layout;
-	VkPipeline bloom_pipeline, fog_pipeline, medium_blur_pipeline,
-	    depth_of_field_pipeline;
+	VkPipeline bloom_pipeline, fog_pipeline, depth_of_field_pipeline;
 	VkPipeline guide_surface_pipeline;
 	VkPipeline transparent_pipeline,
 	    opaque_pipeline; // Split guide surface shading.
@@ -1095,7 +1093,6 @@ static void scene_uniform(RenderUniform* uniform, const RenderScene* scene)
 	uniform->backdrop_style[0] = scene->background_blur;
 	uniform->backdrop_style[1] = scene->background_glow;
 	uniform->backdrop_style[2] = scene->background_ambient;
-	uniform->membrane_fade[2] = scene->thin_blur_radius;
 	uniform->membrane_fade[3] = 1;
 	uniform->thin_material[0] = scene->thin_transmission;
 	uniform->thin_material[1] = scene->thin_absorption;
@@ -1127,11 +1124,6 @@ static void scene_uniform(RenderUniform* uniform, const RenderScene* scene)
 	memcpy(uniform->scene_max, scene->bounds_max, 3 * sizeof(float));
 	memcpy(uniform->foreground_min, scene->foreground_min, 3 * sizeof(float));
 	memcpy(uniform->foreground_max, scene->foreground_max, 3 * sizeof(float));
-	uniform->quality[3] = scene->thin_blur_radius > 0 ? 1 : 0;
-	for (uint32_t i = 0; i < scene->media.size(); ++i)
-		if ((scene->media[i].blur[0] > 0 || scene->media[i].blur[3] > 0) &&
-		    scene->media[i].blur[2] > 0)
-			uniform->quality[3] = 1;
 	uniform->scene[1] = (uint32_t)scene->media.size();
 	uniform->scene[2] = scene->sight_count;
 	uniform->fog_grid[0] = scene->fog_field.low_x;
@@ -2343,8 +2335,7 @@ static bool create_output(RendererState* state)
 	    (VkDeviceSize)((state->config.width + stride - 1) / stride) *
 	    ((state->config.height + stride - 1) / stride);
 	VkDeviceSize guide_bytes =
-	    ((VkDeviceSize)state->config.width * state->config.height +
-		 2 * anchors) *
+	    ((VkDeviceSize)state->config.width * state->config.height + anchors) *
 	    4 * sizeof(float);
 	if (!create_buffer(state, &state->debug_pixels, debug_bytes,
 	                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -2503,19 +2494,16 @@ static bool create_output(RendererState* state)
 	                       VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 	                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
 		return false;
-	VkDeviceSize sharp_bytes = (state->uniform_data.quality[3] ||
-	                            state->uniform_data.background_quality[3])
-	                               ? (VkDeviceSize)state->config.width *
-	                                     state->config.height * 4 *
-	                                     sizeof(float)
-	                               : 4 * sizeof(float);
-	if (sharp_bytes > state->properties.limits.maxStorageBufferRange)
+	VkDeviceSize glow_bytes = state->uniform_data.background_quality[3]
+	                              ? (VkDeviceSize)state->config.width *
+	                                    state->config.height * sizeof(float)
+	                              : sizeof(float);
+	if (glow_bytes > state->properties.limits.maxStorageBufferRange)
 	{
-		fprintf(stderr,
-		        "Medium sharp layer exceeds the storage-buffer range.\n");
+		fprintf(stderr, "Emission guide exceeds the storage-buffer range.\n");
 		return false;
 	}
-	if (!create_buffer(state, &state->sharp_layer, sharp_bytes,
+	if (!create_buffer(state, &state->glow_guide, glow_bytes,
 	                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 	                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
 		return false;
@@ -2888,9 +2876,9 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
 		    {frame.instance_styles.handle, 0, frame.instance_styles.size}};
 		for (uint32_t i = 0; i < 3; ++i)
 			writes[RENDER_BINDING_EFFECTS + i].pBufferInfo = &effect_buffers[i];
-		VkDescriptorBufferInfo sharp_buffer = {state->sharp_layer.handle, 0,
-		                                       state->sharp_layer.size};
-		writes[RENDER_BINDING_SHARP_LAYER].pBufferInfo = &sharp_buffer;
+		VkDescriptorBufferInfo glow_buffer = {
+		    state->glow_guide.handle, 0, state->glow_guide.size};
+		writes[RENDER_BINDING_GLOW].pBufferInfo = &glow_buffer;
 		VkDescriptorBufferInfo lighting_buffer = {
 		    state->static_lighting.handle, 0, state->static_lighting.size};
 		VkDescriptorBufferInfo instance_buffer = {
@@ -2982,7 +2970,7 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
 		bindings[i].descriptorType =
 		    i == BLOOM_BINDING_UNIFORM ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
 			: (i == BLOOM_BINDING_DEBUG || i == BLOOM_BINDING_SIGHT ||
-			   i == BLOOM_BINDING_SHARP_LAYER || i == BLOOM_BINDING_GUIDES)
+			   i == BLOOM_BINDING_GLOW || i == BLOOM_BINDING_GUIDES)
 		        ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
 		        : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		bindings[i].descriptorCount = 1;
@@ -3049,7 +3037,7 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
 		VkDescriptorBufferInfo extra_buffers[] = {
 		    {frame.uniform.handle, 0, frame.uniform.size},
 		    {frame.sight.handle, 0, frame.sight.size},
-		    {state->sharp_layer.handle, 0, state->sharp_layer.size},
+		    {state->glow_guide.handle, 0, state->glow_guide.size},
 		    {state->guides.handle, 0, state->guides.size}};
 		for (uint32_t i = 0; i < 4; ++i)
 		{
@@ -3082,8 +3070,6 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
 	                      state->bloom_layout, &state->bloom_pipeline) &&
 	       load_companion(state, ray_trace_path, "fog.comp.spv",
 	                      state->bloom_layout, &state->fog_pipeline) &&
-	       load_companion(state, ray_trace_path, "medium_blur.comp.spv",
-	                      state->bloom_layout, &state->medium_blur_pipeline) &&
 	       load_companion(state, ray_trace_path, "depth_of_field.comp.spv",
 	                      state->bloom_layout, &state->depth_of_field_pipeline);
 }
@@ -3455,8 +3441,6 @@ static uint32_t available_features(const RendererState* state,
 	if (!state->custom_shader && state->config.volume_rays_per_pixel &&
 	    !scene->media.empty())
 		mask |= RENDER_VOLUME;
-	if (!state->custom_shader && state->uniform_data.quality[3])
-		mask |= RENDER_CELL_BLUR;
 	if (state->config.focus_radius > 0 && state->config.focus_blur_scale > 0)
 		mask |= RENDER_DEPTH_OF_FIELD;
 	if (scene->fog_blur > 0)
@@ -3488,10 +3472,9 @@ static void profile_overlay(RendererState* state, const Renderer* renderer,
 	         "F1 FRAME PROFILER / ROLLING MEAN %u OF %u FRAMES", p->count,
 	         PROFILE_HISTORY);
 	profile_text(state, line, 8, 8, STATS_TEXT_WIDTH - 8);
-	snprintf(line, sizeof(line), "F5 SSS %s / F6 VOLUME %s / F7 CELL BLUR %s",
+	snprintf(line, sizeof(line), "F5 SSS %s / F6 VOLUME %s",
 	         feature_status(renderer, RENDER_SSS),
-	         feature_status(renderer, RENDER_VOLUME),
-	         feature_status(renderer, RENDER_CELL_BLUR));
+	         feature_status(renderer, RENDER_VOLUME));
 	profile_text(state, line, 8, 288, STATS_TEXT_WIDTH - 8);
 	snprintf(line, sizeof(line),
 	         "F8 DEPTH OF FIELD %s / F9 FOG BLUR %s / F10 GLOW %s",
@@ -3566,7 +3549,7 @@ static void profile_overlay(RendererState* state, const Renderer* renderer,
 		         p->latest[hover].duration_ms, p->mean[hover].duration_ms);
 	else
 	{
-		int top[3] = {PROFILE_SURFACE, PROFILE_VOLUME, PROFILE_CELL_BLUR};
+		int top[3];
 		for (int rank = 0; rank < 3; ++rank)
 		{
 			top[rank] = -1;
@@ -4189,15 +4172,6 @@ static bool report_frame(RendererState* state, Renderer* renderer,
 		surface_ticks &= (UINT64_C(1) << state->timestamp_bits) - 1;
 		volume_ticks &= (UINT64_C(1) << state->timestamp_bits) - 1;
 	}
-	uint64_t medium_blur_ticks =
-	    timestamps[GPU_TIME_MEDIUM_BLUR_END] - timestamps[GPU_TIME_EFFECTS_END];
-	if (state->timestamp_bits < TIMESTAMP_WORD_BITS)
-		medium_blur_ticks &= (UINT64_C(1) << state->timestamp_bits) - 1;
-	if (renderer->frame_log)
-		printf("GPU medium blur: %.3f ms; native resolution; transmitted light "
-		       "and effects.\n",
-		       medium_blur_ticks * state->properties.limits.timestampPeriod /
-		           NANOSECONDS_PER_MILLISECOND);
 	uint64_t grid_ticks =
 	    timestamps[GPU_TIME_GRID_END] - timestamps[GPU_TIME_BACKDROP_END];
 	if (state->timestamp_bits < TIMESTAMP_WORD_BITS)
@@ -4266,7 +4240,7 @@ static bool report_frame(RendererState* state, Renderer* renderer,
 		       volume_ticks * state->properties.limits.timestampPeriod /
 		           NANOSECONDS_PER_MILLISECOND);
 	uint64_t bloom_ticks =
-	    timestamps[GPU_TIME_BLOOM_END] - timestamps[GPU_TIME_MEDIUM_BLUR_END];
+	    timestamps[GPU_TIME_BLOOM_END] - timestamps[GPU_TIME_EFFECTS_END];
 	if (state->timestamp_bits < TIMESTAMP_WORD_BITS)
 		bloom_ticks &= (UINT64_C(1) << state->timestamp_bits) - 1;
 	double bloom_ms = bloom_ticks * state->properties.limits.timestampPeriod /
@@ -4316,10 +4290,10 @@ static bool report_frame(RendererState* state, Renderer* renderer,
 		           ? 0.0f
 				   : state->config.bloom_strength);
 	if (renderer->frame_log)
-		printf("Render settings: disabled %u; SSS %s; volume rays %u; cell "
-		       "blur %u; depth of field radius %.1f; fog radius %.1f.\n",
+		printf("Render settings: disabled %u; SSS %s; volume rays %u; "
+		       "depth of field radius %.1f; fog radius %.1f.\n",
 		       report.disabled_features, feature_status(renderer, RENDER_SSS),
-		       uniform->quality[0], uniform->quality[3], uniform->depth_of_field[3],
+		       uniform->quality[0], uniform->depth_of_field[3],
 		       uniform->fog[0]);
 	static const struct
 	{
@@ -4335,8 +4309,7 @@ static bool report_frame(RendererState* state, Renderer* renderer,
 	    {PROFILE_VOLUME, GPU_TIME_SURFACE_END, GPU_TIME_VOLUME_END},
 	    {PROFILE_GPU_POST, GPU_TIME_VOLUME_END, GPU_TIME_BLOOM_END},
 	    {PROFILE_EFFECTS, GPU_TIME_VOLUME_END, GPU_TIME_EFFECTS_END},
-	    {PROFILE_CELL_BLUR, GPU_TIME_EFFECTS_END, GPU_TIME_MEDIUM_BLUR_END},
-	    {PROFILE_FOG, GPU_TIME_MEDIUM_BLUR_END, GPU_TIME_FOG_END},
+	    {PROFILE_FOG, GPU_TIME_EFFECTS_END, GPU_TIME_FOG_END},
 	    {PROFILE_DEPTH_OF_FIELD, GPU_TIME_FOG_END, GPU_TIME_DEPTH_OF_FIELD_END},
 	    {PROFILE_BLOOM, GPU_TIME_DEPTH_OF_FIELD_END, GPU_TIME_BLOOM_END},
 	    {PROFILE_GPU_OUTPUT, GPU_TIME_BLOOM_END, GPU_TIME_COPY_END},
@@ -4493,12 +4466,6 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene,
 		uniform->fog[0] = 0;
 	uniform->membrane_fade[3] =
 	    renderer->disabled_features & RENDER_GLOW ? 0.0f : 1.0f;
-	if (state->custom_shader ||
-	    (renderer->disabled_features & RENDER_CELL_BLUR))
-	{
-		uniform->quality[3] = 0;
-		uniform->membrane_fade[2] = 0;
-	}
 #ifdef DEVELOPMENT
 	uniform->wireframe_line[3] = 0;
 	if (renderer->wireframe && !state->custom_shader &&
@@ -4518,8 +4485,6 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene,
 		uniform->depth_of_field[3] = 0;
 		uniform->fog[0] = 0;
 		uniform->membrane_fade[3] = 0;
-		uniform->quality[3] = 0;
-		uniform->membrane_fade[2] = 0;
 	}
 #endif
 	if (scene->instances.size() != state->instance_count ||
@@ -4732,7 +4697,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene,
 	vkCmdWriteTimestamp(state->command, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 	                    state->queries, GPU_TIME_SURFACE_END);
 	if (renderer->debug_views || scene->guides_required ||
-	    state->config.volume_spatial_filter || uniform->quality[3] ||
+	    state->config.volume_spatial_filter ||
 	    state->config.focus_radius > 0)
 		shader_buffer_barrier(state->command);
 	if (uniform->quality[0] && uniform->scene[1] &&
@@ -4784,7 +4749,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene,
 	vkCmdWriteTimestamp(state->command, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 	                    state->queries, GPU_TIME_VOLUME_END);
 	if (renderer->debug_views || scene->guides_required ||
-	    state->config.volume_spatial_filter || uniform->quality[3] ||
+	    state->config.volume_spatial_filter ||
 	    state->config.focus_radius > 0)
 		shader_buffer_barrier(state->command);
 	image_barrier(state->command, state->hdr, VK_IMAGE_LAYOUT_GENERAL,
@@ -4821,46 +4786,6 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene,
 	}
 	vkCmdWriteTimestamp(state->command, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 	                    state->queries, GPU_TIME_EFFECTS_END);
-	if (uniform->quality[3])
-	{
-		shader_buffer_barrier(state->command);
-		vkCmdBindPipeline(state->command, VK_PIPELINE_BIND_POINT_COMPUTE,
-		                  state->medium_blur_pipeline);
-		vkCmdBindDescriptorSets(state->command, VK_PIPELINE_BIND_POINT_COMPUTE,
-		                        state->bloom_layout, 0, 1,
-		                        &state->bloom_descriptors, 0, 0);
-		for (int pass = 0; pass < 2; ++pass)
-		{
-			image_barrier(
-			    state->command, state->hdr, VK_IMAGE_LAYOUT_GENERAL,
-			    VK_IMAGE_LAYOUT_GENERAL,
-			    VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT,
-			    VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-			    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-			image_barrier(
-			    state->command, state->hdr_scratch, VK_IMAGE_LAYOUT_GENERAL,
-			    VK_IMAGE_LAYOUT_GENERAL,
-			    VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT,
-			    VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-			    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-			BloomParameters parameters = {};
-			parameters.extent[0] = state->config.width;
-			parameters.extent[1] = state->config.height;
-			parameters.pass = pass;
-			vkCmdPushConstants(state->command, state->bloom_layout,
-			                   VK_SHADER_STAGE_COMPUTE_BIT, 0,
-			                   sizeof(parameters), &parameters);
-			vkCmdDispatch(state->command, (state->config.width + 7) / 8,
-			              (state->config.height + 7) / 8, 1);
-		}
-		vkCmdBindDescriptorSets(state->command, VK_PIPELINE_BIND_POINT_COMPUTE,
-		                        state->pipeline_layout, 0, 1,
-		                        &state->descriptors, 0, 0);
-	}
-	vkCmdWriteTimestamp(state->command, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-	                    state->queries, GPU_TIME_MEDIUM_BLUR_END);
 	BloomParameters bloom = {};
 	bloom.extent[0] = (int32_t)state->config.width;
 	bloom.extent[1] = (int32_t)state->config.height;
@@ -5163,8 +5088,6 @@ bool renderer_shutdown(Renderer* renderer)
 			vkDestroyPipeline(state->device, state->opaque_pipeline, 0);
 		if (state->depth_of_field_pipeline)
 			vkDestroyPipeline(state->device, state->depth_of_field_pipeline, 0);
-		if (state->medium_blur_pipeline)
-			vkDestroyPipeline(state->device, state->medium_blur_pipeline, 0);
 		if (state->fog_pipeline)
 			vkDestroyPipeline(state->device, state->fog_pipeline, 0);
 		if (state->bloom_pipeline)
@@ -5235,7 +5158,7 @@ bool renderer_shutdown(Renderer* renderer)
 		    &state->readback,         &state->optical_depth_upload,
 		    &state->shadow_grid,      &state->static_lighting,
 		    &state->surface_lighting, &state->dynamic_lighting,
-		    &state->sharp_layer,      &state->debug_pixels,
+		    &state->glow_guide,      &state->debug_pixels,
 		    &state->guides,           &state->opaque_hits,
 		    &state->radiance_cascades};
 		for (uint32_t i = 0; i < sizeof(buffers) / sizeof(buffers[0]); ++i)
