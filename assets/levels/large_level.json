@@ -28,7 +28,7 @@
     "colonized_starts": true
   },
   "layout": {
-    "field_radius": 120,
+    "field_radius": 96,
     "cells": 128,
     "minimum_gap": 4,
     "centroid_steps": 3,
