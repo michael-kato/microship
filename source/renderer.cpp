@@ -15,6 +15,7 @@
 #include "math_constants.h"
 
 #include <algorithm>
+#include <assert.h>
 #include <atomic>
 #include <cmath>
 #include <float.h>
@@ -1072,10 +1073,12 @@ static void scene_instances(RendererState* state,const RenderScene* scene)
 
 // Geometry 0 is opaque and committed by traversal. Geometry 1 holds thin
 // membranes, which shadow rays inspect once each to multiply transmission.
-static void mesh_geometries(RendererState* state,uint32_t vertex_count,const MeshAllocation& mesh,
+// Each BLAS reads only its mesh's vertices; the index buffer holds mesh-local indices.
+// An empty geometry points at the mesh's first triangle so the address stays inside the buffer.
+static void mesh_geometries(RendererState* state,const MeshAllocation& mesh,
     VkAccelerationStructureGeometryKHR* geometries,VkAccelerationStructureBuildRangeInfoKHR* ranges)
 {
-    uint32_t first[2]={mesh.range.first,mesh.range.first+mesh.opaque_count};
+    uint32_t first[2]={mesh.range.first,mesh.opaque_count<mesh.range.count ? mesh.range.first+mesh.opaque_count : mesh.range.first};
     uint32_t counts[2]={mesh.opaque_count,mesh.range.count-mesh.opaque_count};
     for (uint32_t g=0;g<2;++g)
     {
@@ -1085,9 +1088,9 @@ static void mesh_geometries(RendererState* state,uint32_t vertex_count,const Mes
         geometry.flags = g==MEMBRANE_GEOMETRY ? VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR : VK_GEOMETRY_OPAQUE_BIT_KHR;
         geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
         geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-        geometry.geometry.triangles.vertexData.deviceAddress = state->vertices.address;
+        geometry.geometry.triangles.vertexData.deviceAddress = state->vertices.address+(VkDeviceSize)mesh.range.first_vertex*sizeof(GpuVertex);
         geometry.geometry.triangles.vertexStride = sizeof(GpuVertex);
-        geometry.geometry.triangles.maxVertex = vertex_count - 1;
+        geometry.geometry.triangles.maxVertex = mesh.range.vertex_count - 1;
         geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
         geometry.geometry.triangles.indexData.deviceAddress = state->indices.address+(VkDeviceSize)first[g]*3*sizeof(uint32_t);
         ranges[g]=VkAccelerationStructureBuildRangeInfoKHR();ranges[g].primitiveCount=counts[g];
@@ -1126,9 +1129,16 @@ static bool upload_geometry(RendererState* state,const Geometry& geometry)
     memcpy(bytes, geometry.vertices.data(), vertex_bytes);
     memcpy(bytes+vertex_bytes, ordered.data(), triangle_bytes);
     uint32_t* indices = (uint32_t*)(bytes+vertex_bytes+triangle_bytes);
-    for (uint32_t i = 0; i < state->triangle_count; ++i)
-        for (uint32_t j = 0; j < 3; ++j)
-            indices[i*3+j] = ordered[i].index[j];
+    for (uint32_t m=0;m<state->mesh_count;++m)
+    {
+        const MeshRange& range=geometry.meshes[m];
+        for (uint32_t i=range.first;i<range.first+range.count;++i)
+            for (uint32_t j=0;j<3;++j)
+            {
+                assert(ordered[i].index[j]-range.first_vertex<range.vertex_count);
+                indices[i*3+j]=ordered[i].index[j]-range.first_vertex;
+            }
+    }
     uint32_t* mesh_ranges=indices+3*state->triangle_count;
     for (uint32_t i=0;i<state->mesh_count;++i) { mesh_ranges[2*i]=geometry.meshes[i].first;mesh_ranges[2*i+1]=state->meshes[i].opaque_count; }
     VkDeviceSize deformable_bytes=0;
@@ -1141,7 +1151,7 @@ static bool upload_geometry(RendererState* state,const Geometry& geometry)
     for (uint32_t i=0;i<state->mesh_count;++i)
     {
         MeshAllocation* allocation=&state->meshes[i];allocation->range=geometry.meshes[i];
-        mesh_geometries(state,(uint32_t)geometry.vertices.size(),*allocation,&meshes[2*i],&ranges[2*i]);
+        mesh_geometries(state,*allocation,&meshes[2*i],&ranges[2*i]);
         state->vertex_upload_offsets[i]=deformable_bytes;
         if (allocation->range.deformable) deformable_bytes+=(VkDeviceSize)allocation->range.vertex_count*sizeof(GpuVertex);
         VkAccelerationStructureBuildGeometryInfoKHR& build=builds[i];build=VkAccelerationStructureBuildGeometryInfoKHR();
@@ -2534,7 +2544,7 @@ static bool update_meshes(RendererState* state,const Geometry& scene,bool log)
         if (!changed && !(mesh.refits && mesh.unchanged>=BLAS_SETTLED_FRAMES)) continue;
         bool rebuild=!changed || mesh.refits>=BLAS_REFITS_PER_BUILD;
         VkAccelerationStructureGeometryKHR geometries[2];VkAccelerationStructureBuildRangeInfoKHR ranges[2];
-        mesh_geometries(state,(uint32_t)scene.vertices.size(),mesh,geometries,ranges);
+        mesh_geometries(state,mesh,geometries,ranges);
         VkAccelerationStructureBuildGeometryInfoKHR build={};build.sType=VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
         build.type=VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
         build.flags=VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
