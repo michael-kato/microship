@@ -24,7 +24,6 @@ enum
 };
 enum
 {
-	MAX_SPIKES = 32,
 	MAX_EMBEDDED = 2,
 	GROWTH_SEGMENTS = 4,
 	MAX_LIMB_DEBRIS = 256

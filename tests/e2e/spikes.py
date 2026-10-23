@@ -13,6 +13,7 @@ root=Path(__file__).resolve().parents[2]
 binary=Path(sys.argv[1]).resolve()
 command=[str(binary)] if sys.platform=='win32' else [sys.executable,str(root/'scripts/proton_run.py'),str(binary)]
 count=0
+spike_storage=int(re.search(r'MAX_SPIKES = (\d+)',(root/'source/asset_limits.h').read_text()).group(1))
 with tempfile.TemporaryDirectory(prefix='nanovore-spikes-') as directory:
     out=Path(directory)
     def stage(side):
@@ -98,7 +99,7 @@ with tempfile.TemporaryDirectory(prefix='nanovore-spikes-') as directory:
         assert own(normal)==own(fast) and other(normal)<other(fast),(side,'AI production counts',own(normal),own(fast),other(normal),other(fast))
     text=stage('virus')
     for name,bad in [
-        ('bad-count',change(text,'rules.spikes.count',33)),
+        ('bad-count',change(text,'rules.spikes.count',spike_storage+1)),
         ('missing-recovery',remove(text,'rules.recovery')),
         ('bad-recovery',change(text,'rules.recovery.heal_interval',0)),
         ('bad-ai-rate',change(text,'rules.ai.production_rate',0)),

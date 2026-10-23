@@ -42,7 +42,6 @@ static const int MAX_DEBRIS_DRAG = 10;
 static const int MAX_DEBRIS_SPEED = 10;
 static const int MAX_DEBRIS_SECONDS = 10;
 static const int MAX_RULES_REGROW_SECONDS = 60;
-static const int MAX_SPIKE_COUNT = 32;
 static const int MAX_RULES_ORBIT_CLEARANCE = 10;
 static const int MAX_RULES_DAMAGE_DELAY = 60;
 static const int MAX_RULES_HEAL_INTERVAL = 60;
@@ -241,7 +240,7 @@ static bool load_rules(World* w, const char* path)
 	{
 		Json j = spikes;
 		json_object(j, "count|regrow_seconds");
-		w->spikes.count = json_uint(json_get(j, "count"), 1, MAX_SPIKE_COUNT);
+		w->spikes.count = json_uint(json_get(j, "count"), 1, MAX_SPIKES);
 		w->spikes.regrow = json_positive(json_get(j, "regrow_seconds"),
 		                                 MAX_RULES_REGROW_SECONDS);
 		w->spikes.enabled = true;
