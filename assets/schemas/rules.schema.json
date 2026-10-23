@@ -58,6 +58,26 @@
       "required": ["production_rate", "expansion_delay"],
       "additionalProperties": false
     },
+    "front": {
+      "type": "object",
+      "description": "Rear cells build slower. Depth is a cell's gap to the nearest other-faction cell minus its faction's smallest such gap.",
+      "properties": {
+        "full_depth": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Depth in world units with full manufacture speed."
+        },
+        "stop_depth": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "description": "Depth from which a cell starts no new units."
+        }
+      },
+      "required": ["full_depth", "stop_depth"],
+      "additionalProperties": false
+    },
     "exploration": {
       "type": "object",
       "properties": {

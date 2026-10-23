@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stddef.h>
+#include <float.h>
 #include <algorithm>
 #include <new>
 
@@ -797,7 +798,7 @@ static void establish_colony(Simulation* s,uint32_t p,Faction faction)
     c->fighter_percent=s->world.content.units[c->priority].group==0 ? 100 : 0;c->production_error=50;
     if (s->world.gameplay.production_ratio_default && content_product(&s->world.content,faction,0)>=0 && content_product(&s->world.content,faction,1)>=0)
     { c->fighter_percent=s->world.gameplay.default_fighter_percent;c->ratio_enabled=true; }
-    c->established_tick=s->tick_count;c->active=true;c->root_generation=1;
+    c->established_tick=s->tick_count;c->active=true;c->front=1;c->root_generation=1;
     s->world.bodies[p].owner=faction;s->faction_established[faction]=true;++s->faction_stats[faction].colonies_gained;
     if (s->world.gameplay.enabled) prepare_factory(s,p);
     if (simulation_producer_definition(s,p)->establishment_seconds>0) c->growth=0;
@@ -2128,9 +2129,37 @@ static bool repair_colony(Simulation* s,uint32_t p,float dt)
     return damaged;
 }
 
+// Gap from each colony to the nearest cell another faction holds, then each
+// colony's depth behind its faction's closest such gap.
+static void front_factors(Simulation* s)
+{
+    const GameplayRules* rules=&s->world.gameplay;const World* w=&s->world;
+    float gap[MAX_BODIES],front[MAX_FACTIONS];
+    for (uint32_t f=0;f<MAX_FACTIONS;++f) front[f]=FLT_MAX;
+    for (uint32_t p=0;p<w->body_count;++p)
+    {
+        Colony* c=&s->colonies[p];c->front=1;gap[p]=FLT_MAX;
+        if (!c->active || rules->front_stop_depth<=0) continue;
+        for (uint32_t q=0;q<w->body_count;++q)
+        {
+            const Colony& other=s->colonies[q];
+            if (!other.active || other.faction==c->faction) continue;
+            gap[p]=min_of(gap[p],length(subtract(w->bodies[p].position,w->bodies[q].position))-w->bodies[p].radius-w->bodies[q].radius);
+        }
+        front[c->faction]=min_of(front[c->faction],gap[p]);
+    }
+    for (uint32_t p=0;p<w->body_count;++p)
+    {
+        Colony* c=&s->colonies[p];if (!c->active || gap[p]==FLT_MAX) continue;
+        float depth=gap[p]-front[c->faction];
+        c->front=min_of(1.0f,max_of(0.0f,(rules->front_stop_depth-depth)/(rules->front_stop_depth-rules->front_full_depth)));
+    }
+}
+
 static void grow_colonies(Simulation* s, float dt)
 {
     refresh_free_hint(s);
+    front_factors(s);
     const GameplayRules* rules=&s->world.gameplay;
     for (uint32_t p=0;p<s->world.body_count;++p)
     {
@@ -2204,7 +2233,8 @@ static void grow_colonies(Simulation* s, float dt)
             { c->leaves[tips[j]]=c->leaves[k];c->leaves[k]=LeafProduction();break; }
             // If all ready leaves are busy, retain the paid job until one becomes free.
         }
-        for (uint32_t i=0;i<c->structure_count;++i)
+        // Cells far behind the front start no paid jobs, so their nutrients stay in storage.
+        for (uint32_t i=0;c->front>0 && i<c->structure_count;++i)
         {
             uint32_t k=(c->production_cursor+i)%c->structure_count;LeafProduction* job=&c->leaves[k];
             if (!ready[k] || job->active) continue;
@@ -2220,7 +2250,7 @@ static void grow_colonies(Simulation* s, float dt)
             // Continue from the same cursor on the next tick. Do not skip other leaves.
             break;
         }
-        float rate=s->world.ai_production_set && (c->faction!=s->world.player_faction || s->world.player_ai) ? s->world.ai_production : 1;
+        float rate=(s->world.ai_production_set && (c->faction!=s->world.player_faction || s->world.player_ai) ? s->world.ai_production : 1)*c->front;
 
         // Smaller factories work in proportion to their cross-sectional area.
         float tip_weight=0;
@@ -2456,6 +2486,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
         const Colony* c=&s->colonies[p];
         fprintf(file,"%s{\"%s\":%u,\"faction\":%d,\"health\":%.6f,\"growth\":%.6f,\"%s\":%.6f,\"energy\":%.6f,\"building\":%s,\"priority\":%d,\"manufacturing\":%.6f,\"capacity_blocked\":%s,\"wounds\":%u",
             p ? "," : "","cell",p,(int)c->faction,c->health,c->growth,"nutrients",c->uptake,c->energy,c->building ? "true" : "false",(int)(c->faction ? s->world.content.units[c->priority].group : 0),c->manufacturing,c->capacity_blocked ? "true" : "false",c->wounds);
+        fprintf(file,",\"front\":%.6f",c->front);
         fprintf(file,",\"fighter_percent\":%u,\"ratio_enabled\":%s,\"produced\":[%u,%u],\"building_type\":\"%s\"",c->fighter_percent,c->ratio_enabled ? "true" : "false",c->produced[0],c->produced[1],c->building ? s->world.content.units[c->building_kind].name : "");
         fprintf(file,",\"repairing\":%s,\"repair_nutrients\":%.6f",c->repairing ? "true" : "false",c->repair_nutrients);
         const Body& body=s->world.bodies[p];

@@ -51,6 +51,9 @@ struct GameplayRules
     float storage,manufacture_seconds,landing_seconds,enemy_attack_seconds;
     float cell_morph_seconds,cell_tint_seconds;
     uint32_t default_fighter_percent;bool production_ratio_default;
+    // Rear cells build slower: full speed up to front_full_depth units deeper than the
+    // faction's closest cell to an enemy, none from front_stop_depth. Zero stop depth: off.
+    float front_full_depth,front_stop_depth;
 };
 enum { COMBAT_FIELD_PROJECTILE=1, COMBAT_FIELD_ORBIT=2, COMBAT_FIELD_DAMAGE=4, COMBAT_FIELDS_COMPLETE=7, STUDIO_LIGHTS_COMPLETE=7 };
 struct StudioLight { Vec3 direction; Color color; float irradiance; };

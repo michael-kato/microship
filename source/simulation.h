@@ -151,6 +151,7 @@ struct Colony
     uint32_t fighter_percent,production_error,produced[2],established_tick;
     bool ratio_enabled;
     bool building, capacity_blocked;
+    float front; // Manufacture speed factor from depth behind the faction's front, 0 to 1.
     bool active;
     float root_regrow_timer;
     uint32_t root_generation,root_count,large_root_count,structure_count;

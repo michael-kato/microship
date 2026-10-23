@@ -467,6 +467,7 @@ static void overlay_enabled(Game* game, const RenderConfig* config)
         r->hud_accent[3]=ours ? 1.0f : c->active ? -1.0f : 0.0f;
         snprintf(r->hud[HUD_LINE_SITE],HUD_LINE_CAPACITY,"%s %02d / %s",s->world.content.bodies[s->world.bodies[p].type].label,p+1,c->active ? (ours ? "YOUR NODE" : "HOSTILE NODE") : "UNCLAIMED");
         if (c->building) snprintf(r->hud[HUD_LINE_SITE]+strlen(r->hud[HUD_LINE_SITE]),HUD_LINE_CAPACITY-strlen(r->hud[HUD_LINE_SITE]),"  %s %03.0f%%",s->world.content.factions[c->faction].automatic ? "SPORE" : "BUILD",c->manufacturing*PERCENT_SCALE);
+        if (c->active && c->front<1) snprintf(r->hud[HUD_LINE_SITE],HUD_LINE_CAPACITY,c->front>0 ? "REAR CELL / BUILD AT %.0f%%" : "REAR CELL / BUILD HELD",c->front*PERCENT_SCALE);
         if (c->capacity_blocked) snprintf(r->hud[HUD_LINE_SITE],HUD_LINE_CAPACITY,"UNIT STORAGE FULL / BUILD HELD");
         if (s->world.gameplay.enabled)
         {

@@ -98,7 +98,7 @@ static uint32_t seed_mix(uint32_t seed,uint32_t salt)
 static bool load_rules(World* w,const char* path)
 {
     JsonDocument d;if (!json_load(&d,path)) return false;Json root=json_root(&d);
-    json_object(root,"$schema|resource_label|economy|ai|exploration|flight|orbit|recovery|spikes|cell_infection");
+    json_object(root,"$schema|resource_label|economy|ai|exploration|front|flight|orbit|recovery|spikes|cell_infection");
     json_string(json_get(root,"resource_label"),w->content.resource_label,MAX_RULES_RESOURCE_LABEL);
     Json economy=json_find(root,"economy");
     if (json_present(economy))
@@ -123,6 +123,14 @@ static bool load_rules(World* w,const char* path)
         w->ai_production=json_positive(json_get(j,"production_rate"),1);
         w->ai_expansion=json_float(json_get(j,"expansion_delay"),0,MAX_RULES_EXPANSION_DELAY);
         w->ai_production_set=true;
+    }
+    Json front=json_find(root,"front");
+    if (json_present(front))
+    {
+        Json j=front;json_object(j,"full_depth|stop_depth");
+        w->gameplay.front_full_depth=json_float(json_get(j,"full_depth"),0,MAX_FIELD_RADIUS);
+        w->gameplay.front_stop_depth=json_positive(json_get(j,"stop_depth"),MAX_FIELD_RADIUS);
+        if (w->gameplay.front_stop_depth<=w->gameplay.front_full_depth) return json_error(j,"stop_depth must exceed full_depth");
     }
     Json exploration=json_find(root,"exploration");
     if (json_present(exploration))
