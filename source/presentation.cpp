@@ -226,7 +226,6 @@ static void unit_pose_axes(const Simulation* s,const Unit* u,Vec3* x,Vec3* y,Vec
     simulation_unit_axes(u,x,y,z);const FactionMotion& motion=s->world.content.factions[u->faction].motion;
     if (!motion.enabled || motion.roll==0) return;
     double time=s->time_seconds;
-    if (motion.cadence>0) time=std::floor(time/motion.cadence)*motion.cadence;
     float angle=motion.roll*(float)std::sin(time/motion.period*FULL_TURN_RADIANS+u->generation);
     Vec3 old=*x;*x=add(scale(*x,std::cos(angle)),scale(*y,std::sin(angle)));
     *y=add(scale(*y,std::cos(angle)),scale(old,-std::sin(angle)));

@@ -41,6 +41,7 @@
         },
         "cadence": {
           "type": "number",
+          "description": "Seconds between steps of cell organelle and factory animation; zero animates continuously. Craft always move smoothly.",
           "minimum": 0,
           "maximum": 1
         },

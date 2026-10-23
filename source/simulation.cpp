@@ -1440,12 +1440,8 @@ static void move_units(Simulation* s, float dt)
             if (length(u->velocity)>MIN_HEADING_SPEED)
             {
                 Vec3 heading=normalize(u->velocity),side=cross(Vec3{0,1,0},u->forward);
+                // Heading and bank always ease toward the flight direction, including on new targets.
                 float blend=1-std::exp(-flight->turn_rate*(motion.enabled ? motion.turn_rate : 1)*dt);
-                if (motion.cadence>0)
-                {
-                    double now=s->time_seconds+u->generation*.037;
-                    blend=std::floor(now/motion.cadence)!=std::floor((now-dt)/motion.cadence) ? 1 : 0;
-                }
                 float bank=-dot(subtract(heading,u->forward),side)*BANK_RESPONSE_GAIN;
                 u->bank+=(max_of(-flight->bank,min_of(flight->bank,bank))-u->bank)*blend;
                 Vec3 forward=add(scale(u->forward,1-blend),scale(heading,blend));
@@ -2515,6 +2511,7 @@ bool simulation_write_state(const Simulation* s, const char* path)
             uint32_t ready=0;for (uint32_t j=0;j<s->world.spikes.count;++j) ready+=u->spikes[j]>=1;
             fprintf(file,"%s{\"slot\":%u,\"generation\":%u,\"faction\":%d,\"kind\":%d,\"health\":%.6f,\"target\":%d,\"position\":[%.6f,%.6f,%.6f],\"velocity\":[%.6f,%.6f,%.6f],\"bank\":%.6f,\"selected\":%s,\"wounds\":%u,\"ready_spikes\":%u,\"flash\":%.6f,\"visible\":%s,\"moving\":%s",
                 first ? "" : ",",i,u->generation,(int)u->faction,(int)simulation_unit_definition(s,u)->group,u->health,u->target,u->position.x,u->position.y,u->position.z,u->velocity.x,u->velocity.y,u->velocity.z,u->bank,u->selected ? "true" : "false",u->wounds,ready,u->flash,s->visible_units[i] ? "true" : "false",u->moving ? "true" : "false");
+            fprintf(file,",\"forward\":[%.6f,%.6f,%.6f]",u->forward.x,u->forward.y,u->forward.z);
             fprintf(file,",\"exposure\":%.6f,\"stun\":%.6f,\"aura\":%.6f",u->exposure,u->stun,u->aura);
             fprintf(file,",\"landing\":%.6f,\"seed_cooldown\":%.6f,\"carrier_timer\":%.6f,\"carrier_blocked\":%s",u->landing,u->seed_cooldown,u->carrier_timer,u->carrier_blocked ? "true" : "false");
             uint32_t pods=0;const UnitDefinition* definition=simulation_unit_definition(s,u);

@@ -41,12 +41,13 @@ with tempfile.TemporaryDirectory(prefix='nanovore_faction_motion_') as directory
   slot=state['units'][0]['slot'];return next(v for v in scene['instances'] if v['slot']==slot)['transform']
  def forward(matrix):
   v=[matrix[i] for i in (2,6,10)];n=math.sqrt(sum(x*x for x in v));return [x/n for x in v]
- # The Virus holds its facing between short turns; the control turns smoothly.
+ # Facing eases toward a new heading every tick: at most the per-tick blend of a full reversal, never a snap.
  command_flight='0 select all\n0 move 20 12 7\n'
- a=run('virus_20',fixture('virus'),20,command_flight);b=run('virus_21',fixture('virus'),21,command_flight)
- c=run('smooth_20',fixture('virus',True),20,command_flight);d=run('smooth_21',fixture('virus',True),21,command_flight)
- assert math.dist(forward(unit_pose(*a)),forward(unit_pose(*b)))<1e-5,'Virus facing did not hold between turns'
- assert math.dist(forward(unit_pose(*c)),forward(unit_pose(*d)))>1e-5,'The control did not exercise a turn'
+ virus=fixture('virus');entry=next(f for f in virus['content']['factions'] if f['name']=='virus')
+ rate=virus['rules']['flight']['turn_rate']*json.loads((out/entry['personality']).resolve().read_text())['motion']['turn_rate']
+ a=run('virus_20',virus,20,command_flight);b=run('virus_21',virus,21,command_flight)
+ turn=math.dist(forward(unit_pose(*a)),forward(unit_pose(*b)))
+ assert 1e-5<turn<=2*(1-math.exp(-rate/60))+1e-4,('Virus facing must turn gradually',turn,rate)
  # Slow Immune units still roll. Factory and organelle poses also change.
  a=run('immune_wobble',fixture('immune',slow=True),120);b=run('immune_control',fixture('immune',True,True),120)
  assert math.dist(unit_pose(*a),unit_pose(*b))>.02,'Immune wobble did not reach the rendered ship'
@@ -58,4 +59,4 @@ with tempfile.TemporaryDirectory(prefix='nanovore_faction_motion_') as directory
  assert math.dist(a[0]['units'][0]['flight_goal'],b[0]['units'][0]['flight_goal'])>1,'Fungal patrol did not wander'
  assert math.dist(a[0]['units'][0]['position'],b[0]['units'][0]['position'])>.1,'Wandering did not affect flight'
  assert a[0]['units'][0]['health']>0 and a[0]['units'][0]['faction']==3
- print(f'Faction motion E2E passed: {count} application runs; abrupt Virus turns, Immune roll, cell and factory poses, fungal wandering.')
+ print(f'Faction motion E2E passed: {count} application runs; gradual Virus turns, Immune roll, cell and factory poses, fungal wandering.')
