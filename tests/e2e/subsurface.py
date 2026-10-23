@@ -42,6 +42,18 @@ with tempfile.TemporaryDirectory(prefix='nanovore-subsurface-') as directory:
     assert baseline==no_sss and view==no_view,'SSS changed simulation or scene geometry'
     missing=deepcopy(settings);missing.pop('subsurface')
     assert run('optional',config=missing,ticks=4800)==(baseline,view)
+    # Old renderer files inherit the surface LOD. New SSS controls cannot alter play.
+    inherited=deepcopy(settings)
+    inherited['level_of_detail'].pop('subsurface_minimum_pixels')
+    inherited['level_of_detail'].pop('subsurface_full_pixels')
+    assert run('inherited-lod',config=inherited,ticks=4800)==(baseline,view)
+    for minimum,full in [(8,4),(-1,16),(4,4097)]:
+        bad=deepcopy(settings)
+        bad['level_of_detail'].update(subsurface_minimum_pixels=minimum,subsurface_full_pixels=full)
+        run('bad-lod-'+str(count),config=bad,expected=1)
+    for field in ('subsurface_minimum_pixels','subsurface_full_pixels'):
+        bad=deepcopy(settings);bad['level_of_detail'].pop(field)
+        run('incomplete-lod-'+str(count),config=bad,expected=1)
     for field,value in [('strength',-1),('strength',1.1),('wrap',1.1),('transmission',-1),('membrane_thickness',0),('samples_per_pixel',0),('samples_per_pixel',7),('extra',1)]:
         bad=deepcopy(settings);bad['subsurface'][field]=value;run('bad-setting-'+str(count),config=bad,expected=1)
     # Malformed V2 materials must fail startup, even with the render effect disabled.

@@ -38,6 +38,12 @@ static const double CAMERA_BASIS_DEGENERACY_EPSILON = 1e-12;
 
 const char* render_config_error(const RenderConfig* config)
 {
+    if (!std::isfinite(config->detail_subsurface_minimum) || !std::isfinite(config->detail_subsurface_full)
+        || config->detail_subsurface_minimum<0 || config->detail_subsurface_full<0
+        || config->detail_subsurface_minimum>MAX_DETAIL_PIXELS || config->detail_subsurface_full>MAX_DETAIL_PIXELS
+        || (config->detail_subsurface_full>0 && config->detail_subsurface_minimum>=config->detail_subsurface_full)
+        || (config->detail_subsurface_full==0 && config->detail_subsurface_minimum!=0))
+        return "Subsurface LOD needs a minimum below its full radius, or two zeros to disable it.";
     if (config->volume_rays_per_pixel > MAX_RENDER_RAYS_PER_PIXEL)
         return "volume_rays_per_pixel must be in [0, 4096]";
     if (config->microfacet_energy_compensation > 1)
@@ -212,9 +218,16 @@ bool render_config_load(RenderConfig* config,const char* path)
     Json detail=json_find(root,"level_of_detail");
     if (json_present(detail))
     {
-        json_object(detail,"surface_minimum_pixels|surface_full_pixels|cell_minimum_pixels|cell_full_pixels|animation_margin");
+        json_object(detail,"surface_minimum_pixels|surface_full_pixels|subsurface_minimum_pixels|subsurface_full_pixels|cell_minimum_pixels|cell_full_pixels|animation_margin");
         loaded.detail_surface_minimum=json_float(json_get(detail,"surface_minimum_pixels"),0,MAX_DETAIL_PIXELS);
         loaded.detail_surface_full=json_positive(json_get(detail,"surface_full_pixels"),MAX_DETAIL_PIXELS);
+        loaded.detail_subsurface_minimum=loaded.detail_surface_minimum;
+        loaded.detail_subsurface_full=loaded.detail_surface_full;
+        if (json_present(json_find(detail,"subsurface_minimum_pixels")) || json_present(json_find(detail,"subsurface_full_pixels")))
+        {
+            loaded.detail_subsurface_minimum=json_float(json_get(detail,"subsurface_minimum_pixels"),0,MAX_DETAIL_PIXELS);
+            loaded.detail_subsurface_full=json_positive(json_get(detail,"subsurface_full_pixels"),MAX_DETAIL_PIXELS);
+        }
         loaded.detail_cell_minimum=json_float(json_get(detail,"cell_minimum_pixels"),0,MAX_DETAIL_PIXELS);
         loaded.detail_cell_full=json_positive(json_get(detail,"cell_full_pixels"),MAX_DETAIL_PIXELS);
         loaded.animation_margin=json_positive(json_get(detail,"animation_margin"),MAX_ANIMATION_MARGIN);

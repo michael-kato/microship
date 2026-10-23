@@ -31,7 +31,7 @@
 static_assert(SIGHT_FIELD_SIDE==FOG_FIELD_SIZE,"Fog CPU/GPU grid layout");
 static const int GPU_VERTEX_BYTES = 64;
 static const int GPU_MEDIUM_BYTES = 96;
-// Scene style floats, then the renderer's screen-space detail and fog reveal.
+// Scene style floats, then surface weight, fog reveal, SSS weight and ray mask.
 static const int INSTANCE_STYLE_GPU_FLOATS = INSTANCE_STYLE_FLOATS+4;
 static const float MAX_PROJECTED_PIXELS = 1e6f;
 static const int GPU_RENDER_UNIFORM_BYTES = 656;
@@ -45,7 +45,7 @@ static const double BACKDROP_TIME_WRAP_SECONDS = 10000.0;
 static const int GPU_DEBUG_PIXEL_BYTES = 96;
 static const int COMPANION_SHADER_PATH_CAPACITY = 1024;
 static const double NANOSECONDS_PER_MILLISECOND = 1000000.0;
-static const int RENDER_STORAGE_BUFFER_BINDINGS = 18;
+static const int RENDER_STORAGE_BUFFER_BINDINGS = 19;
 static const int RENDER_DESCRIPTOR_SET_COUNT = 3;
 static const int RENDER_STORAGE_IMAGE_BINDINGS = 3;
 static const int RENDER_SAMPLER_BINDINGS = 4;
@@ -74,6 +74,9 @@ struct GpuBuffer
     VkDeviceAddress address;
     void* mapped;
 };
+
+struct MediumRayNode { float low[3];uint32_t escape;float high[3];uint32_t medium; };
+static_assert(sizeof(MediumRayNode)==32,"Medium ray node GPU layout");
 
 struct LightingInstance
 {
@@ -170,7 +173,7 @@ struct FrameResources
     VkFence fence;
     VkSemaphore image_available;
     VkQueryPool queries;
-    GpuBuffer uniform,instances,media,lighting_instances,lighting_bounds,sight,instance_styles,effects,effect_tiles,debug_text,vertex_upload;
+    GpuBuffer uniform,instances,media,medium_ray_nodes,lighting_instances,lighting_bounds,sight,instance_styles,effects,effect_tiles,debug_text,vertex_upload;
     VkDescriptorSet descriptors,effect_descriptors,debug_descriptors,bloom_descriptors;
     bool pending; // Submitted; timestamps not yet reported.
     FrameReport report;
@@ -234,6 +237,8 @@ struct RendererState
     uint32_t lighting_bakes,lighting_reuses,lighting_surface_bakes;
     std::vector<uint32_t> surface_cache_meshes,surface_slots;
     uint32_t medium_count;
+    std::vector<uint32_t> medium_ray_order;
+    std::vector<MediumRayNode> medium_ray_scratch;
     PFN_vkCmdCopyBufferToImage copy_buffer_to_image;
     PFN_vkCmdFillBuffer fill_buffer;
     PFN_vkCmdCopyBuffer copy_buffer;
@@ -1016,7 +1021,7 @@ static float fog_reveal(const RenderScene* scene,const float center[3],float rad
     v=std::fmax(v,std::fmax(fog_visibility(scene,x,y+radius),fog_visibility(scene,x,y-radius)));
     return std::fmin(1.0f,v);
 }
-// Instances: surface detail (size ramp times fog reveal) and fog reveal. Cells:
+// Instances: separate surface and SSS size ramps, fog reveal and ray mask. Cells:
 // projected radius, fog reveal, then moving-shadow and cascade weights.
 static void update_level_of_detail(RendererState* state,const RenderScene* scene)
 {
@@ -1035,7 +1040,9 @@ static void update_level_of_detail(RendererState* state,const RenderScene* scene
         float radius=.5f*std::sqrt(extent)*scale,reveal=fog_reveal(scene,center,radius);
         float size=radius>0 ? detail_ramp(projected_radius(u,center,radius),c.detail_surface_minimum,c.detail_surface_full) : 1;
         float* detail=&state->style_data[j*INSTANCE_STYLE_GPU_FLOATS+INSTANCE_STYLE_FLOATS];
-        detail[0]=size*reveal;detail[1]=reveal;detail[2]=detail[3]=0;
+        detail[0]=size*reveal;detail[1]=reveal;
+        detail[2]=detail_ramp(projected_radius(u,center,radius),c.detail_subsurface_minimum,c.detail_subsurface_full)*reveal;
+        detail[3]=source.static_lighting ? STATIC_BLOCKER_RAY_MASK : DYNAMIC_BLOCKER_RAY_MASK;
     }
     RenderMedium* media=(RenderMedium*)frame_data(state).media.mapped;
     for (uint32_t i=0;i<state->medium_count;++i)
@@ -1045,6 +1052,46 @@ static void update_level_of_detail(RendererState* state,const RenderScene* scene
         m.detail[1]=fog_reveal(scene,m.center_radius,m.center_radius[3]);
         m.detail[2]=m.detail[3]=detail_ramp(m.detail[0],c.detail_cell_minimum,c.detail_cell_full)*m.detail[1];
     }
+}
+
+// A balanced, stackless tree over current medium spheres. Build at the frame
+// boundary into this slot's buffer; attenuation rays keep exact sphere tests.
+static uint32_t build_medium_ray_node(const RenderMedium* media,uint32_t* order,
+    uint32_t begin,uint32_t end,MediumRayNode* nodes,uint32_t cursor)
+{
+    uint32_t index=cursor++;MediumRayNode& node=nodes[index];
+    for (uint32_t a=0;a<3;++a) { node.low[a]=FLT_MAX;node.high[a]=-FLT_MAX; }
+    for (uint32_t j=begin;j<end;++j)
+    {
+        const RenderMedium& medium=media[order[j]];const float* sphere=medium.center_radius;
+        float radius=std::fmax(sphere[3],medium.lighting[3]);
+        for (uint32_t a=0;a<3;++a)
+        { node.low[a]=std::fmin(node.low[a],sphere[a]-radius);node.high[a]=std::fmax(node.high[a],sphere[a]+radius); }
+    }
+    node.medium=UINT32_MAX;
+    if (end-begin==1) node.medium=order[begin];
+    else
+    {
+        uint32_t axis=0;
+        for (uint32_t a=1;a<3;++a) if (node.high[a]-node.low[a]>node.high[axis]-node.low[axis]) axis=a;
+        std::sort(order+begin,order+end,[media,axis](uint32_t a,uint32_t b) {
+            float x=media[a].center_radius[axis],y=media[b].center_radius[axis];return x==y ? a<b : x<y;
+        });
+        uint32_t middle=begin+(end-begin)/2;
+        cursor=build_medium_ray_node(media,order,begin,middle,nodes,cursor);
+        cursor=build_medium_ray_node(media,order,middle,end,nodes,cursor);
+    }
+    node.escape=cursor;return cursor;
+}
+
+static void update_medium_ray_nodes(RendererState* state,const RenderScene* scene)
+{
+    if (!state->medium_count) return;
+    FrameResources& frame=frame_data(state);
+    for (uint32_t i=0;i<state->medium_count;++i) state->medium_ray_order[i]=i;
+    build_medium_ray_node(scene->media.data(),state->medium_ray_order.data(),0,
+        state->medium_count,state->medium_ray_scratch.data(),0);
+    memcpy(frame.medium_ray_nodes.mapped,state->medium_ray_scratch.data(),state->medium_ray_scratch.size()*sizeof(MediumRayNode));
 }
 
 // Masked-out slots stay out of the TLAS. Instance IDs index the compacted
@@ -1282,12 +1329,15 @@ static bool upload_scene(RendererState* state,const RenderScene* scene)
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, host)) return false;
     microfacet_energy_table((float*)state->energy.mapped);
     state->medium_count=(uint32_t)scene->media.size();
+    state->medium_ray_order.resize(state->medium_count);
+    state->medium_ray_scratch.resize(state->medium_count ? 2*state->medium_count-1 : 0);
     for (uint32_t f=0;f<FRAMES_IN_FLIGHT;++f)
     {
         FrameResources& frame=state->frames[f];
         if (!create_buffer(state, &frame.uniform, sizeof(RenderUniform), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, host)
             || !create_buffer(state,&frame.sight,sizeof(scene->sight)+sizeof(scene->fog_field.reveal),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host)
-            || !create_buffer(state,&frame.media,(state->medium_count ? state->medium_count : 1)*sizeof(RenderMedium),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host))
+            || !create_buffer(state,&frame.media,(state->medium_count ? state->medium_count : 1)*sizeof(RenderMedium),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host)
+            || !create_buffer(state,&frame.medium_ray_nodes,(state->medium_count ? 2*state->medium_count-1 : 1)*sizeof(MediumRayNode),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,host))
             return false;
         if (state->medium_count) memcpy(frame.media.mapped,scene->media.data(),state->medium_count*sizeof(RenderMedium));
         if (scene->fog_blur>0) memcpy(frame.sight.mapped,scene->fog_field.reveal,sizeof(scene->fog_field.reveal));
@@ -1708,7 +1758,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
     if (state->properties.limits.maxPerStageDescriptorStorageBuffers < RENDER_STORAGE_BUFFER_BINDINGS ||
         state->properties.limits.maxDescriptorSetStorageBuffers < RENDER_STORAGE_BUFFER_BINDINGS)
     {
-        fprintf(stderr,"Renderer requires seventeen compute storage-buffer descriptors.\n");
+        fprintf(stderr,"Renderer requires nineteen compute storage-buffer descriptors.\n");
         return false;
     }
     VkDescriptorSetLayoutBinding bindings[RENDER_DESCRIPTOR_COUNT] = {};
@@ -1722,7 +1772,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
     for (uint32_t i = 0; i < RENDER_DESCRIPTOR_COUNT; ++i)
     {
         bindings[i].binding = i;
@@ -1788,6 +1838,8 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
         writes[RENDER_BINDING_TRIANGLES].pBufferInfo = &buffers[SCENE_BUFFER_TRIANGLES];
         writes[RENDER_BINDING_UNIFORM].pBufferInfo = &buffers[SCENE_BUFFER_UNIFORM];
         writes[RENDER_BINDING_MEDIA].pBufferInfo = &buffers[SCENE_BUFFER_MEDIA];
+        VkDescriptorBufferInfo medium_ray_buffer={frame.medium_ray_nodes.handle,0,frame.medium_ray_nodes.size};
+        writes[RENDER_BINDING_MEDIUM_RAYS].pBufferInfo=&medium_ray_buffer;
         writes[RENDER_BINDING_ENERGY].pBufferInfo = &buffers[SCENE_BUFFER_ENERGY];
         writes[RENDER_BINDING_RESERVED].pBufferInfo = &buffers[SCENE_BUFFER_RESERVED];
         writes[RENDER_BINDING_DEBUG].pBufferInfo = &buffers[SCENE_BUFFER_DEBUG];
@@ -2800,6 +2852,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     update_lighting_dependencies(state,scene);
     update_grid_activity(state);
     update_level_of_detail(state,scene);
+    update_medium_ray_nodes(state,scene);
     if (scene->fog_blur>0) memcpy(frame.sight.mapped,scene->fog_field.reveal,sizeof(scene->fog_field.reveal));
     memcpy((char*)frame.sight.mapped+sizeof(scene->fog_field.reveal),scene->sight,sizeof(scene->sight));
     memcpy(frame.instances.mapped,state->instance_data.data(),state->active_count*sizeof(state->instance_data[0]));
@@ -3135,7 +3188,7 @@ bool renderer_shutdown(Renderer* renderer)
         for (uint32_t f=0;f<FRAMES_IN_FLIGHT;++f)
         {
             FrameResources& frame=state->frames[f];
-            GpuBuffer* owned[]={&frame.uniform,&frame.instances,&frame.media,&frame.lighting_instances,&frame.lighting_bounds,&frame.sight,
+            GpuBuffer* owned[]={&frame.uniform,&frame.instances,&frame.media,&frame.medium_ray_nodes,&frame.lighting_instances,&frame.lighting_bounds,&frame.sight,
                 &frame.instance_styles,&frame.effects,&frame.effect_tiles,&frame.debug_text,&frame.vertex_upload};
             for (uint32_t i=0;i<sizeof(owned)/sizeof(owned[0]);++i) destroy_buffer(state,owned[i]);
             if (frame.image_available) vkDestroySemaphore(state->device,frame.image_available,0);

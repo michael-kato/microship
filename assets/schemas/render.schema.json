@@ -398,6 +398,18 @@
           "exclusiveMinimum": 0,
           "maximum": 1000,
           "description": "World units around the view within which factories animate; farther factories hold their rest pose."
+        },
+        "subsurface_minimum_pixels": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4096,
+          "description": "Projected mesh radius in pixels below which SSS is disabled."
+        },
+        "subsurface_full_pixels": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 4096,
+          "description": "Projected mesh radius in pixels at which SSS reaches full strength."
         }
       },
       "required": [
@@ -407,7 +419,11 @@
         "cell_full_pixels",
         "animation_margin"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "dependentRequired": {
+        "subsurface_minimum_pixels": ["subsurface_full_pixels"],
+        "subsurface_full_pixels": ["subsurface_minimum_pixels"]
+      }
     }
   },
   "required": ["output", "sampling", "geometry", "camera", "lighting", "bloom", "volume"],

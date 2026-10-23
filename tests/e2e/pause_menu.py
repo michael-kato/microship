@@ -219,6 +219,8 @@ def cpu_checks(args):
         active.ui('set|Exposure|2')
         active.ui('click|Lighting')
         active.ui('set|Subsurface light wrap|0.65')
+        active.ui('set|SSS minimum radius in pixels|8')
+        active.ui('set|SSS full radius in pixels|24')
         active.ui('click|Volume')
         active.ui('set|Integration steps|2')
         active.ui('click|Effects')
@@ -239,6 +241,8 @@ def cpu_checks(args):
         saved = json.loads(preferences.read_text())
         assert saved['display']['exposure'] == 2
         assert abs(saved['lighting']['subsurface_wrap'] - .65) < .000001
+        assert saved['lighting']['subsurface_lod_minimum'] == 8
+        assert saved['lighting']['subsurface_lod_full'] == 24
         assert saved['volume']['steps'] == 2
         assert saved['effects']['bloom_strength'] == .25
         assert saved['audio'] == dict(master_volume=.5, effects_volume=.25)
@@ -248,6 +252,10 @@ def cpu_checks(args):
         active = Application(args, 'reload_defaults', preferences)
         active.ui('click|Settings')
         assert active.ui('get|Exposure') == ['VALUE|2']
+        active.ui('click|Lighting')
+        assert active.ui('get|SSS minimum radius in pixels') == ['VALUE|8']
+        assert active.ui('get|SSS full radius in pixels') == ['VALUE|24']
+        active.ui('click|Display')
         active.ui('click|Restore Defaults')
         assert active.ui('get|Exposure') == ['VALUE|1.6']
         active.ui('click|Cancel')

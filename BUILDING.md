@@ -1399,3 +1399,63 @@ Color alone leaves simulation state unchanged. Reports, worlds, state
 exports, capture commands, and timing logs are in
 `build/fungal_spacing_review/`. Native Windows and sustained GPU timing
 remain unverified.
+
+
+## Surface ray work (Oct 22)
+
+The native RenderDoc capture in `build/zoomin_rdc/` identified the fused
+surface and SSS dispatch as the largest GPU stage. Replay measured 26.40 ms
+for that dispatch, 70.2% of the 37.59 ms event sum. Those replay times are
+separate from application timings. Compiler output reported 216 VGPRs and
+no spills. Hardware stall and occupancy counters were unavailable.
+
+The renderer now builds a small, flat tree over the current medium spheres.
+Rays skip groups that cannot intersect their segment. Exact sphere and optical
+depth calculations remain. The tree includes the full blur radius, uses
+preallocated CPU scratch, and is copied once to the current frame slot. It
+adds no dispatch. The surface shader also skips unused diffuse-visibility
+lookups. SSS exit queries exclude the opposite static or moving instance
+class, then retain their original same-instance and face checks.
+
+SSS stays in the surface pass. Its separate projected mesh-radius thresholds
+are now 4 and 16 pixels, twice the former 2 and 8 pixels. Surface-detail
+thresholds stay at 2 and 8. Old config files inherit their surface thresholds
+when the two optional SSS fields are absent. Lighting settings expose both
+SSS thresholds. A large nearby cell still receives full SSS.
+
+Measurements used the Windows Release executable through Proton 11 on the
+RX 7800 XT, native 1920x1080, default one-film sampling, and no RenderDoc or
+validation. The application reported validation as not active. The frozen
+`performance_battle.json` scene used seed 1234, tick 1800, 128 cells, 4096
+units and 1,451,022 triangles. Three alternating before/after close-view pairs
+measured 120 frames each after 10 warmup frames. The distant pair measured
+52 frames per build after 10 warmup frames. Baseline source was `a46d261`.
+
+| View and span | Before ms | After ms |
+| --- | ---: | ---: |
+| Close GPU frame mean | 27.150 | 24.256 |
+| Close GPU frame p95 | 27.860 | 24.886 |
+| Close surface + SSS mean | 18.899 | 16.748 |
+| Close volume mean | 2.690 | 1.971 |
+| Close CPU frame wall time mean | 27.735 | 24.679 |
+| Distant GPU frame mean | 9.772 | 7.735 |
+| Distant surface + SSS mean | 3.426 | 3.085 |
+
+Close GPU time fell 10.7%; surface and SSS time fell 11.4%. Each close pair
+improved. CPU frame time includes GPU waits, logging and the final capture;
+it excludes simulation in these frozen runs. These results do not establish
+live-match frame rate or native Windows performance.
+
+With the original SSS thresholds, optimized close and distant images matched
+the baseline RGB8 images exactly outside the top 300 profiler rows. With the
+new thresholds, maximum differences were 2 close and 10 distant; mean channel
+differences were 0.000023 and 0.003021 RGB8 levels. State exports were identical.
+Screenshots 001068 and 001069 show the new close and distant views. Timings,
+per-frame samples, states and image comparisons are in
+`build/surface_optimization/`. Normal, close and F2 GPU views passed Vulkan
+host validation. Smoke, world files, data assets and SSS application checks
+passed through Proton. The SSS checks include old files and invalid thresholds.
+The pause-menu check passed 24 real application runs, including SSS LOD
+Apply, save and reload through the Win32 input queue.
+The close camera-pan check also passed host validation with the thickness
+cache enabled; moving the camera reused valid static lighting.

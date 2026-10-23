@@ -43,6 +43,7 @@ struct RenderConfig
     // Screen-space level of detail: projected radius in pixels where a feature starts
     // to fade in and where it is complete. Zero full radius: always full detail.
     float detail_surface_minimum,detail_surface_full,detail_cell_minimum,detail_cell_full;
+    float detail_subsurface_minimum,detail_subsurface_full;
     float animation_margin; // World units around the view within which factories animate.
     // Development wireframe view (F3). Zero line width: no wireframe section.
     Color wireframe_line,wireframe_fill;float wireframe_pixels;

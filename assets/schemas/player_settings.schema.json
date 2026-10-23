@@ -127,6 +127,16 @@
         "thickness_cache": {
           "title": "Static thickness cache",
           "type": "boolean"
+        },
+        "subsurface_lod_minimum": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "subsurface_lod_full": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4096
         }
       },
       "additionalProperties": false

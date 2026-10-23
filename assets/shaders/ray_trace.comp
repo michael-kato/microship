@@ -102,6 +102,8 @@ struct Medium
     vec4 detail; // Projected radius in pixels, fog reveal, moving-shadow weight, cascade weight.
 };
 layout(set = 0, binding = RENDER_BINDING_MEDIA, std430) readonly buffer MediaBuffer { Medium media[]; };
+struct MediumRayNode { vec3 low;uint escape;vec3 high;uint medium; };
+layout(set=0,binding=RENDER_BINDING_MEDIUM_RAYS,std430) readonly buffer MediumRayNodes { MediumRayNode medium_ray_nodes[]; };
 layout(set = 0, binding = RENDER_BINDING_ENERGY, std430) readonly buffer EnergyBuffer { float ggx_energy[]; };
 
 const float PI = 3.14159265358979323846;
@@ -137,6 +139,22 @@ bool box_intersection(vec3 origin, vec3 direction, float distance, float margin,
         }
     }
     return end >= begin;
+}
+
+// Skip disjoint medium groups. Leaf sphere tests retain the authored transport.
+bool next_ray_medium(inout uint node,vec3 origin,vec3 direction,float distance,out uint medium)
+{
+    uint count=render.scene.y>0u ? 2u*render.scene.y-1u : 0u;
+    while (node<count)
+    {
+        MediumRayNode bound=medium_ray_nodes[node];
+        float margin=max(point_epsilon(bound.low),point_epsilon(bound.high));
+        if (!box_intersection(origin,direction,distance,margin,bound.low,bound.high))
+        { node=bound.escape;continue; }
+        ++node;
+        if (bound.medium!=0xffffffffu) { medium=bound.medium;return true; }
+    }
+    return false;
 }
 
 bool scene_box_intersection(vec3 origin, vec3 direction, float distance, float margin)
@@ -210,7 +228,8 @@ float medium_blur_radius(vec3 direction,float distance)
 {
     if (render.quality.w==0u) return 0;
     float radius=0;
-    for (uint i=0u;i<render.scene.y;++i)
+    uint node=0u,i;
+    while (next_ray_medium(node,render.camera_position.xyz,direction,RAY_MAX,i))
     {
         Medium m=media[i];if (m.blur.z<=0.0) continue;
         float begin,end;
@@ -234,7 +253,8 @@ float medium_sharp_limit(vec3 direction)
 {
     float limit=RAY_MAX;
     if (render.quality.w==0u) return limit;
-    for (uint i=0u;i<render.scene.y;++i)
+    uint node=0u,i;
+    while (next_ray_medium(node,render.camera_position.xyz,direction,RAY_MAX,i))
     {
         Medium medium=media[i];if (medium.blur.z<=0.0) continue;
         float begin,end;
@@ -280,7 +300,8 @@ float cached_density_integral(uint index,vec3 origin,vec3 direction,float begin,
 vec3 transmittance(vec3 origin, vec3 direction, float distance)
 {
     vec3 optical_depth = vec3(0.0);
-    for (uint i = 0u; i < render.scene.y; ++i)
+    uint node=0u,i;
+    while (next_ray_medium(node,origin,direction,distance,i))
     {
         Medium medium = media[i];
         float begin, end;
@@ -340,7 +361,8 @@ vec3 single_scattering(vec3 origin,vec3 direction,float distance,float sharp_lim
     vec3 radiance=vec3(0);sharp=vec3(0);
     float path_offset=dot(origin-render.camera_position.xyz,direction);
     uint steps=integration_steps();
-    for (uint i=0u;i<render.scene.y;++i)
+    uint node=0u,i;
+    while (next_ray_medium(node,origin,direction,distance,i))
     {
         Medium medium=media[i];float begin,end;
         if (all(equal(medium.scattering.rgb,vec3(0)))) continue;
@@ -455,7 +477,8 @@ vec3 evaluate_bsdf(vec3 normal, vec3 outgoing, vec3 incoming, vec3 albedo,
 }
 
 // Material: emission, target roughness, roughness weight, flags (unshadowed=1, thin tint=2, organelle=4,
-// fresnel emission=8, ambient follows detail=16, no subsurface=32). Detail: screen-size detail times fog reveal, fog reveal.
+// fresnel emission=8, ambient follows detail=16, no subsurface=32).
+// Detail: surface weight, fog reveal, SSS weight, static or dynamic ray mask.
 struct InstanceStyle { vec4 tint,material,detail; };
 layout(set=0,binding = RENDER_BINDING_INSTANCE_STYLES,std430) readonly buffer InstanceStyles { InstanceStyle instance_style[]; };
 
@@ -524,6 +547,7 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
     float instance_scale=min(length(hit_to_world[0]),min(length(hit_to_world[1]),length(hit_to_world[2])));
     surface.subsurface=a.subsurface*weights.x+b.subsurface*weights.y+c.subsurface*weights.z;
     surface.subsurface.rgb*=instance_scale;
+    surface.subsurface.a*=instance_style[hit_instance].detail.z;
     surface.triangle=triangle_index;surface.barycentric=weights;
     surface.instance=hit_instance;surface.front_face=dot(area_normal,direction)<0.0;
     surface.point = point; surface.normal = normal; surface.geometric_normal = geometric_normal;
@@ -855,7 +879,7 @@ vec3 volume_incident(vec3 point,uint medium_index,vec3 ambient,vec3 phases,vec3 
 
 float scattering_weight(Surface s)
 {
-    return !subsurface_enabled || s.metal || s.unshadowed ? 0.0 : s.subsurface.a*render.subsurface.x*s.detail;
+    return !subsurface_enabled || s.metal || s.unshadowed ? 0.0 : s.subsurface.a*render.subsurface.x;
 }
 
 vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
@@ -903,7 +927,8 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
         // Thin walls use their baked samples. Opaque receivers trace exact current
         // shadows for surface reflection; light diffused under the surface keeps the
         // smooth field, since scattering blurs it over the mean free path anyway.
-        diffused_visibility=baked_surface_visibility(s,selected,geometric_cosine<=0.0,origin);
+        if (s.translucent || scatter>0.0)
+            diffused_visibility=baked_surface_visibility(s,selected,geometric_cosine<=0.0,origin);
         // Cascade rays shade indirect light; the smooth current field is enough there.
         visibility=s.translucent || geometric_cosine<=0.0 ? diffused_visibility
             : cascade_tracing ? sampled_visibility(origin,s.geometric_normal,selected) : studio_visibility(origin,direction);
@@ -922,7 +947,11 @@ bool subsurface_exit(Surface s,vec3 direction,float limit,out vec3 exit_point,ou
 #if defined(NANOVORE_DEBUG_BUFFERS) && !defined(NANOVORE_NO_QUERY_COUNTERS)
     ++debug_shadow_queries;
 #endif
-    rayQueryInitializeEXT(query,scene_acceleration,gl_RayFlagsNoOpaqueEXT,SURFACE_RAY_MASK,origin,0.0,direction,limit);
+    // Other instances cannot be this surface's exit. Drop the opposite blocker
+    // class before traversal; the instance check below still selects this object.
+    uint mask=uint(instance_style[s.instance].detail.w);
+    if (mask==0u) mask=SURFACE_RAY_MASK;
+    rayQueryInitializeEXT(query,scene_acceleration,gl_RayFlagsNoOpaqueEXT,mask,origin,0.0,direction,limit);
     while (rayQueryProceedEXT(query))
     {
         if (rayQueryGetIntersectionTypeEXT(query,false)!=gl_RayQueryCandidateIntersectionTriangleEXT) continue;

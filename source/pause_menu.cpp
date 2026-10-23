@@ -56,12 +56,14 @@ static void settings_rows(PauseMenu* menu)
 {
     for (int page=0;page<SETTINGS_PAGE_COUNT;++page)
         button(menu,page_title(page),28,MENU_CONTENT_TOP+page*48,158,MENU_PAGE_ID+page);
-    size_t count;const SettingField* fields=player_setting_fields(&count);int row=0;
+    size_t count;const SettingField* fields=player_setting_fields(&count);int row=0,rows=0;
+    for (size_t i=0;i<count;++i) if (fields[i].page==menu->page) ++rows;
+    int row_height=rows>12 ? 384/rows : MENU_ROW_HEIGHT;
     for (size_t i=0;i<count;++i)
     {
         const SettingField& field=fields[i];if (field.page!=menu->page) continue;
-        int y=MENU_CONTENT_TOP+row++*MENU_ROW_HEIGHT;
-        label(menu,field.label,MENU_LABEL_LEFT,y+5,MENU_VALUE_LEFT-MENU_LABEL_LEFT-12,28);
+        int y=MENU_CONTENT_TOP+row++*row_height;
+        label(menu,field.label,MENU_LABEL_LEFT,y+3,MENU_VALUE_LEFT-MENU_LABEL_LEFT-12,24);
         HWND combo=control(menu,"COMBOBOX","",WS_TABSTOP|WS_VSCROLL|CBS_DROPDOWNLIST,
             MENU_VALUE_LEFT,y,MENU_VALUE_WIDTH,300,MENU_FIELD_ID+(int)i);
         double current=player_setting_value(menu->draft,field);int selected=-1;

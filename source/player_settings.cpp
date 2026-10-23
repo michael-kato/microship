@@ -48,6 +48,8 @@ static const SettingField FIELDS[]={
     GRAPHICS(LIGHTING,"transmission_layers","Transparent surface layers",UINT,max_transmission_layers,1,32,LAYERS),
     GRAPHICS(LIGHTING,"subsurface_strength","Subsurface strength",FLOAT,subsurface_strength,0,1,UNIT),
     GRAPHICS(LIGHTING,"subsurface_samples","Subsurface film samples",UINT,subsurface_samples,0,4096,SAMPLES),
+    GRAPHICS(LIGHTING,"subsurface_lod_minimum","SSS minimum radius in pixels",FLOAT,detail_subsurface_minimum,0,4096,RADIUS),
+    GRAPHICS(LIGHTING,"subsurface_lod_full","SSS full radius in pixels",FLOAT,detail_subsurface_full,0,4096,RADIUS),
     GRAPHICS(LIGHTING,"subsurface_wrap","Subsurface light wrap",FLOAT,subsurface_wrap,0,1,UNIT),
     GRAPHICS(LIGHTING,"subsurface_transmission","Subsurface transmission",FLOAT,subsurface_transmission,0,1,UNIT),
     GRAPHICS(LIGHTING,"membrane_thickness","Membrane optical thickness",FLOAT,subsurface_thickness,0,1,THICKNESS),
