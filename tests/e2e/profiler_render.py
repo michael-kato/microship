@@ -26,11 +26,15 @@ for name,extra in cases:
  for label,start,last,mean,samples in re.findall(r'Profile (.*?): start ([0-9.]+) ms; last ([0-9.]+) ms; mean ([0-9.]+) ms; samples ([0-9]+)\.',result.stdout):
   index=int(samples)-1;assert index in (0,1);frames[index][label]=dict(start=float(start),last=float(last),mean=float(mean))
  for index,frame in enumerate(frames):
-  assert len(frame)==31,(name,index,frame)
+  assert len(frame)==33,(name,index,frame)
   for label,node in frame.items():
    assert all(math.isfinite(v) and v>=0 for v in node.values()),node
    expected=sum(f[label]['last'] for f in frames[:index+1])/(index+1)
    assert abs(node['mean']-expected)<.00001,(label,node,expected)
+  # Split surface frames time membranes and opaque hits; fused debug views report no children.
+  split=[frame[c]['last'] for c in ('MEMBRANES','OPAQUE HITS')]
+  if frame['SURFACE + SSS']['last']>0:
+   assert (sum(split)==0)==(name=='buffers') and (sum(split)==0 or abs(sum(split)-frame['SURFACE + SSS']['last'])<.0001),(name,split,frame['SURFACE + SSS'])
   for parent,children in parents.items():
    root_node=frame[parent];child_nodes=[frame[c] for c in children]
    assert abs(sum(c['last'] for c in child_nodes)-root_node['last'])<(.2 if parent=='CPU FRAME' else .0001),(name,parent,child_nodes,root_node)

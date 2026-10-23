@@ -63,12 +63,12 @@ static const uint32_t THIN_MEMBRANE_TRIANGLE = 3; // GpuTriangle material tag.
 static const int HUD_MAX_LINE_CHARACTERS = (HUD_TEXT_WIDTH-2*TEXT_MARGIN)/HUD_MASK_CHARACTER_SPACING;
 static const unsigned int STATS_TEXT_WIDTH_UNSIGNED = STATS_TEXT_WIDTH;
 static const unsigned int STATS_TEXT_HEIGHT_UNSIGNED = STATS_TEXT_HEIGHT;
-static const int GPU_TIMESTAMP_COUNT = 17;
+static const int GPU_TIMESTAMP_COUNT = 18;
 static const int TIMESTAMP_WORD_BITS = 64;
 
 enum { SCENE_BUFFER_VERTICES=0, SCENE_BUFFER_TRIANGLES=1, SCENE_BUFFER_UNIFORM=2, SCENE_BUFFER_MEDIA=3, SCENE_BUFFER_ENERGY=4, SCENE_BUFFER_RESERVED=5, SCENE_BUFFER_DEBUG=6 };
 
-enum { GPU_TIME_FRAME_BEGIN=0, GPU_TIME_SURFACE_BEGIN=1, GPU_TIME_SURFACE_END=2, GPU_TIME_VOLUME_END=3, GPU_TIME_EFFECTS_BEGIN=4, GPU_TIME_BLOOM_END=5, GPU_TIME_OVERLAY_END=6, GPU_TIME_BACKDROP_END=7, GPU_TIME_UPLOAD_END=8, GPU_TIME_EFFECTS_END=9, GPU_TIME_GRID_END=10, GPU_TIME_MEDIUM_BLUR_END=11, GPU_TIME_FOG_END=12, GPU_TIME_FOCUS_END=13, GPU_TIME_COPY_END=14, GPU_TIME_BAKE_END=15, GPU_TIME_CASCADE_END=16 };
+enum { GPU_TIME_FRAME_BEGIN=0, GPU_TIME_SURFACE_BEGIN=1, GPU_TIME_SURFACE_END=2, GPU_TIME_VOLUME_END=3, GPU_TIME_EFFECTS_BEGIN=4, GPU_TIME_BLOOM_END=5, GPU_TIME_OVERLAY_END=6, GPU_TIME_BACKDROP_END=7, GPU_TIME_UPLOAD_END=8, GPU_TIME_EFFECTS_END=9, GPU_TIME_GRID_END=10, GPU_TIME_MEDIUM_BLUR_END=11, GPU_TIME_FOG_END=12, GPU_TIME_FOCUS_END=13, GPU_TIME_COPY_END=14, GPU_TIME_BAKE_END=15, GPU_TIME_CASCADE_END=16, GPU_TIME_TRANSPARENT_END=17 };
 
 struct GpuBuffer
 {
@@ -166,7 +166,7 @@ struct FrameReport
 {
     RenderUniform uniform;
     uint32_t disabled_features,lighting_bakes,lighting_reuses,lighting_surface_bakes,optical_depth_bakes,cascade_updates;
-    bool debug_views,debug_stats,background_layer;
+    bool debug_views,debug_stats,background_layer,split_surface;
 };
 // Everything the CPU writes for one frame. GPU-only images and caches are
 // shared: one queue executes frames in order and barriers order their reuse.
@@ -2253,10 +2253,10 @@ static void profile_overlay(RendererState* state,const Renderer* renderer,Profil
     profile_text(state,line,8,8,STATS_TEXT_WIDTH-8);
     snprintf(line,sizeof(line),"F5 SSS %s / F6 VOLUME %s / F7 CELL BLUR %s",
         feature_status(renderer,RENDER_SSS),feature_status(renderer,RENDER_VOLUME),feature_status(renderer,RENDER_CELL_BLUR));
-    profile_text(state,line,8,268,STATS_TEXT_WIDTH-8);
+    profile_text(state,line,8,288,STATS_TEXT_WIDTH-8);
     snprintf(line,sizeof(line),"F8 TILT SHIFT %s / F9 FOG BLUR %s / F10 GLOW %s",
         feature_status(renderer,RENDER_TILT_SHIFT),feature_status(renderer,RENDER_FOG_BLUR),feature_status(renderer,RENDER_GLOW));
-    profile_text(state,line,8,286,STATS_TEXT_WIDTH-8);
+    profile_text(state,line,8,306,STATS_TEXT_WIDTH-8);
     if (!p->count) { profile_text(state,"WAITING FOR THE FIRST COMPLETED FRAME",8,30,STATS_TEXT_WIDTH-8);return; }
     snprintf(line,sizeof(line),"MEAN CPU %.2F / GPU %.2F MS   LAST CPU %.2F / GPU %.2F MS   %.1F FPS",
         p->mean[PROFILE_CPU_FRAME].duration_ms,p->mean[PROFILE_GPU_FRAME].duration_ms,
@@ -2302,7 +2302,7 @@ static void profile_overlay(RendererState* state,const Renderer* renderer,Profil
         snprintf(line,sizeof(line),"TOP GPU: %s %.2F / %s %.2F / %s %.2F MS",profile_name(state,(uint32_t)top[0]),p->mean[top[0]].duration_ms,
             profile_name(state,(uint32_t)top[1]),p->mean[top[1]].duration_ms,profile_name(state,(uint32_t)top[2]),p->mean[top[2]].duration_ms);
     }
-    profile_text(state,line,8,246,STATS_TEXT_WIDTH-8);
+    profile_text(state,line,8,266,STATS_TEXT_WIDTH-8);
 }
 
 static void draw_debug(RendererState* state, const Renderer* renderer)
@@ -2759,6 +2759,14 @@ static bool report_frame(RendererState* state,Renderer* renderer,FrameResources&
     for (uint32_t i=0;i<sizeof(spans)/sizeof(spans[0]);++i)
         profiler_span(profile,spans[i].node,((timestamps[spans[i].begin]-timestamps[GPU_TIME_FRAME_BEGIN])&mask)*scale,
             ((timestamps[spans[i].end]-timestamps[spans[i].begin])&mask)*scale);
+    // A fused surface pass has no membrane/opaque boundary, so it reports no children.
+    if (report.split_surface)
+    {
+        profiler_span(profile,PROFILE_SURFACE_TRANSPARENT,((timestamps[GPU_TIME_CASCADE_END]-timestamps[GPU_TIME_FRAME_BEGIN])&mask)*scale,
+            ((timestamps[GPU_TIME_TRANSPARENT_END]-timestamps[GPU_TIME_CASCADE_END])&mask)*scale);
+        profiler_span(profile,PROFILE_SURFACE_OPAQUE,((timestamps[GPU_TIME_TRANSPARENT_END]-timestamps[GPU_TIME_FRAME_BEGIN])&mask)*scale,
+            ((timestamps[GPU_TIME_SURFACE_END]-timestamps[GPU_TIME_TRANSPARENT_END])&mask)*scale);
+    }
     state->trace_ms = milliseconds;
     state->volume_ms = volume_ticks*state->properties.limits.timestampPeriod/NANOSECONDS_PER_MILLISECOND;
     state->bloom_ms = bloom_ms;
@@ -2947,6 +2955,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     vkCmdBindDescriptorSets(state->command, VK_PIPELINE_BIND_POINT_COMPUTE, state->pipeline_layout,
         0, 1, &state->descriptors, 0, 0);
     vkCmdDispatch(state->command, (state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, (state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, 1);
+    vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_TRANSPARENT_END);
     if (split)
     {
         shader_buffer_barrier(state->command);
@@ -3113,7 +3122,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     report.lighting_bakes=state->lighting_bakes;report.lighting_reuses=state->lighting_reuses;
     report.lighting_surface_bakes=state->lighting_surface_bakes;report.optical_depth_bakes=state->optical_depth_bakes;
     report.cascade_updates=state->cascade_updates;
-    report.debug_views=renderer->debug_views;report.debug_stats=renderer->debug_stats;report.background_layer=scene->background_blur>0;
+    report.debug_views=renderer->debug_views;report.debug_stats=renderer->debug_stats;report.background_layer=scene->background_blur>0;report.split_surface=split;
     if (!submit_commands(state, !state->headless, image_index, false))
         return false;
     frame.pending=true;
