@@ -33,7 +33,7 @@ add_custom_command(OUTPUT "${cascade_output}"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/ray_trace.comp" -o "${cascade_output}"
     DEPENDS assets/shaders/render_bindings.glsl assets/shaders/ray_trace.comp assets/shaders/render_uniform.glsl VERBATIM)
 set(debug_outputs)
-set(debug_variants guide_surface)
+set(debug_variants guide_surface guide_transparent guide_opaque)
 if(DEVELOPMENT)
     list(APPEND debug_variants surface volume)
 endif()
@@ -45,6 +45,11 @@ foreach(debug_variant IN LISTS debug_variants)
     endif()
     if(debug_variant MATCHES "volume$")
         list(APPEND debug_flags -DNANOVORE_VOLUME_PASS=1)
+    endif()
+    if(debug_variant STREQUAL "guide_transparent")
+        list(APPEND debug_flags -DNANOVORE_TRANSPARENT_PASS=1)
+    elseif(debug_variant STREQUAL "guide_opaque")
+        list(APPEND debug_flags -DNANOVORE_OPAQUE_PASS=1)
     endif()
     add_custom_command(OUTPUT "${debug_output}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders"

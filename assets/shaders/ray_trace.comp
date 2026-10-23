@@ -23,7 +23,7 @@ struct Vertex
 };
 
 layout(set = 0, binding = RENDER_BINDING_ACCELERATION) uniform accelerationStructureEXT scene_acceleration;
-#ifdef NANOVORE_VOLUME_PASS
+#if defined(NANOVORE_VOLUME_PASS) || defined(NANOVORE_OPAQUE_PASS)
 layout(set = 0, binding = RENDER_BINDING_BEAUTY, rgba16f) uniform image2D output_image;
 #else
 layout(set = 0, binding = RENDER_BINDING_BEAUTY, rgba16f) uniform writeonly image2D output_image;
@@ -291,6 +291,32 @@ float medium_sharp_limit(vec3 direction)
 }
 
 vec3 film_sharp_sum=vec3(0),film_volume=vec3(0),film_emission=vec3(0);
+// Split surface shading. The transparent pass walks membranes and shades them;
+// it stops at the first opaque hit and records it. The opaque pass shades that
+// hit, so shadow and SSS exit rays run apart from the membrane walk.
+#ifdef NANOVORE_TRANSPARENT_PASS
+const bool transparent_pass=true;
+#else
+const bool transparent_pass=false;
+#endif
+// One flag word per pixel: half-float throughput blue and flags (-1 none,
+// +1 sharp contribution, +2 pixel blurred). Pixels with a hit also store seven
+// words after all flag words: triangle, instance, barycentric bits, half-float
+// throughput red/green and membrane emission RGB. Misses touch only the flag word.
+layout(set=0,binding=RENDER_BINDING_OPAQUE_HITS,std430) buffer OpaqueHits { uint opaque_hits[]; };
+const uint OPAQUE_HIT_WORDS=7u;
+uvec4 opaque_hit=uvec4(0);vec3 opaque_weight=vec3(0);float opaque_flags=-1.0;
+void store_opaque_hit(uint index,float blur_max)
+{
+    float flags=opaque_flags<0.0 ? -1.0 : opaque_flags+(blur_max>0.0 ? 2.0 : 0.0);
+    opaque_hits[index]=packHalf2x16(vec2(opaque_weight.b,flags));
+    if (flags<0.0) return;
+    uint first=render.settings.x*render.settings.y+index*OPAQUE_HIT_WORDS;
+    for (uint i=0u;i<4u;++i) opaque_hits[first+i]=opaque_hit[i];
+    opaque_hits[first+4u]=packHalf2x16(opaque_weight.rg);
+    opaque_hits[first+5u]=packHalf2x16(film_emission.rg);
+    opaque_hits[first+6u]=packHalf2x16(vec2(film_emission.b,0));
+}
 float film_terminal_distance=RAY_MAX;
 float film_blur_max=0.0;
 layout(set=0,binding=RENDER_BINDING_SHARP_LAYER,std430) buffer SharpLayer { vec4 sharp_pixels[]; };
@@ -948,7 +974,7 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
         if (s.translucent || scatter>0.0)
             diffused_visibility=baked_surface_visibility(s,selected,geometric_cosine<=0.0,origin);
         // Cascade rays shade indirect light; the smooth current field is enough there.
-        visibility=s.translucent || geometric_cosine<=0.0 ? diffused_visibility
+        visibility=transparent_pass || s.translucent || geometric_cosine<=0.0 ? diffused_visibility
             : cascade_tracing ? sampled_visibility(origin,s.geometric_normal,selected) : studio_visibility(origin,direction);
         // Under fog the blurred map needs no shadows; they fade in as it is revealed.
         visibility=mix(vec3(1),visibility,s.reveal);diffused_visibility=mix(vec3(1),diffused_visibility,s.reveal);
@@ -1017,7 +1043,7 @@ vec3 evaluate_subsurface(Surface s,vec3 outgoing)
     vec3 direction=render.studio_direction[selected].xyz,entry;float thickness;
     float cosine=max(0.0,-dot(s.normal,direction));
     if (cosine<=0.0) return vec3(0);
-    if (s.translucent)
+    if (transparent_pass || s.translucent)
     {
         // The wall encloses fluid. Its authored thickness is not the cell diameter.
         thickness=render.subsurface.w/max(MIN_MEMBRANE_DIRECTION_COSINE,cosine);
@@ -1152,6 +1178,12 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
             }
         }
 #endif
+        if (transparent_pass && !s.translucent)
+        {
+            opaque_hit=uvec4(triangle,hit_instance,floatBitsToUint(barycentric));
+            opaque_weight=weight;opaque_flags=blur_radius<=0.0 ? 1.0 : 0.0;
+            break;
+        }
         vec3 glow_color=surface_glow_color(s);
         vec3 direct=glow_color*s.emission;
         vec3 sss=vec3(0);
@@ -1578,6 +1610,45 @@ void main()
     if (render.quality.w>0u && surface.a>0.0)
     { sharp_pixels[index].rgb+=sharp;radiance-=sharp; }
     imageStore(output_image,ivec2(pixel),vec4(radiance,surface.a));
+#elif defined(NANOVORE_OPAQUE_PASS)
+    // Shade the opaque hit the transparent pass recorded and add it to that
+    // pass's membrane light, as the fused layer loop would for its last layer.
+    uint index=pixel.y*render.settings.x+pixel.x;
+    vec2 last=unpackHalf2x16(opaque_hits[index]);
+    if (last.y<0.0) return;
+    uint first=render.settings.x*render.settings.y+index*OPAQUE_HIT_WORDS;
+    uvec4 hit=uvec4(opaque_hits[first],opaque_hits[first+1u],opaque_hits[first+2u],opaque_hits[first+3u]);
+    vec3 weight=vec3(unpackHalf2x16(opaque_hits[first+4u]),last.x);
+    uint flags=uint(last.y);
+    hit_instance=hit.y;
+    LightingInstance instance=lighting_instances[hit_instance];
+    hit_to_world=transpose(mat3x4(instance.row0,instance.row1,instance.row2));
+    hit_normal_to_world=transpose(inverse(mat3(hit_to_world)));
+    vec3 direction=film_direction(pixel,film_sample(0u,1u));
+    Surface s;if (!surface_at(hit.x,uintBitsToFloat(hit.zw),direction,s)) return;
+    s.translucent=false;
+    medium_scan_first=first_medium_near(s.point,4.0*point_epsilon(s.point));
+    vec3 glow_color=surface_glow_color(s);
+    vec3 direct=glow_color*s.emission;
+    for (int light=0;light<3;++light) { vec3 scattered;direct+=evaluate_studio(s,-direction,light,scattered); }
+    if (render.subsurface_quality.x>0u) direct+=evaluate_subsurface(s,-direction);
+    vec3 contribution=weight*(direct+ambient_surface(s,-direction));
+    vec3 emitted=vec3(unpackHalf2x16(opaque_hits[first+5u]),unpackHalf2x16(opaque_hits[first+6u]).x)+weight*glow_color*s.emission;
+    float glow=max(emitted.r,max(emitted.g,emitted.b));
+    vec4 radiance=imageLoad(output_image,ivec2(pixel));
+    if (render.quality.w>0u)
+    {
+        // A blurred pixel keeps sharp light in its own layer, outside the beauty image.
+        vec4 layer=sharp_pixels[index];
+        if (flags==3u) layer.rgb+=contribution; else radiance.rgb+=contribution;
+        sharp_pixels[index]=vec4(layer.rgb,glow);
+    }
+    else
+    {
+        radiance.rgb+=contribution;
+        if (render.background_quality.w>0u) sharp_pixels[index].a=glow;
+    }
+    imageStore(output_image,ivec2(pixel),radiance);
 #else
 #ifndef NANOVORE_VOLUME_PASS
 #ifndef NANOVORE_DISABLE_VACUUM_SKIP
@@ -1593,6 +1664,9 @@ void main()
         debug_pixels[pixel.y*render.settings.x+pixel.x] = DebugPixel(vec4(0),vec4(0),
             vec4(background,0),vec4(background,0),vec4(0),vec4(0));
 #endif
+#endif
+#ifdef NANOVORE_TRANSPARENT_PASS
+        store_opaque_hit(pixel.y*render.settings.x+pixel.x,0.0);
 #endif
         imageStore(output_image,ivec2(pixel),vec4(background,0.0));
         return;
@@ -1665,6 +1739,9 @@ void main()
     #ifdef NANOVORE_VOLUME_PASS
     imageStore(output_image,ivec2(pixel),vec4(radiance,surface_radiance.a));
 #else
+#ifdef NANOVORE_TRANSPARENT_PASS
+    store_opaque_hit(pixel.y*render.settings.x+pixel.x,film_blur_max);
+#endif
     imageStore(output_image,ivec2(pixel),vec4(radiance,film_blur_max));
 #endif
 #endif // Spatial volume variants.

@@ -46,9 +46,10 @@ static const float LUMINANCE_GREEN_WEIGHT = .7152f;
 static const float LUMINANCE_BLUE_WEIGHT = .0722f;
 static const double BACKDROP_TIME_WRAP_SECONDS = 10000.0;
 static const int GPU_DEBUG_PIXEL_BYTES = 96;
+static const int GPU_OPAQUE_HIT_BYTES = 32; // A flag word plus seven hit words.
 static const int COMPANION_SHADER_PATH_CAPACITY = 1024;
 static const double NANOSECONDS_PER_MILLISECOND = 1000000.0;
-static const int RENDER_STORAGE_BUFFER_BINDINGS = 19;
+static const int RENDER_STORAGE_BUFFER_BINDINGS = 20;
 static const int RENDER_DESCRIPTOR_SET_COUNT = 3;
 static const int RENDER_STORAGE_IMAGE_BINDINGS = 3;
 static const int RENDER_SAMPLER_BINDINGS = 4;
@@ -262,6 +263,7 @@ struct RendererState
     GpuBuffer energy;
     GpuBuffer debug_pixels; // Full F2 diagnostic records; minimal unless buffer views can open.
     GpuBuffer guides; // Compact current-frame guides and spatial volume anchors.
+    GpuBuffer opaque_hits; // Split surface shading: one opaque hit record per native pixel.
     bool debug_records;
 
     std::vector<float> style_data;
@@ -293,6 +295,7 @@ struct RendererState
     VkPipelineLayout bloom_layout;
     VkPipeline bloom_pipeline,fog_pipeline,medium_blur_pipeline,focus_pipeline;
     VkPipeline guide_surface_pipeline;
+    VkPipeline transparent_pipeline,opaque_pipeline; // Split guide surface shading.
     VkPipeline no_sss_pipeline,no_sss_guide_pipeline,no_sss_debug_pipeline;
     VkImage output;
     VkDeviceMemory output_memory;
@@ -1544,7 +1547,9 @@ static bool create_output(RendererState* state)
     VkDeviceSize guide_bytes=((VkDeviceSize)state->config.width*state->config.height+2*anchors)*4*sizeof(float);
     if (!create_buffer(state,&state->debug_pixels,debug_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
-        || !create_buffer(state,&state->guides,guide_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
+        || !create_buffer(state,&state->guides,guide_bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+        || !create_buffer(state,&state->opaque_hits,(VkDeviceSize)state->config.width*state->config.height*GPU_OPAQUE_HIT_BYTES,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) return false;
     for (uint32_t f=0;f<FRAMES_IN_FLIGHT;++f)
     {
         GpuBuffer& text=state->frames[f].debug_text;
@@ -1761,7 +1766,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
     if (state->properties.limits.maxPerStageDescriptorStorageBuffers < RENDER_STORAGE_BUFFER_BINDINGS ||
         state->properties.limits.maxDescriptorSetStorageBuffers < RENDER_STORAGE_BUFFER_BINDINGS)
     {
-        fprintf(stderr,"Renderer requires nineteen compute storage-buffer descriptors.\n");
+        fprintf(stderr,"Renderer requires twenty compute storage-buffer descriptors.\n");
         return false;
     }
     VkDescriptorSetLayoutBinding bindings[RENDER_DESCRIPTOR_COUNT] = {};
@@ -1775,7 +1780,8 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
     for (uint32_t i = 0; i < RENDER_DESCRIPTOR_COUNT; ++i)
     {
         bindings[i].binding = i;
@@ -1877,6 +1883,8 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
         writes[RENDER_BINDING_MESH_RANGES].pBufferInfo=&range_buffer;
         VkDescriptorBufferInfo guide_buffer={state->guides.handle,0,state->guides.size};
         writes[RENDER_BINDING_GUIDES].pBufferInfo=&guide_buffer;
+        VkDescriptorBufferInfo opaque_buffer={state->opaque_hits.handle,0,state->opaque_hits.size};
+        writes[RENDER_BINDING_OPAQUE_HITS].pBufferInfo=&opaque_buffer;
         VkDescriptorBufferInfo cascade_buffer={state->radiance_cascades.handle,0,state->radiance_cascades.size};
         writes[RENDER_BINDING_CASCADES].pBufferInfo=&cascade_buffer;
         vkUpdateDescriptorSets(state->device, RENDER_DESCRIPTOR_COUNT, writes, 0, 0);
@@ -2011,7 +2019,9 @@ static bool create_debug(RendererState* state, const char* builtin_shader_path)
     if (!load_companion(state,builtin_shader_path,"debug_surface.comp.spv",state->pipeline_layout,&state->debug_surface_pipeline)
         || !load_companion(state,builtin_shader_path,"debug_volume.comp.spv",state->pipeline_layout,&state->debug_volume_pipeline)) return false;
 #endif
-    return load_companion(state,builtin_shader_path,"debug_guide_surface.comp.spv",state->pipeline_layout,&state->guide_surface_pipeline);
+    return load_companion(state,builtin_shader_path,"debug_guide_surface.comp.spv",state->pipeline_layout,&state->guide_surface_pipeline)
+        && load_companion(state,builtin_shader_path,"debug_guide_transparent.comp.spv",state->pipeline_layout,&state->transparent_pipeline)
+        && load_companion(state,builtin_shader_path,"debug_guide_opaque.comp.spv",state->pipeline_layout,&state->opaque_pipeline);
 }
 
 static bool create_surface_toggles(RendererState* state,const char* shader_path)
@@ -2931,10 +2941,21 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     VkPipeline surface=renderer->debug_views ? (no_sss ? state->no_sss_debug_pipeline : state->debug_surface_pipeline)
         : (scene->guides_required || state->config.volume_spatial_filter || uniform->focus_band[3]>0) ? (no_sss ? state->no_sss_guide_pipeline : state->guide_surface_pipeline)
         : (no_sss ? state->no_sss_pipeline : state->pipeline);
-    vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,surface);
+    // One film sample: membranes, then each pixel's opaque hit in its own pass.
+    bool split=surface==state->guide_surface_pipeline && state->transparent_pipeline && state->config.samples_per_pixel==1 && !state->custom_shader;
+    vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,split ? state->transparent_pipeline : surface);
     vkCmdBindDescriptorSets(state->command, VK_PIPELINE_BIND_POINT_COMPUTE, state->pipeline_layout,
         0, 1, &state->descriptors, 0, 0);
     vkCmdDispatch(state->command, (state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, (state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE, 1);
+    if (split)
+    {
+        shader_buffer_barrier(state->command);
+        image_barrier(state->command,state->hdr,VK_IMAGE_LAYOUT_GENERAL,VK_IMAGE_LAYOUT_GENERAL,
+            VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+        vkCmdBindPipeline(state->command,VK_PIPELINE_BIND_POINT_COMPUTE,state->opaque_pipeline);
+        vkCmdDispatch(state->command,(state->config.width+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,(state->config.height+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,1);
+    }
     vkCmdWriteTimestamp(state->command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,state->queries,GPU_TIME_SURFACE_END);
     if (renderer->debug_views || scene->guides_required || state->config.volume_spatial_filter || uniform->quality[3] || state->config.focus_radius>0) shader_buffer_barrier(state->command);
     if (uniform->quality[0] && uniform->scene[1]
@@ -3165,6 +3186,8 @@ bool renderer_shutdown(Renderer* renderer)
         if (state->no_sss_guide_pipeline) vkDestroyPipeline(state->device,state->no_sss_guide_pipeline,0);
         if (state->no_sss_debug_pipeline) vkDestroyPipeline(state->device,state->no_sss_debug_pipeline,0);
         if (state->guide_surface_pipeline) vkDestroyPipeline(state->device,state->guide_surface_pipeline,0);
+        if (state->transparent_pipeline) vkDestroyPipeline(state->device,state->transparent_pipeline,0);
+        if (state->opaque_pipeline) vkDestroyPipeline(state->device,state->opaque_pipeline,0);
         if (state->focus_pipeline) vkDestroyPipeline(state->device,state->focus_pipeline,0);
         if (state->medium_blur_pipeline) vkDestroyPipeline(state->device,state->medium_blur_pipeline,0);
         if (state->fog_pipeline) vkDestroyPipeline(state->device,state->fog_pipeline,0);
@@ -3205,7 +3228,7 @@ bool renderer_shutdown(Renderer* renderer)
         GpuBuffer* buffers[] = { &state->vertices, &state->triangles, &state->indices, &state->mesh_ranges,
             &state->tlas_buffer, &state->tlas_scratch,
             &state->readback, &state->optical_depth_upload, &state->shadow_grid, &state->static_lighting, &state->surface_lighting, &state->dynamic_lighting, &state->sharp_layer, &state->energy,
-            &state->debug_pixels, &state->guides, &state->radiance_cascades };
+            &state->debug_pixels, &state->guides, &state->opaque_hits, &state->radiance_cascades };
         for (uint32_t i = 0; i < sizeof(buffers)/sizeof(buffers[0]); ++i) destroy_buffer(state, buffers[i]);
         for (uint32_t f=0;f<FRAMES_IN_FLIGHT;++f)
         {
