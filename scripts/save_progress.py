@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Save a display screenshot as NUMBER_description.png in screenshots/."""
+"""Save a display screenshot as NUMBER_description.png in screenshots/, unless an identical image is already there."""
 
 import argparse
 from pathlib import Path
@@ -47,7 +47,12 @@ def archive_capture(capture, description=None):
     if not description:
         raise ValueError('Description must contain letters or numbers')
     ROOT.mkdir(parents=True, exist_ok=True)
-    numbers = (re.fullmatch(r'(\d+)(?:[-_][a-z0-9_-]+)?\.png', path.name)
+    # Save only when the image changed: identical pixels encode to identical bytes.
+    for path in sorted(ROOT.glob('*.png'), reverse=True):
+        if path.stat().st_size == len(data) and path.read_bytes() == data:
+            print(f'Screenshot unchanged: {path}', flush=True)
+            return path
+    numbers =(re.fullmatch(r'(\d+)(?:[-_][a-z0-9_-]+)?\.png', path.name)
                for path in ROOT.glob('*.png'))
     number = max((int(match[1]) for match in numbers if match), default=0) + 1
     while True:
