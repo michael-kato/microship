@@ -96,7 +96,7 @@ enum
 	GPU_TIME_GRID_END = 10,
 	GPU_TIME_MEDIUM_BLUR_END = 11,
 	GPU_TIME_FOG_END = 12,
-	GPU_TIME_FOCUS_END = 13,
+	GPU_TIME_DEPTH_OF_FIELD_END = 13,
 	GPU_TIME_COPY_END = 14,
 	GPU_TIME_BAKE_END = 15,
 	GPU_TIME_CASCADE_END = 16,
@@ -158,7 +158,7 @@ struct RenderUniform
 	float backdrop_style[4], backdrop_animation[4];
 	float studio_direction[3][4], studio_color[3][4], thin_material[4],
 	    backdrop_wave[4];
-	float fog[4], fog_tint[4], membrane_fade[4], focus_band[4], subsurface[4];
+	float fog[4], fog_tint[4], membrane_fade[4], depth_of_field[4], subsurface[4];
 	uint32_t subsurface_quality[4];
 	float fog_grid[4];
 	float organelle_style[4], membrane_ripple[4], emission_fresnel[4],
@@ -385,7 +385,7 @@ struct RendererState
 	VkDescriptorSet bloom_descriptors;
 	VkPipelineLayout bloom_layout;
 	VkPipeline bloom_pipeline, fog_pipeline, medium_blur_pipeline,
-	    focus_pipeline;
+	    depth_of_field_pipeline;
 	VkPipeline guide_surface_pipeline;
 	VkPipeline transparent_pipeline,
 	    opaque_pipeline; // Split guide surface shading.
@@ -1966,10 +1966,9 @@ static bool upload_scene(RendererState* state, const RenderScene* scene)
 		uniform.cascade_interval[0] = state->config.cascade_interval;
 		uniform.cascade_interval[1] = state->config.cascade_growth;
 	}
-	uniform.focus_band[0] = state->config.focus_center;
-	uniform.focus_band[1] = state->config.focus_half_width;
-	uniform.focus_band[2] = state->config.focus_falloff;
-	uniform.focus_band[3] = state->config.focus_radius;
+	uniform.depth_of_field[1] = state->config.focus_range;
+	uniform.depth_of_field[2] = state->config.focus_blur_scale;
+	uniform.depth_of_field[3] = state->config.focus_radius;
 	uniform.subsurface_quality[0] = state->config.subsurface_samples;
 	uniform.subsurface[0] = state->config.subsurface_strength;
 	uniform.subsurface[1] = state->config.subsurface_wrap;
@@ -3097,8 +3096,8 @@ static bool create_bloom(RendererState* state, const char* ray_trace_path)
 	                      state->bloom_layout, &state->fog_pipeline) &&
 	       load_companion(state, ray_trace_path, "medium_blur.comp.spv",
 	                      state->bloom_layout, &state->medium_blur_pipeline) &&
-	       load_companion(state, ray_trace_path, "focus.comp.spv",
-	                      state->bloom_layout, &state->focus_pipeline);
+	       load_companion(state, ray_trace_path, "depth_of_field.comp.spv",
+	                      state->bloom_layout, &state->depth_of_field_pipeline);
 }
 
 static bool create_debug(RendererState* state, const char* builtin_shader_path)
@@ -3470,8 +3469,8 @@ static uint32_t available_features(const RendererState* state,
 		mask |= RENDER_VOLUME;
 	if (!state->custom_shader && state->uniform_data.quality[3])
 		mask |= RENDER_CELL_BLUR;
-	if (state->config.focus_radius > 0)
-		mask |= RENDER_TILT_SHIFT;
+	if (state->config.focus_radius > 0 && state->config.focus_blur_scale > 0)
+		mask |= RENDER_DEPTH_OF_FIELD;
 	if (scene->fog_blur > 0)
 		mask |= RENDER_FOG_BLUR;
 	if (scene->self_glow || state->config.bloom_strength > 0)
@@ -3507,8 +3506,8 @@ static void profile_overlay(RendererState* state, const Renderer* renderer,
 	         feature_status(renderer, RENDER_CELL_BLUR));
 	profile_text(state, line, 8, 288, STATS_TEXT_WIDTH - 8);
 	snprintf(line, sizeof(line),
-	         "F8 TILT SHIFT %s / F9 FOG BLUR %s / F10 GLOW %s",
-	         feature_status(renderer, RENDER_TILT_SHIFT),
+	         "F8 DEPTH OF FIELD %s / F9 FOG BLUR %s / F10 GLOW %s",
+	         feature_status(renderer, RENDER_DEPTH_OF_FIELD),
 	         feature_status(renderer, RENDER_FOG_BLUR),
 	         feature_status(renderer, RENDER_GLOW));
 	profile_text(state, line, 8, 306, STATS_TEXT_WIDTH - 8);
@@ -4313,7 +4312,7 @@ static bool report_frame(RendererState* state, Renderer* renderer,
 		printf("GPU fog/bloom/display: %.3f ms; total render: %.3f ms\n",
 		       bloom_ms, renderer->gpu_frame_ms);
 	uint64_t halo_ticks =
-	    (timestamps[GPU_TIME_BLOOM_END] - timestamps[GPU_TIME_FOCUS_END]);
+	    (timestamps[GPU_TIME_BLOOM_END] - timestamps[GPU_TIME_DEPTH_OF_FIELD_END]);
 	if (state->timestamp_bits < TIMESTAMP_WORD_BITS)
 		halo_ticks &= (UINT64_C(1) << state->timestamp_bits) - 1;
 	if (renderer->frame_log)
@@ -4330,9 +4329,9 @@ static bool report_frame(RendererState* state, Renderer* renderer,
 				   : state->config.bloom_strength);
 	if (renderer->frame_log)
 		printf("Render settings: disabled %u; SSS %s; volume rays %u; cell "
-		       "blur %u; tilt radius %.1f; fog radius %.1f.\n",
+		       "blur %u; depth of field radius %.1f; fog radius %.1f.\n",
 		       report.disabled_features, feature_status(renderer, RENDER_SSS),
-		       uniform->quality[0], uniform->quality[3], uniform->focus_band[3],
+		       uniform->quality[0], uniform->quality[3], uniform->depth_of_field[3],
 		       uniform->fog[0]);
 	static const struct
 	{
@@ -4350,8 +4349,8 @@ static bool report_frame(RendererState* state, Renderer* renderer,
 	    {PROFILE_EFFECTS, GPU_TIME_VOLUME_END, GPU_TIME_EFFECTS_END},
 	    {PROFILE_CELL_BLUR, GPU_TIME_EFFECTS_END, GPU_TIME_MEDIUM_BLUR_END},
 	    {PROFILE_FOG, GPU_TIME_MEDIUM_BLUR_END, GPU_TIME_FOG_END},
-	    {PROFILE_FOCUS, GPU_TIME_FOG_END, GPU_TIME_FOCUS_END},
-	    {PROFILE_BLOOM, GPU_TIME_FOCUS_END, GPU_TIME_BLOOM_END},
+	    {PROFILE_DEPTH_OF_FIELD, GPU_TIME_FOG_END, GPU_TIME_DEPTH_OF_FIELD_END},
+	    {PROFILE_BLOOM, GPU_TIME_DEPTH_OF_FIELD_END, GPU_TIME_BLOOM_END},
 	    {PROFILE_GPU_OUTPUT, GPU_TIME_BLOOM_END, GPU_TIME_COPY_END},
 	    {PROFILE_OVERLAY, GPU_TIME_BLOOM_END, GPU_TIME_OVERLAY_END},
 	    {PROFILE_COPY, GPU_TIME_OVERLAY_END, GPU_TIME_COPY_END}};
@@ -4493,9 +4492,15 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene,
 	uniform->subsurface[0] = renderer->disabled_features & RENDER_SSS
 	                             ? 0.0f
 	                             : state->config.subsurface_strength;
-	uniform->focus_band[3] = renderer->disabled_features & RENDER_TILT_SHIFT
-	                             ? 0.0f
-	                             : state->config.focus_radius;
+	// Focus on the camera target: the map plane point the view orbits.
+	uniform->depth_of_field[0] =
+	    std::sqrt(dot(subtract(camera->target, camera->position),
+	                  subtract(camera->target, camera->position)));
+	uniform->depth_of_field[3] =
+	    renderer->disabled_features & RENDER_DEPTH_OF_FIELD ||
+	            state->config.focus_blur_scale <= 0
+	        ? 0.0f
+	        : state->config.focus_radius;
 	if (renderer->disabled_features & RENDER_FOG_BLUR)
 		uniform->fog[0] = 0;
 	uniform->membrane_fade[3] =
@@ -4522,7 +4527,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene,
 		// Edges only: no medium, blur, focus or glow over the lines.
 		uniform->quality[0] = 0;
 		uniform->subsurface[0] = 0;
-		uniform->focus_band[3] = 0;
+		uniform->depth_of_field[3] = 0;
 		uniform->fog[0] = 0;
 		uniform->membrane_fade[3] = 0;
 		uniform->quality[3] = 0;
@@ -4699,7 +4704,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene,
 	    renderer->debug_views ? (no_sss ? state->no_sss_debug_pipeline
 		                                : state->debug_surface_pipeline)
 		: (scene->guides_required || state->config.volume_spatial_filter ||
-		   uniform->focus_band[3] > 0)
+		   uniform->depth_of_field[3] > 0)
 	        ? (no_sss ? state->no_sss_guide_pipeline
 	                  : state->guide_surface_pipeline)
 	        : (no_sss ? state->no_sss_pipeline : state->pipeline);
@@ -4935,15 +4940,18 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene,
 	}
 	vkCmdWriteTimestamp(state->command, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 	                    state->queries, GPU_TIME_FOG_END);
-	if (uniform->focus_band[3] > 0 && !renderer->debug_views)
+	if (uniform->depth_of_field[3] > 0 && !renderer->debug_views)
 	{
 		vkCmdBindPipeline(state->command, VK_PIPELINE_BIND_POINT_COMPUTE,
-		                  state->focus_pipeline);
+		                  state->depth_of_field_pipeline);
 		vkCmdBindDescriptorSets(state->command, VK_PIPELINE_BIND_POINT_COMPUTE,
 		                        state->bloom_layout, 0, 1,
 		                        &state->bloom_descriptors, 0, 0);
 		for (int pass = 0; pass < 2; ++pass)
 		{
+			// Pass 1 reads the tile radii pass 0 writes to the guides.
+			if (pass)
+				shader_buffer_barrier(state->command);
 			image_barrier(
 			    state->command, state->hdr, VK_IMAGE_LAYOUT_GENERAL,
 			    VK_IMAGE_LAYOUT_GENERAL,
@@ -4977,7 +4985,7 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene,
 		              VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 	}
 	vkCmdWriteTimestamp(state->command, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-	                    state->queries, GPU_TIME_FOCUS_END);
+	                    state->queries, GPU_TIME_DEPTH_OF_FIELD_END);
 	vkCmdBindPipeline(state->command, VK_PIPELINE_BIND_POINT_COMPUTE,
 	                  state->bloom_pipeline);
 	vkCmdBindDescriptorSets(state->command, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -5165,8 +5173,8 @@ bool renderer_shutdown(Renderer* renderer)
 			vkDestroyPipeline(state->device, state->transparent_pipeline, 0);
 		if (state->opaque_pipeline)
 			vkDestroyPipeline(state->device, state->opaque_pipeline, 0);
-		if (state->focus_pipeline)
-			vkDestroyPipeline(state->device, state->focus_pipeline, 0);
+		if (state->depth_of_field_pipeline)
+			vkDestroyPipeline(state->device, state->depth_of_field_pipeline, 0);
 		if (state->medium_blur_pipeline)
 			vkDestroyPipeline(state->device, state->medium_blur_pipeline, 0);
 		if (state->fog_pipeline)

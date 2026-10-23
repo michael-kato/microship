@@ -22,7 +22,7 @@ config=json.loads((root/'assets/rendering/renderer.json').read_text());config['s
 if a.view=='wide':config['camera'].update(position=[0,24,95],target=[0,0,0])
 if a.view in ('isolated','overview'):
     base.pop('rules',None);base.pop('effects',None);base['match']={'player':'virus','opponent':'immune'};base['bodies']=[];base['spawns']=[dict(type='virus_fighter',position=[500,0,0])]
-    base['appearance'].pop('fog',None);base['appearance'].pop('atmosphere',None);config.pop('tilt_shift',None);config['camera'].update(position=[0,15,165 if a.view=='overview' else 100],target=[0,0,0])
+    base['appearance'].pop('fog',None);base['appearance'].pop('atmosphere',None);config.pop('depth_of_field',None);config['camera'].update(position=[0,15,165 if a.view=='overview' else 100],target=[0,0,0])
 commands=[]
 for name in a.variants.split(','):
     assert name in ('flesh','bone','red_organs','blue_organs','veins','ligaments','intestines','villi','legacy','matte','shadow','repeat','behind_medium')

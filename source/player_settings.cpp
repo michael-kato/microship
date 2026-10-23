@@ -25,9 +25,8 @@ static const double RADIUS[] = {0, 1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64};
 static const double BLOOM_RADIUS[] = {1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64};
 static const double THRESHOLD[] = {0, .1, .25, .5, .55, .75, 1, 1.5, 2, 4};
 static const double THICKNESS[] = {.01, .04, .08, .12, .16, .24, .32, .5, 1};
-static const double POSITIVE_UNIT[] = {.01, .05, .1, .14, .2,
-                                       .3,  .4,  .5, .75, 1};
-static const double HALF_UNIT[] = {0, .05, .1, .14, .2, .25, .3, .4, .5};
+static const double FOCUS_RANGE[] = {0, .01, .02, .03, .05, .1, .2};
+static const double BLUR_SCALE[] = {0, 15, 30, 45, 60, 90, 120, 200};
 static const double SPEED[] = {0, 6, 12, 18, 24, 36, 48, 72, 96, 128};
 static const double SENSITIVITY[] = {.25, .5, .75, 1, 1.25, 1.5, 2, 3, 4};
 
@@ -113,7 +112,8 @@ static const SettingField FIELDS[] = {
 	         volume_lighting_grid, 0, 1, OFF_ON),
     FIELD(EFFECTS, "cell_blur", "Cell depth blur", BOOL, cell_blur, 0, 1,
 	      OFF_ON),
-    FIELD(EFFECTS, "tilt_shift", "Tilt shift", BOOL, tilt_shift, 0, 1, OFF_ON),
+    FIELD(EFFECTS, "depth_of_field", "Depth of field", BOOL, depth_of_field, 0,
+	      1, OFF_ON),
     FIELD(EFFECTS, "fog_blur", "Fog of war blur", BOOL, fog_blur, 0, 1, OFF_ON),
     FIELD(EFFECTS, "glow", "Glow and bloom", BOOL, glow, 0, 1, OFF_ON),
     GRAPHICS(EFFECTS, "bloom_radius", "Bloom radius", UINT, bloom_radius, 1, 64,
@@ -122,13 +122,11 @@ static const SettingField FIELDS[] = {
 	         0, 1, UNIT),
     GRAPHICS(EFFECTS, "bloom_threshold", "Bloom threshold", FLOAT,
 	         bloom_threshold, 0, 1000000, THRESHOLD),
-    GRAPHICS(EFFECTS, "focus_center", "Focus center", FLOAT, focus_center, 0, 1,
-	         UNIT),
-    GRAPHICS(EFFECTS, "focus_width", "Focus half width", FLOAT,
-	         focus_half_width, 0, .5, HALF_UNIT),
-    GRAPHICS(EFFECTS, "focus_falloff", "Focus falloff", FLOAT, focus_falloff, 0,
-	         1, POSITIVE_UNIT),
-    GRAPHICS(EFFECTS, "focus_radius", "Maximum focus blur radius", FLOAT,
+    GRAPHICS(EFFECTS, "focus_range", "Sharp depth range", FLOAT, focus_range,
+	         0, 1, FOCUS_RANGE),
+    GRAPHICS(EFFECTS, "focus_blur_scale", "Depth blur strength", FLOAT,
+	         focus_blur_scale, 0, 1000, BLUR_SCALE),
+    GRAPHICS(EFFECTS, "focus_radius", "Maximum depth blur radius", FLOAT,
 	         focus_radius, 0, 64, RADIUS),
     FIELD(AUDIO, "master_volume", "Master volume", FLOAT, master_volume, 0, 1,
 	      UNIT),
@@ -360,7 +358,7 @@ uint32_t player_settings_disabled_features(const PlayerSettings* s)
 	return (s->subsurface ? 0u : (uint32_t)RENDER_SSS) |
 	       (s->volume ? 0u : (uint32_t)RENDER_VOLUME) |
 	       (s->cell_blur ? 0u : (uint32_t)RENDER_CELL_BLUR) |
-	       (s->tilt_shift ? 0u : (uint32_t)RENDER_TILT_SHIFT) |
+	       (s->depth_of_field ? 0u : (uint32_t)RENDER_DEPTH_OF_FIELD) |
 	       (s->fog_blur ? 0u : (uint32_t)RENDER_FOG_BLUR) |
 	       (s->glow ? 0u : (uint32_t)RENDER_GLOW);
 }

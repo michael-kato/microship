@@ -103,7 +103,7 @@ for name, zoom in (('zoomed_out', '-1000'), ('zoomed_in', '1000')):
         if node in ('GPU FRAME', 'CPU FRAME') or ms < .05:
             continue
         frame = gpu if node in ('SCENE', 'AS UPDATE', 'BACKDROP', 'LIGHTING FIELDS', 'SURFACE + SSS', 'VOLUME', 'POST', 'EFFECTS',
-            'CELL BLUR', 'FOG', 'TILT SHIFT', 'BLOOM + DISPLAY', 'OUTPUT', 'HUD + PROFILER', 'OUTPUT COPY') else cpu
+            'CELL BLUR', 'FOG', 'DEPTH OF FIELD', 'BLOOM + DISPLAY', 'OUTPUT', 'HUD + PROFILER', 'OUTPUT COPY') else cpu
         print(f'  {node:<20} {ms:7.2f} ms  {100 * ms / frame:5.1f}%')
 (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
 print(f'Report: {out / "report.json"}')

@@ -339,7 +339,7 @@ the reported 100 ms gameplay case remain unverified.
 
 ## Live render controls
 
-F5 toggles SSS, F6 volume scattering, F7 cell blur, F8 tilt shift, and F9
+F5 toggles SSS, F6 volume scattering, F7 cell blur, F8 depth of field, and F9
 the fog-of-war filter. The keys open F1 and clear its timing averages.
 The normal window prepares SSS-on and SSS-off surface programs at startup;
 key presses do not compile shaders or replace Vulkan resources.
@@ -453,10 +453,16 @@ from 10.983 to 10.473 ms median application time and from 11.514 to
 Fog filtering now skips pixels with exactly zero fog. A CPU view check
 can skip the full filter only when every covered visibility-field vertex
 is fully revealed. Field edges and uncertain projections keep the filter.
-The tilt filter copies its center when all rounded taps address that
-pixel. Close and far captures differed by at most one RGB8 level. A
-120-frame close-view comparison reduced median GPU time from 9.254 to
-8.845 ms. Application time remained above ten milliseconds.
+Depth of field replaced the screen-band tilt shift. It focuses on the
+camera target and blurs by relative depth, `blur_scale * max(0,
+|1 - focus/distance| - focus_range)` pixels up to `max_radius`, so every
+zoom keeps the same look. A golden-angle spiral gathers taps whose own
+blur reaches the pixel; farther taps cannot spread over a sharper center.
+Each 8x8 tile stores its largest radius, and the spiral stops past the
+largest one in reach, which leaves the result unchanged. Against a dense
+reference (0.25 step), the shipping 2-pixel step changed 1.1 % of
+zoomed-out pixels by more than 4 RGB8 levels; a 1-pixel step changed
+0.9 % at twice the cost (2.6 against 1.4 ms).
 
 `volume.quadrature` accepts `midpoint` (default) or `gauss_legendre`.
 Gauss-Legendre requires two or three integration steps. The optical-depth
@@ -545,7 +551,7 @@ these results do not establish a hard ten-millisecond bound.
 
 `assets/rendering/renderer.json` now uses one native film sample, current-frame
 directional edge filtering, three Gauss-Legendre volume points, a four-pixel
-volume grid and a 16-cell shadow field. SSS, scattering, cell blur, tilt shift,
+volume grid and a 16-cell shadow field. SSS, scattering, cell blur, depth of field,
 fog, atmosphere and backdrop highlights stay enabled. Static lighting bakes
 keep their dependency checks. There is no temporal reconstruction.
 
@@ -712,7 +718,7 @@ time fell from 1.61 to 1.18 ms in the wide view and from 1.34 to 1.15 ms in
 the close view; `fog_memory_render.py` still passes with similar falloff,
 memory and decay changes.
 
-Effects, tilt shift and the spatial volume filter read a compact guide
+Effects, depth of field and the spatial volume filter read a compact guide
 buffer: one vec4 per pixel (first-hit distance, hit code, log terminal
 depth) followed by two vec4 per volume stride cell. Normal frames no longer
 write or read the 96-byte F2 diagnostic record; only F2 fills it, and it is

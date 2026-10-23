@@ -78,10 +78,10 @@ with tempfile.TemporaryDirectory(prefix='nanovore-medium-') as directory:
         config=deepcopy(settings);config['volume'].update(quadrature='gauss_legendre',integration_steps=3,spatial_filter=True)
         config['volume'][field]=value;run('bad-volume-mode-'+str(count),data,config=config,expected=1)
     # Optional focus settings must not affect simulation or geometry.
-    config=deepcopy(settings);config.pop('tilt_shift')
+    config=deepcopy(settings);config.pop('depth_of_field')
     s,_=run('focus-off',data,4800,orders,config);assert s==baseline
-    for field,value in [('focus_center',1.1),('focus_half_width',-.1),('falloff',0),('max_radius',65),('unknown',1)]:
-        config=deepcopy(settings);config['tilt_shift'][field]=value
+    for field,value in [('focus_range',1.1),('focus_range',-.1),('blur_scale',1001),('max_radius',65),('unknown',1)]:
+        config=deepcopy(settings);config['depth_of_field'][field]=value
         run('bad-focus-'+field,data,config=config,expected=1)
     for n in (1,7,65):
         config=deepcopy(settings);config['lighting']['shadow_grid_resolution']=n

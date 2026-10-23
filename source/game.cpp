@@ -1048,7 +1048,7 @@ static PauseAction pause_session(Game* game, Presentation* presentation,
 		settings->subsurface = !(mask & RENDER_SSS);
 		settings->volume = !(mask & RENDER_VOLUME);
 		settings->cell_blur = !(mask & RENDER_CELL_BLUR);
-		settings->tilt_shift = !(mask & RENDER_TILT_SHIFT);
+		settings->depth_of_field = !(mask & RENDER_DEPTH_OF_FIELD);
 		settings->fog_blur = !(mask & RENDER_FOG_BLUR);
 		settings->glow = !(mask & RENDER_GLOW);
 		settings->show_stats = game->renderer.debug_stats;
@@ -1315,7 +1315,7 @@ int game_run(const GameOptions* options)
 	    "set production; Space pause; Esc pause menu; R restart.\n");
 #ifdef DEVELOPMENT
 	printf("Development: F1 profiler; F2 render buffers; F3 wireframe; F5 SSS; "
-	       "F6 volume; F7 cell blur; F8 tilt shift; F9 fog blur; F10 self-glow "
+	       "F6 volume; F7 cell blur; F8 depth of field; F9 fog blur; F10 self-glow "
 	       "and halo.\n");
 #endif
 	const double tick_seconds = 1.0 / SIMULATION_TICKS_PER_SECOND_DOUBLE;

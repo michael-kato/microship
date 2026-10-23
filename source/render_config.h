@@ -37,7 +37,9 @@ struct RenderConfig
 	uint32_t bloom_radius;
 	float bloom_strength;
 	float bloom_threshold;
-	float focus_center, focus_half_width, focus_falloff, focus_radius;
+	// Depth of field: blur radius in pixels per unit of relative depth error
+	// beyond the sharp range, up to the maximum radius.
+	float focus_range, focus_blur_scale, focus_radius;
 	uint32_t subsurface_samples;
 	float subsurface_strength, subsurface_wrap, subsurface_transmission,
 	    subsurface_thickness;

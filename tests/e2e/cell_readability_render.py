@@ -26,7 +26,7 @@ center=base['bodies'][0]['position'];radius=base['bodies'][0]['radius'];n=[0,3/m
 for x,depth,tint in [(-1.3,.18,[.95,.25,.05]),(0,.5,[.1,.9,.2]),(1.3,.82,[.05,.3,1])]:
  half=math.sqrt(radius*radius-x*x);point=[center[i]+(x if i==0 else n[i]*half*(1-2*depth)) for i in range(3)];probes.append(point)
  base['bodies'].append(dict(type='depth_probe',owner='neutral',position=point,radius=.35,tint=tint))
-config=json.loads((root/'assets/rendering/renderer.json').read_text());config['sampling']['samples_per_pixel']=3;config['camera']['position']=[0,3,10];config.pop('tilt_shift')
+config=json.loads((root/'assets/rendering/renderer.json').read_text());config['sampling']['samples_per_pixel']=3;config['camera']['position']=[0,3,10];config.pop('depth_of_field')
 clear=deepcopy(base)
 for b in clear['bodies']:
  if 'medium' in b:b['medium']['depth_blur']['max_radius']=0

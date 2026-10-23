@@ -1,0 +1,81 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#include "render_bindings.glsl"
+#include "render_uniform.glsl"
+#define NANOVORE_DEBUG_BINDING BLOOM_BINDING_DEBUG
+#define NANOVORE_GUIDE_BINDING BLOOM_BINDING_GUIDES
+#include "debug_buffers.glsl"
+layout(local_size_x=COMPUTE_GROUP_SIZE,local_size_y=COMPUTE_GROUP_SIZE) in;
+layout(set=0,binding=BLOOM_BINDING_BEAUTY,rgba16f) uniform image2D beauty;
+layout(set=0,binding=BLOOM_BINDING_HORIZONTAL,rgba16f) uniform image2D scratch;
+layout(push_constant) uniform FocusPass
+{
+    ivec2 extent;int radius;int pass;
+    float threshold;float strength;float exposure;float views;
+} focus;
+const float GOLDEN_ANGLE=2.39996322972865332;
+// Tap k sits at radius sqrt(1+2*SPIRAL_STEP*k) pixels: equal area per tap, the
+// first one pixel out, about radius^2/(2*step) taps to the maximum radius.
+const float SPIRAL_STEP=2.0;
+// Relative depth error 1 - focus/distance: negative in front of the focus,
+// below one behind it, and increasing with distance, so it also orders depth.
+float depth_error(float distance) { return 1.0-render.depth_of_field.x/max(distance,1e-6); }
+// Blur radius in pixels. Relative to the focus distance, so every zoom keeps the same look.
+float blur_radius(float error)
+{ return min(render.depth_of_field.w,render.depth_of_field.z*max(0.0,abs(error)-render.depth_of_field.y)); }
+// Largest blur radius in this workgroup's tile (pass 0) or within reach of it (pass 1).
+// Radii are non-negative, so their float bits order like the floats.
+shared uint tile_radius;
+void main()
+{
+    ivec2 pixel=ivec2(gl_GlobalInvocationID.xy);
+    bool inside=all(lessThan(pixel,focus.extent));
+    if (gl_LocalInvocationIndex==0u) tile_radius=0u;
+    barrier();
+    // Pass 0 pairs this frame's color with the depth error at the terminal camera
+    // distance of its center film sample, and stores the tile's largest radius in
+    // the unused guide W of the tile's first pixel.
+    if (focus.pass==0)
+    {
+        if (inside)
+        {
+            float error=depth_error(exp2(guides[pixel.y*focus.extent.x+pixel.x].z)-1.0);
+            imageStore(scratch,pixel,vec4(imageLoad(beauty,pixel).rgb,error));
+            atomicMax(tile_radius,floatBitsToUint(blur_radius(error)));
+        }
+        barrier();
+        ivec2 first=ivec2(gl_WorkGroupID.xy)*COMPUTE_GROUP_SIZE;
+        if (gl_LocalInvocationIndex==0u) guides[first.y*focus.extent.x+first.x].w=uintBitsToFloat(tile_radius);
+        return;
+    }
+    // Taps farther than every blur radius in reach cannot count, so the spiral stops there.
+    int reach=(int(ceil(render.depth_of_field.w))+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE,side=2*reach+1;
+    ivec2 tiles=(focus.extent+COMPUTE_GROUP_SIZE-1)/COMPUTE_GROUP_SIZE;
+    for (int i=int(gl_LocalInvocationIndex);i<side*side;i+=COMPUTE_GROUP_SIZE*COMPUTE_GROUP_SIZE)
+    {
+        ivec2 tile=ivec2(gl_WorkGroupID.xy)+ivec2(i%side,i/side)-reach;
+        if (any(lessThan(tile,ivec2(0))) || any(greaterThanEqual(tile,tiles))) continue;
+        ivec2 first=tile*COMPUTE_GROUP_SIZE;
+        atomicMax(tile_radius,floatBitsToUint(guides[first.y*focus.extent.x+first.x].w));
+    }
+    barrier();
+    if (!inside) return;
+    // Scatter as gather on a golden-angle spiral (Gustafsson 2018): a tap counts
+    // when its own blur disc reaches this pixel, and a farther tap cannot spread
+    // over a sharper center. Fixed taps from the current frame only.
+    vec4 center=imageLoad(scratch,pixel);
+    float center_radius=blur_radius(center.a),limit=min(render.depth_of_field.w,uintBitsToFloat(tile_radius)+.5);
+    vec3 sum=center.rgb;float count=1.0,radius=1.0;
+    // Each tap turns the direction by the golden angle.
+    vec2 direction=vec2(1,0),turn=vec2(cos(GOLDEN_ANGLE),sin(GOLDEN_ANGLE));
+    while (radius<limit)
+    {
+        vec4 tap=imageLoad(scratch,clamp(pixel+ivec2(round(radius*direction)),ivec2(0),focus.extent-1));
+        float size=blur_radius(tap.a);
+        if (tap.a>center.a) size=min(size,2.0*center_radius);
+        sum+=mix(sum/count,tap.rgb,smoothstep(radius-.5,radius+.5,size));
+        radius=sqrt(1.0+2.0*SPIRAL_STEP*count);count+=1.0;
+        direction=vec2(direction.x*turn.x-direction.y*turn.y,direction.x*turn.y+direction.y*turn.x);
+    }
+    imageStore(beauty,pixel,vec4(sum/count,1));
+}

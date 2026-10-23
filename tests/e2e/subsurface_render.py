@@ -28,7 +28,7 @@ data['appearance']={'ambient':[0,0,0],'gradient':{'top':[0,0,0],'bottom':[0,0,0]
     'rim':dict(direction=[0,0,-1],color=[1,1,1],irradiance=6)}}
 unit=data['content']['units'][0];unit.update(model=Path(os.path.relpath(root/'assets/models/virus_leaf.fmesh',out)).as_posix(),scale=2,yaw_degrees=0)
 config=json.loads((root/'assets/rendering/renderer.json').read_text());config['sampling']['samples_per_pixel']=3
-config['camera'].update(position=[0,0,8],target=[0,0,0]);config.pop('tilt_shift',None)
+config['camera'].update(position=[0,0,8],target=[0,0,0]);config.pop('depth_of_field',None)
 # A non-scattering blocker must still block the light-entry side of the thin leaf.
 blocker=bytearray((root/'assets/models/virus_virion.fmesh').read_bytes());n=struct.unpack_from('<I',blocker,8)[0]
 for v in range(n):struct.pack_into('<4f',blocker,16+v*64+48,0,0,0,0)

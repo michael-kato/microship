@@ -138,7 +138,7 @@ bool render_config_load(RenderConfig* config, const char* path)
 	json_object(
 	    root,
 	    "$schema|output|sampling|volume|geometry|camera|lighting|radiance_"
-	    "cascades|bloom|tilt_shift|subsurface|wireframe|level_of_detail");
+	    "cascades|bloom|depth_of_field|subsurface|wireframe|level_of_detail");
 	RenderConfig loaded = {};
 	{
 		Json j = json_get(root, "output");
@@ -373,14 +373,13 @@ bool render_config_load(RenderConfig* config, const char* path)
 		loaded.wireframe_pixels =
 		    json_float(json_get(wireframe, "line_pixels"), .25, 8);
 	}
-	Json focus = json_find(root, "tilt_shift");
+	Json focus = json_find(root, "depth_of_field");
 	if (json_present(focus))
 	{
-		json_object(focus, "focus_center|focus_half_width|falloff|max_radius");
-		loaded.focus_center = json_float(json_get(focus, "focus_center"), 0, 1);
-		loaded.focus_half_width =
-		    json_float(json_get(focus, "focus_half_width"), 0, .5f);
-		loaded.focus_falloff = json_positive(json_get(focus, "falloff"), 1);
+		json_object(focus, "focus_range|blur_scale|max_radius");
+		loaded.focus_range = json_float(json_get(focus, "focus_range"), 0, 1);
+		loaded.focus_blur_scale =
+		    json_float(json_get(focus, "blur_scale"), 0, 1000);
 		loaded.focus_radius = json_float(json_get(focus, "max_radius"), 0, 64);
 	}
 	if (!document.valid)

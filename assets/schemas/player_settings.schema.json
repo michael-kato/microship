@@ -192,8 +192,8 @@
           "title": "Cell depth blur",
           "type": "boolean"
         },
-        "tilt_shift": {
-          "title": "Tilt shift",
+        "depth_of_field": {
+          "title": "Depth of field",
           "type": "boolean"
         },
         "fog_blur": {
@@ -222,26 +222,20 @@
           "minimum": 0.0,
           "maximum": 1000000.0
         },
-        "focus_center": {
-          "title": "Focus center",
+        "focus_range": {
+          "title": "Sharp depth range",
           "type": "number",
           "minimum": 0.0,
           "maximum": 1.0
         },
-        "focus_width": {
-          "title": "Focus half width",
+        "focus_blur_scale": {
+          "title": "Depth blur strength",
           "type": "number",
           "minimum": 0.0,
-          "maximum": 0.5
-        },
-        "focus_falloff": {
-          "title": "Focus falloff",
-          "type": "number",
-          "minimum": 0.0,
-          "maximum": 1.0
+          "maximum": 1000.0
         },
         "focus_radius": {
-          "title": "Maximum focus blur radius",
+          "title": "Maximum depth blur radius",
           "type": "number",
           "minimum": 0.0,
           "maximum": 64.0

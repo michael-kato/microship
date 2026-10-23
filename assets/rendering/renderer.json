@@ -54,10 +54,9 @@
     "spatial_filter": true,
     "spatial_stride": 4
   },
-  "tilt_shift": {
-    "focus_center": 0.52,
-    "focus_half_width": 0.14,
-    "falloff": 0.3,
+  "depth_of_field": {
+    "focus_range": 0.02,
+    "blur_scale": 60,
     "max_radius": 24
   },
   "subsurface": {

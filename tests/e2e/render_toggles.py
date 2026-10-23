@@ -76,7 +76,7 @@ seconds=time.monotonic()-started
 assert process.returncode==0,(output,errors)
 assert seconds<=process_limit,seconds
 assert 'Vulkan validation: enabled.' in output
-settings=re.findall(r'Render settings: disabled (\d+); SSS (ON|OFF|N/A); volume rays (\d+); cell blur (\d+); tilt radius ([0-9.]+); fog radius ([0-9]+\.[0-9]+)\.',output)
+settings=re.findall(r'Render settings: disabled (\d+); SSS (ON|OFF|N/A); volume rays (\d+); cell blur (\d+); depth of field radius ([0-9.]+); fog radius ([0-9]+\.[0-9]+)\.',output)
 assert len(settings)==2,settings
 expected={'baseline':[0,0],'off':[0,31],'restore':[31,0],'repeat':[0,0],'buffers':[0,1],'buffers-return':[0,0],'glow-off':[0,32],'glow-restore':[32,0]}[a.case]
 assert [int(s[0]) for s in settings]==expected,(settings,expected)
@@ -92,7 +92,7 @@ for f in frames:
   if samples=='1':assert abs(float(last)-float(mean))<.00001,(last,mean)
 if a.case=='off':
  for name,_,last,_,_ in frames[1]:
-  if name in ('VOLUME','CELL BLUR','FOG','TILT SHIFT'):assert float(last)<.05,(name,last)
+  if name in ('VOLUME','CELL BLUR','FOG','DEPTH OF FIELD'):assert float(last)<.05,(name,last)
 glow_settings=re.findall(r'Surface self-glow: (ON|OFF); halo strength ([0-9.]+)\.',output)
 assert len(glow_settings)==2,glow_settings
 for mask,settings_glow in zip(expected,glow_settings):

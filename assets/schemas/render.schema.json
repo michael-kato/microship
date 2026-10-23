@@ -278,23 +278,19 @@
         }
       ]
     },
-    "tilt_shift": {
+    "depth_of_field": {
       "type": "object",
+      "description": "Camera depth blur focused at the camera target. Radius in pixels = blur_scale * max(0, |1 - focus distance / pixel distance| - focus_range), up to max_radius.",
       "properties": {
-        "focus_center": {
+        "focus_range": {
           "type": "number",
           "minimum": 0,
           "maximum": 1
         },
-        "focus_half_width": {
+        "blur_scale": {
           "type": "number",
           "minimum": 0,
-          "maximum": 0.5
-        },
-        "falloff": {
-          "type": "number",
-          "exclusiveMinimum": 0,
-          "maximum": 1
+          "maximum": 1000
         },
         "max_radius": {
           "type": "number",
@@ -302,7 +298,7 @@
           "maximum": 64
         }
       },
-      "required": ["focus_center", "focus_half_width", "falloff", "max_radius"],
+      "required": ["focus_range", "blur_scale", "max_radius"],
       "additionalProperties": false
     },
     "subsurface": {
