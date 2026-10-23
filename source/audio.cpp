@@ -41,9 +41,8 @@ enum
 };
 
 Audio::Audio()
-    : trigger_write(0), trigger_read(0), stopping(false), failed(false),
-      output_gain(1), device(0), capture(0), captured(0), distance(1),
-      valid(true)
+    : trigger_write(0), trigger_read(0), stopping(false), output_gain(1),
+      device(0), capture(0), captured(0), distance(1), valid(true)
 {
 	memset(faction_banks, 0, sizeof(faction_banks));
 	memset(voices, 0, sizeof(voices));
@@ -230,7 +229,7 @@ static DWORD WINAPI audio_thread(LPVOID context)
 				if (waveOutWrite(a->device, &a->headers[i], sizeof(WAVEHDR)) !=
 				    MMSYSERR_NOERROR)
 				{
-					a->failed.store(true);
+					fprintf(stderr, "Audio output stopped; sound is muted.\n");
 					return 1;
 				}
 			}
@@ -365,10 +364,6 @@ bool audio_tick(Audio* a)
 	a->valid = a->valid && fwrite(samples, sizeof(samples), 1, a->capture) == 1;
 	return a->valid;
 }
-bool audio_running(const Audio* a)
-{
-	return !a->failed.load(std::memory_order_acquire);
-}
 bool audio_close(Audio* a)
 {
 #ifdef _WIN32
@@ -379,8 +374,6 @@ bool audio_close(Audio* a)
 		WaitForSingleObject(a->thread, INFINITE);
 		CloseHandle(a->thread);
 		a->thread = 0;
-		if (a->failed.load())
-			a->valid = false;
 	}
 	if (a->device)
 	{

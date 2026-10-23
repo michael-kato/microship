@@ -61,7 +61,7 @@ struct Audio
 	uint32_t faction_banks[MAX_FACTIONS];
 	AudioTrigger triggers[AUDIO_TRIGGER_CAPACITY];
 	std::atomic<uint32_t> trigger_write, trigger_read;
-	std::atomic<bool> stopping, failed;
+	std::atomic<bool> stopping;
 	std::atomic<float> output_gain;
 #ifdef _WIN32
 	HWAVEOUT device;
@@ -84,7 +84,5 @@ bool audio_load(Audio*, const char* manifest, const char* capture,
 bool audio_open(Audio*);
 void audio_events(Audio*, Simulation*, Vec3 listener);
 bool audio_tick(Audio*);
-bool audio_running(
-    const Audio*); // False once the live output thread has failed.
 bool audio_close(Audio*);
 #endif
