@@ -88,6 +88,7 @@ struct World
     bool neutral_start,auto_colonize,colonized_starts;
     uint32_t active_factions;
     bool fully_established,rally_enabled;Vec3 rally_point;
+    uint32_t rally_factions; // Bit per faction sent to the rally point; the others hold their cells.
     uint32_t production_ticks;float formation_spacing; // Production-only stress preparation.
     bool player_ai; // Enable AI control of the player's faction.
     Spawn spawns[MAX_SPAWNS];

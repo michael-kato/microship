@@ -908,7 +908,10 @@ bool simulation_initialize(Simulation* s, const char* world_path,uint32_t seed,c
             uint32_t columns=(uint32_t)std::ceil(std::sqrt((float)counts[u.faction]));
             const Body& home=s->world.bodies[home_body(s,u.faction)];
             Vec3 offset={(rank%columns-(columns-1)*.5f)*s->world.formation_spacing,(rank/columns-(columns-1)*.5f)*s->world.formation_spacing,home.factory_surface_radius+s->world.formation_spacing};
-            u.position=add(home.position,offset);u.destination=s->world.rally_point;u.flight_goal=u.destination;u.moving=true;u.commanded=true;
+            u.position=add(home.position,offset);
+            // Holding factions orbit their home cell; the others fly to the rally point.
+            if (s->world.rally_factions&(1u<<u.faction)) { u.destination=s->world.rally_point;u.flight_goal=u.destination;u.moving=true;u.commanded=true; }
+            else { u.target=home_body(s,u.faction);u.flight_goal=u.position; }
             s->faction_stats[u.faction].peak_units=counts[u.faction];
         }
     }
@@ -2262,7 +2265,8 @@ static void ai_orders(Simulation* s,Faction enemy)
 {
     int home=home_body(s,enemy),target=-1;float nearest=INITIAL_ENEMY_DISTANCE;bool assault_ready=false;
     if (home<0) return;
-    if (s->world.rally_enabled)
+    // Rallying factions only fly to the rally point; the others play the normal strategy.
+    if (s->world.rally_enabled && (s->world.rally_factions&(1u<<enemy)))
     {
         for (uint32_t i=0;i<MAX_UNITS;++i) if (s->units[i].health>0 && s->units[i].faction==enemy)
         {

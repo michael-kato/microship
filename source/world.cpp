@@ -620,7 +620,7 @@ bool world_load(World* world,const char* path,uint32_t seed,const char* player)
     Json rules=json_find(root,"rules");if (json_present(rules) && (!json_path(rules,path,file) || !load_rules(&loaded,file))) return false;
     Json effects=json_find(root,"effects");if (json_present(effects) && (!json_path(effects,path,file) || !load_effects(&loaded,file))) return false;
     if (!json_path(json_get(root,"appearance"),path,loaded.appearance_path) || !load_appearance(&loaded,loaded.appearance_path,seed)) return false;
-    Json match=json_get(root,"match");json_object(match,"player|opponent|starts|force_ring|auto_colonize|colonized_starts|player_ai|fully_established|rally_point|production_seconds|formation_spacing");
+    Json match=json_get(root,"match");json_object(match,"player|opponent|starts|force_ring|auto_colonize|colonized_starts|player_ai|fully_established|rally_point|rally_factions|production_seconds|formation_spacing");
     Json automatic=json_find(match,"auto_colonize");if (json_present(automatic)) loaded.auto_colonize=json_bool(automatic);
     Json player_ai=json_find(match,"player_ai");if (json_present(player_ai)) loaded.player_ai=json_bool(player_ai);
     loaded.player_faction=read_owner(&loaded,json_get(match,"player"));
@@ -646,6 +646,19 @@ bool world_load(World* world,const char* path,uint32_t seed,const char* player)
     {
         loaded.rally_point=json_vector(rally,-MAX_PLACEMENT_COORDINATE,MAX_PLACEMENT_COORDINATE);
         if (!loaded.player_ai) return json_error(rally,"rally_point requires player_ai");
+    }
+    // Without a list, every faction rallies.
+    Json rallying=json_find(match,"rally_factions");loaded.rally_factions=~0u;
+    if (json_present(rallying))
+    {
+        if (!loaded.rally_enabled) return json_error(rallying,"rally_factions requires rally_point");
+        loaded.rally_factions=0;JsonArray list=json_array(rallying,MAX_FACTIONS-1);Json name={};
+        while (json_next(&list,&name))
+        {
+            Faction faction=read_owner(&loaded,name);
+            if (!faction || (loaded.rally_factions&(1u<<faction))) return json_error(name,"rally_factions requires distinct non-neutral factions");
+            loaded.rally_factions|=1u<<faction;
+        }
     }
     Json production=json_find(match,"production_seconds"),spacing=json_find(match,"formation_spacing");
     if (json_present(production))

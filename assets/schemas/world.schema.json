@@ -96,6 +96,15 @@
         "rally_point": {
           "$ref": "shared.schema.json#/$defs/position"
         },
+        "rally_factions": {
+          "description": "Factions sent to the rally point; the others hold and orbit their cells. Default: every faction.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
         "production_seconds": {
           "type": "integer",
           "minimum": 1,
