@@ -31,19 +31,20 @@ struct Order
 	Vec3 destination;
 };
 
-static bool integer(const char* text, uint32_t maximum, uint32_t* value)
+bool parse_integer(const char* text, uint32_t minimum, uint32_t maximum,
+                   uint32_t* value)
 {
-	if (!*text)
+	if (!text[0])
 		return false;
 	for (const char* p = text; *p; ++p)
 		if (*p < '0' || *p > '9')
 			return false;
 	errno = 0;
 	char* end = 0;
-	unsigned long long n = strtoull(text, &end, DECIMAL_RADIX);
-	if (errno || *end || n > maximum)
+	unsigned long long parsed = strtoull(text, &end, DECIMAL_RADIX);
+	if (errno || *end || parsed < minimum || parsed > maximum)
 		return false;
-	*value = (uint32_t)n;
+	*value = (uint32_t)parsed;
 	return true;
 }
 
@@ -84,7 +85,7 @@ bool orders_run(Simulation* s, const char* path, uint32_t ticks, Audio* audio)
 				break;
 			}
 			Order order = {};
-			if (!integer(tick, ticks - 1, &order.tick) ||
+			if (!parse_integer(tick, 0, ticks - 1, &order.tick) ||
 			    (count && order.tick < orders[count - 1].tick))
 			{
 				valid = false;
@@ -130,8 +131,8 @@ bool orders_run(Simulation* s, const char* path, uint32_t ticks, Audio* audio)
 			{
 				order.kind = !strcmp(command, "order") ? TARGET : INSPECT;
 				if (!s->world.body_count ||
-				    !integer(argument, s->world.body_count - 1,
-				             &order.argument))
+				    !parse_integer(argument, 0, s->world.body_count - 1,
+				                   &order.argument))
 				{
 					valid = false;
 					break;
@@ -140,7 +141,7 @@ bool orders_run(Simulation* s, const char* path, uint32_t ticks, Audio* audio)
 			else if (!strcmp(command, "ratio"))
 			{
 				order.kind = RATIO;
-				if (!integer(argument, 100, &order.argument))
+				if (!parse_integer(argument, 0, 100, &order.argument))
 				{
 					valid = false;
 					break;

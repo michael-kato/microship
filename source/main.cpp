@@ -1,5 +1,6 @@
 #include "asset_json.h"
 #include "game.h"
+#include "orders.h"
 #include "start_menu.h"
 
 #include <cmath>
@@ -26,7 +27,6 @@ static const int MAX_COMMAND_TICKS = 1000000;
 static const int MAX_COMMAND_MATCHES = 1000;
 static const int EXECUTABLE_PATH_CAPACITY = 4096;
 static const int MAX_COMMAND_REAL_MAGNITUDE = 1000000;
-static const int DECIMAL_RADIX = 10;
 static const int MAX_CLIENT_PIXEL_COORDINATE = 65535;
 static const double MAX_CURSOR_ANCHOR_COORDINATE = 100000.0;
 static const int MAX_AUDIO_CAPTURE_TICKS = 3600;
@@ -116,23 +116,6 @@ static bool parse_real(const char* text, double* value)
 	    std::fabs(parsed) > MAX_COMMAND_REAL_MAGNITUDE)
 		return false;
 	*value = parsed;
-	return true;
-}
-
-static bool parse_integer(const char* text, uint32_t minimum, uint32_t maximum,
-                          uint32_t* value)
-{
-	if (!text[0])
-		return false;
-	for (const char* p = text; *p; ++p)
-		if (*p < '0' || *p > '9')
-			return false;
-	errno = 0;
-	char* end = 0;
-	unsigned long long parsed = strtoull(text, &end, DECIMAL_RADIX);
-	if (errno || *end || parsed < minimum || parsed > maximum)
-		return false;
-	*value = (uint32_t)parsed;
 	return true;
 }
 
