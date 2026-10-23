@@ -185,6 +185,7 @@ struct World
 	uint32_t studio_mask;
 	float thin_transmission, thin_absorption;
 	bool thin_transmission_set;
+	float thin_bleed_strength, thin_bleed_depth;
 	float thin_clarity, thin_edge_strength, thin_edge_power, thin_blur_radius,
 	    ai_production, ai_expansion;
 	bool thin_clarity_set, ai_production_set;

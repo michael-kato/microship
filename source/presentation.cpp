@@ -347,6 +347,8 @@ bool presentation_initialize(Presentation* p, const Simulation* s,
 	scene->thin_edge_strength = w->thin_edge_strength;
 	scene->thin_edge_power = w->thin_edge_power;
 	scene->thin_blur_radius = w->thin_blur_radius;
+	scene->thin_bleed_strength = w->thin_bleed_strength;
+	scene->thin_bleed_depth = w->thin_bleed_depth;
 	scene->background_samples = w->backdrop_soft ? 0 : w->backdrop_samples;
 	scene->background_triangles =
 	    w->backdrop_soft || !w->backdrop.model_path[0]

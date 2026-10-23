@@ -34,6 +34,8 @@ static const int MAX_RELIEF_FREQUENCY = 1000; // Features per object-space unit.
 static const int MAX_RELIEF_DEPTH = 4;         // Slope scale.
 static const int MAX_ELECTRON_SIGNAL = 16;
 static const int MAX_ELECTRON_EDGE = 64;
+static const int MAX_WALL_BLEED = 16;
+static const int MAX_WALL_BLEED_DEPTH = 100;
 static const int MAX_SPIKE_LENGTH = 2;
 static const int MAX_EFFECTS_POP_RADIUS = 100;
 static const int MAX_EFFECTS_POP_SECONDS = 2;
@@ -655,8 +657,17 @@ static bool load_appearance(World* w, const char* path, uint32_t seed)
 	Json thin = json_find(root, "thin_surface");
 	if (json_present(thin))
 	{
-		json_object(thin,
-		            "transmission|absorption|clarity|edge_fade|blur_radius");
+		json_object(thin, "transmission|absorption|clarity|edge_fade|blur_"
+		                  "radius|bleed");
+		Json bleed = json_find(thin, "bleed");
+		if (json_present(bleed))
+		{
+			json_object(bleed, "strength|depth");
+			w->thin_bleed_strength =
+			    json_float(json_get(bleed, "strength"), 0, MAX_WALL_BLEED);
+			w->thin_bleed_depth =
+			    json_float(json_get(bleed, "depth"), 0, MAX_WALL_BLEED_DEPTH);
+		}
 		Json blur = json_find(thin, "blur_radius");
 		if (json_present(blur))
 			w->thin_blur_radius = json_float(blur, 0, 32);

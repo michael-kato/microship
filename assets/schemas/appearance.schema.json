@@ -168,6 +168,24 @@
           "type": "number",
           "minimum": 0,
           "maximum": 32
+        },
+        "bleed": {
+          "type": "object",
+          "description": "Interior light a cell wall shows from depth (world units) beneath it, from the cell's radiance cascades; organelle colors appear as soft blobs.",
+          "properties": {
+            "strength": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 16
+            },
+            "depth": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": ["strength", "depth"],
+          "additionalProperties": false
         }
       },
       "required": ["transmission", "absorption"],
