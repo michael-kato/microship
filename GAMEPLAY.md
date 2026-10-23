@@ -90,7 +90,7 @@ The appearance file defines a finite global scattering medium as well as the cel
 
 All biological surfaces use subsurface scattering settings. Diffuse light becomes softer, and thin parts transmit colored light from behind. Thickness follows the current solid mesh. Cell walls use a separate wall thickness because they enclose fluid. The effect is an approximation of scattering. It keeps specular highlights, wall clarity, selection marks, and HUD text separate. It uses only the current frame and does not change game outcomes.
 
-Idle craft use per-unit task ranges. Direct orders take priority. Factory avoidance uses current stem and head bounds. A digesting craft attacking a factory ignores every limb of that colony, so it can reach heads inside dense trees. The flight settings provide two seconds of lookahead and one world unit of extra clearance. Top speeds and acceleration are unchanged by these presentation changes.
+Idle craft use per-unit task ranges. Direct orders take priority. Craft avoid and collide with factories only while orbiting a cell without a move order, and only that cell's factories, using current stem and head bounds. Moving craft, launching craft and fungal spores pass through factories. A digesting craft attacking a factory ignores every limb of that colony, so it can reach heads inside dense trees. The flight settings provide two seconds of lookahead and one world unit of extra clearance. Top speeds and acceleration are unchanged by these presentation changes.
 
 Normal window starts choose a variation seed. Restart restores the same seed, neutral ownership, starting craft, and discovery. Asset edits require application restart.
 
