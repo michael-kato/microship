@@ -165,16 +165,21 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
                 && scale_authored_glow(&scene->geometry,p->segment_meshes[i],w->glow_stems*w->content.producers[i].factory_glow_scale);
         }
         scene->self_glow=w->glow_interior>0 || w->glow_organelles>0 || w->glow_stems>0 || w->glow_leaves>0 || w->glow_units>0;
+        // Each cell reserves slots for the most structures any producer can grow there.
+        p->structure_first[0]=0;
+        for (uint32_t body=0;body<w->body_count;++body)
+            p->structure_first[body+1]=p->structure_first[body]+(w->gameplay.enabled ? simulation_structure_limit(s,body) : 0);
+        uint32_t structures=p->structure_first[w->body_count];
         p->unit_base=0;p->body_base=w->gameplay.enabled ? (uint32_t)MAX_UNITS : w->spawn_count;
         p->factory_base=p->body_base+w->body_count;
-        p->stem_base=p->factory_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES : 0);
-        p->bud_base=p->stem_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES*GROWTH_PATH_SEGMENTS : 0);
-        p->debris_base=p->bud_base+(w->gameplay.enabled ? w->body_count*MAX_FACTORY_STRUCTURES : 0);
+        p->stem_base=p->factory_base+structures;
+        p->bud_base=p->stem_base+structures*GROWTH_PATH_SEGMENTS;
+        p->debris_base=p->bud_base+structures;
         p->attached_base=p->debris_base+(w->gameplay.enabled ? MAX_LIMB_DEBRIS : 0);
         p->flying_base=p->attached_base+(w->spikes.enabled ? MAX_ATTACHED_INSTANCES : 0);
         p->embedded_base=p->flying_base+(w->spikes.enabled ? MAX_PROJECTILES : 0);
         p->structure_embedded_base=p->embedded_base+(w->spikes.enabled ? MAX_UNIT_EMBEDDED_INSTANCES : 0);
-        p->background_slot=p->structure_embedded_base+(w->spikes.enabled ? MAX_EMBEDDED*MAX_BODIES*MAX_FACTORY_STRUCTURES : 0);
+        p->background_slot=p->structure_embedded_base+(w->spikes.enabled ? MAX_EMBEDDED*structures : 0);
         p->organelle_base=p->background_slot;
         for (uint32_t body=0;body<w->body_count;++body) if (w->content.bodies[w->bodies[body].type].hosts_site)
         {
@@ -184,7 +189,10 @@ bool presentation_initialize(Presentation* p,const Simulation* s,const RenderCon
         }
         p->background_slot+=(uint32_t)p->organelles.size();
         if (!presentation_prepare_membranes(p,s)) return false;
-        scene->instances.resize(p->background_slot+1);
+        scene->instances.assign(p->background_slot+1,RenderInstance());p->previous_ranges.clear();
+        scene->ranges.reserve(4*w->body_count+8);p->previous_ranges.reserve(4*w->body_count+8);
+        for (uint32_t i=0;i<scene->instances.size();++i)
+            for (uint32_t axis=0;axis<3;++axis) scene->instances[i].transform[axis][axis]=1;
         scene->effects.resize(MAX_EFFECT_SEGMENTS);
         scene->tile_count=((config->width+EFFECT_TILE-1)/EFFECT_TILE)*((config->height+EFFECT_TILE-1)/EFFECT_TILE);
         scene->effect_tiles.resize(2*scene->tile_count+1+MAX_EFFECT_REFERENCES);
@@ -224,7 +232,13 @@ static void unit_pose_axes(const Simulation* s,const Unit* u,Vec3* x,Vec3* y,Vec
 static Vec3 posed_direction(Vec3 local,Vec3 x,Vec3 y,Vec3 z)
 { return add(add(scale(x,local.x),scale(y,local.y)),scale(z,local.z)); }
 static uint32_t factory_instance_slot(const Presentation* state,uint32_t cell,uint32_t structure)
-{ return state->factory_base+cell*MAX_FACTORY_STRUCTURES+structure; }
+{ return state->factory_base+state->structure_first[cell]+structure; }
+static uint32_t stem_slot(const Presentation* state,uint32_t cell,uint32_t structure,uint32_t span)
+{ return state->stem_base+(state->structure_first[cell]+structure)*GROWTH_PATH_SEGMENTS+span; }
+static uint32_t bud_slot(const Presentation* state,uint32_t cell,uint32_t structure)
+{ return state->bud_base+state->structure_first[cell]+structure; }
+static uint32_t structure_spike_slot(const Presentation* state,uint32_t cell,uint32_t structure,uint32_t spike)
+{ return state->structure_embedded_base+(state->structure_first[cell]+structure)*MAX_EMBEDDED+spike; }
 static float craft_flags(const UnitDefinition& definition)
 { return (float)(INSTANCE_DETAIL_AMBIENT | (definition.subsurface ? 0 : INSTANCE_NO_SUBSURFACE)); }
 static void spike_instance(Presentation* state,uint32_t slot,Vec3 root,Vec3 direction,float length,float width,Color color)
@@ -238,7 +252,7 @@ static void spike_instance(Presentation* state,uint32_t slot,Vec3 root,Vec3 dire
 static void update_spike_instances(Presentation* state,const Simulation* simulation)
 {
     const Simulation* s=simulation;const SpikeRules* r=&s->world.spikes;if (!r->enabled) return;
-    state->attached_spikes=state->flying_spikes=state->embedded_spikes=0;
+    state->attached_spikes=state->flying_spikes=state->embedded_spikes=0;state->attached_used=state->embedded_used=0;
     uint32_t flying=state->flying_base,attached=state->attached_base,attached_end=attached+MAX_ATTACHED_INSTANCES;
     uint32_t embedded=state->embedded_base,embedded_end=embedded+MAX_UNIT_EMBEDDED_INSTANCES;
     for (uint32_t i=0;i<MAX_UNITS;++i)
@@ -292,6 +306,7 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
         float blend=std::fmin(1.0f,p->age/PROJECTILE_SHRINK_SECONDS),length=p->launch_scale+(r->scale-p->launch_scale)*blend;
         spike_instance(state,flying+i,p->position,p->direction,length,length*.5f,content_color(&s->world.content,p->faction));++state->flying_spikes;
     }
+    state->attached_used=attached-state->attached_base;state->embedded_used=embedded-state->embedded_base;
     for (uint32_t i=0;i<s->world.body_count;++i)
     {
         const Colony* c=&s->colonies[i];if (!c->active || !s->visible_bodies[i]) continue;
@@ -307,7 +322,7 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
             {
                 if (dot(spikes[j].direction,spikes[j].direction)<MIN_EMBEDDED_DIRECTION_SQUARED) continue;
                 Vec3 outward=spikes[j].direction;float length=r->scale*2;
-                spike_instance(state,state->structure_embedded_base+(i*MAX_FACTORY_STRUCTURES+k)*MAX_EMBEDDED+j,
+                spike_instance(state,structure_spike_slot(state,i,k,j),
                     add(add(tip,spikes[j].anchor),scale(outward,length*EMBEDDED_SPIKE_OUTWARD_SCALE)),scale(outward,-1),length,length*.5f,
                     content_color(&s->world.content,spikes[j].faction));++state->embedded_spikes;
             }
@@ -352,10 +367,10 @@ static void animate_factories(Presentation* p,const Simulation* s)
             float angle=s->world.factory_sway*(motion.enabled ? motion.factory_amount : 1)*(float)std::sin(phase),sine=std::sin(angle),cosine=std::cos(angle);
             Vec3 pivot=colony.stems[root][0];
             sway_factory_instance(p,factory_instance_slot(p,body,k),pivot,sine,cosine);
-            for (uint32_t j=0;j<GROWTH_PATH_SEGMENTS;++j) sway_factory_instance(p,p->stem_base+(body*MAX_FACTORY_STRUCTURES+k)*GROWTH_PATH_SEGMENTS+j,pivot,sine,cosine);
-            sway_factory_instance(p,p->bud_base+body*MAX_FACTORY_STRUCTURES+k,pivot,sine,cosine);
+            for (uint32_t j=0;j<GROWTH_PATH_SEGMENTS;++j) sway_factory_instance(p,stem_slot(p,body,k,j),pivot,sine,cosine);
+            sway_factory_instance(p,bud_slot(p,body,k),pivot,sine,cosine);
             if (s->world.spikes.enabled) for (uint32_t j=0;j<MAX_EMBEDDED;++j)
-                sway_factory_instance(p,p->structure_embedded_base+(body*MAX_FACTORY_STRUCTURES+k)*MAX_EMBEDDED+j,pivot,sine,cosine);
+                sway_factory_instance(p,structure_spike_slot(p,body,k,j),pivot,sine,cosine);
         }
     }
 }
@@ -420,7 +435,7 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                         float span_length=definition->length_color_distance>0 ? std::sqrt(dot(delta,delta)) : 0;
                         Vec3 y=normalize(delta),x=normalize(cross(std::fabs(y.z)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
                         float width=simulation_structure_stem_width(s,p,k,j,growth);
-                        uint32_t slot=state->stem_base+(p*MAX_FACTORY_STRUCTURES+k)*GROWTH_PATH_SEGMENTS+j;
+                        uint32_t slot=stem_slot(state,p,k,j);
                         Vec3 axis=delta,origin=start;
                         if (definition->rounded_stem)
                         {
@@ -453,9 +468,9 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                     float size=u.scale*(BUD_START_SCALE+BUD_GROWTH_SCALE*t*t*(3-2*t));Vec3 tip=simulation_structure_position(s,p,k);
                     Vec3 z=normalize(subtract(tip,s->world.bodies[p].position));
                     Vec3 x=normalize(cross(std::fabs(z.y)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,1,0} : Vec3{1,0,0},z)),y=cross(z,x);
-                    state->scene.instances[state->bud_base+p*MAX_FACTORY_STRUCTURES+k].style[4]=s->world.glow_units;
-                    state->scene.instances[state->bud_base+p*MAX_FACTORY_STRUCTURES+k].style[7]=craft_flags(u);
-                    set_instance(state,state->bud_base+p*MAX_FACTORY_STRUCTURES+k,state->unit_meshes[job.type],tip,scale(x,size),scale(y,size),scale(z,size));
+                    state->scene.instances[bud_slot(state,p,k)].style[4]=s->world.glow_units;
+                    state->scene.instances[bud_slot(state,p,k)].style[7]=craft_flags(u);
+                    set_instance(state,bud_slot(state,p,k),state->unit_meshes[job.type],tip,scale(x,size),scale(y,size),scale(z,size));
                 }
                 continue;
             }
@@ -490,6 +505,35 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
         style[0]=color.r;style[1]=color.g;style[2]=color.b;style[3]=s->world.content.producers[d.producer].factory_tint_strength;style[7]=INSTANCE_EMISSION_FRESNEL;
     }
     update_spike_instances(state,simulation);
+}
+
+static void add_range(RenderScene* scene,uint32_t first,uint32_t count)
+{
+    if (!count) return;
+    if (!scene->ranges.empty() && scene->ranges.back().first+scene->ranges.back().count==first) scene->ranges.back().count+=count;
+    else scene->ranges.push_back(RenderRange{first,count});
+}
+// The slots this build may have written, in ascending order.
+static void instance_ranges(Presentation* p,const Simulation* s)
+{
+    RenderScene* scene=&p->scene;const World* w=&s->world;scene->ranges.clear();
+    add_range(scene,p->unit_base,w->gameplay.enabled ? (uint32_t)MAX_UNITS : w->spawn_count);
+    add_range(scene,p->body_base,w->body_count);
+    if (w->gameplay.enabled)
+    {
+        for (uint32_t b=0;b<w->body_count;++b) if (s->colonies[b].active) add_range(scene,factory_instance_slot(p,b,0),s->colonies[b].structure_count);
+        for (uint32_t b=0;b<w->body_count;++b) if (s->colonies[b].active) add_range(scene,stem_slot(p,b,0,0),s->colonies[b].structure_count*GROWTH_PATH_SEGMENTS);
+        for (uint32_t b=0;b<w->body_count;++b) if (s->colonies[b].active) add_range(scene,bud_slot(p,b,0),s->colonies[b].structure_count);
+        add_range(scene,p->debris_base,MAX_LIMB_DEBRIS);
+    }
+    if (w->spikes.enabled)
+    {
+        add_range(scene,p->attached_base,p->attached_used);
+        add_range(scene,p->flying_base,MAX_PROJECTILES);
+        add_range(scene,p->embedded_base,p->embedded_used);
+        for (uint32_t b=0;b<w->body_count;++b) if (s->colonies[b].active) add_range(scene,structure_spike_slot(p,b,0,0),s->colonies[b].structure_count*MAX_EMBEDDED);
+    }
+    add_range(scene,p->organelle_base,p->background_slot+1-p->organelle_base);
 }
 
 static void add_sight(RenderScene* scene,Vec3 center,float radius)
@@ -527,9 +571,14 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
         for (uint32_t i=0;i<MAX_UNITS;++i)
             if (s->units[i].health>0 && s->units[i].faction==w->player_faction) add_sight(scene,s->units[i].position,w->sight_radius);
     }
-    memset(scene->instances.data(),0,scene->instances.size()*sizeof(RenderInstance));
-    for (uint32_t i=0;i<scene->instances.size();++i)
-        for (uint32_t axis=0;axis<3;++axis) scene->instances[i].transform[axis][axis]=1;
+    // Only last frame's ranges can hold instances; empty them.
+    for (uint32_t r=0;r<p->previous_ranges.size();++r)
+    {
+        RenderInstance* first=scene->instances.data()+p->previous_ranges[r].first;
+        memset(first,0,p->previous_ranges[r].count*sizeof(RenderInstance));
+        for (uint32_t i=0;i<p->previous_ranges[r].count;++i)
+            for (uint32_t axis=0;axis<3;++axis) first[i].transform[axis][axis]=1;
+    }
     for (uint32_t i=0;i<w->body_count;++i)
     {
         RenderInstance& instance=scene->instances[p->body_base+i];
@@ -615,6 +664,7 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
         scene->instances[p->background_slot].background=true;
         scene->instances[p->background_slot].style[7]=INSTANCE_UNSHADOWED;
     }
+    instance_ranges(p,s);p->previous_ranges=scene->ranges;
     render_scene_bounds(scene);
     return effects_build(s,camera,config,scene->effects.data(),&scene->effect_count,scene->effect_tiles.data(),scene->tile_count);
 }

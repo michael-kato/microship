@@ -15,7 +15,7 @@ void render_scene_bounds(RenderScene* scene)
         scene->bounds_min[axis]=scene->foreground_min[axis]=FLT_MAX;
         scene->bounds_max[axis]=scene->foreground_max[axis]=-FLT_MAX;
     }
-    for (uint32_t i=0;i<scene->instances.size();++i)
+    for (uint32_t r=0;r<scene->ranges.size();++r) for (uint32_t i=scene->ranges[r].first;i<scene->ranges[r].first+scene->ranges[r].count;++i)
     {
         const RenderInstance* instance=&scene->instances[i];
         if (!(instance->mask&1)) continue;

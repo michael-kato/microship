@@ -1056,7 +1056,7 @@ static void update_level_of_detail(RendererState* state,const RenderScene* scene
 static void scene_instances(RendererState* state,const RenderScene* scene)
 {
     uint32_t active=0;
-    for (uint32_t i=0;i<state->instance_count;++i)
+    for (uint32_t r=0;r<scene->ranges.size();++r) for (uint32_t i=scene->ranges[r].first;i<scene->ranges[r].first+scene->ranges[r].count;++i)
     {
         const RenderInstance* source=&scene->instances[i];if (!source->mask) continue;
         uint32_t j=active++;VkAccelerationStructureInstanceKHR* out=&state->instance_data[j];state->active_slots[j]=i;
@@ -2768,9 +2768,18 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
         || scene->geometry.meshes.size()!=state->mesh_count || scene->effect_tiles.size()!=state->effect_tile_size
         || scene->lighting_bounds.size()!=state->medium_count)
     { fprintf(stderr,"Render scene storage changed after initialization.\n");return false; }
-    if (uniform->scene[3]) for (uint32_t i=0;i<state->instance_count;++i)
-        if (state->surface_cache_meshes[i]!=(scene->instances[i].static_lighting ? scene->instances[i].mesh+1 : 0))
-        { fprintf(stderr,"Static lighting instance layout changed after initialization.\n");return false; }
+    if (uniform->scene[3])
+    {
+        // Slots outside the ranges are empty, so every static slot must lie inside them.
+        uint32_t covered=0;
+        for (uint32_t r=0;r<scene->ranges.size();++r) for (uint32_t i=scene->ranges[r].first;i<scene->ranges[r].first+scene->ranges[r].count;++i)
+        {
+            if (state->surface_cache_meshes[i]!=(scene->instances[i].static_lighting ? scene->instances[i].mesh+1 : 0))
+            { fprintf(stderr,"Static lighting instance layout changed after initialization.\n");return false; }
+            covered+=state->surface_cache_meshes[i]!=0;
+        }
+        if (covered!=state->surface_slots.size()) { fprintf(stderr,"Static lighting instance layout changed after initialization.\n");return false; }
+    }
     if (!update_meshes(state,scene->geometry,renderer->frame_log)) return false;
     scene_instances(state,scene);
     if (state->medium_count) memcpy(frame.media.mapped,scene->media.data(),state->medium_count*sizeof(RenderMedium));

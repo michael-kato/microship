@@ -25,7 +25,10 @@ struct Presentation
     uint32_t segment_meshes[MAX_PRODUCER_TYPES],tip_meshes[MAX_PRODUCER_TYPES],stem_base,bud_base,debris_base;
     uint32_t unit_base,body_base,factory_base,attached_base,flying_base,embedded_base,structure_embedded_base,background_slot;
     int32_t medium_bodies[MAX_BODIES+1];
+    uint32_t structure_first[MAX_BODIES+1]; // Each cell's first structure slot; the last entry is the total.
     uint32_t attached_spikes,flying_spikes,embedded_spikes;
+    uint32_t attached_used,embedded_used; // Slots written from each spike cursor's base this frame.
+    std::vector<RenderRange> previous_ranges; // Cleared before the next build.
 };
 bool presentation_initialize(Presentation*,const Simulation*,const RenderConfig*);
 bool presentation_build(Presentation*,const Simulation*,const Camera*,const RenderConfig*);

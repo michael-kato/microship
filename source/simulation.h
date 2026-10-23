@@ -264,6 +264,7 @@ float simulation_structure_head_scale(const Simulation*,uint32_t cell,uint32_t s
 bool simulation_structure_terminal(const Simulation*,uint32_t cell,uint32_t structure);
 float simulation_structure_growth(const Simulation*,uint32_t cell,uint32_t structure);
 float simulation_production(const Simulation*,uint32_t cell);
+uint32_t simulation_structure_limit(const Simulation*,uint32_t cell);
 bool simulation_in_sight(const Simulation*,Vec3 position,float radius);
 bool simulation_body_known(const Simulation*,uint32_t cell);
 void simulation_update_sight(Simulation*);

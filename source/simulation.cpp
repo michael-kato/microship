@@ -1,5 +1,6 @@
 #include "simulation.h"
 #include "vector_math.h"
+#include <assert.h>
 #include "factory_shape.h"
 #include "geometry.h"
 #include "flight.h"
@@ -689,6 +690,16 @@ static void regrow_factory_stems(Simulation* s,uint32_t p,uint32_t root,uint32_t
     }
 }
 
+// An upper bound on structure_count for any producer this cell can host:
+// tree levels or the authored count over every attachment, plus small roots and their one child.
+uint32_t simulation_structure_limit(const Simulation* s,uint32_t p)
+{
+    const Body& body=s->world.bodies[p];uint32_t limit=0,roots=std::max(1u,body.factory_root_count);
+    if (!s->world.content.bodies[body.type].hosts_site) return 0;
+    for (uint32_t t=0;t<s->world.content.producer_count;++t)
+        limit=std::max(limit,factory_count(s->world.content.producers[t].branches,roots)+2*roots);
+    return std::min(limit,(uint32_t)MAX_FACTORY_STRUCTURES);
+}
 static void prepare_factory(Simulation* s,uint32_t p)
 {
     Colony* c=&s->colonies[p];const BranchRules* f=&simulation_producer_definition(s,p)->branches;
@@ -697,6 +708,7 @@ static void prepare_factory(Simulation* s,uint32_t p)
     const Body& body=s->world.bodies[p];
     c->root_count=select_factory_roots(body,*f,c->root_attachments,&c->large_root_count);
     c->structure_count=factory_count(*f,c->large_root_count)+c->root_count-c->large_root_count;
+    assert(c->structure_count<=simulation_structure_limit(s,p));
     // Keep the selected large roots. Each remaining organelle receives one small factory.
     float minimum_radius=body.factory_root_radii[c->root_attachments[0]];
     for (uint32_t k=1;k<c->large_root_count;++k) minimum_radius=min_of(minimum_radius,body.factory_root_radii[c->root_attachments[k]]);
@@ -756,6 +768,7 @@ static void prepare_factory(Simulation* s,uint32_t p)
         for (uint32_t i=0;i<count;++i)
         { c->deployment_start[order[i]]=i ? first+(i-1)*interval : start;c->deployment_seconds[order[i]]=grow; }
     }
+    assert(c->structure_count<=simulation_structure_limit(s,p));
     if (simulation_producer_definition(s,p)->segment_path[0])
     {
         seed^=body.seed;

@@ -17,6 +17,8 @@ struct RenderInstance
     bool background,static_lighting; // Static light blockers can be baked until their inputs change.
     float style[INSTANCE_STYLE_FLOATS]; // RGB tint, weight; emission, target roughness, roughness weight, flags.
 };
+// Ascending, disjoint instance slot ranges. Every instance outside them is empty this frame.
+struct RenderRange { uint32_t first,count; };
 struct RenderMedium
 {
     float center_radius[4], scattering[4], absorption_phase[4],lighting[4],blur[4]; // Lighting: shadow enabled, grid eligible, grid active, full cell radius.
@@ -32,6 +34,7 @@ struct RenderScene
 {
     Geometry geometry;
     std::vector<RenderInstance> instances;
+    std::vector<RenderRange> ranges;
     std::vector<RenderMedium> media;
     std::vector<RenderGridBounds> lighting_bounds;
     std::vector<EffectSegment> effects;
