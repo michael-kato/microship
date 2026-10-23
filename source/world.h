@@ -186,9 +186,9 @@ struct World
 	float thin_transmission, thin_absorption;
 	bool thin_transmission_set;
 	float thin_bleed_strength, thin_bleed_depth;
-	float thin_clarity, thin_edge_strength, thin_edge_power, thin_blur_radius,
+	float thin_blur_radius,
 	    ai_production, ai_expansion;
-	bool thin_clarity_set, ai_production_set;
+	bool ai_production_set;
 	SpikeRules spikes;
 	CombatVisuals combat;
 	uint32_t combat_fields;

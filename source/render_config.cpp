@@ -25,7 +25,6 @@ static const int MAX_RENDER_SPHERE_SEGMENTS = 512;
 static const int MAX_RENDER_RAYS_PER_PIXEL = 4096;
 static const int MIN_RENDER_INTEGRATION_STEPS = 2;
 static const int MAX_RENDER_INTEGRATION_STEPS = 64;
-static const int MAX_TRANSMISSION_LAYERS = 32;
 static const int MAX_RENDER_SAMPLES_PER_PIXEL = 4096;
 static const int MAX_RENDER_EXPOSURE = 100;
 static const int MAX_RENDER_HEIGHT = 4096;
@@ -72,9 +71,6 @@ const char* render_config_error(const RenderConfig* config)
 	if (config->samples_per_pixel == 0 ||
 	    config->samples_per_pixel > MAX_RENDER_SAMPLES_PER_PIXEL)
 		return "samples_per_pixel must be in [1, 4096]";
-	if (config->max_transmission_layers == 0 ||
-	    config->max_transmission_layers > MAX_TRANSMISSION_LAYERS)
-		return "max_transmission_layers must be in [1, 32]";
 	if (config->sphere_segments < 3 ||
 	    config->sphere_segments > MAX_RENDER_SPHERE_SEGMENTS ||
 	    config->sphere_rings < 2 ||
@@ -148,15 +144,12 @@ bool render_config_load(RenderConfig* config, const char* path)
 	}
 	{
 		Json j = json_get(root, "sampling");
-		json_object(j, "samples_per_pixel|max_transmission_layers|seed|spatial_"
-		               "antialiasing");
+		json_object(j, "samples_per_pixel|seed|spatial_antialiasing");
 		Json aa = json_find(j, "spatial_antialiasing");
 		if (json_present(aa))
 			loaded.spatial_antialiasing = json_bool(aa);
 		loaded.samples_per_pixel = json_uint(json_get(j, "samples_per_pixel"),
 		                                     1, MAX_RENDER_SAMPLES_PER_PIXEL);
-		loaded.max_transmission_layers = json_uint(
-		    json_get(j, "max_transmission_layers"), 1, MAX_TRANSMISSION_LAYERS);
 		loaded.seed = json_uint(json_get(j, "seed"), 0, UINT32_MAX);
 	}
 	{

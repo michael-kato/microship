@@ -1237,9 +1237,9 @@ int game_run(const GameOptions* options)
 	}
 	audio_set_volume(&audio, settings.master_volume, settings.effects_volume);
 	printf("Render configuration: direct ray tracing; %u film samples; %u "
-	       "transmission layers; %u volume rays; %u integration steps.\n",
-	       config.samples_per_pixel, config.max_transmission_layers,
-	       config.volume_rays_per_pixel, config.volume_steps);
+	       "volume rays; %u integration steps.\n",
+	       config.samples_per_pixel, config.volume_rays_per_pixel,
+	       config.volume_steps);
 	startup_camera(&game, &config);
 	if (!orders_run(&game.simulation, options->replay_path, options->ticks,
 	                &audio))

@@ -343,9 +343,6 @@ bool presentation_initialize(Presentation* p, const Simulation* s,
 	scene->guides_required = w->combat.enabled;
 	scene->thin_transmission = w->thin_transmission;
 	scene->thin_absorption = w->thin_absorption;
-	scene->thin_clarity = w->thin_clarity;
-	scene->thin_edge_strength = w->thin_edge_strength;
-	scene->thin_edge_power = w->thin_edge_power;
 	scene->thin_blur_radius = w->thin_blur_radius;
 	scene->thin_bleed_strength = w->thin_bleed_strength;
 	scene->thin_bleed_depth = w->thin_bleed_depth;

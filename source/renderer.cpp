@@ -1095,14 +1095,11 @@ static void scene_uniform(RenderUniform* uniform, const RenderScene* scene)
 	uniform->backdrop_style[0] = scene->background_blur;
 	uniform->backdrop_style[1] = scene->background_glow;
 	uniform->backdrop_style[2] = scene->background_ambient;
-	uniform->membrane_fade[0] = scene->thin_edge_strength;
-	uniform->membrane_fade[1] = scene->thin_edge_power;
 	uniform->membrane_fade[2] = scene->thin_blur_radius;
 	uniform->membrane_fade[3] = 1;
 	uniform->thin_material[0] = scene->thin_transmission;
 	uniform->thin_material[1] = scene->thin_absorption;
 	uniform->thin_material[2] = scene->lights_enabled ? 1 : 0;
-	uniform->thin_material[3] = scene->thin_clarity;
 	float total = 0;
 	for (uint32_t i = 0; i < 3; ++i)
 	{
@@ -1943,7 +1940,6 @@ static bool upload_scene(RendererState* state, const RenderScene* scene)
 	uniform.settings[0] = state->config.width;
 	uniform.settings[1] = state->config.height;
 	uniform.settings[2] = state->config.samples_per_pixel;
-	uniform.settings[3] = state->config.max_transmission_layers;
 	uniform.scene[0] = state->config.seed;
 	uniform.display[0] = state->config.exposure;
 	uniform.display[1] =
@@ -3920,9 +3916,9 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene,
 	renderer->running = true;
 	renderer->available_features = available_features(state, scene);
 	printf("Renderer: direct ray tracing; %ux%u native; %u film samples; %u "
-	       "transmission layers; %u triangles.\n",
+	       "triangles.\n",
 	       config->width, config->height, config->samples_per_pixel,
-	       config->max_transmission_layers, state->triangle_count);
+	       state->triangle_count);
 	printf("Sampling: fixed mirrored film points; no stochastic surface "
 	       "transport, denoising, or temporal history.\n");
 	printf("Spatial antialiasing: %s; current native pixels; HUD drawn "

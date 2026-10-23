@@ -68,12 +68,6 @@
           "title": "Subsurface scattering",
           "type": "boolean"
         },
-        "transmission_layers": {
-          "title": "Transparent surface layers",
-          "type": "integer",
-          "minimum": 1.0,
-          "maximum": 32.0
-        },
         "subsurface_strength": {
           "title": "Subsurface strength",
           "type": "number",

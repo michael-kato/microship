@@ -82,7 +82,6 @@ def main():
     for body in spheres['content']['bodies']:
         body['geometry']='sphere';body.pop('model',None);body.pop('variation',None)
     cases=[('full',world,config),('single-structure',single,config),('sphere-bodies',spheres,config),
-           ('one-transmission-layer',world,setting(config,'max_transmission_layers',1)),
            ('half-samples',world,setting(config,'samples_per_pixel',max(1,args.samples//2)))]
     if 'cell_medium' in world['appearance']:
         no_volumes=deepcopy(world)

@@ -14,7 +14,6 @@ struct RenderConfig
 	uint32_t width;
 	uint32_t height;
 	uint32_t samples_per_pixel;
-	uint32_t max_transmission_layers;
 	uint32_t seed;
 	uint32_t sphere_segments;
 	uint32_t sphere_rings;

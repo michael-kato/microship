@@ -88,11 +88,7 @@ bool render_scene_validate(const RenderScene* scene)
 	        scene->emission_fresnel[1] >= .01f &&
 	        scene->emission_fresnel[1] <= 16;
 	valid = valid && std::isfinite(scene->thin_blur_radius) &&
-	        scene->thin_blur_radius >= 0 && scene->thin_blur_radius <= 32 &&
-	        std::isfinite(scene->thin_edge_strength) &&
-	        scene->thin_edge_strength >= 0 && scene->thin_edge_strength <= 1 &&
-	        std::isfinite(scene->thin_edge_power) &&
-	        scene->thin_edge_power >= 0 && scene->thin_edge_power <= 16;
+	        scene->thin_blur_radius >= 0 && scene->thin_blur_radius <= 32;
 	valid = valid && std::isfinite(scene->fog_tint.r) &&
 	        scene->fog_tint.r >= 0 && scene->fog_tint.r <= 1 &&
 	        std::isfinite(scene->fog_tint.g) && scene->fog_tint.g >= 0 &&
@@ -310,9 +306,7 @@ bool render_scene_write(const RenderScene* scene, const char* path)
 		        m->center_radius[3]);
 	}
 	fprintf(file,
-	        "],\"membrane_fade\":[%.6f,%.6f],\"wall_blur_radius\":%.6f,"
-	        "\"medium_blur\":[",
-	        scene->thin_edge_strength, scene->thin_edge_power,
+	        "],\"wall_blur_radius\":%.6f,\"medium_blur\":[",
 	        scene->thin_blur_radius);
 	for (uint32_t i = 0; i < scene->media.size(); ++i)
 		fprintf(file, "%s[%.6f,%.6f,%.6f]", i ? "," : "",

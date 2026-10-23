@@ -14,7 +14,6 @@ static const double OFF_ON[] = {0, 1};
 static const double WIDTHS[] = {1280, 1600, 1920, 2560, 3840};
 static const double HEIGHTS[] = {720, 900, 1080, 1440, 2160};
 static const double SAMPLES[] = {1, 2, 3, 4, 6, 8, 16, 32, 64};
-static const double LAYERS[] = {1, 2, 4, 8, 12, 16, 24, 32};
 static const double EXPOSURE[] = {.25, .5, .75, 1, 1.25, 1.6, 2, 2.5, 3, 4};
 static const double FOV[] = {30, 35, 40, 45, 50, 60, 75, 90};
 static const double UNIT[] = {0, .1, .2, .25, .35, .5, .65, .75, .85, 1};
@@ -69,8 +68,6 @@ static const SettingField FIELDS[] = {
 	      OFF_ON),
     FIELD(LIGHTING, "subsurface_enabled", "Subsurface scattering", BOOL,
 	      subsurface, 0, 1, OFF_ON),
-    GRAPHICS(LIGHTING, "transmission_layers", "Transparent surface layers",
-	         UINT, max_transmission_layers, 1, 32, LAYERS),
     GRAPHICS(LIGHTING, "subsurface_strength", "Subsurface strength", FLOAT,
 	         subsurface_strength, 0, 1, UNIT),
     GRAPHICS(LIGHTING, "subsurface_samples", "Subsurface film samples", UINT,

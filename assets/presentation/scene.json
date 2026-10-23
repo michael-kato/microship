@@ -52,11 +52,6 @@
   "thin_surface": {
     "transmission": 0.82,
     "absorption": 0.025,
-    "clarity": 0,
-    "edge_fade": {
-      "strength": 1,
-      "power": 0.5
-    },
     "bleed": {
       "strength": 0.6,
       "depth": 0.6

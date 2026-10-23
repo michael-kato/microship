@@ -8,7 +8,6 @@
   "sampling": {
     "samples_per_pixel": 1,
     "seed": 1,
-    "max_transmission_layers": 8,
     "spatial_antialiasing": true
   },
   "geometry": {

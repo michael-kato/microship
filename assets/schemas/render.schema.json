@@ -41,16 +41,11 @@
           "minimum": 0,
           "maximum": 4294967295
         },
-        "max_transmission_layers": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 32
-        },
         "spatial_antialiasing": {
           "type": "boolean"
         }
       },
-      "required": ["samples_per_pixel", "seed", "max_transmission_layers"],
+      "required": ["samples_per_pixel", "seed"],
       "additionalProperties": false
     },
     "geometry": {

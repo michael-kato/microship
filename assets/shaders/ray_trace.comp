@@ -70,8 +70,7 @@ const float RELATIVE_RAY_ORIGIN_OFFSET = 0.00001;
 const uint THIN_MEMBRANE_MATERIAL = 3u;
 const float MIN_SHADING_DENOMINATOR = 0.000001;
 const float MIN_MEMBRANE_DIRECTION_COSINE = .2;
-const float CLEAR_MEMBRANE_PIGMENT_WEIGHT = .15;
-const float DIFFUSE_MEMBRANE_PIGMENT_WEIGHT = .35;
+const float MEMBRANE_PIGMENT_WEIGHT = .35;
 const float BIT_REVERSE_WORD_BITS = 32.0;
 const float PIXEL_DIAGONAL_CONE_FACTOR = 2.828427125;
 const float CAMERA_NORMALIZATION_MARGIN = 0.00002;
@@ -368,26 +367,6 @@ float henyey_greenstein(float cosine, float g)
     return (1.0 - g*g) / (4.0*PI*denominator*sqrt(denominator));
 }
 
-// Fresnel-style coverage: face-on membrane is clear; oblique edges are more opaque.
-float membrane_opacity(float cosine)
-{
-    if (render.membrane_fade.x<=0.0 || render.thin_material.x<=0.0 || render.thin_material.w<=0.0) return 1.0;
-    return 1.0-render.membrane_fade.x+render.membrane_fade.x*pow(clamp(1.0-cosine,0.0,1.0),render.membrane_fade.y);
-}
-float membrane_clear(float cosine)
-{
-    float base=render.thin_material.x*render.thin_material.w;
-    // The covered rim must not retain the baseline clear transmission.
-    return base>0.0 ? 1.0-membrane_opacity(cosine)+base*(1.0-render.membrane_fade.x) : 0.0;
-}
-// As the rim closes, use the opaque material response for the covered light.
-float membrane_transmission(float cosine)
-{
-    float strength=render.membrane_fade.x;
-    if (strength<=0.0) return render.thin_material.x;
-    float edge=clamp(membrane_opacity(cosine)-(1.0-strength),0.0,1.0);
-    return render.thin_material.x*(1.0-edge);
-}
 vec3 studio_visibility(vec3 origin,vec3 direction);
 vec3 sampled_visibility(vec3 point,vec3 normal,int light);
 
@@ -639,16 +618,8 @@ vec3 light_visibility(vec3 origin,vec3 direction,uint subset,bool medium_attenua
         uvec4 triangle=triangles[index];
         vec2 uv=rayQueryGetIntersectionBarycentricsEXT(q,false);vec3 w=vec3(1.0-uv.x-uv.y,uv);
         vec3 pigment=vertices[triangle.x].color.rgb*w.x+vertices[triangle.y].color.rgb*w.y+vertices[triangle.z].color.rgb*w.z;
-        float clarity=render.thin_material.w,cosine=1.0;
-        if (clarity>0.0)
-        {
-            vec3 n=vertices[triangle.x].normal.xyz*w.x+vertices[triangle.y].normal.xyz*w.y+vertices[triangle.z].normal.xyz*w.z;
-            n=transpose(mat3(rayQueryGetIntersectionWorldToObjectEXT(q,false)))*n;
-            cosine=max(MIN_MEMBRANE_DIRECTION_COSINE,abs(dot(normalize(n),direction)));
-        }
-        float opacity=membrane_opacity(cosine);
-        float clear=clarity>0.0 ? membrane_clear(cosine) : render.thin_material.x;
-        visibility*=mix(vec3(1),pigment,(clarity>0.0 ? CLEAR_MEMBRANE_PIGMENT_WEIGHT : DIFFUSE_MEMBRANE_PIGMENT_WEIGHT)*opacity)*clear*exp(-render.thin_material.y*opacity/cosine);
+        // Light diffuses through each wall: transmission, partial pigment and absorption.
+        visibility*=mix(vec3(1),pigment,MEMBRANE_PIGMENT_WEIGHT)*(render.thin_material.x*exp(-render.thin_material.y));
     }
     if (rayQueryGetIntersectionTypeEXT(q,true)!=gl_RayQueryCommittedIntersectionNoneEXT) return vec3(0);
     return medium_attenuation ? visibility*transmittance(origin,direction,RAY_MAX) : visibility;
@@ -940,7 +911,6 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
     if (render.studio_direction[selected].w<=0.0) return vec3(0);
     vec3 direction=render.studio_direction[selected].xyz;
     float cosine=dot(s.normal,direction),geometric_cosine=dot(s.geometric_normal,direction);
-    float transmission=s.translucent ? membrane_transmission(max(0.0,dot(s.normal,outgoing))) : 0.0;
     float scatter=scattering_weight(s);vec3 weighted=vec3(0);
     float wrap=render.subsurface.y;
     bool front=s.translucent || geometric_cosine>0.0;
@@ -959,11 +929,8 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
             sss=s.color*(scatter*(1.0-render.subsurface.z)*diffuse/PI);
             reflected+=sss;
         }
-        weighted=(1.0-transmission)*reflected*render.studio_color[selected].rgb;
+        weighted=reflected*render.studio_color[selected].rgb;
     }
-    if (cosine<0.0 && (s.translucent || geometric_cosine<0.0) && transmission>0.0)
-        weighted+=s.color*((1.0-scatter)*transmission*(1.0-render.thin_material.w)*(-cosine)/PI)*
-            exp(-render.thin_material.y/max(MIN_MEMBRANE_DIRECTION_COSINE,-cosine))*render.studio_color[selected].rgb;
     if (max(weighted.r,max(weighted.g,weighted.b))<=0.0) { sss=vec3(0);return vec3(0); }
     vec3 origin=s.point+s.geometric_normal*(geometric_cosine>0.0 ? point_epsilon(s.point) : -point_epsilon(s.point));
     vec3 visibility=vec3(1),diffused_visibility=vec3(1);
@@ -980,7 +947,7 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
         // Under fog the blurred map needs no shadows; they fade in as it is revealed.
         visibility=mix(vec3(1),visibility,s.reveal);diffused_visibility=mix(vec3(1),diffused_visibility,s.reveal);
     }
-    sss*=(1.0-transmission)*render.studio_color[selected].rgb*diffused_visibility;
+    sss*=render.studio_color[selected].rgb*diffused_visibility;
     return (weighted-sss)*visibility+sss;
 }
 
@@ -1057,8 +1024,7 @@ vec3 evaluate_subsurface(Surface s,vec3 outgoing)
         if (!cached && !subsurface_exit(s,direction,8.0*radius,entry,thickness)) return vec3(0);
     }
     vec3 attenuation=exp(-thickness/max(s.subsurface.rgb,vec3(MIN_SHADING_DENOMINATOR)));
-    float clear_budget=s.translucent ? 1.0-membrane_transmission(max(0.0,dot(s.normal,outgoing))) : 1.0;
-    vec3 light=s.color*attenuation*(scatter*render.subsurface.z*clear_budget*cosine/PI)*render.studio_color[selected].rgb;
+    vec3 light=s.color*attenuation*(scatter*render.subsurface.z*cosine/PI)*render.studio_color[selected].rgb;
     // Query from the light-entry side. Other objects must still cast shadows.
     // The entry can lie outside the surface hit's medium, so scan every medium there.
     uint scan_first=medium_scan_first;medium_scan_first=0u;
@@ -1084,24 +1050,14 @@ vec3 ambient_surface(Surface s,vec3 outgoing)
     if (s.ambient<=0.0) return vec3(0);
     vec3 sh[4];float weight;bool cascaded=cascade_lighting(s.point,s.geometric_normal,sh,weight);
     if (!cascaded) weight=0.0;
-    float cosine=max(0.0,dot(s.normal,outgoing));
-    float transmission=s.translucent ? membrane_transmission(max(0.0,dot(s.normal,outgoing))) : 0.0;
-    vec3 diffuse=vec3(0),behind=vec3(0);
+    vec3 diffuse=vec3(0);
     if (weight<1.0)
     {
         float visibility=ambient_visibility(s.point,s.geometric_normal)*(1.0-weight);
         diffuse=visibility*render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5+s.normal.y/COSINE_GRADIENT_DENOMINATOR);
-        behind=visibility*render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5-s.normal.y/COSINE_GRADIENT_DENOMINATOR);
     }
-    if (weight>0.0)
-    {
-        diffuse+=weight*sh_irradiance(sh,s.normal);
-        if (transmission>0.0) behind+=weight*sh_irradiance(sh,-s.normal);
-    }
-    vec3 result=s.color*diffuse*(1.0-transmission);
-    if (transmission>0.0)
-        result+=s.color*behind*(transmission*(1.0-render.thin_material.w))*
-            exp(-render.thin_material.y/max(MIN_MEMBRANE_DIRECTION_COSINE,cosine));
+    if (weight>0.0) diffuse+=weight*sh_irradiance(sh,s.normal);
+    vec3 result=s.color*diffuse;
     if (s.translucent && render.wall_bleed.x>0.0)
     {
         // Subsurface bleed: a wall shows its cell's interior light, half tinted by its
@@ -1143,82 +1099,65 @@ float backdrop_remaining(vec3 origin,vec3 direction,uvec2 pixel)
     return max(0.0,distance-dot(origin-render.camera_position.xyz,direction));
 }
 
+// Camera rays stop at their first surface: cell walls are opaque to the camera.
 vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float subsurface_sample_weight)
 {
-    vec3 radiance=vec3(0),weight=vec3(1);float path_distance=0;bool through_wall=false;
+    vec3 radiance=vec3(0);
     float sharp_limit=fused_volume ? medium_sharp_limit(direction) : RAY_MAX;
-    // The limit counts transparent crossings. An opaque surface after the last
-    // allowed crossing can still be shaded. Exhaustion does not reveal the sky.
-    for (uint layer=0u;layer<=render.settings.w;++layer)
+    uint triangle;vec2 barycentric;float distance;
+    bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
+    if (!hit && render.backdrop_style.x>0.0)
+        distance=backdrop_remaining(origin,direction,pixel);
+    if (fused_volume && render.quality.x>0u)
     {
-        uint triangle;vec2 barycentric;float distance;
-        bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
-        if (!hit && render.backdrop_style.x>0.0)
-            distance=backdrop_remaining(origin,direction,pixel);
-        if (fused_volume && render.quality.x>0u)
-        {
-            vec3 sharp;
-            vec3 volume=weight*single_scattering(origin,direction,distance,sharp_limit,sharp);
-            radiance+=volume;film_volume+=volume;film_sharp_sum+=weight*sharp;
-        }
-        weight*=transmittance(origin,direction,distance);
-        path_distance+=distance;
-        if (sample_index==0u) film_terminal_distance=path_distance;
-        float blur_radius=max(medium_blur_radius(direction,path_distance),through_wall ? render.membrane_fade.z : 0.0);
-        film_blur_max=max(film_blur_max,blur_radius);
-        if (!hit)
-        {
-            vec3 background=render.backdrop_style.x>0.0 ? texelFetch(soft_backdrop,ivec2(pixel),0).rgb : environment_radiance(direction);
-            radiance+=weight*background;
-            if (blur_radius<=0.0) film_sharp_sum+=weight*background;
-#ifdef NANOVORE_DEBUG_BUFFERS
-            debug_direct+=weight*background;
-#endif
-            break;
-        }
-        Surface s;if (!surface_at(triangle,barycentric,direction,s)) break;
-        medium_scan_first=first_medium_near(s.point,4.0*point_epsilon(s.point));
-#ifdef NANOVORE_DEBUG_BUFFERS
-        if (layer==0u)
-        {
-            ++debug_primary_hits;
-            if (sample_index==0u)
-            {
-                debug_vertex_hit=vec4(s.color,s.translucent ? THIN_MEMBRANE_GUIDE_CODE : 1.0);
-                debug_normal_depth=vec4(s.normal,distance);
-            }
-        }
-#endif
-        if (transparent_pass && !s.translucent)
-        {
-            opaque_hit=uvec4(triangle,hit_instance,floatBitsToUint(barycentric));
-            opaque_weight=weight;opaque_flags=blur_radius<=0.0 ? 1.0 : 0.0;
-            break;
-        }
-        vec3 glow_color=surface_glow_color(s);
-        vec3 direct=glow_color*s.emission+electron_signal(s,-direction);
-        vec3 sss=vec3(0);
-        for (int light=0;light<3;++light)
-        { vec3 contribution;direct+=evaluate_studio(s,-direction,light,contribution);sss+=contribution; }
-        if (subsurface_sample_weight>0.0)
-        { vec3 contribution=subsurface_sample_weight*evaluate_subsurface(s,-direction);direct+=contribution;sss+=contribution; }
-        float view_cosine=abs(dot(s.normal,direction));
-        float opacity=s.translucent ? membrane_opacity(view_cosine) : 1.0;
-        film_emission+=weight*glow_color*s.emission*opacity;
-        vec3 contribution=weight*(direct+ambient_surface(s,-direction))*opacity;
-        radiance+=contribution;
-        if (blur_radius<=0.0) film_sharp_sum+=contribution;
-        // Fused volume samples at the next layer lie elsewhere along the ray.
-        medium_scan_first=0u;
-#ifdef NANOVORE_DEBUG_BUFFERS
-        debug_direct+=weight*direct*opacity;debug_sss+=weight*sss*opacity;
-#endif
-        float clear=s.translucent ? membrane_clear(view_cosine) : 0.0;
-        if (clear<=0.0 || layer==render.settings.w) break;
-        through_wall=true;
-        weight*=clear*mix(vec3(1),s.color,CLEAR_MEMBRANE_PIGMENT_WEIGHT*opacity)*exp(-render.thin_material.y*opacity/max(MIN_MEMBRANE_DIRECTION_COSINE,view_cosine));
-        origin=s.point-s.geometric_normal*point_epsilon(s.point);
+        vec3 sharp;
+        vec3 volume=single_scattering(origin,direction,distance,sharp_limit,sharp);
+        radiance+=volume;film_volume+=volume;film_sharp_sum+=sharp;
     }
+    vec3 weight=transmittance(origin,direction,distance);
+    if (sample_index==0u) film_terminal_distance=distance;
+    float blur_radius=medium_blur_radius(direction,distance);
+    film_blur_max=max(film_blur_max,blur_radius);
+    if (!hit)
+    {
+        vec3 background=render.backdrop_style.x>0.0 ? texelFetch(soft_backdrop,ivec2(pixel),0).rgb : environment_radiance(direction);
+        radiance+=weight*background;
+        if (blur_radius<=0.0) film_sharp_sum+=weight*background;
+#ifdef NANOVORE_DEBUG_BUFFERS
+        debug_direct+=weight*background;
+#endif
+        return radiance;
+    }
+    Surface s;if (!surface_at(triangle,barycentric,direction,s)) return radiance;
+    medium_scan_first=first_medium_near(s.point,4.0*point_epsilon(s.point));
+#ifdef NANOVORE_DEBUG_BUFFERS
+    ++debug_primary_hits;
+    if (sample_index==0u)
+    {
+        debug_vertex_hit=vec4(s.color,s.translucent ? THIN_MEMBRANE_GUIDE_CODE : 1.0);
+        debug_normal_depth=vec4(s.normal,distance);
+    }
+#endif
+    if (transparent_pass && !s.translucent)
+    {
+        opaque_hit=uvec4(triangle,hit_instance,floatBitsToUint(barycentric));
+        opaque_weight=weight;opaque_flags=blur_radius<=0.0 ? 1.0 : 0.0;
+        return radiance;
+    }
+    vec3 glow_color=surface_glow_color(s);
+    vec3 direct=glow_color*s.emission+electron_signal(s,-direction);
+    vec3 sss=vec3(0);
+    for (int light=0;light<3;++light)
+    { vec3 contribution;direct+=evaluate_studio(s,-direction,light,contribution);sss+=contribution; }
+    if (subsurface_sample_weight>0.0)
+    { vec3 contribution=subsurface_sample_weight*evaluate_subsurface(s,-direction);direct+=contribution;sss+=contribution; }
+    film_emission+=weight*glow_color*s.emission;
+    vec3 contribution=weight*(direct+ambient_surface(s,-direction));
+    radiance+=contribution;
+    if (blur_radius<=0.0) film_sharp_sum+=contribution;
+#ifdef NANOVORE_DEBUG_BUFFERS
+    debug_direct+=weight*direct;debug_sss+=weight*sss;
+#endif
     return radiance;
 }
 
@@ -1244,34 +1183,28 @@ vec3 film_direction(uvec2 pixel, vec2 jitter)
 
 #ifdef DEVELOPMENT
 // Development view: triangle edges by world distance to the nearest edge, in
-// pixels at the hit. Clear walls show the edges behind them, up to an opaque hit.
+// pixels at the first hit.
 vec3 trace_wireframe(uvec2 pixel)
 {
     vec3 origin=render.camera_position.xyz,direction=film_direction(pixel,film_sample(0u,1u));
-    vec3 color=render.wireframe_fill.rgb;float weight=1.0,path=0.0;
+    vec3 color=render.wireframe_fill.rgb;
     float pixel_angle=2.0*render.display.y/float(render.settings.y),half_width=.5*render.wireframe_line.w;
-    for (uint layer=0u;layer<=render.settings.w;++layer)
-    {
-        uint triangle;vec2 barycentric;float distance;
-        if (!closest_hit(origin,direction,triangle,barycentric,distance)) break;
-        Surface s;if (!surface_at(triangle,barycentric,direction,s)) break;
-        path+=distance;film_terminal_distance=path;
+    uint triangle;vec2 barycentric;float distance;
+    if (!closest_hit(origin,direction,triangle,barycentric,distance)) return color;
+    Surface s;if (!surface_at(triangle,barycentric,direction,s)) return color;
+    film_terminal_distance=distance;
 #ifdef NANOVORE_DEBUG_BUFFERS
-        if (layer==0u) { debug_vertex_hit=vec4(s.color,s.translucent ? THIN_MEMBRANE_GUIDE_CODE : 1.0);debug_normal_depth=vec4(s.normal,distance); }
+    debug_vertex_hit=vec4(s.color,s.translucent ? THIN_MEMBRANE_GUIDE_CODE : 1.0);debug_normal_depth=vec4(s.normal,distance);
 #endif
-        uvec4 t=triangles[triangle];
-        vec3 a=hit_to_world*vec4(vertices[t.x].position.xyz,1.0);
-        vec3 b=hit_to_world*vec4(vertices[t.y].position.xyz,1.0);
-        vec3 c=hit_to_world*vec4(vertices[t.z].position.xyz,1.0);
-        vec3 heights=length(cross(b-a,c-a))/vec3(length(c-b),length(a-c),length(b-a));
-        vec3 edges=s.barycentric*heights;
-        float pixels=min(edges.x,min(edges.y,edges.z))/(path*pixel_angle);
-        float line=1.0-smoothstep(half_width-.5,half_width+.5,pixels);
-        color+=weight*line*render.wireframe_line.rgb*(.35+.65*s.color);
-        if (!s.translucent) break;
-        weight*=.5;origin=s.point-s.geometric_normal*point_epsilon(s.point);
-    }
-    return color;
+    uvec4 t=triangles[triangle];
+    vec3 a=hit_to_world*vec4(vertices[t.x].position.xyz,1.0);
+    vec3 b=hit_to_world*vec4(vertices[t.y].position.xyz,1.0);
+    vec3 c=hit_to_world*vec4(vertices[t.z].position.xyz,1.0);
+    vec3 heights=length(cross(b-a,c-a))/vec3(length(c-b),length(a-c),length(b-a));
+    vec3 edges=s.barycentric*heights;
+    float pixels=min(edges.x,min(edges.y,edges.z))/(distance*pixel_angle);
+    float line=1.0-smoothstep(half_width-.5,half_width+.5,pixels);
+    return color+line*render.wireframe_line.rgb*(.35+.65*s.color);
 }
 #endif
 
@@ -1334,26 +1267,16 @@ vec3 integrate_volume(uvec2 pixel,out vec3 sharp_result,out float terminal)
     for (uint sample_index = 0u; sample_index < volume_count; ++sample_index)
     {
         vec3 direction=film_direction(pixel,film_sample(sample_index,volume_count));
-        vec3 origin=render.camera_position.xyz,weight=vec3(1);
+        vec3 origin=render.camera_position.xyz;
         float sharp_limit=medium_sharp_limit(direction);
-        for (uint depth=0u;depth<=render.settings.w;++depth)
-        {
-            uint triangle;vec2 barycentric;float distance;
-            bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
-            if (!hit && render.backdrop_style.x>0.0)
-                distance=backdrop_remaining(origin,direction,pixel);
-            terminal=dot(origin-render.camera_position.xyz,direction)+distance;
-            vec3 sharp;
-            vec3 scattering=weight*single_scattering(origin,direction,distance,sharp_limit,sharp);
-            volume_sum+=scattering;sharp_volume_sum+=weight*sharp;
-            if (!hit || depth==render.settings.w) break;
-            Surface s;if (!surface_at(triangle,barycentric,direction,s) || !s.translucent) break;
-            float view_cosine=abs(dot(s.normal,direction)),opacity=membrane_opacity(view_cosine);
-            float clear=membrane_clear(view_cosine);if (clear<=0.0) break;
-            weight*=transmittance(origin,direction,distance)*clear*mix(vec3(1),s.color,CLEAR_MEMBRANE_PIGMENT_WEIGHT*opacity)
-                *exp(-render.thin_material.y*opacity/max(MIN_MEMBRANE_DIRECTION_COSINE,view_cosine));
-            origin=s.point-s.geometric_normal*point_epsilon(s.point);
-        }
+        // Media in front of the first surface only: cell walls are opaque.
+        uint triangle;vec2 barycentric;float distance;
+        bool hit=closest_hit(origin,direction,triangle,barycentric,distance);
+        if (!hit && render.backdrop_style.x>0.0)
+            distance=backdrop_remaining(origin,direction,pixel);
+        terminal=distance;
+        vec3 sharp;
+        volume_sum+=single_scattering(origin,direction,distance,sharp_limit,sharp);sharp_volume_sum+=sharp;
     }
     sharp_result=volume_count>0u ? sharp_volume_sum/float(volume_count) : vec3(0);
     return volume_count>0u ? volume_sum/float(volume_count) : vec3(0);
@@ -1370,7 +1293,6 @@ uint volume_anchor(uvec2 cell)
 
 #if defined(NANOVORE_CASCADE_PASS)
 layout(push_constant) uniform CascadePass { uint cascade;uint pass;uint media;uint first; } cascade_pass; // Media: bit per traced cell.
-const uint CASCADE_MAX_CROSSINGS=4u;
 
 vec3 octahedron_point(uvec2 texel,uint side)
 {
@@ -1393,32 +1315,16 @@ float interval_start(uint cascade,float spacing)
 // beyond its end that still arrives. The last cascade continues to the environment.
 vec4 trace_interval(vec3 origin,vec3 direction,float limit,bool last)
 {
-    vec3 radiance=vec3(0),weight=vec3(1);float remaining=limit;
-    for (uint layer=0u;layer<=CASCADE_MAX_CROSSINGS;++layer)
-    {
-        uint triangle;vec2 barycentric;float distance;
-        bool hit=closest_hit_within(origin,direction,last ? RAY_MAX : remaining,triangle,barycentric,distance);
-        weight*=transmittance(origin,direction,hit ? distance : (last ? RAY_MAX : remaining));
-        if (!hit)
-        {
-            if (last) return vec4(radiance+weight*environment_radiance(direction),0);
-            return vec4(radiance,dot(weight,vec3(1.0/3.0)));
-        }
-        Surface s;if (!surface_at(triangle,barycentric,direction,s)) break;
-        // A probe inside a solid sees its back faces and receives nothing from them.
-        if (!s.translucent && !s.front_face) break;
-        vec3 light=surface_glow_color(s)*s.emission+ambient_surface(s,-direction);
-        for (int l=0;l<3;++l) { vec3 sss;light+=evaluate_studio(s,-direction,l,sss); }
-        float view_cosine=abs(dot(s.normal,direction));
-        float opacity=s.translucent ? membrane_opacity(view_cosine) : 1.0;
-        radiance+=weight*light*opacity;
-        float clear=s.translucent ? membrane_clear(view_cosine) : 0.0;
-        if (clear<=0.0) break;
-        weight*=clear*mix(vec3(1),s.color,CLEAR_MEMBRANE_PIGMENT_WEIGHT*opacity)*exp(-render.thin_material.y*opacity/max(MIN_MEMBRANE_DIRECTION_COSINE,view_cosine));
-        remaining-=distance;
-        origin=s.point-s.geometric_normal*point_epsilon(s.point);
-    }
-    return vec4(radiance,0);
+    uint triangle;vec2 barycentric;float distance;
+    bool hit=closest_hit_within(origin,direction,last ? RAY_MAX : limit,triangle,barycentric,distance);
+    vec3 weight=transmittance(origin,direction,hit ? distance : (last ? RAY_MAX : limit));
+    if (!hit) return last ? vec4(weight*environment_radiance(direction),0) : vec4(0,0,0,dot(weight,vec3(1.0/3.0)));
+    Surface s;if (!surface_at(triangle,barycentric,direction,s)) return vec4(0);
+    // A probe inside a solid sees its back faces and receives nothing from them.
+    if (!s.translucent && !s.front_face) return vec4(0);
+    vec3 light=surface_glow_color(s)*s.emission+ambient_surface(s,-direction);
+    for (int l=0;l<3;++l) { vec3 sss;light+=evaluate_studio(s,-direction,l,sss); }
+    return vec4(weight*light,0);
 }
 
 // Cascade 0 to RGB L1 spherical harmonics, one probe per invocation.

@@ -15,8 +15,6 @@ const float BLAST_RING_RADIUS_SCALE = .75;
 const float EDGE_FEATHER_PIXELS = .7;
 const float EDGE_FEATHER_WIDTH_PIXELS = 1.4;
 const float GUIDE_DEPTH_MARGIN = .12;
-const float THIN_MEMBRANE_GUIDE_CODE = 3.0;
-const float MEMBRANE_EFFECT_TRANSMISSION = .35;
 const float BURST_LIGHT_GAIN = 4.0;
 const float BURST_HALO_GAIN = .25;
 const float RING_LIGHT_GAIN = 3.5;
@@ -60,8 +58,8 @@ void main()
         else alpha=clamp((s.a.w+EDGE_FEATHER_PIXELS-distance)/EDGE_FEATHER_WIDTH_PIXELS,0.0,1.0);
         float depth=mix(s.a.z,s.b.z,t);
         float margin=s.b.w<.5 ? 0.0 : GUIDE_DEPTH_MARGIN;
-        if (guide.y>0.5 && guide.x>0.0 && depth>guide.x+margin)
-            alpha*=guide.y==THIN_MEMBRANE_GUIDE_CODE ? render.thin_material.x*MEMBRANE_EFFECT_TRANSMISSION : 0.0;
+        // Every surface, cell walls included, hides effects behind it.
+        if (guide.y>0.5 && guide.x>0.0 && depth>guide.x+margin) alpha=0.0;
         float strength=s.b.w<.5 ? TRAIL_LIGHT_GAIN : s.b.w<SELECTION_KIND_LOWER_BOUND ? BURST_LIGHT_GAIN : 1.0;
         if (s.b.w>.5 && s.b.w<RING_KIND_LOWER_BOUND)
             alpha+=exp(-distance*distance/max(1.0,s.a.w*s.a.w*BURST_HALO_VARIANCE_SCALE))*BURST_HALO_GAIN;

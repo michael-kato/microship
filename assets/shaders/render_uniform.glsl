@@ -7,7 +7,7 @@ layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
     vec4 camera_right;
     vec4 camera_up;
     vec4 background;
-    uvec4 settings;   // Width, height, film samples per pixel, max transparent crossings.
+    uvec4 settings;   // Width, height, film samples per pixel, unused.
     uvec4 scene;      // Fixed film seed, media count, sight count, static lighting cache enabled.
     vec4 display;     // Exposure, tan(vertical FOV / 2), aspect, volume integration steps.
     uvec4 quality;    // Volume film rays, visibility grid size, unused, medium blur enabled.
@@ -20,7 +20,7 @@ layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
     vec4 studio_direction[3],studio_color[3],thin_material,backdrop_wave;
     vec4 fog; // Blur radius in pixels, sight feather in world units, map plane Z.
     vec4 fog_tint;
-    vec4 membrane_fade; // View-angle opacity strength/power, transmitted blur radius, surface emission enabled.
+    vec4 membrane_fade; // Unused XY, transmitted blur radius, surface emission enabled.
     vec4 depth_of_field; // Focus distance, sharp relative depth range, pixels per relative depth, maximum pixel radius.
     vec4 subsurface; // Global weight, diffuse wrap, transmission budget, thin-wall thickness.
     uvec4 subsurface_quality; // Number of existing film samples used for thickness transport.

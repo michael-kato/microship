@@ -132,37 +132,12 @@
           "type": "number",
           "minimum": 0,
           "maximum": 0.9,
-          "description": "Thin-surface light transmission. Use edge_fade.power to set the rim width."
+          "description": "Fraction of light that crosses a cell wall. Walls are opaque to the camera."
         },
         "absorption": {
           "type": "number",
           "minimum": 0,
           "maximum": 10
-        },
-        "clarity": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1,
-          "description": "Clear fraction of thin-surface transmission. Zero blocks the clear path. At full edge-fade strength, the angle controls the clear path while this value is positive."
-        },
-        "edge_fade": {
-          "type": "object",
-          "properties": {
-            "strength": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1,
-              "description": "Angle fade strength. Zero uses transmission times clarity. One keeps the face-on wall clear and blocks clear transmission at the grazing-angle limit."
-            },
-            "power": {
-              "type": "number",
-              "exclusiveMinimum": 0,
-              "maximum": 16,
-              "description": "Rim falloff power. Lower values widen the opaque rim; higher values narrow it. Try 0.5 for a wider rim or 2 for a narrow rim."
-            }
-          },
-          "required": ["strength", "power"],
-          "additionalProperties": false
         },
         "blur_radius": {
           "type": "number",

@@ -80,7 +80,7 @@ with tempfile.TemporaryDirectory(prefix='nanovore-json-e2e-') as directory:
     for path,value in [('volume.rays_per_pixel',4097),('volume.integration_steps',1),
                        ('sampling.max_bounces',4),('lighting.shadow_grid_resolution',4),
                        ('sampling.seed',4294967296),('output.width',1920.5),('output.width','1920'),
-                       ('camera.position',[0,0]),('camera.up',[0,0,0]),('sampling.max_transmission_layers',0),
+                       ('camera.position',[0,0]),('camera.up',[0,0,0]),('sampling.samples_per_pixel',0),
                        ('output.exposure',0),('bloom.radius',65),('camera.max_distance',1),
                        ('output.unknown',1),('unknown',{}),('reconstruction',{}),('lighting.volume_local_bounds',True),('sampling.temporal',True)]:
         config.write_text(json.dumps(change(render,path,value)));failure(run(relocated,out),config)

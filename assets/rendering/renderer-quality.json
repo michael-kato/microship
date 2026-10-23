@@ -7,8 +7,7 @@
   },
   "sampling": {
     "samples_per_pixel": 6,
-    "seed": 1,
-    "max_transmission_layers": 8
+    "seed": 1
   },
   "geometry": {
     "sphere_segments": 64,

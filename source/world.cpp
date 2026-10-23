@@ -657,8 +657,7 @@ static bool load_appearance(World* w, const char* path, uint32_t seed)
 	Json thin = json_find(root, "thin_surface");
 	if (json_present(thin))
 	{
-		json_object(thin, "transmission|absorption|clarity|edge_fade|blur_"
-		                  "radius|bleed");
+		json_object(thin, "transmission|absorption|blur_radius|bleed");
 		Json bleed = json_find(thin, "bleed");
 		if (json_present(bleed))
 		{
@@ -671,25 +670,11 @@ static bool load_appearance(World* w, const char* path, uint32_t seed)
 		Json blur = json_find(thin, "blur_radius");
 		if (json_present(blur))
 			w->thin_blur_radius = json_float(blur, 0, 32);
-		Json edge = json_find(thin, "edge_fade");
-		if (json_present(edge))
-		{
-			json_object(edge, "strength|power");
-			w->thin_edge_strength =
-			    json_float(json_get(edge, "strength"), 0, 1);
-			w->thin_edge_power = json_positive(json_get(edge, "power"), 16);
-		}
 		w->thin_transmission = json_float(json_get(thin, "transmission"), 0,
 		                                  MAX_MEMBRANE_TRANSMISSION);
 		w->thin_absorption = json_float(json_get(thin, "absorption"), 0,
 		                                MAX_MEMBRANE_ABSORPTION);
 		w->thin_transmission_set = true;
-		Json clarity = json_find(thin, "clarity");
-		if (json_present(clarity))
-		{
-			w->thin_clarity = json_float(clarity, 0, 1);
-			w->thin_clarity_set = true;
-		}
 	}
 	Json backdrop = json_find(root, "backdrop");
 	if (json_present(backdrop))
@@ -1046,11 +1031,6 @@ static bool validate_world(const World* world, const char* path)
 		        path);
 		return false;
 	}
-	if (world->thin_clarity_set && !world->thin_transmission_set)
-	{
-		fprintf(stderr, "%s: thin clarity requires thin_transmission\n", path);
-		return false;
-	}
 	if ((world->backdrop_samples || world->backdrop_soft) &&
 	    !world->backdrop.model_path[0])
 	{
@@ -1373,11 +1353,7 @@ void world_copy_appearance(World* output, const World* source)
 	output->thin_transmission = source->thin_transmission;
 	output->thin_absorption = source->thin_absorption;
 	output->thin_transmission_set = source->thin_transmission_set;
-	output->thin_clarity = source->thin_clarity;
-	output->thin_edge_strength = source->thin_edge_strength;
-	output->thin_edge_power = source->thin_edge_power;
 	output->thin_blur_radius = source->thin_blur_radius;
-	output->thin_clarity_set = source->thin_clarity_set;
 	memcpy(output->factory_emission_color, source->factory_emission_color,
 	       sizeof(output->factory_emission_color));
 	memcpy(output->factory_emission_fresnel, source->factory_emission_fresnel,
