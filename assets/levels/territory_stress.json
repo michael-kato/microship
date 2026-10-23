@@ -10,7 +10,7 @@
     "player_ai": true,
     "fully_established": true,
     "rally_point": [0, 0, 8],
-    "production_seconds": 10,
+    "production_seconds": 8,
     "formation_spacing": 0.6
   },
   "bodies": [

@@ -11,7 +11,7 @@
     "fully_established": true,
     "rally_point": [-0.722496, 0.418914, 9.0],
     "rally_factions": ["immune", "fungus"],
-    "production_seconds": 10,
+    "production_seconds": 8,
     "formation_spacing": 0.6
   },
   "bodies": [
