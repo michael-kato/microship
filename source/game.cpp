@@ -1201,7 +1201,18 @@ int game_run(const GameOptions* options)
 		settings_path = user_path;
 	}
 	if (settings_path && !player_settings_load(&settings, settings_path, true))
-		return 1;
+	{
+		if (settings_path != user_path)
+			return 1;
+		// A file saved by another build must not block startup; keep it aside.
+		char kept[ASSET_PATH_CAPACITY + 4];
+		snprintf(kept, sizeof(kept), "%s.bad", user_path);
+		remove(kept);
+		if (rename(user_path, kept))
+			return 1;
+		fprintf(stderr, "Player settings set aside as '%s'; defaults apply.\n",
+		        kept);
+	}
 	if (options->samples)
 		settings.graphics.samples_per_pixel = options->samples;
 	if (options->vsync)
