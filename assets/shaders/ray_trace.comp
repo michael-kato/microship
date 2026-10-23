@@ -157,6 +157,23 @@ bool next_ray_medium(inout uint node,vec3 origin,vec3 direction,float distance,o
     return false;
 }
 
+// Media below this index cannot hold the current surface hit; shading lookups start here.
+uint medium_scan_first=0u;
+// Lowest index of a medium whose sphere, grown by the margin, holds the point; the count if none does.
+uint first_medium_near(vec3 point,float margin)
+{
+    uint count=render.scene.y>0u ? 2u*render.scene.y-1u : 0u,node=0u,first=render.scene.y;
+    while (node<count)
+    {
+        MediumRayNode bound=medium_ray_nodes[node];
+        if (any(lessThan(point,bound.low-margin)) || any(greaterThan(point,bound.high+margin))) { node=bound.escape;continue; }
+        ++node;
+        uint i=bound.medium;
+        if (i<first && length(point-media[i].center_radius.xyz)<media[i].center_radius.w+margin) first=i;
+    }
+    return first;
+}
+
 bool scene_box_intersection(vec3 origin, vec3 direction, float distance, float margin)
 {
     return box_intersection(origin,direction,distance,margin,render.scene_min.xyz,render.scene_max.xyz);
@@ -687,7 +704,7 @@ vec3 sampled_visibility(vec3 point,vec3 normal,int light)
 {
     uint n=render.quality.y;
     if (n>0u)
-        for (uint i=0u;i<render.scene.y;++i)
+        for (uint i=medium_scan_first;i<render.scene.y;++i)
         {
             vec3 q;if (!grid_coordinates(i,point,normal,q)) continue;
             uvec3 low=min(uvec3(floor(q)),uvec3(n-2u));vec3 f=q-vec3(low),sum=vec3(0);
@@ -723,7 +740,7 @@ float ambient_visibility(vec3 point,vec3 normal)
 {
     uint n=render.quality.y;
     if (n==0u) return 1.0;
-    for (uint i=0u;i<render.scene.y;++i)
+    for (uint i=medium_scan_first;i<render.scene.y;++i)
     {
         vec3 q;if (!grid_coordinates(i,point,normal,q)) continue;
         if (texture_lighting_grid)
@@ -780,7 +797,7 @@ bool cascade_lighting(vec3 point,vec3 normal,out vec3 sh[4],out float weight)
     sh[0]=sh[1]=sh[2]=sh[3]=vec3(0);weight=0.0;
     if (render.cascades.x==0u || (cascade_tracing && render.cascades.w==0u)) return false;
     uint n=render.cascades.x;
-    for (uint i=0u;i<render.scene.y;++i)
+    for (uint i=medium_scan_first;i<render.scene.y;++i)
     {
         if (!cascade_medium(i)) continue;
         float radius=media[i].center_radius.w;
@@ -1018,8 +1035,11 @@ vec3 evaluate_subsurface(Surface s,vec3 outgoing)
     float clear_budget=s.translucent ? 1.0-membrane_transmission(max(0.0,dot(s.normal,outgoing))) : 1.0;
     vec3 light=s.color*attenuation*(scatter*render.subsurface.z*clear_budget*entry_transmission*exit_transmission*cosine/PI)*render.studio_color[selected].rgb;
     // Query from the light-entry side. Other objects must still cast shadows.
+    // The entry can lie outside the surface hit's medium, so scan every medium there.
+    uint scan_first=medium_scan_first;medium_scan_first=0u;
     vec3 visibility=s.translucent && lighting_cached() && lighting_instances[s.instance].range.w>0u ? baked_surface_visibility(s,selected,true,entry+direction*point_epsilon(entry))
         : sampled_visibility(entry+direction*point_epsilon(entry),direction,selected);
+    medium_scan_first=scan_first;
     return light*visibility;
 }
 
@@ -1119,6 +1139,7 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
             break;
         }
         Surface s;if (!surface_at(triangle,barycentric,direction,s)) break;
+        medium_scan_first=first_medium_near(s.point,4.0*point_epsilon(s.point));
 #ifdef NANOVORE_DEBUG_BUFFERS
         if (layer==0u)
         {
@@ -1143,6 +1164,8 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
         vec3 contribution=weight*(direct+ambient_surface(s,-direction))*opacity;
         radiance+=contribution;
         if (blur_radius<=0.0) film_sharp_sum+=contribution;
+        // Fused volume samples at the next layer lie elsewhere along the ray.
+        medium_scan_first=0u;
 #ifdef NANOVORE_DEBUG_BUFFERS
         debug_direct+=weight*direct*opacity;debug_sss+=weight*sss*opacity;
 #endif
