@@ -34,7 +34,7 @@ layout(set = 0, binding = RENDER_BINDING_VERTICES, std430) readonly buffer Verte
 };
 layout(set = 0, binding = RENDER_BINDING_TRIANGLES, std430) readonly buffer TriangleBuffer
 {
-    uvec4 triangles[]; // XYZ vertex indices; W: 0 dielectric, 2 conductor, 3 thin membrane.
+    uvec4 triangles[]; // XYZ vertex indices; W: 3 thin membrane, otherwise solid.
 };
 // Per mesh: first triangle and opaque triangle count. Instance custom indices name meshes.
 layout(set = 0, binding = RENDER_BINDING_MESH_RANGES, std430) readonly buffer MeshRanges { uvec2 mesh_ranges[]; };
@@ -69,17 +69,6 @@ const float MIN_RAY_ORIGIN_OFFSET = 0.0001;
 const float RELATIVE_RAY_ORIGIN_OFFSET = 0.00001;
 const uint THIN_MEMBRANE_MATERIAL = 3u;
 const float MIN_SHADING_DENOMINATOR = 0.000001;
-const float SCHLICK_EXPONENT = 5.0;
-const float MIN_ENERGY_TABLE_COSINE = 0.001;
-const float ENERGY_TABLE_LAST_COORDINATE = 31.0;
-const uint ENERGY_TABLE_LAST_CELL = 30u;
-const uint ENERGY_TABLE_ROW_STRIDE = 32u;
-const uint ENERGY_TABLE_DIAGONAL_OFFSET = 33u;
-const float DIFFUSE_ROUGHNESS_THRESHOLD = 0.999;
-const float SPECULAR_FADE_ROUGHNESS = 0.95;
-const float SPECULAR_FADE_IOR = 1.05;
-const float MIN_GGX_ALPHA = 0.002;
-const uint CONDUCTOR_MATERIAL = 2u;
 const float MIN_MEMBRANE_DIRECTION_COSINE = .2;
 const float CLEAR_MEMBRANE_PIGMENT_WEIGHT = .15;
 const float DIFFUSE_MEMBRANE_PIGMENT_WEIGHT = .35;
@@ -104,7 +93,6 @@ struct Medium
 layout(set = 0, binding = RENDER_BINDING_MEDIA, std430) readonly buffer MediaBuffer { Medium media[]; };
 struct MediumRayNode { vec3 low;uint escape;vec3 high;uint medium; };
 layout(set=0,binding=RENDER_BINDING_MEDIUM_RAYS,std430) readonly buffer MediumRayNodes { MediumRayNode medium_ray_nodes[]; };
-layout(set = 0, binding = RENDER_BINDING_ENERGY, std430) readonly buffer EnergyBuffer { float ggx_energy[]; };
 
 const float PI = 3.14159265358979323846;
 const float RAY_MAX = 3.402823466e38;
@@ -446,86 +434,7 @@ vec3 single_scattering(vec3 origin,vec3 direction,float distance,float sharp_lim
     return radiance;
 }
 
-// Authored roughness >= 0.999 or IOR <= 1 means a purely diffuse dielectric.
-// Specular presence fades smoothly toward those limits instead of switching,
-// so interpolated vertex materials do not draw a seam.
-float specular_presence(float roughness, float ior)
-{
-    return (1.0-smoothstep(SPECULAR_FADE_ROUGHNESS,DIFFUSE_ROUGHNESS_THRESHOLD,roughness))*smoothstep(1.0,SPECULAR_FADE_IOR,ior);
-}
-
-float fresnel(float cosine, float ior)
-{
-    float f0 = (ior - 1.0) / (ior + 1.0);
-    f0 *= f0;
-    return f0 + (1.0 - f0) * pow(1.0 - clamp(cosine, 0.0, 1.0), SCHLICK_EXPONENT);
-}
-
-float ggx_distribution(float cosine, float alpha)
-{
-    float a2 = alpha*alpha;
-    float denominator = cosine*cosine*(a2-1.0)+1.0;
-    return a2 / (PI*denominator*denominator);
-}
-
-float ggx_mask(float cosine, float alpha)
-{
-    return 2.0*cosine / (cosine + sqrt(alpha*alpha + (1.0-alpha*alpha)*cosine*cosine));
-}
-
-// Bilinear lookup in a 32x32 GGX table over sqrt(n.v) and roughness.
-float energy_table(uint table, float cosine, float roughness)
-{
-    vec2 grid = vec2(sqrt(clamp(cosine,MIN_ENERGY_TABLE_COSINE,1.0)),clamp(roughness,0.0,1.0))*ENERGY_TABLE_LAST_COORDINATE;
-    uvec2 cell = min(uvec2(grid),uvec2(ENERGY_TABLE_LAST_CELL));
-    vec2 fraction = grid-vec2(cell);
-    uint base = table*ENERGY_TABLE_ROW_STRIDE*ENERGY_TABLE_ROW_STRIDE+cell.y*ENERGY_TABLE_ROW_STRIDE+cell.x;
-    float low = mix(ggx_energy[base],ggx_energy[base+1u],fraction.x);
-    float high = mix(ggx_energy[base+ENERGY_TABLE_ROW_STRIDE],ggx_energy[base+ENERGY_TABLE_DIAGONAL_OFFSET],fraction.x);
-    return mix(low,high,fraction.y);
-}
-// GGX directional albedo with Fresnel = 1.
-float directional_energy(float cosine, float roughness) { return energy_table(0u,cosine,roughness); }
-// Directional albedo for normal-incidence reflectance f0 (Schlick): f0*(E-B)+B.
-vec3 directional_albedo(vec3 f0, float cosine, float roughness)
-{
-    float energy=energy_table(0u,cosine,roughness),bias=energy_table(1u,cosine,roughness);
-    return f0*(energy-bias)+bias;
-}
-
-vec3 evaluate_bsdf(vec3 normal, vec3 outgoing, vec3 incoming, vec3 albedo,
-                   float roughness, float ior, bool metal,float diffuse_weight,out float interface_fresnel)
-{
-    interface_fresnel=0.0;
-    float ni = max(0.0, dot(normal, incoming)), no = max(0.0, dot(normal, outgoing));
-    if (ni <= 0.0 || no <= 0.0) return vec3(0.0);
-    float presence = metal ? 1.0 : specular_presence(roughness, ior);
-    if (presence <= 0.0) return diffuse_weight*albedo / PI;
-    vec3 half_vector = normalize(incoming + outgoing);
-    float nh = max(0.0, dot(normal, half_vector)), oh = max(MIN_SHADING_DENOMINATOR, dot(outgoing, half_vector));
-    float alpha = max(MIN_GGX_ALPHA, roughness*roughness);
-    float distribution = ggx_distribution(nh, alpha);
-    if (metal)
-    {
-        // Vertex RGB is conductor normal-incidence reflectance (Schlick RGB
-        // approximation), not diffuse albedo. No diffuse lobe in metal.
-        vec3 f = albedo + (vec3(1.0) - albedo) * pow(1.0 - oh, SCHLICK_EXPONENT);
-        vec3 gain = vec3(1.0);
-        if (render.quality.z != 0u)
-        {
-            // Turquin Eq.16: inexpensive conductor microfacet multiple-scattering
-            // approximation for direct shading.
-            float energy = directional_energy(no,roughness);
-            gain += albedo*((1.0-energy)/energy);
-        }
-        return gain*f*distribution*ggx_mask(ni,alpha)*ggx_mask(no,alpha)/(4.0*ni*no);
-    }
-    float f = fresnel(oh, ior)*presence;interface_fresnel=f;
-    float specular = f * distribution * ggx_mask(ni, alpha) * ggx_mask(no, alpha) / (4.0*ni*no);
-    return diffuse_weight*albedo * ((1.0-f) / PI) + vec3(specular);
-}
-
-// Material: emission, target roughness, roughness weight, flags (unshadowed=1, thin tint=2, organelle=4,
+// Material: emission, two unused, flags (unshadowed=1, thin tint=2, organelle=4,
 // fresnel emission=8, ambient follows detail=16, no subsurface=32).
 // Detail: surface weight, fog reveal, SSS weight, static or dynamic ray mask.
 struct InstanceStyle { vec4 tint,material,detail; };
@@ -534,8 +443,8 @@ layout(set=0,binding = RENDER_BINDING_INSTANCE_STYLES,std430) readonly buffer In
 struct Surface
 {
     vec3 point, normal, geometric_normal, color;
-    float roughness, ior, emission;
-    bool metal,translucent,unshadowed,front_face;
+    float emission;
+    bool translucent,unshadowed,front_face;
     vec4 subsurface;
     float detail,reveal,ambient; // Screen-space and fog level of detail; ambient light weight.
     float occlusion; // Ambient openness: 1 open, toward 0 deep in relief creases.
@@ -641,8 +550,6 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
         return false;
     vec3 geometric_normal = area_normal / twice_area;
     vec3 color = a.color.rgb * weights.x + b.color.rgb * weights.y + c.color.rgb * weights.z;
-    float roughness = dot(vec3(a.color.w,b.color.w,c.color.w), weights);
-    float ior = dot(vec3(a.position.w,b.position.w,c.position.w), weights);
     float emission = dot(vec3(a.normal.w,b.normal.w,c.normal.w), weights);
     vec3 normal = normalize(a.normal.xyz * weights.x + b.normal.xyz * weights.y +
                             c.normal.xyz * weights.z);
@@ -684,8 +591,8 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
     surface.triangle=triangle_index;surface.barycentric=weights;
     surface.instance=hit_instance;surface.front_face=dot(area_normal,direction)<0.0;
     surface.point = point; surface.normal = normal; surface.geometric_normal = geometric_normal;
-    surface.color = color; surface.roughness = roughness; surface.ior = ior;
-    surface.emission = emission; surface.metal = triangle.w == CONDUCTOR_MATERIAL;
+    surface.color = color;
+    surface.emission = emission;
     surface.translucent=triangle.w==THIN_MEMBRANE_MATERIAL;
     vec4 tint=instance_style[hit_instance].tint;
     uint flags=uint(instance_style[hit_instance].material.w);
@@ -710,7 +617,6 @@ bool surface_at(uint triangle_index, vec2 barycentric, vec3 direction, out Surfa
     surface.detail=instance_style[hit_instance].detail.x;surface.reveal=instance_style[hit_instance].detail.y;
     surface.ambient=(flags&16u)!=0u ? surface.detail : 1.0;
     if ((flags&32u)!=0u) surface.subsurface.a=0.0;
-    if (surface.translucent) surface.roughness=mix(surface.roughness,instance_style[hit_instance].material.y,instance_style[hit_instance].material.z);
     return true;
 }
 
@@ -1007,7 +913,7 @@ vec3 volume_incident(vec3 point,uint medium_index,vec3 ambient,vec3 phases,vec3 
 
 float scattering_weight(Surface s)
 {
-    return !subsurface_enabled || s.metal || s.unshadowed ? 0.0 : s.subsurface.a*render.subsurface.x;
+    return !subsurface_enabled || s.unshadowed ? 0.0 : s.subsurface.a*render.subsurface.x;
 }
 
 vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
@@ -1020,26 +926,18 @@ vec3 evaluate_studio(Surface s,vec3 outgoing,int selected,out vec3 sss)
     float scatter=scattering_weight(s);vec3 weighted=vec3(0);
     float wrap=render.subsurface.y;
     bool front=s.translucent || geometric_cosine>0.0;
-    // Surface reflection needs the geometric front. Scattered light wraps past
-    // the smooth shading terminator instead, so faceted triangles do not switch it.
+    // Diffuse reflection only; there is no specular lobe. It needs the geometric
+    // front. Scattered light wraps past the smooth shading terminator instead,
+    // so faceted triangles do not switch it.
     if ((front && cosine>0.0) || (scatter>0.0 && cosine+wrap>0.0))
     {
-        float interface_fresnel;
-        vec3 reflected=front ? evaluate_bsdf(s.normal,outgoing,direction,s.color,s.roughness,s.ior,s.metal,1.0-scatter,interface_fresnel)*max(0.0,cosine) : vec3(0);
-        if (!front) interface_fresnel=0.0;
+        vec3 reflected=front && cosine>0.0 && dot(s.normal,outgoing)>0.0 ? s.color*((1.0-scatter)*cosine/PI) : vec3(0);
         if (scatter>0.0)
         {
             // Wrapped diffusion falls continuously to zero at cosine = -wrap and is
             // normalized over that support for walls and solid organelles alike.
             float diffuse=max(0.0,cosine+wrap)/((1.0+wrap)*(1.0+wrap));
-            if (cosine<=0.0)
-            {
-                vec3 half_vector=direction+outgoing;
-                float half_cosine=dot(outgoing,half_vector)*inversesqrt(max(MIN_SHADING_DENOMINATOR,dot(half_vector,half_vector)));
-                interface_fresnel=fresnel(clamp(half_cosine,0.0,1.0),s.ior)*specular_presence(s.roughness,s.ior);
-            }
-            // Keep the interface response continuous across the light horizon.
-            sss=s.color*((1.0-interface_fresnel)*scatter*(1.0-render.subsurface.z)*diffuse/PI);
+            sss=s.color*(scatter*(1.0-render.subsurface.z)*diffuse/PI);
             reflected+=sss;
         }
         weighted=(1.0-transmission)*reflected*render.studio_color[selected].rgb;
@@ -1140,11 +1038,8 @@ vec3 evaluate_subsurface(Surface s,vec3 outgoing)
         if (!cached && !subsurface_exit(s,direction,8.0*radius,entry,thickness)) return vec3(0);
     }
     vec3 attenuation=exp(-thickness/max(s.subsurface.rgb,vec3(MIN_SHADING_DENOMINATOR)));
-    float presence=specular_presence(s.roughness,s.ior);
-    float exit_transmission=1.0-fresnel(max(0.0,dot(s.normal,outgoing)),s.ior)*presence;
-    float entry_transmission=1.0-fresnel(cosine,s.ior)*presence;
     float clear_budget=s.translucent ? 1.0-membrane_transmission(max(0.0,dot(s.normal,outgoing))) : 1.0;
-    vec3 light=s.color*attenuation*(scatter*render.subsurface.z*clear_budget*entry_transmission*exit_transmission*cosine/PI)*render.studio_color[selected].rgb;
+    vec3 light=s.color*attenuation*(scatter*render.subsurface.z*clear_budget*cosine/PI)*render.studio_color[selected].rgb;
     // Query from the light-entry side. Other objects must still cast shadows.
     // The entry can lie outside the surface hit's medium, so scan every medium there.
     uint scan_first=medium_scan_first;medium_scan_first=0u;
@@ -1167,32 +1062,20 @@ vec3 ambient_surface(Surface s,vec3 outgoing)
     vec3 sh[4];float weight;bool cascaded=cascade_lighting(s.point,s.geometric_normal,sh,weight);
     if (!cascaded) weight=0.0;
     float cosine=max(0.0,dot(s.normal,outgoing));
-    // Rough lobes gather light around the normal: use the GGX dominant direction.
-    float alpha=max(MIN_GGX_ALPHA,s.roughness*s.roughness);
-    vec3 dominant=normalize(mix(s.normal,reflect(-outgoing,s.normal),(1.0-alpha)*(sqrt(1.0-alpha)+alpha)));
     float transmission=s.translucent ? membrane_transmission(max(0.0,dot(s.normal,outgoing))) : 0.0;
-    vec3 diffuse=vec3(0),reflected=vec3(0),behind=vec3(0);
+    vec3 diffuse=vec3(0),behind=vec3(0);
     if (weight<1.0)
     {
         float visibility=ambient_visibility(s.point,s.geometric_normal)*(1.0-weight);
         diffuse=visibility*render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5+s.normal.y/COSINE_GRADIENT_DENOMINATOR);
-        reflected=visibility*environment_radiance(dominant);
         behind=visibility*render.background.rgb*mix(render.ambient_bottom.rgb,render.ambient_top.rgb,.5-s.normal.y/COSINE_GRADIENT_DENOMINATOR);
     }
     if (weight>0.0)
     {
-        diffuse+=weight*sh_irradiance(sh,s.normal);reflected+=weight*sh_radiance(sh,dominant,1.0);
+        diffuse+=weight*sh_irradiance(sh,s.normal);
         if (transmission>0.0) behind+=weight*sh_irradiance(sh,-s.normal);
     }
-    // Pre-integrated GGX albedo instead of a mirror Fresnel term, so rough surfaces
-    // do not gain a bright grazing rim. Conductors keep their multiple-scattering gain.
-    float f0=(s.ior-1.0)/(s.ior+1.0);f0*=f0;
-    vec3 f=s.metal ? directional_albedo(s.color,cosine,s.roughness)
-        : directional_albedo(vec3(f0),cosine,s.roughness)*specular_presence(s.roughness,s.ior);
-    if (s.metal && render.quality.z!=0u)
-    { float energy=directional_energy(cosine,s.roughness);f*=vec3(1.0)+s.color*((1.0-energy)/energy); }
-    vec3 result=s.metal ? f*reflected : (vec3(1)-f)*s.color*diffuse+f*reflected;
-    result*=1.0-transmission;
+    vec3 result=s.color*diffuse*(1.0-transmission);
     if (transmission>0.0)
         result+=s.color*behind*(transmission*(1.0-render.thin_material.w))*
             exp(-render.thin_material.y/max(MIN_MEMBRANE_DIRECTION_COSINE,cosine));
@@ -1298,7 +1181,7 @@ vec3 trace_direct(vec3 origin,vec3 direction,uint sample_index,uvec2 pixel,float
 vec2 film_sample(uint index,uint count)
 {
     if (count==1u || ((count&1u)!=0u && index==count-1u)) return vec2(.5);
-    uint pairs=count/CONDUCTOR_MATERIAL,pair=index/CONDUCTOR_MATERIAL;
+    uint pairs=count/2u,pair=index/2u;
     // Mirrored pairs keep the centroid at the pixel center for every count.
     // The fixed seed changes film positions only; no frame or pixel RNG exists.
     vec2 sample_value=vec2((float(pair)+.5)/float(pairs),

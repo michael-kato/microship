@@ -24,7 +24,6 @@
     "keyboard_pan_speed": 24
   },
   "lighting": {
-    "microfacet_energy_compensation": true,
     "shadow_grid_resolution": 32,
     "static_lighting_cache": true,
     "texture_grid": true,

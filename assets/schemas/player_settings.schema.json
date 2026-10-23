@@ -104,12 +104,6 @@
           "minimum": 0.0,
           "maximum": 1.0
         },
-        "energy_compensation": {
-          "title": "Specular energy compensation",
-          "type": "integer",
-          "minimum": 0.0,
-          "maximum": 1.0
-        },
         "shadow_grid": {
           "title": "Lighting grid resolution",
           "type": "integer",

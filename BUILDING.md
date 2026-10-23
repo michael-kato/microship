@@ -774,12 +774,12 @@ saturated light toward white. At the authored exposure of 1.6 the stable
 close view's mean display value rose from 119 to 136 (RGB8); `output.exposure`
 remains the brightness control.
 
-Ambient specular uses pre-integrated GGX albedo, `F0*(E-B)+B`, from the
-32x32 tables in `microfacet.cpp` (directional albedo E and the Schlick bias
-integral B), instead of a mirror Schlick term at n.v. Rough surfaces lose the
-bright white grazing rim and keep more diffuse color there. The environment
-lookup follows the GGX dominant direction, which moves toward the normal as
-roughness grows. Conductors keep their multiple-scattering gain.
+There is no specular reflection: electron microscope images have no
+highlights. Studio lights, ambient light, cascade hits and the backdrop shade
+diffuse only, and SSS has no Fresnel interface split. Vertex roughness and IOR
+remain in the mesh format but do not affect shading. Radiance cascades and
+their diffuse bounce light are unchanged. Removing GGX, the conductor path and
+the energy tables saved 1.2 ms of surface time in the zoomed-in perf scene.
 
 Subsurface wrap is continuous for solid organelles as well as walls:
 `max(0, cos + wrap) / (1 + wrap)^2`, gated by the smooth shading normal so it
@@ -787,12 +787,6 @@ falls to zero at `cos = -wrap`. Surface reflection still requires the
 geometric front face. The previous solid form added a constant
 `wrap / (1 + 2 wrap)` floor that switched off per triangle at the geometric
 terminator, which drew faceted bands on organelles.
-
-Roughness at or above 0.999, or IOR at or below 1, still authors a purely
-diffuse dielectric, but specular reflection and the interface Fresnel split
-now fade out over roughness 0.95–0.999 and IOR 1.05–1.0 instead of switching
-off, so vertex materials interpolated across those limits shade without a
-seam. No current material is inside either band.
 
 Opaque surfaces inside cells trace exact current shadow rays for their
 surface reflection. They previously read the 16^3 interior visibility grid,
@@ -807,7 +801,7 @@ Ambient fill inside cells is scaled by a baked ambient visibility stored in
 the spare alpha channel of each interior grid point's first light entry. The
 static bake traces 32 fixed Fibonacci directions per grid point through
 stationary blockers, wall transmission and medium attenuation, weighted by
-the environment gradient's luminance. Surface ambient (diffuse, specular and
+the environment gradient's luminance. Surface ambient (diffuse and
 light from behind thin walls) and ambient in-scattering in cell volumes read
 it with the same one-voxel normal offset as the light grids. Moving units do
 not occlude ambient light. Previously enclosed organelles received the full

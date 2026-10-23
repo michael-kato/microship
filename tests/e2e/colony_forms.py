@@ -34,10 +34,7 @@ with tempfile.TemporaryDirectory(prefix='nanovore-forms-') as directory:
         mature,scene=run(side+'-mature',data,1800,orders)
         a=initial['colonies'][home]['appearance'];b=middle['colonies'][home]['appearance'];c=mature['colonies'][home]['appearance']
         assert a['factions'][faction]==0 and 0<b['factions'][faction]<1 and c['factions'][faction]==1,(side,a,b,c)
-        body_slot=mature['unit_capacity']+home
-        style=next(v['style'] for v in scene['instances'] if v['slot']==body_slot)
         profile=next(f for f in data['content']['factions'] if f['id']==faction)
-        assert abs(style[5]-profile['cell_appearance']['roughness'])<1e-5 and style[6]==1
         base=initial_scene['meshes'][home]['deformation'];partial=mid_scene['meshes'][home]['deformation'];full=scene['meshes'][home]['deformation']
         assert base['indices']==partial['indices']==full['indices'],'Cell topology changed'
         assert len(base['vertices'])==len(partial['vertices'])==len(full['vertices'])
@@ -113,6 +110,6 @@ with tempfile.TemporaryDirectory(prefix='nanovore-forms-') as directory:
     assert all(a==b for i,(a,b) in enumerate(zip(regular['vertices'],rounded['vertices'])) if i not in wall),'Immune capture moved an organelle'
     for field,value in [('children',1),('levels',0),('length_scale',1.1),('width_scale',0),('angle_degrees',0),('bend',0)]:
         run('bad-tree-'+field,change(virus,'content.buildings.0.branches.tree.'+field,value),expected=1)
-    for field,value in [('roughness',-1),('roundness',-.01),('roundness',1.01),('displacement.features',257),('displacement.features',0),('displacement.width_degrees',5),('displacement.height',0),('displacement.profile','missing')]:
+    for field,value in [('roundness',-.01),('roundness',1.01),('displacement.features',257),('displacement.features',0),('displacement.width_degrees',5),('displacement.height',0),('displacement.profile','missing')]:
         run('bad-surface-'+field.replace('.','-'),change(virus,'content.factions.0.cell_appearance.'+field,value),expected=1)
-print(f'Colony forms E2E passed: {count} application runs; fixed wall topology, vertex interpolation, unchanged organelles, valid normals, immune roundness and capture, faction materials, restart, deterministic results and invalid assets.')
+print(f'Colony forms E2E passed: {count} application runs; fixed wall topology, vertex interpolation, unchanged organelles, valid normals, immune roundness and capture, restart, deterministic results and invalid assets.')

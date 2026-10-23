@@ -55,11 +55,6 @@
                 "minimum": 0,
                 "maximum": 1
               },
-              "roughness": {
-                "type": "number",
-                "minimum": 0.02,
-                "maximum": 1
-              },
               "displacement": {
                 "type": "object",
                 "properties": {

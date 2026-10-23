@@ -14,7 +14,6 @@
       "cell_appearance": {
         "tint": [0.16, 0.72, 0.18],
         "strength": 0.72,
-        "roughness": 0.18,
         "displacement": {
           "features": 256,
           "height": 0.19,
@@ -38,7 +37,6 @@
       "cell_appearance": {
         "tint": [0.96, 0.98, 1],
         "strength": 0.78,
-        "roughness": 0.6,
         "roundness": 0.8
       },
       "personality": "../presentation/immune_personality.json"
@@ -56,7 +54,6 @@
       "cell_appearance": {
         "tint": [0.34, 0.16, 0.055],
         "strength": 0.8,
-        "roughness": 1,
         "displacement": {
           "features": 24,
           "height": 0.2,

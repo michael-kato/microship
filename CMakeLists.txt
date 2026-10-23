@@ -206,7 +206,6 @@ add_executable(nanovore
     source/content.cpp source/asset_json.cpp
     source/effects.cpp source/communications.cpp source/audio.cpp
     source/main.cpp
-    source/microfacet.cpp
     source/camera.cpp
     source/world.cpp source/map_layout.cpp
     source/render_config.cpp

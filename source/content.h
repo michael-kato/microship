@@ -78,8 +78,7 @@ struct FactionDefinition
 	uint32_t producer, default_unit, assault_unit;
 	bool automatic;
 	Color cell_tint;
-	float cell_strength, cell_roughness, cell_roundness;
-	bool cell_material;
+	float cell_strength, cell_roundness;
 	uint32_t displacement_features, displacement_seed;
 	float displacement_height, displacement_width;
 	bool displacement_pointed;

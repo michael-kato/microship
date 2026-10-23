@@ -8,7 +8,6 @@
 #include "asset_json.h"
 #include "geometry.h"
 #include "math_constants.h"
-#include "microfacet.h"
 #include "render_config.h"
 #include "render_scene.h"
 #include "renderer.h"
@@ -50,7 +49,7 @@ static const int GPU_DEBUG_PIXEL_BYTES = 96;
 static const int GPU_OPAQUE_HIT_BYTES = 32; // A flag word plus seven hit words.
 static const int COMPANION_SHADER_PATH_CAPACITY = 1024;
 static const double NANOSECONDS_PER_MILLISECOND = 1000000.0;
-static const int RENDER_STORAGE_BUFFER_BINDINGS = 20;
+static const int RENDER_STORAGE_BUFFER_BINDINGS = 19;
 static const int RENDER_DESCRIPTOR_SET_COUNT = 3;
 static const int RENDER_STORAGE_IMAGE_BINDINGS = 3;
 static const int RENDER_SAMPLER_BINDINGS = 4;
@@ -76,9 +75,8 @@ enum
 	SCENE_BUFFER_TRIANGLES = 1,
 	SCENE_BUFFER_UNIFORM = 2,
 	SCENE_BUFFER_MEDIA = 3,
-	SCENE_BUFFER_ENERGY = 4,
-	SCENE_BUFFER_RESERVED = 5,
-	SCENE_BUFFER_DEBUG = 6
+	SCENE_BUFFER_RESERVED = 4,
+	SCENE_BUFFER_DEBUG = 5
 };
 
 enum
@@ -345,7 +343,6 @@ struct RendererState
 	std::vector<float> optical_depth_fades;
 	bool optical_depth_initialized;
 	uint32_t optical_depth_size, optical_depth_layers, optical_depth_bakes;
-	GpuBuffer energy;
 	GpuBuffer debug_pixels; // Full F2 diagnostic records; minimal unless buffer
 	                        // views can open.
 	GpuBuffer
@@ -1958,7 +1955,6 @@ static bool upload_scene(RendererState* state, const RenderScene* scene)
 	                           !state->custom_shader
 	                       ? 1
 	                       : 0;
-	uniform.quality[2] = state->config.microfacet_energy_compensation;
 	if (!state->custom_shader && state->config.cascade_probes)
 	{
 		uniform.cascades[0] = state->config.cascade_probes;
@@ -1977,12 +1973,6 @@ static bool upload_scene(RendererState* state, const RenderScene* scene)
 	uniform.subsurface[2] = state->config.subsurface_transmission;
 	uniform.subsurface[3] = state->config.subsurface_thickness;
 	scene_uniform(&uniform, scene);
-	if (!create_buffer(state, &state->energy,
-	                   2 * MICROFACET_TABLE_SIZE * MICROFACET_TABLE_SIZE *
-	                       sizeof(float),
-	                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, host))
-		return false;
-	microfacet_energy_table((float*)state->energy.mapped);
 	state->medium_count = (uint32_t)scene->media.size();
 	state->medium_ray_order.resize(state->medium_count);
 	state->medium_ray_scratch.resize(
@@ -2757,7 +2747,7 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
 	{
 		fprintf(
 		    stderr,
-		    "Renderer requires twenty compute storage-buffer descriptors.\n");
+		    "Renderer requires nineteen compute storage-buffer descriptors.\n");
 		return false;
 	}
 	VkDescriptorSetLayoutBinding bindings[RENDER_DESCRIPTOR_COUNT] = {};
@@ -2786,7 +2776,6 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
 	    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 	    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 	    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-	    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 	    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 	    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 	    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -2855,7 +2844,6 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
 		    {state->triangles.handle, 0, state->triangles.size},
 		    {frame.uniform.handle, 0, frame.uniform.size},
 		    {frame.media.handle, 0, frame.media.size},
-		    {state->energy.handle, 0, state->energy.size},
 		    {state->shadow_grid.handle, 0,
 			 state->shadow_grid.size}, // Current-frame visibility only.
 		    {state->debug_pixels.handle, 0, state->debug_pixels.size}};
@@ -2880,8 +2868,6 @@ static bool create_pipeline(RendererState* state, const char* shader_path)
 		VkDescriptorBufferInfo medium_ray_buffer = {
 		    frame.medium_ray_nodes.handle, 0, frame.medium_ray_nodes.size};
 		writes[RENDER_BINDING_MEDIUM_RAYS].pBufferInfo = &medium_ray_buffer;
-		writes[RENDER_BINDING_ENERGY].pBufferInfo =
-		    &buffers[SCENE_BUFFER_ENERGY];
 		writes[RENDER_BINDING_RESERVED].pBufferInfo =
 		    &buffers[SCENE_BUFFER_RESERVED];
 		writes[RENDER_BINDING_DEBUG].pBufferInfo = &buffers[SCENE_BUFFER_DEBUG];
@@ -5249,9 +5235,9 @@ bool renderer_shutdown(Renderer* renderer)
 		    &state->readback,         &state->optical_depth_upload,
 		    &state->shadow_grid,      &state->static_lighting,
 		    &state->surface_lighting, &state->dynamic_lighting,
-		    &state->sharp_layer,      &state->energy,
-		    &state->debug_pixels,     &state->guides,
-		    &state->opaque_hits,      &state->radiance_cascades};
+		    &state->sharp_layer,      &state->debug_pixels,
+		    &state->guides,           &state->opaque_hits,
+		    &state->radiance_cascades};
 		for (uint32_t i = 0; i < sizeof(buffers) / sizeof(buffers[0]); ++i)
 			destroy_buffer(state, buffers[i]);
 		for (uint32_t f = 0; f < FRAMES_IN_FLIGHT; ++f)

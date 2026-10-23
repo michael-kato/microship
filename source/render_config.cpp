@@ -52,8 +52,6 @@ const char* render_config_error(const RenderConfig* config)
 		       "zeros to disable it.";
 	if (config->volume_rays_per_pixel > MAX_RENDER_RAYS_PER_PIXEL)
 		return "volume_rays_per_pixel must be in [0, 4096]";
-	if (config->microfacet_energy_compensation > 1)
-		return "microfacet_energy_compensation must be 0 or 1";
 	if (config->bloom_radius < 1 || config->bloom_radius > MAX_BLOOM_RADIUS ||
 	    config->bloom_strength < 0 || config->bloom_strength > 1 ||
 	    config->bloom_threshold < 0 ||
@@ -248,9 +246,9 @@ bool render_config_load(RenderConfig* config, const char* path)
 	}
 	{
 		Json j = json_get(root, "lighting");
-		json_object(j, "microfacet_energy_compensation|shadow_grid_resolution|"
-		               "static_lighting_cache|force_lighting_rebuild|texture_"
-		               "grid|organelle_cache|subgroup_size");
+		json_object(j, "shadow_grid_resolution|static_lighting_cache|force_"
+		               "lighting_rebuild|texture_grid|organelle_cache|subgroup_"
+		               "size");
 		Json subgroup = json_find(j, "subgroup_size");
 		if (json_present(subgroup))
 			loaded.subgroup_size = json_uint(subgroup, 0, 64);
@@ -274,8 +272,6 @@ bool render_config_load(RenderConfig* config, const char* path)
 		if (loaded.shadow_grid_resolution && loaded.shadow_grid_resolution < 8)
 			json_error(grid,
 			           "shadow grid resolution must be zero or in [8,64]");
-		loaded.microfacet_energy_compensation =
-		    json_bool(json_get(j, "microfacet_energy_compensation"));
 	}
 	Json cascades = json_find(root, "radiance_cascades");
 	if (json_present(cascades))

@@ -85,8 +85,6 @@ static const SettingField FIELDS[] = {
 	         FLOAT, subsurface_transmission, 0, 1, UNIT),
     GRAPHICS(LIGHTING, "membrane_thickness", "Membrane optical thickness",
 	         FLOAT, subsurface_thickness, 0, 1, THICKNESS),
-    GRAPHICS(LIGHTING, "energy_compensation", "Specular energy compensation",
-	         UINT, microfacet_energy_compensation, 0, 1, OFF_ON),
     GRAPHICS(LIGHTING, "shadow_grid", "Lighting grid resolution", UINT,
 	         shadow_grid_resolution, 0, 64, GRID),
     GRAPHICS(LIGHTING, "static_cache", "Static lighting cache", BOOL,

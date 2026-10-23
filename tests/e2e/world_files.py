@@ -77,7 +77,7 @@ with tempfile.TemporaryDirectory(prefix='nanovore-json-e2e-') as directory:
 
     config=bundle/'assets/rendering/renderer.json';render=json.loads(config.read_text())
     for path,value in [('volume.rays_per_pixel',4097),('volume.integration_steps',1),
-                       ('sampling.max_bounces',4),('lighting.microfacet_energy_compensation',2),
+                       ('sampling.max_bounces',4),('lighting.shadow_grid_resolution',4),
                        ('sampling.seed',4294967296),('output.width',1920.5),('output.width','1920'),
                        ('camera.position',[0,0]),('camera.up',[0,0,0]),('sampling.max_transmission_layers',0),
                        ('output.exposure',0),('bloom.radius',65),('camera.max_distance',1),

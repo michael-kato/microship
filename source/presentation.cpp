@@ -1157,20 +1157,6 @@ bool presentation_build(Presentation* p, const Simulation* s,
 			style[2] = a.tint.b;
 			style[3] = s->visible_bodies[i] ? a.strength : 0;
 			style[7] = INSTANCE_TINT_THIN_ONLY;
-			float weight = 0, roughness = 0;
-			if (s->visible_bodies[i])
-				for (uint32_t f = 1; f < MAX_FACTIONS; ++f)
-					if (w->content.factions[f].cell_material)
-					{
-						weight += a.factions[f];
-						roughness += a.factions[f] *
-						             w->content.factions[f].cell_roughness;
-					}
-			if (weight > 0)
-			{
-				style[5] = roughness / weight;
-				style[6] = std::fmin(1.0f, weight);
-			}
 		}
 	for (uint32_t i = 0; i < p->organelles.size(); ++i)
 	{
