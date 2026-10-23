@@ -34,6 +34,9 @@ Enemy messages appear at the bottom right. Each faction has separate lines for f
 
 Performance: `python3 tests/e2e/performance.py build/windows-cross/nanovore.exe` runs the two perf scenes on `assets/levels/performance_battle.json`: 122 developed cells, storage 80% full so production continues, Immune and Fungus attacking the Virus-held center while Virus colonizes six neutral cells nearby, with sight and fog on. After 1,800 battle ticks it renders at maximum zoom-out and maximum zoom-in. It prints CPU cost per simulation tick by phase, and each F1 profiler span in ms and percent of frame. Logs, captures and `report.json` go to `build/performance/`.
 
+RenderDoc uses the native Linux headless target. Capture and replay are separate
+commands. The default profile uses application timers. See [BUILDING.md](BUILDING.md#native-render-profiling).
+
 The primary stress scene is `assets/levels/three_faction_stress.json`: five fully developed cells and 60 seconds of actual production per faction, with all armies and reinforcements ordered to the center. Preparation runs 3,600 normal production steps with full initial nutrient storage and no combat or unit expiry. The produced armies assemble at their front cells. Counts follow faction production; unit storage holds 4,096. Run it with `python3 scripts/proton_run.py build/windows-cross/nanovore.exe --world assets/levels/three_faction_stress.json`.
 
 C++ and Vulkan target Windows. Linux builds use MinGW, `glslc`, and an initialized Steam Proton 11 prefix:

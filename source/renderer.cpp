@@ -13,6 +13,9 @@
 #include "render_scene.h"
 #include "vector_math.h"
 #include "math_constants.h"
+#ifdef NANOVORE_RENDERDOC_CAPTURE
+#include "renderdoc_capture.h"
+#endif
 
 #include <algorithm>
 #include <assert.h>
@@ -2479,6 +2482,9 @@ bool renderer_initialize(Renderer* renderer, const RenderScene* scene, const Ren
         return false;
     RendererState* state = renderer->state;
     state->validation_failed.store(false);
+#ifdef NANOVORE_RENDERDOC_CAPTURE
+    if (!renderdoc_capture_initialize()) { renderer_shutdown(renderer);return false; }
+#endif
     state->config = *config;
     state->headless = headless;
     state->no_activate = no_activate;
@@ -2793,6 +2799,13 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
             return false;
     }
     phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_ACQUIRE,phase_start,phase_end);phase_start=phase_end;
+#ifdef NANOVORE_RENDERDOC_CAPTURE
+    if (renderdoc_capture_requested(renderer->scene_submissions+1))
+    {
+        // Start before command recording, after all earlier submissions finish.
+        if (!vk_ok(vkQueueWaitIdle(state->queue),"Wait before RenderDoc capture") || !renderdoc_capture_begin()) return false;
+    }
+#endif
     if (!begin_commands(state))
         return false;
     vkCmdResetQueryPool(state->command,state->queries,0,GPU_TIMESTAMP_COUNT);
@@ -3106,6 +3119,12 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
     // A capture reads this frame's readback, so it waits for every queued frame.
     if (capture_path && (!report_pending(state,renderer) || !capture_image(state, capture_path)))
         return false;
+#ifdef NANOVORE_RENDERDOC_CAPTURE
+    if (renderdoc_capture_active())
+    {
+        if (!vk_ok(vkQueueWaitIdle(state->queue),"Wait for RenderDoc capture") || !renderdoc_capture_end()) return false;
+    }
+#endif
     state->frame=(state->frame+1)%FRAMES_IN_FLIGHT;
     if (renderer->frame_log) fflush(stdout);
     phase_end=profiler_clock_ms();profiler_cpu(profile,PROFILE_CAPTURE,phase_start,phase_end);
@@ -3116,6 +3135,9 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera*
 
 bool renderer_shutdown(Renderer* renderer)
 {
+#ifdef NANOVORE_RENDERDOC_CAPTURE
+    renderdoc_capture_shutdown();
+#endif
     RendererState* state = renderer->state;
     if (!state)
         return true;

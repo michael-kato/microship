@@ -46,7 +46,7 @@ python3 scripts/proton_run.py build/windows-cross/nanovore.exe --world assets/le
 
 Per-frame diagnostic lines (`Scene time`, GPU stage times, `Application frame`) print only in bounded `--frames` runs. Interactive play writes startup lines only, so console output stays out of the frame.
 
-All checks use the real application. Short GPU checks keep native 1920×1080, default renderer sampling. Each ordinary process uses at most two frames and ten seconds, with thirty seconds per sequential batch. Longer startup and performance limits are described below. See [PROFILING.md](PROFILING.md) for commands and validation limits.
+All checks use the real application. GPU checks keep native 1920×1080 and default renderer sampling. There is no time limit per process or batch; pre-simulate as long as a check needs. See [PROFILING.md](PROFILING.md) for commands and validation limits.
 
 To record flight paths, run `python3 tests/e2e/navigation.py build/windows-cross/nanovore.exe --output build/navigation`. With Matplotlib installed, run `python3 scripts/plot_flight.py build/navigation/paths.json --output build/navigation/flight-paths.svg`. The plot joins measured half-second positions.
 
@@ -242,39 +242,83 @@ two were about 10.2 ms. Close-view mean image error was 0.111 RGB8 levels,
 with a maximum of 2. These short checks do not establish steady gameplay
 performance or a total frame time below 10 ms.
 
-## RenderDoc diagnosis
+## Native render profiling
 
-The local capture tool uses RenderDoc 1.44 from `/opt/renderdoc_1.44`.
-It needs its SDK header, `cc`, Vulkan headers, the existing Proton setup,
-and an available GPU. The small native Vulkan layer is a diagnostic tool;
-the game remains a Windows target. The tool creates a local layer manifest
-and does not change system Vulkan registration.
+Use the native Linux headless target for RenderDoc. The Windows game remains
+the interactive target. Keep native and Proton measurements separate.
 
-Prepare the close-view capture with:
+The old custom Vulkan layer for Proton capture is removed. Capture now uses
+the standard RenderDoc launcher and the application API at frame boundaries.
+It starts before command recording, after earlier submissions finish. It ends
+after the selected frame finishes. It captures frame two once.
+
+Build the diagnostic target:
 
 ```sh
-python3 scripts/renderdoc_profile.py build/windows-cross/nanovore.exe --output build/renderdoc-on
+cmake -S . -B build/linux_diagnostic -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DNANOVORE_NATIVE_DIAGNOSTIC=ON -DNANOVORE_RENDERDOC_CAPTURE=ON \
+  -DNANOVORE_RENDERDOC_INCLUDE_DIR=/opt/renderdoc_1.44/include
+cmake --build build/linux_diagnostic --parallel 6
 ```
 
-Add `--run` to start GPU work. The default uses native 1920 by 1080,
-six film samples, one volume ray and one backdrop query. It runs two game
-frames, captures the second headless frame, then runs one bounded replay
-process. Each process has a two-second limit; the batch has a five-second
-limit. Hardware tracing remains disabled. The user authorized RenderDoc
-for this diagnosis. Replay uses Khronos host validation; capture does not.
+Without `--run`, each command writes a plan and starts no GPU work. The default
+mode uses application timestamps. It does not load RenderDoc. The default
+config is `renderer.json`, with its normal sample count and native 1920x1080
+output. The native executable is `build/linux_diagnostic/nanovore`.
 
-Use `--sss off --output build/renderdoc-off --run` for the matching SSS-off
-case. When `subsurface.strength` is zero, built-in shaders now compile out
-SSS. The default keeps SSS enabled. External shaders keep their own
-specialization contract.
+Prepare the close battle profile:
 
-The output contains an `.rdc` capture, `report.json`, pipeline compiler
-reports, logs and the frozen scene inputs. Display images are also saved
-in `screenshots/`. The analysis identifies shader programs by captured
-SPIR-V hashes. It reports event duration and compute invocations, plus
-register counts and code statistics from
-`KHR_pipeline_executable_properties`. Compiler subgroup limits are not
-measured occupancy. This setup exposes no AMD hardware stall counters.
+```sh
+python3 scripts/renderdoc_profile.py --world assets/levels/performance_battle.json \
+  --ticks 1800 --output build/native_battle_timing
+```
+
+Add `--run` to run those application timings. Two frames are a short diagnostic;
+they do not establish sustained performance. The frame waits, captures and
+logging also affect application wall time.
+
+Prepare one RenderDoc capture:
+
+```sh
+python3 scripts/renderdoc_profile.py --mode capture \
+  --world assets/levels/performance_battle.json --ticks 1800 \
+  --output build/native_battle_capture
+```
+
+Add `--run` to launch the native executable through `renderdoccmd`. Capture
+does not start replay or counter collection. The plan and live log go to the
+output folder. Capture fails if the native executable lacks capture support.
+Windows executables are rejected before launch.
+
+Replay is a separate explicit command:
+
+```sh
+python3 scripts/renderdoc_profile.py --mode replay --capture-file /path/frame.rdc \
+  --output build/native_battle_replay
+```
+
+Add `--run` to open that capture for replay. GPU counters require `--counters`.
+Shader inspection requires `--compiler-statistics`. Both can cause more replay
+work. Unrequested counter times remain unknown in the report. Host validation
+requires `--validation`; leave it off for timings.
+
+The process timeout stops a process that does not finish. It cannot guarantee
+recovery from a GPU driver hang.
+
+The earlier capture attempts exhausted host memory. Each BLAS build declared
+the full shared vertex-buffer range. RenderDoc retained that input for each
+mesh. Commit `a46d261` limits each build to its mesh's vertices and uses local
+indices. The successful close battle capture is
+`build/zoomin_rdc/native_capture_capture.rdc`. Its memory-guard log records
+3.0 GB additional host memory and exit code zero. The separate replay also
+completed; its event and compiler reports are in `build/zoomin_rdc_analysis/`.
+
+Native and Windows builds, native CPU-only application startup, command
+preparation, Windows capture rejection, native GPU capture and separate
+replay passed. Capture and replay results apply to the build at `a46d261`;
+the later surface optimization uses ordinary application timing checks below.
+
+Historical measurements follow. They use the earlier capture path.
 
 In the earlier six-film close-view captures, the surface pass took
 20.252 ms with SSS and 15.205 ms with SSS compiled out. Volume took

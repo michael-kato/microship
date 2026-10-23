@@ -9,7 +9,10 @@ from pathlib import Path
 import renderdoc as rd
 
 out=Path(os.environ['NANOVORE_RENDERDOC_OUTPUT'])
-report={'capture':os.environ['NANOVORE_RENDERDOC_CAPTURE_FILE']}
+collect_counters=os.environ.get('NANOVORE_RENDERDOC_COUNTERS')=='1'
+inspect_compiler=os.environ.get('NANOVORE_RENDERDOC_COMPILER_STATISTICS')=='1'
+report={'capture':os.environ['NANOVORE_RENDERDOC_CAPTURE_FILE'],
+        'counters_requested':collect_counters,'compiler_statistics_requested':inspect_compiler}
 controller=None
 capture=None
 try:
@@ -18,7 +21,7 @@ try:
     report['open_file']=str(status)
     if status!=rd.ResultCode.Succeeded:raise RuntimeError(str(status))
     started=time.monotonic()
-    options=rd.ReplayOptions();options.apiValidation=True
+    options=rd.ReplayOptions();options.apiValidation=os.environ.get('NANOVORE_RENDERDOC_VALIDATION')=='1'
     status,controller=capture.OpenCapture(options,None)
     report['open_replay']=str(status)
     if status!=rd.ResultCode.Succeeded:raise RuntimeError(str(status))
@@ -29,17 +32,17 @@ try:
             actions.append(action)
             visit(action.children)
     visit(controller.GetRootActions())
-    counters=controller.EnumerateCounters()
+    counters=controller.EnumerateCounters() if collect_counters else []
     report['available_counters']=[]
     for counter in counters:
         description=controller.DescribeCounter(counter)
         report['available_counters'].append(dict(id=int(counter),name=description.name,
             description=description.description,type=str(description.resultType),unit=str(description.unit)))
-    if rd.GPUCounter.EventGPUDuration not in counters:
+    if collect_counters and rd.GPUCounter.EventGPUDuration not in counters:
         raise RuntimeError('Replay exposes no GPU duration counter')
     chosen=[c for c in (rd.GPUCounter.EventGPUDuration,rd.GPUCounter.CSInvocations) if c in counters]
     values={}
-    for result in controller.FetchCounters(chosen):
+    for result in (controller.FetchCounters(chosen) if collect_counters else []):
         value=result.value.d if result.counter==rd.GPUCounter.EventGPUDuration else result.value.u64
         values[(result.eventId,int(result.counter))]=value
     report['events']=[]
@@ -48,7 +51,7 @@ try:
         report['events'].append(dict(event=action.eventId,name=action.GetName(structured),
             dispatch=list(action.dispatchDimension),gpu_ms=duration*1000 if duration is not None else None,
             compute_invocations=values.get((action.eventId,int(rd.GPUCounter.CSInvocations)))))
-    report['event_duration_sum_ms']=sum(item['gpu_ms'] for item in report['events'] if item['gpu_ms'] is not None)
+    report['event_duration_sum_ms']=sum(item['gpu_ms'] for item in report['events'] if item['gpu_ms'] is not None) if collect_counters else None
     report['duration_event_count']=sum(item['gpu_ms'] is not None for item in report['events'])
     report['disassembly_targets']=list(controller.GetDisassemblyTargets(True))
     report['shaders']=[]
@@ -56,7 +59,7 @@ try:
     known={hashlib.sha256(p.read_bytes()).hexdigest():p.name for p in shader_folder.glob('*.spv')}
     # Identify the surface and volume programs by captured SPIR-V hashes.
     # Spatial-volume programs have different dispatch dimensions.
-    for action in actions:
+    for action in (actions if inspect_compiler else []):
         if not action.flags & rd.ActionFlags.Dispatch:continue
         controller.SetFrameEvent(action.eventId,False)
         pipeline=controller.GetPipelineState()
@@ -69,7 +72,7 @@ try:
         target='KHR_pipeline_executable_properties'
         if target in report['disassembly_targets']:
             text=controller.DisassembleShader(pipeline.GetComputePipelineObject(),reflection,target)
-            filename='shader-'+str(action.eventId)+'-driver.txt'
+            filename='shader_'+str(action.eventId)+'_driver.txt'
             (out/filename).write_text(text)
             record['driver_report']=filename
             record['compiler_statistics']={}
@@ -80,7 +83,7 @@ try:
     names={s['shader'] for s in report['shaders']}
     surface=bool(names&{'debug_guide_surface.comp.spv','debug_surface.comp.spv','ray_trace.comp.spv'})
     volume=bool(names&{'volume.comp.spv','debug_volume.comp.spv'}) or {'volume_coarse.comp.spv','volume_filter.comp.spv'}<=names
-    if not surface or not volume:raise RuntimeError('Could not identify the surface and volume programs')
+    if inspect_compiler and (not surface or not volume):raise RuntimeError('Could not identify the surface and volume programs')
     report['replay_analysis_seconds']=time.monotonic()-started
 except BaseException:
     report['error']=traceback.format_exc()

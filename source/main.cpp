@@ -80,6 +80,9 @@ static void print_usage(FILE* output)
         "Default: faction menu, then direct ray-traced Win32 window; Esc opens the pause menu; close exits.\n"
         "Headless/capture runs default to one frame. PFM saves linear HDR before bloom; PPM saves display RGB.\n"
         "--smoke runs asset loading and simulation lifecycle without a GPU.\n");
+#ifdef NANOVORE_RENDERDOC_CAPTURE
+    fprintf(output,"Native RenderDoc capture support: enabled.\n");
+#endif
 }
 
 static bool parse_real(const char* text, double* value)
