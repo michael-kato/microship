@@ -32,6 +32,8 @@ static const int MAX_GRADIENT_TOP_RADIANCE = 10000;
 static const int MAX_AMBIENT_RADIANCE = 10000;
 static const int MAX_RELIEF_FREQUENCY = 1000; // Features per object-space unit.
 static const int MAX_RELIEF_DEPTH = 4;         // Slope scale.
+static const int MAX_ELECTRON_SIGNAL = 16;
+static const int MAX_ELECTRON_EDGE = 64;
 static const int MAX_SPIKE_LENGTH = 2;
 static const int MAX_EFFECTS_POP_RADIUS = 100;
 static const int MAX_EFFECTS_POP_SECONDS = 2;
@@ -482,7 +484,7 @@ static bool load_appearance(World* w, const char* path, uint32_t seed)
 	Json electron = json_find(root, "electron_microscope");
 	if (json_present(electron))
 	{
-		json_object(electron, "relief");
+		json_object(electron, "relief|sheen|edge");
 		Json relief = json_get(electron, "relief");
 		json_object(relief, "domes|wrinkles|fuzz|crease_shadow");
 		const char* layers[] = {"domes", "wrinkles", "fuzz"};
@@ -496,6 +498,19 @@ static bool load_appearance(World* w, const char* path, uint32_t seed)
 			    json_float(json_get(layer, "depth"), 0, MAX_RELIEF_DEPTH);
 		}
 		w->relief[6] = json_float(json_get(relief, "crease_shadow"), 0, 1);
+		Json edge = json_get(electron, "edge");
+		json_object(edge, "signal|strength|power");
+		Color signal = json_color(json_get(edge, "signal"), MAX_ELECTRON_SIGNAL);
+		w->electron[0] = signal.r;
+		w->electron[1] = signal.g;
+		w->electron[2] = signal.b;
+		w->electron[3] =
+		    json_float(json_get(edge, "strength"), 0, MAX_ELECTRON_EDGE);
+		w->electron[4] = json_float(json_get(edge, "power"), .1f, 16);
+		Json sheen = json_get(electron, "sheen");
+		json_object(sheen, "strength|roughness");
+		w->electron[5] = json_float(json_get(sheen, "strength"), 0, 4);
+		w->electron[6] = json_float(json_get(sheen, "roughness"), .05f, 1);
 	}
 	w->factory_emission_fresnel[1] = 1;
 	Json factory = json_find(root, "factory_appearance");

@@ -163,6 +163,8 @@ struct World
 	// Electron microscope relief: dome frequency/depth, wrinkle
 	// frequency/depth, fuzz frequency/depth, crease shadow; zero depth: off.
 	float relief[8];
+	// Edge signal RGB and strength; edge power, sheen strength and roughness.
+	float electron[8];
 	float organelle_squash, organelle_period, membrane_ripple,
 	    membrane_wavelength, membrane_period, factory_sway, factory_period;
 	StudioLight studio[3];

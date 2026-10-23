@@ -112,6 +112,8 @@ void main()
         for (int i=0;i<3;++i) ambient+=render.studio_color[i].rgb*(STUDIO_AMBIENT_WEIGHT*max(0.0,dot(normal,render.studio_direction[i].xyz)));
         color+=pigment*shape*(render.backdrop_style.y*(VEIN_BASE_GLOW+vein*pulse*VEIN_PULSE_GLOW)*(SILHOUETTE_FADE_COSINE+FACING_GLOW_WEIGHT*facing)
             +ambient*render.backdrop_style.z);
+        // The scene's electron edge signal, scaled like the backdrop's ambient.
+        color+=pigment*render.electron[0].rgb*(render.backdrop_style.z*(1.0+render.electron[0].w*pow(1.0-facing,render.electron[1].x)));
     }
     imageStore(background_a,pixel,vec4(color,distance));
 }

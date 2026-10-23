@@ -462,9 +462,55 @@
           },
           "required": ["domes", "wrinkles", "fuzz", "crease_shadow"],
           "additionalProperties": false
+        },
+        "edge": {
+          "type": "object",
+          "description": "Secondary-electron signal on every camera-visible surface: signal * (1 + strength * (1 - n.v)^power), darkened in relief creases. It is not light and never bounces.",
+          "properties": {
+            "signal": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 16
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "strength": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 64
+            },
+            "power": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 16
+            }
+          },
+          "required": ["signal", "strength", "power"],
+          "additionalProperties": false
+        },
+        "sheen": {
+          "type": "object",
+          "description": "Fuzz lobe for studio lights (Charlie sheen); roughness widens it.",
+          "properties": {
+            "strength": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 4
+            },
+            "roughness": {
+              "type": "number",
+              "minimum": 0.05,
+              "maximum": 1
+            }
+          },
+          "required": ["strength", "roughness"],
+          "additionalProperties": false
         }
       },
-      "required": ["relief"],
+      "required": ["relief", "edge", "sheen"],
       "additionalProperties": false
     },
     "animation": {
