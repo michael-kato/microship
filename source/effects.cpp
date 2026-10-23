@@ -124,23 +124,6 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
     p.right=normalize(cross(p.forward,camera->up));p.up=cross(p.right,p.forward);
     p.cx=config->width*.5f;p.cy=config->height*.5f;p.pixels=config->height/(2*std::tan(config->vertical_fov_degrees*HALF_DEGREES_TO_RADIANS));
     const CombatVisuals* v=&s->world.combat;
-    for (uint32_t i=0;i<MAX_UNITS;++i)
-    {
-        const Unit* u=&s->units[i];const Trail* t=&s->trails[i];if (u->health<=0 || !simulation_unit_definition(s,u)->trails || !s->visible_units[i]) continue;
-        Vec3 origin=simulation_trail_origin(s,u),previous=origin;float total=0;
-        for (uint32_t j=0;j<t->count;++j)
-        { Vec3 d=subtract(t->points[j],previous);total+=std::sqrt(dot(d,d));previous=t->points[j]; }
-        float remaining=total*v->trail_length_scale,target=remaining;previous=origin;
-        for (uint32_t j=0;j<t->count && remaining>0;++j)
-        {
-            Vec3 delta=subtract(t->points[j],previous);float distance=std::sqrt(dot(delta,delta));
-            if (distance<=0) continue;
-            float used=std::fmin(remaining,distance),fade=(remaining-.5f*used)/target;
-            Vec3 end=add(previous,scale(delta,used/distance));
-            segment(output,count,p,previous,end,v->trail_width*fade,content_color(&s->world.content,u->faction),fade*.5f,0);
-            previous=end;remaining-=used;
-        }
-    }
     bool held[MAX_UNITS]={};
     for (uint32_t i=0;i<MAX_UNITS;++i)
         if (!s->units[i].latch_colony && simulation_attachment_valid(s,&s->units[i])) held[s->units[i].latch]=true;
@@ -226,6 +209,25 @@ bool effects_build(const Simulation* s,const Camera* camera,const RenderConfig* 
             Vec3 direction=add(scale(p.right,std::cos(angle)),scale(p.up,std::sin(angle)));
             segment(output,count,p,add(hit->position,scale(direction,radius*HIT_RAY_INNER_RADIUS_SCALE)),add(hit->position,scale(direction,radius)),
                 v->trail_width*HIT_RAY_WIDTH_SCALE,v->flash,(1-t)*(1-t),1);
+        }
+    }
+    // Trails fill the segment pool last, so a crowded late game drops trail
+    // segments rather than selection cues, target lines and combat effects.
+    for (uint32_t i=0;i<MAX_UNITS;++i)
+    {
+        const Unit* u=&s->units[i];const Trail* t=&s->trails[i];if (u->health<=0 || !simulation_unit_definition(s,u)->trails || !s->visible_units[i]) continue;
+        Vec3 origin=simulation_trail_origin(s,u),previous=origin;float total=0;
+        for (uint32_t j=0;j<t->count;++j)
+        { Vec3 d=subtract(t->points[j],previous);total+=std::sqrt(dot(d,d));previous=t->points[j]; }
+        float remaining=total*v->trail_length_scale,target=remaining;previous=origin;
+        for (uint32_t j=0;j<t->count && remaining>0;++j)
+        {
+            Vec3 delta=subtract(t->points[j],previous);float distance=std::sqrt(dot(delta,delta));
+            if (distance<=0) continue;
+            float used=std::fmin(remaining,distance),fade=(remaining-.5f*used)/target;
+            Vec3 end=add(previous,scale(delta,used/distance));
+            segment(output,count,p,previous,end,v->trail_width*fade,content_color(&s->world.content,u->faction),fade*.5f,0);
+            previous=end;remaining-=used;
         }
     }
     for (uint32_t i=0;i<*count;++i)
