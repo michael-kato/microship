@@ -173,7 +173,7 @@ struct World
 	                                   // reserved.
 	float organelle_style[4];          // Edge saturation/width, center emission
 	                                   // multiplier/power.
-	// Electron microscope relief: dome frequency/depth, wrinkle
+	// Electron microscope relief: lump frequency/depth, wrinkle
 	// frequency/depth, fuzz frequency/depth, crease shadow; zero depth: off.
 	float relief[8];
 	// Edge signal RGB and strength; edge power, sheen strength and roughness.

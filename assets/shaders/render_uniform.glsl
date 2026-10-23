@@ -33,7 +33,7 @@ layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
     vec4 cascade_interval; // First interval in probe spacings, interval growth per cascade.
     vec4 wireframe_line; // RGB edge color, W line width in pixels; zero W: normal shading.
     vec4 wireframe_fill; // RGB face and empty-space color.
-    vec4 relief[2]; // Object-space detail per unit length and slope depth: domes XY, wrinkles ZW; fuzz XY, crease shadow Z.
+    vec4 relief[2]; // Object-space detail per unit length and slope depth: lumps XY, wrinkles ZW; fuzz XY, crease shadow Z.
     vec4 electron[2]; // Edge signal RGB, edge strength; edge power, sheen strength, sheen roughness.
     vec4 colorize; // Pigment saturation scale; one keeps authored colors.
     vec4 wall_bleed; // Interior light shown through cell walls: strength, depth in world units.

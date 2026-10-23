@@ -503,9 +503,9 @@
       "properties": {
         "relief": {
           "type": "object",
-          "description": "Procedural object-space detail. Frequency: features per object-space unit; depth: slope scale, zero disables a layer. Layers fade out below a few pixels per feature.",
+          "description": "Procedural object-space detail. Frequency: features per object-space unit; depth: slope scale, zero disables a layer. Lumps are two smooth octaves, wrinkles a rounded ridge, fuzz three octaves (each twice the frequency, 0.7 of the slope). Layers fade out between 3 and 1 pixels per feature.",
           "properties": {
-            "domes": {
+            "lumps": {
               "type": "object",
               "properties": {
                 "frequency": {
@@ -562,7 +562,7 @@
               "maximum": 1
             }
           },
-          "required": ["domes", "wrinkles", "fuzz", "crease_shadow"],
+          "required": ["lumps", "wrinkles", "fuzz", "crease_shadow"],
           "additionalProperties": false
         },
         "edge": {

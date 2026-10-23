@@ -115,17 +115,17 @@
   },
   "electron_microscope": {
     "relief": {
-      "domes": {
-        "frequency": 7,
-        "depth": 0.35
+      "lumps": {
+        "frequency": 3,
+        "depth": 0.1
       },
       "wrinkles": {
         "frequency": 3,
-        "depth": 0.3
+        "depth": 0.1
       },
       "fuzz": {
-        "frequency": 40,
-        "depth": 0.25
+        "frequency": 120,
+        "depth": 0.8
       },
       "crease_shadow": 0.75
     },

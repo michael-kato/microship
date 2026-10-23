@@ -541,8 +541,8 @@ static bool load_appearance(World* w, const char* path, uint32_t seed)
 		json_object(electron, "relief|sheen|edge|saturation");
 		w->saturation = json_float(json_get(electron, "saturation"), 0, 4);
 		Json relief = json_get(electron, "relief");
-		json_object(relief, "domes|wrinkles|fuzz|crease_shadow");
-		const char* layers[] = {"domes", "wrinkles", "fuzz"};
+		json_object(relief, "lumps|wrinkles|fuzz|crease_shadow");
+		const char* layers[] = {"lumps", "wrinkles", "fuzz"};
 		for (uint32_t i = 0; i < 3; ++i)
 		{
 			Json layer = json_get(relief, layers[i]);

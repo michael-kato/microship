@@ -454,7 +454,7 @@ struct Surface
 
 // Procedural relief: fixed object-space height fields, so detail stays on
 // moving objects and every frame shades the same surface. Analytic gradients
-// tilt the shading normal; each layer fades out below a few pixels per feature.
+// tilt the shading normal; each layer fades out between 3 and 1 pixels per feature.
 uvec3 relief_hash(ivec3 cell)
 {
     // pcg3d (Jarzynski and Olano 2020).
@@ -479,48 +479,42 @@ vec4 gradient_noise(vec3 p)
     }
     return sum;
 }
-// Rounded cellular domes: height 1 at a jittered site, 0 where neighbors meet.
-vec4 cellular_domes(vec3 p)
-{
-    ivec3 base=ivec3(floor(p));vec3 f=fract(p);
-    float nearest=8.0;vec3 offset=vec3(0);
-    for (int k=0;k<27;++k)
-    {
-        ivec3 o=ivec3(k%3,(k/3)%3,k/9)-1;
-        vec3 d=vec3(o)+.15+.7*relief_random(base+o)-f;float d2=dot(d,d);
-        if (d2<nearest) { nearest=d2;offset=d; }
-    }
-    float open=max(0.0,1.0-nearest);
-    // h=open^2, so grad h = 2*open*grad(open) and grad(open) = 2*offset.
-    return vec4(open*open,4.0*open*offset);
-}
 // Layer weight from object-space wavelength over object-space pixel footprint;
 // zero depth disables the layer.
 float relief_detail(float frequency,float depth,float footprint)
-{ return depth>0.0 ? smoothstep(2.0,6.0,1.0/(frequency*footprint)) : 0.0; }
+{ return depth>0.0 ? smoothstep(1.0,3.0,1.0/(frequency*footprint)) : 0.0; }
+const uint RELIEF_FUZZ_OCTAVES=3u;
+const float RELIEF_FUZZ_GAIN=.7;      // Slope share of each finer octave.
+const float RELIEF_RIDGE_SOFTNESS=.01; // Rounds the wrinkle crease: |n| becomes sqrt(n^2+this).
 void apply_relief(inout Surface s,vec3 object_point,float instance_scale)
 {
     float footprint=length(s.point-render.camera_position.xyz)*2.0*render.display.y/float(render.settings.y)/instance_scale;
     vec4 layers=render.relief[0],fuzz=render.relief[1];
     vec3 slope=vec3(0);float cavity=1.0,crease=fuzz.z;
+    // Lumps: two smooth octaves, no creases; low ground is shaded.
     float w=relief_detail(layers.x,layers.y,footprint);
     if (w>0.0)
     {
-        vec4 dome=cellular_domes(object_point*layers.x);
-        slope+=w*layers.y*dome.yzw;cavity*=1.0-w*crease*(1.0-sqrt(dome.x));
+        vec4 n=gradient_noise(object_point*layers.x)+.5*gradient_noise(object_point*2.0*layers.x+5.0)*vec4(1,2,2,2);
+        slope+=w*layers.y*n.yzw;cavity*=1.0-w*crease*smoothstep(0.0,-.6,n.x);
     }
     w=relief_detail(layers.z,layers.w,footprint);
     if (w>0.0)
     {
-        // Ridged noise: sharp creases where the noise crosses zero.
+        // Ridged noise with a rounded crease where the noise crosses zero.
         vec4 n=gradient_noise(object_point*layers.z+17.0);
-        slope-=w*layers.w*sign(n.x)*n.yzw;cavity*=1.0-w*crease*.5*(1.0-smoothstep(0.0,.25,abs(n.x)));
+        float ridge=sqrt(n.x*n.x+RELIEF_RIDGE_SOFTNESS);
+        slope-=w*layers.w*(n.x/ridge)*n.yzw;cavity*=1.0-w*crease*.5*(1.0-smoothstep(0.0,.25,ridge));
     }
-    w=relief_detail(fuzz.x,fuzz.y,footprint);
-    if (w>0.0)
+    // Fuzz: octaves of fine noise, each fading out as it nears one pixel per feature.
+    float frequency=fuzz.x,depth=fuzz.y;
+    for (uint octave=0u;octave<RELIEF_FUZZ_OCTAVES;++octave)
     {
-        vec4 n=gradient_noise(object_point*fuzz.x+41.0);
-        slope+=w*fuzz.y*n.yzw;cavity*=1.0-w*crease*.4*smoothstep(0.0,-.5,n.x);
+        w=relief_detail(frequency,depth,footprint);
+        if (w<=0.0) break;
+        vec4 n=gradient_noise(object_point*frequency+41.0+float(octave)*13.0);
+        slope+=w*depth*n.yzw;cavity*=1.0-w*crease*.3*smoothstep(0.0,-.5,n.x);
+        frequency*=2.0;depth*=RELIEF_FUZZ_GAIN;
     }
     // Height gradients are covectors: they transform like normals; the scale keeps the slope.
     vec3 g=instance_scale*(hit_normal_to_world*slope);
