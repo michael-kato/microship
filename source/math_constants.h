@@ -1,7 +1,7 @@
 #ifndef NANOVORE_MATH_CONSTANTS_H
 #define NANOVORE_MATH_CONSTANTS_H
 
-static const float HALF_DEGREES_TO_RADIANS=.00872664626f;
-static const float DEGREES_TO_RADIANS=.01745329252f;
+static const float HALF_DEGREES_TO_RADIANS = .00872664626f;
+static const float DEGREES_TO_RADIANS = .01745329252f;
 
 #endif

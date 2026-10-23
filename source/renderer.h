@@ -1,10 +1,10 @@
 #ifndef NANOVORE_RENDERER_H
 #define NANOVORE_RENDERER_H
 
-#include <stdint.h>
+#include "../assets/shaders/hud_layout.glsl"
 #include "profiler.h"
 #include "render_features.h"
-#include "../assets/shaders/hud_layout.glsl"
+#include <stdint.h>
 
 struct RenderScene;
 struct RenderConfig;
@@ -16,35 +16,39 @@ struct Window;
 // One concrete Vulkan backend; the state owns resources allocated at startup.
 struct Renderer
 {
-    RendererState* state;
-    Profiler profiler;
-    bool running;
-    uint32_t scene_submissions;
-    bool debug_stats;
-    bool frame_log; // Per-frame diagnostic lines, only for bounded --frames runs.
-    bool debug_views;
+	RendererState* state;
+	Profiler profiler;
+	bool running;
+	uint32_t scene_submissions;
+	bool debug_stats;
+	bool frame_log; // Per-frame diagnostic lines, only for bounded --frames
+	                // runs.
+	bool debug_views;
 #ifdef DEVELOPMENT
-    bool wireframe; // F3: triangle edges instead of lighting.
+	bool wireframe; // F3: triangle edges instead of lighting.
 #endif
-    uint32_t disabled_features,available_features;
-    double previous_frame_ms;
-    double gpu_frame_ms, work_frame_ms, acquire_ms, present_ms;
-    bool overlay_enabled;
-    uint32_t notice_mask; // Bit zero: dialogue; bits one through three: alert tiles.
-    char hud[HUD_TEXT_LINES][HUD_LINE_CAPACITY];
-    int32_t selection_box[4];
-    int32_t selection_marker[4];
-    int32_t hover_marker[4];
-    float hud_status[4],hud_accent[4],hud_feedback[4];
+	uint32_t disabled_features, available_features;
+	double previous_frame_ms;
+	double gpu_frame_ms, work_frame_ms, acquire_ms, present_ms;
+	bool overlay_enabled;
+	uint32_t
+	    notice_mask; // Bit zero: dialogue; bits one through three: alert tiles.
+	char hud[HUD_TEXT_LINES][HUD_LINE_CAPACITY];
+	int32_t selection_box[4];
+	int32_t selection_marker[4];
+	int32_t hover_marker[4];
+	float hud_status[4], hud_accent[4], hud_feedback[4];
 };
 
 bool renderer_initialize(Renderer* renderer, const RenderScene* scene,
-                         const RenderConfig* config, const char* shader_path, const char* builtin_shader_path,
-                         bool headless, bool debug_views, bool no_activate);
+                         const RenderConfig* config, const char* shader_path,
+                         const char* builtin_shader_path, bool headless,
+                         bool debug_views, bool no_activate);
 Window* renderer_window(Renderer*);
 bool renderer_poll(Renderer* renderer, PointerInput* input);
 void renderer_toggle_features(Renderer* renderer, uint32_t mask);
-bool renderer_render(Renderer* renderer, const RenderScene* scene, const Camera* camera, const char* capture_path);
+bool renderer_render(Renderer* renderer, const RenderScene* scene,
+                     const Camera* camera, const char* capture_path);
 bool renderer_shutdown(Renderer* renderer);
 
 #endif
