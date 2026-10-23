@@ -76,6 +76,7 @@
     "surface_minimum_pixels": 2,
     "surface_full_pixels": 8,
     "cell_minimum_pixels": 40,
-    "cell_full_pixels": 90
+    "cell_full_pixels": 90,
+    "animation_margin": 12
   }
 }

@@ -979,11 +979,6 @@ static void update_grid_activity(RendererState* state)
 
 // Screen-space level of detail. Smooth ramps of the projected radius keep shading
 // continuous while zooming; the fog reveal is the current fog pass visibility.
-static float detail_ramp(float pixels,float minimum,float full)
-{
-    if (full<=0) return 1;
-    float t=std::fmin(1.0f,std::fmax(0.0f,(pixels-minimum)/(full-minimum)));return t*t*(3-2*t);
-}
 static float projected_radius(const RenderUniform& u,const float center[3],float radius)
 {
     float z=0;for (uint32_t j=0;j<3;++j) z+=(center[j]-u.camera_position[j])*u.camera_forward[j];

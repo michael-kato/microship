@@ -10,6 +10,14 @@ struct RenderConfig;
 struct MembraneVertex { uint32_t index,group;GpuVertex neutral;Vec3 displacement[MAX_FACTIONS]; };
 struct CellMembrane { uint32_t body,first,count,first_group,group_count;float weights[MAX_FACTIONS]; };
 struct OrganellePose { uint32_t body,mesh;Vec3 pivot; };
+// The current view for animation and level of detail. Disabled: everything animates at full detail.
+struct ViewDetail
+{
+    Vec3 position,forward,right,up;
+    float tan_x,tan_y,pixels_per_tan,margin;
+    float surface_minimum,surface_full,cell_minimum; // Level-of-detail radii in pixels.
+    bool enabled;
+};
 struct Presentation
 {
     RenderScene scene;
@@ -29,6 +37,9 @@ struct Presentation
     uint32_t attached_spikes,flying_spikes,embedded_spikes;
     uint32_t attached_used,embedded_used; // Slots written from each spike cursor's base this frame.
     std::vector<RenderRange> previous_ranges; // Cleared before the next build.
+    ViewDetail view;
+    bool colony_animated[MAX_BODIES]; // Factories near the view sway; the others hold their rest pose.
+    uint32_t span_step[MAX_BODIES]; // Factory curve spans per drawn stem: 1 near, several when the cell is small.
 };
 bool presentation_initialize(Presentation*,const Simulation*,const RenderConfig*);
 bool presentation_build(Presentation*,const Simulation*,const Camera*,const RenderConfig*);

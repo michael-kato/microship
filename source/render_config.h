@@ -43,11 +43,18 @@ struct RenderConfig
     // Screen-space level of detail: projected radius in pixels where a feature starts
     // to fade in and where it is complete. Zero full radius: always full detail.
     float detail_surface_minimum,detail_surface_full,detail_cell_minimum,detail_cell_full;
+    float animation_margin; // World units around the view within which factories animate.
     // Development wireframe view (F3). Zero line width: no wireframe section.
     Color wireframe_line,wireframe_fill;float wireframe_pixels;
 };
 
 const char* render_config_error(const RenderConfig*);
+// Smooth level-of-detail weight of a projected radius in pixels; no full radius means full detail.
+inline float detail_ramp(float pixels,float minimum,float full)
+{
+    if (full<=0) return 1;
+    float t=(pixels-minimum)/(full-minimum);t=t<0 ? 0 : t>1 ? 1 : t;return t*t*(3-2*t);
+}
 bool render_config_load(RenderConfig* config, const char* path);
 
 #endif

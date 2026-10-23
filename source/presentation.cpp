@@ -7,6 +7,7 @@
 #include "math_constants.h"
 #include "factory_shape.h"
 #include <string.h>
+#include <float.h>
 #include <stdio.h>
 #include <new>
 #include <algorithm>
@@ -32,6 +33,7 @@ static const float MIN_VISIBLE_STEM_EXTENSION = .0001f;
 static const float FACTORY_AXIS_PARALLEL_LIMIT = .9f;
 static const float BUD_START_SCALE = .08f;
 static const float BUD_GROWTH_SCALE = .92f;
+static const uint32_t FAR_SPAN_STEP = 4; // Curve spans merged per stem instance below the cell detail radius.
 
 static void factory_length_color(const ProducerDefinition& definition,float distance,float* style)
 {
@@ -239,6 +241,51 @@ static uint32_t bud_slot(const Presentation* state,uint32_t cell,uint32_t struct
 { return state->bud_base+state->structure_first[cell]+structure; }
 static uint32_t structure_spike_slot(const Presentation* state,uint32_t cell,uint32_t structure,uint32_t spike)
 { return state->structure_embedded_base+(state->structure_first[cell]+structure)*MAX_EMBEDDED+spike; }
+static ViewDetail view_detail(const Camera* camera,const RenderConfig* config)
+{
+    ViewDetail v={};v.enabled=config->animation_margin>0;v.margin=config->animation_margin;
+    v.position=camera->position;v.forward=normalize(subtract(camera->target,camera->position));
+    v.right=normalize(cross(v.forward,camera->up));v.up=cross(v.right,v.forward);
+    v.tan_y=std::tan(config->vertical_fov_degrees*DEGREES_TO_RADIANS*.5f);v.tan_x=v.tan_y*config->width/config->height;
+    v.pixels_per_tan=.5f*config->height/v.tan_y;
+    v.surface_minimum=config->detail_surface_minimum;v.surface_full=config->detail_surface_full;v.cell_minimum=config->detail_cell_minimum;
+    return v;
+}
+// A sphere widened by the margin touches the view frustum. Ray tracing still needs
+// off-screen geometry for shadows and cascades, so this only gates animation.
+static bool in_view(const ViewDetail& v,Vec3 center,float radius)
+{
+    if (!v.enabled) return true;
+    Vec3 d=subtract(center,v.position);float z=dot(d,v.forward),r=radius+v.margin;
+    if (z+r<=0) return false;
+    return std::fabs(dot(d,v.right))<=z*v.tan_x+r*std::sqrt(1+v.tan_x*v.tan_x)
+        && std::fabs(dot(d,v.up))<=z*v.tan_y+r*std::sqrt(1+v.tan_y*v.tan_y);
+}
+static float view_pixels(const ViewDetail& v,Vec3 center,float radius)
+{
+    float z=dot(subtract(center,v.position),v.forward);
+    return z<=radius ? FLT_MAX : radius/z*v.pixels_per_tan;
+}
+// Factories of a cell lie within its radius and the reach of every stem tip and head.
+static void update_view(Presentation* p,const Simulation* s,const Camera* camera,const RenderConfig* config)
+{
+    p->view=view_detail(camera,config);
+    for (uint32_t b=0;b<s->world.body_count;++b)
+    {
+        const Colony& c=s->colonies[b];const Body& body=s->world.bodies[b];float reach=body.radius;
+        if (c.active && s->world.gameplay.enabled)
+        {
+            const ProducerDefinition& d=*simulation_producer_definition(s,b);
+            for (uint32_t k=0;k<c.structure_count;++k)
+            {
+                Vec3 tip=subtract(c.paths[k][GROWTH_PATH_SEGMENTS],body.position);
+                reach=std::max(reach,std::sqrt(dot(tip,tip))+d.width);
+            }
+        }
+        p->colony_animated[b]=in_view(p->view,body.position,reach);
+        p->span_step[b]=p->view.enabled && view_pixels(p->view,body.position,body.radius)<p->view.cell_minimum ? FAR_SPAN_STEP : 1;
+    }
+}
 static float craft_flags(const UnitDefinition& definition)
 { return (float)(INSTANCE_DETAIL_AMBIENT | (definition.subsurface ? 0 : INSTANCE_NO_SUBSURFACE)); }
 static void spike_instance(Presentation* state,uint32_t slot,Vec3 root,Vec3 direction,float length,float width,Color color)
@@ -258,12 +305,15 @@ static void update_spike_instances(Presentation* state,const Simulation* simulat
     for (uint32_t i=0;i<MAX_UNITS;++i)
     {
         const Unit* u=&s->units[i];if (u->health<=0 || !s->visible_units[i]) continue;
-        float size=simulation_unit_scale(s,u);Vec3 x,y,z;unit_pose_axes(s,u,&x,&y,&z);
+        float size=simulation_unit_scale(s,u);
+        // Spikes shrink away on craft too small on screen to show them.
+        float spike_detail=state->view.enabled ? detail_ramp(view_pixels(state->view,u->position,size),state->view.surface_minimum,state->view.surface_full) : 1;
+        Vec3 x,y,z;unit_pose_axes(s,u,&x,&y,&z);
         Color color=u->flash>0 ? s->world.combat.flash : u->wounds ? r->injury[std::min(1u,u->wounds-1)] : content_color(&s->world.content,u->faction);
         if (simulation_unit_definition(s,u)->detaches)
             for (uint32_t j=0;j<r->count;++j)
             {
-                float growth=u->spikes[j];if (growth<=MIN_VISIBLE_SPIKE_GROWTH || attached==attached_end) continue;
+                float growth=u->spikes[j]*spike_detail;if (growth<=MIN_VISIBLE_SPIKE_GROWTH || attached==attached_end) continue;
                 Vec3 local=simulation_spike_direction(j,r->count);
                 local=Vec3{local.x*r->attached_scale.x,local.y*r->attached_scale.y,local.z*r->attached_scale.z};
                 Vec3 dir=posed_direction(local,x,y,z);float stretch=std::sqrt(dot(dir,dir));
@@ -356,7 +406,7 @@ static void animate_factories(Presentation* p,const Simulation* s)
     for (uint32_t body=0;body<s->world.body_count;++body)
     {
         const Colony& colony=s->colonies[body];
-        if (!colony.active || !s->visible_bodies[body] || !simulation_producer_definition(s,body)->segment_path[0]) continue;
+        if (!colony.active || !s->visible_bodies[body] || !p->colony_animated[body] || !simulation_producer_definition(s,body)->segment_path[0]) continue;
         for (uint32_t k=0;k<colony.structure_count;++k)
         {
             uint32_t root=k;while (colony.parents[root]>=0) root=(uint32_t)colony.parents[root];
@@ -367,7 +417,7 @@ static void animate_factories(Presentation* p,const Simulation* s)
             float angle=s->world.factory_sway*(motion.enabled ? motion.factory_amount : 1)*(float)std::sin(phase),sine=std::sin(angle),cosine=std::cos(angle);
             Vec3 pivot=colony.stems[root][0];
             sway_factory_instance(p,factory_instance_slot(p,body,k),pivot,sine,cosine);
-            for (uint32_t j=0;j<GROWTH_PATH_SEGMENTS;++j) sway_factory_instance(p,stem_slot(p,body,k,j),pivot,sine,cosine);
+            for (uint32_t j=0;j<GROWTH_PATH_SEGMENTS;j+=p->span_step[body]) sway_factory_instance(p,stem_slot(p,body,k,j),pivot,sine,cosine);
             sway_factory_instance(p,bud_slot(p,body,k),pivot,sine,cosine);
             if (s->world.spikes.enabled) for (uint32_t j=0;j<MAX_EMBEDDED;++j)
                 sway_factory_instance(p,structure_spike_slot(p,body,k,j),pivot,sine,cosine);
@@ -427,14 +477,16 @@ static void update_gameplay_instances(Presentation* state,const Simulation* simu
                     fork_distance[k]=distance;
                     float growth=simulation_structure_growth(s,p,k);
                     if (growth*GROWTH_PATH_SEGMENTS<=MIN_VISIBLE_STEM_EXTENSION) continue;
-                    for (uint32_t j=0;j<GROWTH_PATH_SEGMENTS;++j)
+                    // Small cells merge consecutive curve spans into one longer stem instance.
+                    uint32_t step=state->span_step[p];
+                    for (uint32_t j=0;j<GROWTH_PATH_SEGMENTS;j+=step)
                     {
-                        float extension=std::fmax(0.0f,std::fmin(1.0f,growth*GROWTH_PATH_SEGMENTS-j));
+                        float extension=std::fmax(0.0f,std::fmin(1.0f,(growth*GROWTH_PATH_SEGMENTS-j)/step));
                         if (extension<=MIN_VISIBLE_STEM_EXTENSION) continue;
-                        Vec3 start=colony->paths[k][j],delta=scale(subtract(colony->paths[k][j+1],start),extension);
+                        Vec3 start=colony->paths[k][j],delta=scale(subtract(colony->paths[k][j+step],start),extension);
                         float span_length=definition->length_color_distance>0 ? std::sqrt(dot(delta,delta)) : 0;
                         Vec3 y=normalize(delta),x=normalize(cross(std::fabs(y.z)<FACTORY_AXIS_PARALLEL_LIMIT ? Vec3{0,0,1} : Vec3{1,0,0},y)),z=cross(x,y);
-                        float width=simulation_structure_stem_width(s,p,k,j,growth);
+                        float width=simulation_structure_stem_width(s,p,k,j+step/2,growth);
                         uint32_t slot=stem_slot(state,p,k,j);
                         Vec3 axis=delta,origin=start;
                         if (definition->rounded_stem)
@@ -558,6 +610,7 @@ bool presentation_build(Presentation* p,const Simulation* s,const Camera* camera
 {
     RenderScene* scene=&p->scene;const World* w=&s->world;
     if (!presentation_update_membranes(p,s)) return false;
+    update_view(p,s,camera,config);
     scene->membrane_ripple[0]=w->membrane_ripple;scene->membrane_ripple[1]=(float)(FULL_TURN_RADIANS/w->membrane_wavelength);
     scene->membrane_ripple[2]=(float)(std::fmod(s->time_seconds/w->membrane_period,1.0)*FULL_TURN_RADIANS);
     scene->sight_count=0;scene->fog_blur=w->sight_radius>0 ? w->fog_blur : 0;

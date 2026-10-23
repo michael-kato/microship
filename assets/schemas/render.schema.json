@@ -371,7 +371,7 @@
     },
     "level_of_detail": {
       "type": "object",
-      "description": "Screen-space level of detail: projected radius in pixels where a feature starts to fade in and where it is complete.",
+      "description": "Screen-space level of detail: projected radius in pixels where a feature starts to fade in and where it is complete, and the margin for animating factories.",
       "properties": {
         "surface_minimum_pixels": {
           "type": "number",
@@ -392,13 +392,20 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 4096
+        },
+        "animation_margin": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "description": "World units around the view within which factories animate; farther factories hold their rest pose."
         }
       },
       "required": [
         "surface_minimum_pixels",
         "surface_full_pixels",
         "cell_minimum_pixels",
-        "cell_full_pixels"
+        "cell_full_pixels",
+        "animation_margin"
       ],
       "additionalProperties": false
     }

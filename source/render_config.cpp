@@ -6,6 +6,7 @@
 
 static const double MAX_WIREFRAME_RADIANCE=16;
 static const double MAX_DETAIL_PIXELS=4096;
+static const double MAX_ANIMATION_MARGIN=1000;
 static const int MAX_CAMERA_KEYBOARD_SPEED = 1000;
 static const int MAX_BLOOM_THRESHOLD = 1000000;
 static const int MAX_BLOOM_RADIUS = 64;
@@ -211,11 +212,12 @@ bool render_config_load(RenderConfig* config,const char* path)
     Json detail=json_find(root,"level_of_detail");
     if (json_present(detail))
     {
-        json_object(detail,"surface_minimum_pixels|surface_full_pixels|cell_minimum_pixels|cell_full_pixels");
+        json_object(detail,"surface_minimum_pixels|surface_full_pixels|cell_minimum_pixels|cell_full_pixels|animation_margin");
         loaded.detail_surface_minimum=json_float(json_get(detail,"surface_minimum_pixels"),0,MAX_DETAIL_PIXELS);
         loaded.detail_surface_full=json_positive(json_get(detail,"surface_full_pixels"),MAX_DETAIL_PIXELS);
         loaded.detail_cell_minimum=json_float(json_get(detail,"cell_minimum_pixels"),0,MAX_DETAIL_PIXELS);
         loaded.detail_cell_full=json_positive(json_get(detail,"cell_full_pixels"),MAX_DETAIL_PIXELS);
+        loaded.animation_margin=json_positive(json_get(detail,"animation_margin"),MAX_ANIMATION_MARGIN);
         if (loaded.detail_surface_minimum>=loaded.detail_surface_full || loaded.detail_cell_minimum>=loaded.detail_cell_full)
             json_error(detail,"each minimum radius must be below its full radius");
     }
