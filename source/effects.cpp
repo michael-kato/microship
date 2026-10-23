@@ -11,7 +11,9 @@
 static const float EFFECT_NEAR_CLIP_DISTANCE = .1f;
 static const float MIN_TRAIL_SEGMENT_SQUARED_LENGTH = .000001f;
 static const float MIN_EFFECT_RADIUS_PIXELS = .65f;
-static const float SELECTION_CUE_ALPHA = .45f;
+static const float SELECTION_CUE_ALPHA = .85f;
+// Selection rings stay readable when the craft itself is a pixel or less.
+static const float MIN_SELECTION_RADIUS_PIXELS = 5;
 static const float BLAST_CORE_RADIUS_SCALE = .18f;
 static const int BLAST_RING_SEGMENTS = 16;
 static const float FULL_TURN_RADIANS = 6.2831853f;
@@ -55,7 +57,7 @@ static void segment(EffectSegment* output,uint32_t* count,const Projection& p,Ve
         if (to<near) b=add(a,scale(subtract(b,a),(from-near)/(from-to)));
     }
     EffectSegment e={};if (!project(p,a,e.start) || !project(p,b,e.end)) return;
-    e.start[3]=std::fmax(MIN_EFFECT_RADIUS_PIXELS,e.start[3]*width);e.end[3]=(float)kind;
+    e.start[3]=std::fmax(kind==3 ? MIN_SELECTION_RADIUS_PIXELS : MIN_EFFECT_RADIUS_PIXELS,e.start[3]*width);e.end[3]=(float)kind;
     e.color[0]=color.r;e.color[1]=color.g;e.color[2]=color.b;e.color[3]=alpha;
     output[(*count)++]=e;
 }

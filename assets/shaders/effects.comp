@@ -20,6 +20,7 @@ const float MEMBRANE_EFFECT_TRANSMISSION = .35;
 const float BURST_LIGHT_GAIN = 4.0;
 const float BURST_HALO_GAIN = .25;
 const float RING_LIGHT_GAIN = 3.5;
+const float SELECTION_LIGHT_GAIN = 1.6;
 const float TRAIL_LIGHT_GAIN = 1.5;
 const float BURST_HALO_VARIANCE_SCALE = 3.0;
 
@@ -53,7 +54,8 @@ void main()
         else if (s.b.w>RING_KIND_LOWER_BOUND && s.b.w<RING_KIND_UPPER_BOUND)
         {
             float ring=abs(distance-s.a.w*(s.b.w>SELECTION_KIND_LOWER_BOUND ? 1.0 : BLAST_RING_RADIUS_SCALE));
-            alpha=exp(-ring*ring/2.0)*clamp(1.0-distance/max(s.a.w,1.0),0.0,1.0)*RING_LIGHT_GAIN;
+            // Blast rings fade toward their edge; selection rings keep their full line.
+            alpha=exp(-ring*ring/2.0)*(s.b.w>SELECTION_KIND_LOWER_BOUND ? SELECTION_LIGHT_GAIN : clamp(1.0-distance/max(s.a.w,1.0),0.0,1.0)*RING_LIGHT_GAIN);
         }
         else alpha=clamp((s.a.w+EDGE_FEATHER_PIXELS-distance)/EDGE_FEATHER_WIDTH_PIXELS,0.0,1.0);
         float depth=mix(s.a.z,s.b.z,t);
