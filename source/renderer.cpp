@@ -4453,10 +4453,8 @@ bool renderer_render(Renderer* renderer, const RenderScene* scene,
 	uniform->subsurface[0] = renderer->disabled_features & RENDER_SSS
 	                             ? 0.0f
 	                             : state->config.subsurface_strength;
-	// Focus on the camera target: the map plane point the view orbits.
-	uniform->depth_of_field[0] =
-	    std::sqrt(dot(subtract(camera->target, camera->position),
-	                  subtract(camera->target, camera->position)));
+	// Keep the authored level plane in focus when camera input moves its target.
+	uniform->depth_of_field[0] = state->config.camera_target.z;
 	uniform->depth_of_field[3] =
 	    renderer->disabled_features & RENDER_DEPTH_OF_FIELD ||
 	            state->config.focus_blur_scale <= 0

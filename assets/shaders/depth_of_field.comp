@@ -17,9 +17,18 @@ const float GOLDEN_ANGLE=2.39996322972865332;
 // Tap k sits at radius sqrt(1+2*SPIRAL_STEP*k) pixels: equal area per tap, the
 // first one pixel out, about radius^2/(2*step) taps to the maximum radius.
 const float SPIRAL_STEP=2.0;
-// Relative depth error 1 - focus/distance: negative in front of the focus,
-// below one behind it, and increasing with distance, so it also orders depth.
-float depth_error(float distance) { return 1.0-render.depth_of_field.x/max(distance,1e-6); }
+// Intersect each camera ray with the horizontal focus plane.
+float depth_error(float distance,ivec2 pixel)
+{
+    vec2 film=(vec2(pixel)+.5)/vec2(focus.extent);
+    vec2 ndc=vec2(2.0*film.x-1.0,1.0-2.0*film.y);
+    vec3 direction=normalize(render.camera_forward.xyz+
+        render.camera_right.xyz*(ndc.x*render.display.y*render.display.z)+
+        render.camera_up.xyz*(ndc.y*render.display.y));
+    float height=distance*direction.z;
+    float plane=render.depth_of_field.x-render.camera_position.z;
+    return abs(height)>1e-6 && height*plane>0.0 ? 1.0-plane/height : 1.0;
+}
 // Blur radius in pixels. Relative to the focus distance, so every zoom keeps the same look.
 float blur_radius(float error)
 { return min(render.depth_of_field.w,render.depth_of_field.z*max(0.0,abs(error)-render.depth_of_field.y)); }
@@ -39,13 +48,32 @@ void main()
     {
         if (inside)
         {
-            float error=depth_error(exp2(guides[pixel.y*focus.extent.x+pixel.x].z)-1.0);
+            float error=depth_error(exp2(guides[pixel.y*focus.extent.x+pixel.x].z)-1.0,pixel);
             imageStore(scratch,pixel,vec4(imageLoad(beauty,pixel).rgb,error));
             atomicMax(tile_radius,floatBitsToUint(blur_radius(error)));
         }
         barrier();
         ivec2 first=ivec2(gl_WorkGroupID.xy)*COMPUTE_GROUP_SIZE;
         if (gl_LocalInvocationIndex==0u) guides[first.y*focus.extent.x+first.x].w=uintBitsToFloat(tile_radius);
+        return;
+    }
+    // Small radii use a symmetric footprint; the spiral has too few taps here.
+    if (render.depth_of_field.w<=1.5)
+    {
+        if (!inside) return;
+        vec4 center=imageLoad(scratch,pixel);
+        float center_radius=blur_radius(center.a),weights=1.0;
+        vec3 sum=center.rgb;
+        for (int y=-1;y<=1;++y) for (int x=-1;x<=1;++x)
+        {
+            if (x==0 && y==0) continue;
+            vec4 tap=imageLoad(scratch,clamp(pixel+ivec2(x,y),ivec2(0),focus.extent-1));
+            float size=blur_radius(tap.a),distance=length(vec2(x,y));
+            if (tap.a>center.a) size=min(size,2.0*center_radius);
+            float weight=.5*smoothstep(distance-.5,distance+.5,size);
+            sum+=weight*tap.rgb;weights+=weight;
+        }
+        imageStore(beauty,pixel,vec4(sum/weights,1));
         return;
     }
     // Taps farther than every blur radius in reach cannot count, so the spiral stops there.

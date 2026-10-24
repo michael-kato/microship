@@ -53,9 +53,9 @@
     "spatial_stride": 4
   },
   "depth_of_field": {
-    "focus_range": 0.02,
-    "blur_scale": 60,
-    "max_radius": 24
+    "focus_range": 0.05,
+    "blur_scale": 0.5,
+    "max_radius": 1.5
   },
   "subsurface": {
     "strength": 1,

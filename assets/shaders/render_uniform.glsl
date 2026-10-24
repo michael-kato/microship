@@ -21,7 +21,7 @@ layout(set = 0, binding = RENDER_BINDING_UNIFORM, std140) uniform RenderUniform
     vec4 fog; // Blur radius in pixels, sight feather in world units, map plane Z.
     vec4 fog_tint;
     vec4 membrane_fade; // Unused XYZ, surface emission enabled.
-    vec4 depth_of_field; // Focus distance, sharp relative depth range, pixels per relative depth, maximum pixel radius.
+    vec4 depth_of_field; // Focus plane world Z, sharp relative depth range, pixels per relative depth, maximum pixel radius.
     vec4 subsurface; // Global weight, diffuse wrap, transmission budget, thin-wall thickness.
     uvec4 subsurface_quality; // Number of existing film samples used for thickness transport.
     vec4 fog_grid; // World origin XY, grid spacing, side length.

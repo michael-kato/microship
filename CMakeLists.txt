@@ -294,6 +294,10 @@ endforeach()
 
 option(NANOVORE_GPU_TESTS "Run real hardware Vulkan E2E scenarios (explicit opt-in)" OFF)
 if(NANOVORE_GPU_TESTS)
+    add_test(NAME depth_of_field_render COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/depth_of_field_render.py $<TARGET_FILE:nanovore>
+        --output "${CMAKE_CURRENT_BINARY_DIR}/depth_of_field" --run)
+    set_tests_properties(depth_of_field_render PROPERTIES TIMEOUT 0 LABELS gpu RUN_SERIAL TRUE)
     add_test(NAME map_render COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/map_render.py $<TARGET_FILE:nanovore>
         --output "${CMAKE_CURRENT_BINARY_DIR}/map_render" --run)

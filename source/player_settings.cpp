@@ -20,12 +20,12 @@ static const double UNIT[] = {0, .1, .2, .25, .35, .5, .65, .75, .85, 1};
 static const double GRID[] = {0, 8, 16, 24, 32, 48, 64};
 static const double STEPS[] = {2, 3, 4, 8, 12, 16, 24, 32, 48, 64};
 static const double STRIDE[] = {2, 4};
-static const double RADIUS[] = {0, 1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64};
+static const double RADIUS[] = {0, .5, 1, 1.5, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64};
 static const double BLOOM_RADIUS[] = {1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64};
 static const double THRESHOLD[] = {0, .1, .25, .5, .55, .75, 1, 1.5, 2, 4};
 static const double THICKNESS[] = {.01, .04, .08, .12, .16, .24, .32, .5, 1};
 static const double FOCUS_RANGE[] = {0, .01, .02, .03, .05, .1, .2};
-static const double BLUR_SCALE[] = {0, 15, 30, 45, 60, 90, 120, 200};
+static const double BLUR_SCALE[] = {0, .25, .5, .75, 1, 2, 4, 8, 15, 30, 45, 60, 90, 120, 200};
 static const double SPEED[] = {0, 6, 12, 18, 24, 36, 48, 72, 96, 128};
 static const double SENSITIVITY[] = {.25, .5, .75, 1, 1.25, 1.5, 2, 3, 4};
 

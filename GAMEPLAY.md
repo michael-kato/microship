@@ -84,7 +84,7 @@ Edit `thin_surface.edge_fade` in `assets/presentation/scene.json`. Set `strength
 
 Cell scattering is RGB 0.10/0.075/0.085, with absorption 0.018. The camera focus filter controls depth of field.
 
-A miniature focus band keeps the middle of the view sharp and softens its upper and lower areas. The render file's `tilt_shift` object sets the band center, half width, falloff, and maximum blur radius. The HUD is drawn after both filters. Maximum camera distance is 180, up from 38; the view can cover 4.7 times the previous map width. Organelle vertex colors distinguish the purple nucleus, orange mitochondria, blue reticulum, and varied vesicles. Faction color changes affect the membrane.
+Depth of field stays focused on the horizontal plane at the authored `camera.target` height. Zoom and pan do not move this plane. Each pixel uses its own camera ray to find the plane, so cells at the screen edge stay in focus. The default sharp range is 0.05, blur strength is 0.5, and maximum radius is 1.5 native pixels. A symmetric 3x3 filter keeps this small blur even in every direction. The HUD is drawn after the filter. Camera distance ranges from 8 to 600. Organelle vertex colors distinguish the purple nucleus, orange mitochondria, blue reticulum, and varied vesicles. Faction color changes affect the membrane.
 
 The global appearance file (named in `startup.json`) defines a finite global scattering medium and the one interior medium every cell shares. Three studio lights provide direct light and shadows. Gameplay geometry does not cast shadows on the backdrop or the global atmosphere. Cell interiors keep geometry shadows. A 32×32×32 visibility grid softens these shadows and reduces repeated shadow queries. The grid is rebuilt from current geometry for each frame. Set `lighting.shadow_grid_resolution` to zero to use direct queries for comparison. Ambient fill approximates indirect light. Clear membranes use straight continuation. There is no refraction or multiple-scattering transport. The fog and backdrop filters use full-resolution current-frame buffers. There is no temporal processing, denoising, upscaling, or authored image map.
 
@@ -117,7 +117,7 @@ Audio uses twelve generated PCM effects and a fixed sixteen-voice mixer. Off-scr
 | F1 / F2 | Toggle the frame profiler / current render buffers |
 | F5 | Toggle subsurface scattering (SSS) |
 | F6 | Toggle volume scattering; keep absorption |
-| F8 | Toggle tilt shift |
+| F8 | Toggle depth of field |
 | F9 | Toggle the fog-of-war blur and tint |
 | F10 | Toggle surface self-glow and its halo |
 
@@ -134,7 +134,7 @@ Settings has six pages. Display, Lighting, Volume, and Effects contain 38 graphi
 | Display | Borderless fullscreen, window size, VSync, film samples, spatial anti-aliasing, exposure, field of view, frame statistics |
 | Lighting | Transmission layers, subsurface scattering and samples, light wrap, transmission, optical thickness, energy compensation, lighting grid and caches |
 | Volume | Scattering, rays, integration steps and method, spatial filter and stride, optical lookup, lighting grid |
-| Effects | Tilt shift, fog blur, glow, bloom radius and strength, bloom threshold, focus band and blur radius |
+| Effects | Depth of field, fog blur, glow, bloom radius and strength, bloom threshold, sharp depth range and blur radius |
 | Audio | Master volume and sound effects volume |
 | Controls | Drag from a cell to another cell to send every unit stationed at the first cell (orbiting or defending it, not moving elsewhere). The drag replaces the selection with those units and orders them to the second cell. A drag that starts on a cell without stationed units, or ends on open space, box-selects as before.
 
@@ -160,7 +160,7 @@ Keyboard camera speed is twenty-four world units per second at the starting zoom
 
 F1 opens the frame profiler. CPU and GPU icicle graphs show a rolling mean of up to 120 completed frames. Child bars are below their parent. Both graphs use the same millisecond scale, but their clocks are not aligned. Hover over a bar to see its latest duration and mean. The top three GPU costs are shown below the graphs. The panel starts closed; `--stats` opens it at launch.
 
-CPU spans cover input, simulation, scene and audio preparation, render command recording, GPU submission and wait, presentation wait, and capture. CPU wall time includes time blocked on the GPU. GPU spans cover acceleration updates, backdrop, shadow grid, surface lighting and SSS, volume scattering, effects, fog, tilt shift, bloom and display, the HUD, and output copy. Surface lighting and SSS share one shader and one timing span. Timings include stage barriers. The header shows both latest and mean durations. The panel uses the previous completed frame; no extra GPU wait is added for profiling. Timing history contains numbers only, with no image or lighting history. Bounded `--frames N --stats` runs also print each span and its mean.
+CPU spans cover input, simulation, scene and audio preparation, render command recording, GPU submission and wait, presentation wait, and capture. CPU wall time includes time blocked on the GPU. GPU spans cover acceleration updates, backdrop, shadow grid, surface lighting and SSS, volume scattering, effects, fog, depth of field, bloom and display, the HUD, and output copy. Surface lighting and SSS share one shader and one timing span. Timings include stage barriers. The header shows both latest and mean durations. The panel uses the previous completed frame; no extra GPU wait is added for profiling. Timing history contains numbers only, with no image or lighting history. Bounded `--frames N --stats` runs also print each span and its mean.
 
 
 F5, F6, F8, F9, and F10 change rendering during play. A second press restores the
@@ -176,7 +176,7 @@ pass but keeps medium attenuation on surface and light paths. F7 has no assigned
 F8 removes the miniature
 focus filter. F9 removes the fog blur and tint; enemy visibility and
 exploration rules still apply. F2 keeps its existing diagnostic behavior:
-it bypasses the tilt-shift and fog filters. Changes last for the current
+it bypasses the depth-of-field and fog filters. Changes last for the current
 application session and do not edit assets. R restarts the match with the
 current render switches.
 

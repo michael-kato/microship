@@ -435,16 +435,28 @@ from 10.983 to 10.473 ms median application time and from 11.514 to
 Fog filtering now skips pixels with exactly zero fog. A CPU view check
 can skip the full filter only when every covered visibility-field vertex
 is fully revealed. Field edges and uncertain projections keep the filter.
-Depth of field replaced the screen-band tilt shift. It focuses on the
-camera target and blurs by relative depth, `blur_scale * max(0,
-|1 - focus/distance| - focus_range)` pixels up to `max_radius`, so every
-zoom keeps the same look. A golden-angle spiral gathers taps whose own
-blur reaches the pixel; farther taps cannot spread over a sharper center.
-Each 8x8 tile stores its largest radius, and the spiral stops past the
-largest one in reach, which leaves the result unchanged. Against a dense
-reference (0.25 step), the shipping 2-pixel step changed 1.1 % of
-zoomed-out pixels by more than 4 RGB8 levels; a 1-pixel step changed
-0.9 % at twice the cost (2.6 against 1.4 ms).
+Depth of field focuses on the horizontal plane at the authored
+`camera.target` height. Each camera ray has its own distance to this plane.
+The focus plane stays fixed under pan, zoom, and cursor-centered zoom.
+The default sharp range is 0.05, strength is 0.5 pixels per relative depth
+error, and maximum radius is 1.5 native pixels. Both renderer configs use
+these values. The settings menu includes these small values.
+
+Radii up to 1.5 pixels use a symmetric 3x3 footprint. Larger authored radii
+retain the golden-angle gather and tile bounds. Both paths read only the
+current frame and prevent farther light from spreading over a sharp center.
+
+Check near, normal, and far views, plus a flat checkerboard at both zoom
+limits and a shifted plane under tilted-camera pan:
+
+```sh
+python3 tests/e2e/depth_of_field_render.py build/windows-cross/nanovore.exe --run
+```
+
+The checkerboard must match depth-of-field-off output exactly. The game
+views must have less than 0.1 RGB8 mean change from the unfiltered output.
+All pairs must keep the same simulation state and pass host validation.
+
 
 `volume.quadrature` accepts `midpoint` (default) or `gauss_legendre`.
 Gauss-Legendre requires two or three integration steps. The optical-depth

@@ -271,7 +271,7 @@
     },
     "depth_of_field": {
       "type": "object",
-      "description": "Camera depth blur focused at the camera target. Radius in pixels = blur_scale * max(0, |1 - focus distance / pixel distance| - focus_range), up to max_radius.",
+      "description": "Focus on the fixed horizontal plane at camera.target.z. Each pixel uses its ray distance to that plane. Radius in pixels = blur_scale * max(0, |1 - plane distance / surface distance| - focus_range), up to max_radius.",
       "properties": {
         "focus_range": {
           "type": "number",
